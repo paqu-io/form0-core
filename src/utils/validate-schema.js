@@ -37,12 +37,14 @@ export function validateSchema(form) {
       if (!Array.isArray(field.elements) || field.elements.length === 0) {
         throw new Error(`Section "${field.data_name}" must contain at least one element`);
       }
-    
+
       const validDisplays = ['inline', 'drilldown'];
       if (field.display && !validDisplays.includes(field.display)) {
-        throw new Error(`Section "${field.data_name}" has invalid display "${field.display}". Allowed: inline, drilldown`);
+        throw new Error(
+          `Section "${field.data_name}" has invalid display "${field.display}". Allowed: inline, drilldown`
+        );
       }
-    }    
+    }
 
     if (field.type === 'ChoiceField' && !Array.isArray(field.choices)) {
       throw new Error(`ChoiceField "${field.data_name}" must have a 'choices' array`);
@@ -60,6 +62,5 @@ export function validateSchema(form) {
         throw new Error(`Invalid display.style "${field.display.style}" for ${field.data_name}`);
       }
     }
-    
   }
 }

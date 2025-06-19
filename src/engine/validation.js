@@ -26,6 +26,6 @@ export function validateFields(schema, values, errors) {
           errors[field.data_name] = `Must be at most ${field.max}`;
         }
       }
-    }    
+    }
   }
 }

@@ -4,7 +4,7 @@ import { flattenFields } from '../utils/flatten-fields.js';
 export function evaluateCalculatedFields(schema, values, helpers) {
   const fields = flattenFields(schema.elements);
 
-  fields.forEach(field => {
+  fields.forEach((field) => {
     if (field.type === 'CalculatedField' && field.calculate) {
       try {
         const context = buildContext(values, helpers);

@@ -9,7 +9,7 @@ import { flattenFields } from './utils/flatten-fields.js';
 
 export function createFormEngine({ schema, initialValues = {}, helpers = {} }) {
   validateSchema(schema.form);
-  
+
   const { form } = schema;
   const values = { ...initialValues };
   const allFields = flattenFields(form.elements);
@@ -44,6 +44,6 @@ export function createFormEngine({ schema, initialValues = {}, helpers = {} }) {
   return {
     eval: evalForm,
     trigger,
-    getState
+    getState,
   };
 }
