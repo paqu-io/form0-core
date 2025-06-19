@@ -1,0 +1,45 @@
+{
+  "name": "form0-core",
+  "version": "0.0.1-alpha.1",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "description": "This is a placeholder for the package description.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test/form0-core.test.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paqu-io/form0-core.git"
+  },
+  "keywords": [
+    "form",
+    "form-builder",
+    "form-generator",
+    "react",
+    "react-native",
+    "dynamic-forms"
+  ],
+  "author": "paqu.io <hello@paqu.io>",
+  "contributors": [
+    {
+      "name": "aragornii"
+    }
+  ],
+  "license": "GPL-3.0-only",
+  "bugs": {
+    "url": "https://github.com/paqu-io/form0-core/issues"
+  },
+  "homepage": "https://github.com/paqu-io/form0-core#readme",
+  "peerDependencies": {},
+  "devDependencies": {
+    "ignore": "^7.0.5"
+  }
+}
