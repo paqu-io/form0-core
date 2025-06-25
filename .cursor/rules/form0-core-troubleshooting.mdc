@@ -1,0 +1,251 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Troubleshooting Guide
+
+## Common Issues and Solutions
+
+### 1. Schema Validation Errors
+
+**Problem**: Engine creation fails with schema validation errors.
+
+**Common Causes**:
+- Missing required fields (`key`, `data_name`, `label`)
+- Invalid field types
+- Malformed conditional expressions
+
+**Solution**: Check [src/utils/validate-schema.js](mdc:form0-core/src/utils/validate-schema.js) for validation rules.
+
+**Example**:
+```javascript
+// ❌ Missing required field
+{
+  type: 'TextField',
+  data_name: 'name'
+  // Missing 'key' and 'label'
+}
+
+// ✅ Correct structure
+{
+  type: 'TextField',
+  key: 'field1',
+  data_name: 'name',
+  label: 'Name'
+}
+```
+
+### 2. Calculation Expression Errors
+
+**Problem**: Calculated fields don't work or return unexpected results.
+
+**Common Causes**:
+- Invalid field references
+- Syntax errors in expressions
+- Missing built-in functions
+
+**Solution**: Check [src/helpers/builtins.js](mdc:form0-core/src/helpers/builtins.js) for available functions.
+
+**Example**:
+```javascript
+// ❌ Invalid field reference
+calculate: '$invalid_field + 10'
+
+// ✅ Correct field reference
+calculate: '$age + 10'
+```
+
+### 3. Conditional Logic Issues
+
+**Problem**: Fields don't show/hide as expected.
+
+**Common Causes**:
+- Incorrect operator usage
+- Field key mismatches
+- Complex nested conditions
+
+**Solution**: Review [src/engine/conditions.js](mdc:form0-core/src/engine/conditions.js) for condition evaluation logic.
+
+**Example**:
+```javascript
+// ❌ Incorrect operator
+{
+  field_key: 'age',
+  operator: 'equals',  // Should be 'equal_to'
+  value: 18
+}
+
+// ✅ Correct operator
+{
+  field_key: 'age',
+  operator: 'equal_to',
+  value: 18
+}
+```
+
+### 4. Performance Issues
+
+**Problem**: Form evaluation is slow or unresponsive.
+
+**Common Causes**:
+- Complex calculations
+- Deeply nested conditions
+- Large number of fields
+
+**Solution**: 
+- Simplify calculations
+- Reduce conditional complexity
+- Use efficient field references
+
+### 5. State Inconsistency
+
+**Problem**: Form state doesn't match expected values.
+
+**Common Causes**:
+- Not calling `engine.eval()` after value changes
+- Race conditions in state updates
+- Incorrect initial values
+
+**Solution**: Always call `eval()` after modifying form values.
+
+**Example**:
+```javascript
+// ❌ Missing evaluation
+engine.getState().values.age = 25;
+const state = engine.getState(); // State not updated
+
+// ✅ Correct pattern
+engine.getState().values.age = 25;
+engine.eval(); // Process all logic
+const state = engine.getState(); // State updated
+```
+
+## Debugging Techniques
+
+### 1. Check Engine State
+```javascript
+const engine = createFormEngine({ schema, initialValues });
+engine.eval();
+const state = engine.getState();
+
+console.log('Values:', state.values);
+console.log('Errors:', state.errors);
+console.log('Visible:', state.visible);
+console.log('Required:', state.required);
+console.log('Read Only:', state.read_only);
+```
+
+### 2. Validate Schema
+```javascript
+import { validateSchema } from 'form0-core';
+
+try {
+  validateSchema(mySchema);
+  console.log('Schema is valid');
+} catch (error) {
+  console.error('Schema validation failed:', error.message);
+}
+```
+
+### 3. Test Individual Components
+
+**Test Calculations**:
+```javascript
+// Check calculation engine directly
+import { evaluateCalculatedFields } from './src/engine/calculation.js';
+```
+
+**Test Conditions**:
+```javascript
+// Check condition engine directly
+import { evaluateVisibility } from './src/engine/conditions.js';
+```
+
+**Test Validation**:
+```javascript
+// Check validation engine directly
+import { validateFields } from './src/engine/validation.js';
+```
+
+### 4. Use Test Examples
+Reference [test/form0-core.test.js](mdc:form0-core/test/form0-core.test.js) for working examples of:
+- Complete form schemas
+- Various field types
+- Conditional logic
+- Calculations
+
+## Error Messages
+
+### Schema Validation Errors
+- `"Missing required field: key"` - Field missing unique identifier
+- `"Invalid field type: X"` - Unsupported field type
+- `"Missing required field: data_name"` - Field missing data name
+
+### Calculation Errors
+- `"Field not found: $field_name"` - Invalid field reference
+- `"Invalid expression syntax"` - Malformed calculation expression
+- `"Function not found: function_name"` - Undefined built-in function
+
+### Condition Errors
+- `"Invalid operator: X"` - Unsupported comparison operator
+- `"Field not found in condition: field_key"` - Invalid field reference in condition
+
+## Best Practices for Debugging
+
+### 1. Start Simple
+- Begin with basic field types
+- Add complexity gradually
+- Test each addition independently
+
+### 2. Use Descriptive Names
+```javascript
+// ❌ Unclear names
+{
+  data_name: 'f1',
+  label: 'Field'
+}
+
+// ✅ Descriptive names
+{
+  data_name: 'user_age',
+  label: 'User Age'
+}
+```
+
+### 3. Test Edge Cases
+- Null/undefined values
+- Empty strings
+- Boundary values (min/max)
+- Special characters
+
+### 4. Validate Incrementally
+- Test schema validation first
+- Test basic field functionality
+- Test conditional logic
+- Test calculations last
+
+### 5. Use Console Logging
+```javascript
+// Add logging to track state changes
+const state = engine.getState();
+console.log('Current state:', JSON.stringify(state, null, 2));
+```
+
+## Getting Help
+
+### Check Documentation
+- Review [API Reference](mdc:form0-core/.cursor/rules/api-reference.mdc)
+- Check [Form Schema Guide](mdc:form0-core/.cursor/rules/form-schema-guide.mdc)
+- Examine [Development Guidelines](mdc:form0-core/.cursor/rules/development-guidelines.mdc)
+
+### Review Source Code
+- Engine logic: [src/engine/](mdc:form0-core/src/engine)
+- Utilities: [src/utils/](mdc:form0-core/src/utils)
+- Helpers: [src/helpers/](mdc:form0-core/src/helpers)
+
+### Test Examples
+- Working examples: [test/form0-core.test.js](mdc:form0-core/test/form0-core.test.js)
+- Schema patterns in test file
+- Complete form definitions
+

@@ -1,0 +1,191 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Form Schema Guide
+
+## Schema Structure
+
+Form0 Core uses a JSON-based schema format to define dynamic forms. The schema structure is validated by [src/utils/validate-schema.js](mdc:form0-core/src/utils/validate-schema.js).
+
+### Root Schema Structure
+```javascript
+{
+  form: {
+    name: string,
+    description: string,
+    elements: FieldElement[]
+  }
+}
+```
+
+## Field Types
+
+### 1. TextField
+```javascript
+{
+  type: 'TextField',
+  key: string,           // Unique identifier
+  data_name: string,     // Field name in form data
+  label: string,         // Display label
+  required: boolean,     // Whether field is required
+  hidden: boolean,       // Whether field is hidden
+  read_only: boolean,    // Whether field is read-only
+  pattern: string,       // Regex pattern for validation
+  pattern_description: string  // Description of pattern
+}
+```
+
+### 2. NumericField
+```javascript
+{
+  type: 'NumericField',
+  key: string,
+  data_name: string,
+  label: string,
+  required: boolean,
+  hidden: boolean,
+  read_only: boolean,
+  min: number,           // Minimum value
+  max: number,           // Maximum value
+  format: 'integer' | 'float'  // Number format
+}
+```
+
+### 3. CalculatedField
+```javascript
+{
+  type: 'CalculatedField',
+  key: string,
+  data_name: string,
+  label: string,
+  required: false,       // Always false for calculated fields
+  hidden: boolean,
+  read_only: true,       // Always true for calculated fields
+  calculate: string,     // Expression to evaluate
+  display: {
+    style: 'text' | 'numeric' | 'date' | 'currency'
+  }
+}
+```
+
+### 4. Section
+```javascript
+{
+  type: 'Section',
+  key: string,
+  data_name: string,
+  label: string,
+  display: 'inline' | 'drilldown',  // Section display mode
+  elements: FieldElement[]          // Nested fields
+}
+```
+
+## Conditional Logic
+
+### Visibility Conditions
+Fields can be conditionally shown/hidden using `visible_conditions`:
+
+```javascript
+{
+  visible_conditions: {
+    and: [
+      { field_key: 'field1', operator: 'equal_to', value: 'yes' },
+      {
+        or: [
+          { field_key: 'field2', operator: 'greater_than', value: 20 },
+          { field_key: 'field3', operator: 'equal_to', value: 'Bob' }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Supported Operators
+- `equal_to` / `not_equal_to`
+- `greater_than` / `less_than`
+- `greater_than_or_equal_to` / `less_than_or_equal_to`
+- `contains` / `not_contains`
+- `starts_with` / `ends_with`
+
+## Calculation Expressions
+
+### Basic Syntax
+Calculated fields use expression syntax with field references:
+
+```javascript
+// Simple arithmetic
+calculate: '$age + 10'
+
+// Conditional logic
+calculate: 'IF($age >= 18, "yes", "no")'
+
+// Complex expressions
+calculate: 'SETRESULT($age + 10 >= 30 ? true : false)'
+```
+
+### Field References
+- Use `$field_name` to reference other field values
+- Field names correspond to `data_name` properties
+
+### Built-in Functions
+Available functions are defined in [src/helpers/builtins.js](mdc:form0-core/src/helpers/builtins.js):
+- `IF(condition, true_value, false_value)`
+- `SETRESULT(value)`
+- Mathematical functions: `SUM()`, `AVERAGE()`, etc.
+
+## Schema Examples
+
+### Complete Example
+See [test/form0-core.test.js](mdc:form0-core/test/form0-core.test.js) for a comprehensive example including:
+- Nested sections with different display modes
+- Multiple field types
+- Conditional visibility
+- Calculated fields with expressions
+- Validation patterns
+
+### Key Patterns
+1. **Nested Structure**: Sections can contain other sections
+2. **Conditional Logic**: Fields can depend on other field values
+3. **Calculations**: Dynamic values based on form data
+4. **Validation**: Pattern matching and constraints
+
+## Schema Validation
+
+### Validation Rules
+The schema validator in [src/utils/validate-schema.js](mdc:form0-core/src/utils/validate-schema.js) ensures:
+- Required fields are present
+- Field types are valid
+- Nested structures are properly formed
+- Conditional logic is syntactically correct
+
+### Common Validation Errors
+- Missing required fields (`key`, `data_name`, `label`)
+- Invalid field types
+- Malformed conditional expressions
+- Circular dependencies in calculations
+
+## Best Practices
+
+### Field Naming
+- Use descriptive `data_name` values
+- Ensure unique keys across the form
+- Use consistent naming conventions
+
+### Conditional Logic
+- Keep conditions simple and readable
+- Test edge cases in conditional logic
+- Avoid deeply nested AND/OR combinations
+
+### Calculations
+- Use clear, readable expressions
+- Test calculation results with various inputs
+- Handle null/undefined values appropriately
+
+### Performance
+- Minimize complex calculations
+- Use efficient conditional logic
+- Avoid unnecessary field dependencies
+
