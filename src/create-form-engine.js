@@ -6,8 +6,14 @@ import { validateFields } from './engine/validation.js';
 import { builtins } from './helpers/builtins.js';
 import { validateSchema } from './utils/validate-schema.js';
 import { flattenFields } from './utils/flatten-fields.js';
+import { DEFAULT_SECURITY_CONFIG } from './utils/security.js';
 
-export function createFormEngine({ schema, initialValues = {}, helpers = {} }) {
+export function createFormEngine({ 
+  schema, 
+  initialValues = {}, 
+  helpers = {},
+  security = DEFAULT_SECURITY_CONFIG 
+}) {
   validateSchema(schema.form);
 
   const { form } = schema;
@@ -26,7 +32,7 @@ export function createFormEngine({ schema, initialValues = {}, helpers = {} }) {
   const allHelpers = { ...builtins, ...helpers };
 
   function evalForm() {
-    evaluateCalculatedFields(form, values, allHelpers);
+    evaluateCalculatedFields(form, values, allHelpers, security);
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);
     evaluateReadOnly(form, values, read_only);

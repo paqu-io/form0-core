@@ -18,11 +18,41 @@ const schema = {
             data_name: 'first_name',
             label: 'First Name',
             required: true,
+            required_conditions: null,
             hidden: false,
+            visible_conditions: null,
             read_only: false,
+            read_only_conditions: null,
             pattern: '^[a-zA-Z]+$',
             pattern_description:
               'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
+          },
+          {
+            type: 'ChoiceField',
+            key: '0180f',
+            data_name: 'city',
+            label: 'City',
+            required: true,
+            required_conditions: null,
+            hidden: false,
+            visible_conditions: null,
+            read_only: false,
+            read_only_conditions: null,
+            allow_other: true, //ChoiceField can be true or false
+            choices: [
+              {
+                label: 'Bogotá',
+                value: 'bogota',
+              },
+              {
+                label: 'Recanati',
+                value: 'recanati',
+              },
+              {
+                label: 'New York',
+                value: 'new_york',
+              },
+            ],
           },
           {
             type: 'NumericField',
@@ -30,8 +60,11 @@ const schema = {
             data_name: 'age',
             label: 'Age',
             required: true,
+            required_conditions: null,
             hidden: false,
+            visible_conditions: null,
             read_only: false,
+            read_only_conditions: null,
             min: 16,
             max: 100,
             format: 'integer', //NumericField can be 'integer' or 'float'
@@ -45,6 +78,7 @@ const schema = {
         label: 'Eligible',
         required: false, //CalcualtedField is required = false by default
         hidden: false,
+        visible_conditions: null,
         read_only: true, //CalcualtedField is read_only = true by default
         calculate: 'IF($age >= 18, "yes", "no")',
         display: {
@@ -58,6 +92,7 @@ const schema = {
         label: 'calc_test',
         required: false, //CalcualtedField is required = false by default
         hidden: false,
+        visible_conditions: null,
         read_only: true, //CalcualtedField is read_only = true by default
         calculate: 'SETRESULT($age + 10 >= 30 ? true : false)',
         display: {
@@ -71,6 +106,7 @@ const schema = {
         label: 'calc_test_new',
         required: false, //CalcualtedField is required = false by default
         hidden: false,
+        visible_conditions: null,
         read_only: true, //CalcualtedField is read_only = true by default
         calculate: '$age + 88',
         display: {
@@ -90,8 +126,11 @@ const schema = {
             data_name: 'comments',
             label: 'Comments',
             required: false,
-            hidden: false,
+            required_conditions: null,
             read_only: false,
+            read_only_conditions: null,
+            hidden: false,
+            visible_conditions: null,
             pattern: null,
             pattern_description: null,
           },
@@ -103,7 +142,9 @@ const schema = {
         data_name: 'who_voted',
         label: 'Who voted?',
         required: true,
+        required_conditions: null,
         read_only: true,
+        read_only_conditions: null,
         hidden: false,
         visible_conditions: {
           and: [
@@ -116,6 +157,8 @@ const schema = {
             },
           ],
         },
+        pattern: null,
+        pattern_description: null,
       },
     ],
   },

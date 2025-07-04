@@ -1,0 +1,94 @@
+---
+title: "IF Builtin"
+description: "Conditional logic function for form0 expressions"
+category: "logical"
+tags: ["conditional", "logic", "branching"]
+---
+
+# IF Function
+
+The `IF` builtin provides conditional logic within form0 expressions, allowing you to return different values based on a condition.
+
+## Syntax
+
+```javascript
+IF(condition, trueValue, falseValue)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `condition` | `boolean` | The condition to evaluate |
+| `trueValue` | `any` | Value returned when condition is true |
+| `falseValue` | `any` | Value returned when condition is false |
+
+## Return Value
+
+Returns `trueValue` if the condition is truthy, otherwise returns `falseValue`.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Show discount message based on user status
+IF(user.isPremium, "20% off", "No discount")
+```
+
+### Numeric Calculations
+
+```javascript
+// Apply different tax rates
+IF(country === "US", price * 0.08, price * 0.20)
+```
+
+### Nested Conditions
+
+```javascript
+// Determine shipping cost based on location and order value
+IF(country === "US", 
+  IF(orderValue > 50, 0, 5.99), 
+  IF(orderValue > 100, 10, 15.99)
+)
+```
+
+### Field Visibility
+
+```javascript
+// Show additional fields for premium users
+IF(user.type === "premium", true, false)
+```
+
+### Dynamic Form Validation
+
+```javascript
+// Conditional validation messages
+IF(age < 18, "Must be 18 or older", "")
+```
+
+## Common Use Cases
+
+- **Conditional pricing**: Different prices based on user type or location
+- **Dynamic field visibility**: Show/hide fields based on other field values
+- **Validation messages**: Display different error messages based on conditions
+- **User experience**: Personalize content based on user preferences
+- **Business logic**: Implement complex conditional rules
+
+## Best Practices
+
+1. **Keep conditions simple**: Complex conditions can be hard to read and debug
+2. **Use descriptive variable names**: Make your conditions self-documenting
+3. **Consider nested IFs carefully**: Too many levels can become difficult to maintain
+4. **Test edge cases**: Ensure your conditions handle all possible scenarios
+
+## Related Functions
+
+- [`AND`](./and.mdx) - Logical AND operations
+- [`OR`](./or.mdx) - Logical OR operations
+
+## Notes
+
+- The condition is evaluated using JavaScript's truthiness rules
+- Both `trueValue` and `falseValue` can be of any type
+- The function is lazy-evaluated - only the returned branch is computed 

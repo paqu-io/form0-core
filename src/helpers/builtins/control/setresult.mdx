@@ -1,0 +1,203 @@
+---
+title: "SETRESULT Builtin"
+description: "Set calculation results in form0 expressions"
+category: "control"
+tags: ["calculation", "result", "output"]
+---
+
+# SETRESULT Function
+
+The `SETRESULT` builtin sets a result value that can be consumed by the form0 engine, typically used in calculations to define the final output value.
+
+## Syntax
+
+```javascript
+SETRESULT(value)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `value` | `any` | The value to set as the result |
+
+## Return Value
+
+Returns the same value that was passed in, while internally storing it as the calculation result.
+
+## Examples
+
+### Basic Calculation
+
+```javascript
+// Calculate total price with tax
+SETRESULT(price * quantity * (1 + taxRate))
+```
+
+### Conditional Results
+
+```javascript
+// Set discount amount based on user type
+SETRESULT(IF(user.isPremium, price * 0.2, price * 0.05))
+```
+
+### Complex Business Logic
+
+```javascript
+// Calculate shipping cost with multiple factors
+SETRESULT(
+  IF(country === "US",
+    IF(orderValue > 50, 0, 5.99),
+    IF(orderValue > 100, 10, 15.99)
+  )
+)
+```
+
+### Score Calculations
+
+```javascript
+// Calculate user credit score
+SETRESULT(
+  (creditHistory * 0.35) + 
+  (paymentHistory * 0.35) + 
+  (creditUtilization * 0.30)
+)
+```
+
+### Dynamic Field Values
+
+```javascript
+// Set field value based on other fields
+SETRESULT(
+  IF(AND(firstName.length > 0, lastName.length > 0),
+    firstName + " " + lastName,
+    "Anonymous User"
+  )
+)
+```
+
+## How It Works
+
+1. **Calculation Execution**: The form0 engine executes your calculation expression
+2. **Result Storage**: `SETRESULT` stores the value internally
+3. **Result Consumption**: The engine retrieves the stored result
+4. **Value Return**: The function also returns the value for use in expressions
+
+## Common Use Cases
+
+- **Price calculations**: Total cost, discounts, taxes
+- **Score computations**: Credit scores, ratings, assessments
+- **Field aggregations**: Combining multiple fields into one result
+- **Conditional outputs**: Different results based on conditions
+- **Business rule results**: Complex logic outcomes
+
+## Best Practices
+
+1. **Single result per calculation**: Use only one `SETRESULT` per expression
+2. **Clear value types**: Ensure the result type matches expectations
+3. **Handle edge cases**: Consider null/undefined values
+4. **Document complex logic**: Add comments for complex calculations
+
+## Important Notes
+
+- **Single use**: Only one `SETRESULT` should be called per calculation
+- **Last wins**: If called multiple times, the last value is used
+- **Pass-through**: The function returns the value, so it can be used in expressions
+- **Type preservation**: The result maintains its original type
+
+## Related Functions
+
+- [`IF`](../logical/if.mdx) - Conditional logic for result selection
+- [`AND`](../logical/and.mdx) - Multiple condition checks
+- [`OR`](../logical/or.mdx) - Alternative condition checks
+
+## Examples by Use Case
+
+### E-commerce Pricing
+
+```javascript
+// Calculate final price with all factors
+SETRESULT(
+  (basePrice * quantity) + 
+  shippingCost + 
+  (taxableAmount * taxRate) - 
+  discountAmount
+)
+```
+
+### User Scoring
+
+```javascript
+// Calculate engagement score
+SETRESULT(
+  (loginFrequency * 0.3) +
+  (activityLevel * 0.4) +
+  (socialSharing * 0.3)
+)
+```
+
+### Form Validation Results
+
+```javascript
+// Set validation status
+SETRESULT(
+  IF(AND(email.isValid, phone.isValid, name.length > 0),
+    "valid",
+    "invalid"
+  )
+)
+```
+
+### Financial Calculations
+
+```javascript
+// Calculate loan eligibility
+SETRESULT(
+  IF(AND(creditScore > 650, income > 50000, debtRatio < 0.4),
+    "approved",
+    "denied"
+  )
+)
+```
+
+### Progress Tracking
+
+```javascript
+// Calculate completion percentage
+SETRESULT(
+  Math.round(
+    (completedSteps / totalSteps) * 100
+  )
+)
+```
+
+## Advanced Examples
+
+### Multi-step Calculation
+
+```javascript
+// Calculate insurance premium
+SETRESULT(
+  IF(age < 25, 
+    basePremium * 1.5,
+    IF(age > 65,
+      basePremium * 1.2,
+      basePremium
+    )
+  ) * 
+  IF(hasAccidents, 1.3, 1.0) *
+  IF(location === "urban", 1.1, 0.9)
+)
+```
+
+### Data Aggregation
+
+```javascript
+// Calculate average rating
+SETRESULT(
+  IF(reviewCount > 0,
+    (rating1 + rating2 + rating3 + rating4 + rating5) / reviewCount,
+    0
+  )
+)
+``` 

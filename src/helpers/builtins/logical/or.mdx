@@ -1,0 +1,191 @@
+---
+title: "OR Builtin"
+description: "Logical OR operation for form0 expressions"
+category: "logical"
+tags: ["logical", "boolean", "validation"]
+---
+
+# OR Function
+
+The `OR` builtin performs logical OR operations, returning `true` if at least one of the provided arguments is truthy.
+
+## Syntax
+
+```javascript
+OR(...args)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `...args` | `any` | Any number of arguments to evaluate |
+
+## Return Value
+
+Returns `true` if at least one argument is truthy, `false` if all arguments are falsy.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Check if user has any premium feature
+OR(user.isPremium, user.isVip, user.hasSubscription)
+```
+
+### Form Validation
+
+```javascript
+// Require either email or phone
+OR(email.length > 0, phone.length > 0)
+```
+
+### Multiple Authentication Methods
+
+```javascript
+// Check if user is authenticated via any method
+OR(user.googleAuth, user.facebookAuth, user.localAuth)
+```
+
+### Field Visibility
+
+```javascript
+// Show field if any condition is met
+OR(user.isAdmin, user.isOwner, feature.showToAll)
+```
+
+### Fallback Values
+
+```javascript
+// Use first available contact method
+OR(user.email, user.phone, user.address)
+```
+
+## Truthiness Rules
+
+The `OR` function uses JavaScript's standard truthiness evaluation:
+
+**Falsy values:**
+- `false`
+- `0`
+- `""` (empty string)
+- `null`
+- `undefined`
+- `NaN`
+
+**Truthy values:**
+- `true`
+- Any non-zero number
+- Any non-empty string
+- Objects and arrays
+- Functions
+
+## Common Use Cases
+
+- **Alternative requirements**: Accept multiple ways to satisfy a condition
+- **Feature detection**: Check if any of several features are available
+- **Fallback logic**: Provide alternatives when primary options fail
+- **Flexible validation**: Allow multiple valid formats or values
+- **Permission systems**: Grant access if user has any qualifying permission
+
+## Best Practices
+
+1. **Order by likelihood**: Put most likely-to-succeed conditions first
+2. **Use for alternatives**: Perfect for "either/or" scenarios
+3. **Combine with AND**: Create complex logical expressions
+4. **Keep conditions related**: All arguments should be logical alternatives
+
+## Performance Notes
+
+- **Short-circuit evaluation**: Stops checking as soon as a truthy value is found
+- **Evaluation order**: Arguments are evaluated left to right
+- **Lazy evaluation**: Later arguments won't be evaluated if earlier ones are truthy
+
+## Related Functions
+
+- [`AND`](./and.mdx) - Logical AND operations
+- [`IF`](./if.mdx) - Conditional logic
+
+## Examples by Use Case
+
+### Contact Information Validation
+
+```javascript
+// Require at least one contact method
+OR(
+  email.includes("@"),
+  phone.length >= 10,
+  address.length > 0
+)
+```
+
+### User Permissions
+
+```javascript
+// Check if user has any admin permission
+OR(
+  user.role === "admin", 
+  user.permissions.includes("admin"),
+  user.isSuperUser
+)
+```
+
+### Payment Methods
+
+```javascript
+// Check if any payment method is available
+OR(
+  creditCard.isValid,
+  paypal.isConnected,
+  bankAccount.isVerified,
+  wallet.hasBalance
+)
+```
+
+### Feature Flags
+
+```javascript
+// Enable feature if any condition is met
+OR(
+  user.betaOptIn,
+  user.isDeveloper,
+  feature.enabledForAll,
+  environment === "staging"
+)
+```
+
+### Emergency Contacts
+
+```javascript
+// Show emergency contact section if any contact exists
+OR(
+  emergencyContact.phone,
+  emergencyContact.email,
+  emergencyContact.relationship
+)
+```
+
+## Complex Examples
+
+### Nested Logic
+
+```javascript
+// Complex user eligibility check
+OR(
+  AND(user.isPremium, user.accountAge > 30),
+  AND(user.referrals >= 5, user.isActive),
+  user.specialStatus === "founder"
+)
+```
+
+### Multi-step Form Logic
+
+```javascript
+// Show next step if user completed any path
+OR(
+  AND(step1.email, step1.verified),
+  AND(step1.phone, step1.smsVerified),
+  step1.socialLogin
+)
+``` 

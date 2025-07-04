@@ -1,0 +1,255 @@
+---
+title: "form0 Builtins Overview"
+description: "Built-in functions for form0 expressions and calculations"
+category: "overview"
+tags: ["builtins", "functions", "expressions", "form0"]
+---
+
+# form0 Builtins Overview
+
+Builtins are pre-defined functions that provide essential functionality for form0 expressions, calculations, and business logic. They are available in all form0 contexts without any imports or setup.
+
+## What Are Builtins?
+
+Builtins are JavaScript functions that extend the capabilities of form0 expressions beyond basic arithmetic and string operations. They enable:
+
+- **Conditional logic** for dynamic form behavior
+- **Boolean operations** for complex validation rules
+- **Result management** for calculations and data processing
+- **Business logic** implementation within form schemas
+
+## Categories
+
+### Logical Functions
+
+Functions that handle boolean logic and conditional operations:
+
+- **[`IF`](../logical/if.mdx)** - Conditional logic and branching
+- **[`AND`](../logical/and.mdx)** - Logical AND operations
+- **[`OR`](../logical/or.mdx)** - Logical OR operations
+
+### Control Functions
+
+Functions that manage calculation flow and results:
+
+- **[`SETRESULT`](../control/setresult.mdx)** - Set calculation results
+
+## Usage in form0
+
+Builtins are used within form0 expressions in several contexts:
+
+### 1. Field Calculations
+
+```javascript
+// Calculate total price with tax
+{
+  "type": "calculation",
+  "expression": "SETRESULT(price * quantity * (1 + taxRate))"
+}
+```
+
+### 2. Conditional Field Visibility
+
+```javascript
+// Show field only for premium users
+{
+  "type": "condition",
+  "expression": "IF(user.isPremium, true, false)"
+}
+```
+
+### 3. Validation Rules
+
+```javascript
+// Require either email or phone
+{
+  "type": "validation",
+  "expression": "OR(email.length > 0, phone.length > 0)"
+}
+```
+
+### 4. Dynamic Field Values
+
+```javascript
+// Set default value based on conditions
+{
+  "type": "default",
+  "expression": "IF(user.country === 'US', 'USD', 'EUR')"
+}
+```
+
+## Expression Syntax
+
+Builtins follow standard JavaScript function syntax:
+
+```javascript
+// Function call with arguments
+BUILTIN_NAME(arg1, arg2, ...)
+
+// Can be nested
+IF(AND(condition1, condition2), value1, value2)
+
+// Can be part of larger expressions
+SETRESULT(basePrice * IF(isPremium, 0.8, 1.0))
+```
+
+## Common Patterns
+
+### Complex Conditional Logic
+
+```javascript
+// Multi-level conditions
+IF(user.type === "premium",
+  IF(order.value > 100, "free", "discounted"),
+  IF(order.value > 50, "reduced", "standard")
+)
+```
+
+### Validation Chains
+
+```javascript
+// Multiple validation criteria
+AND(
+  email.includes("@"),
+  phone.length >= 10,
+  age >= 18,
+  agreedToTerms === true
+)
+```
+
+### Fallback Logic
+
+```javascript
+// Provide alternatives
+OR(
+  user.preferredContact,
+  user.email,
+  user.phone,
+  "No contact method"
+)
+```
+
+## Best Practices
+
+### 1. Keep Expressions Readable
+
+```javascript
+// Good: Clear and understandable
+IF(user.isPremium, premiumPrice, standardPrice)
+
+// Avoid: Too complex in one expression
+IF(AND(OR(user.isPremium, user.isVip), user.age > 21, user.country === "US"), 
+   IF(order.value > 100, price * 0.7, price * 0.8), 
+   IF(user.isStudent, price * 0.9, price))
+```
+
+### 2. Use Descriptive Field Names
+
+```javascript
+// Good: Self-documenting
+IF(hasValidLicense, "Approved", "Pending Review")
+
+// Avoid: Cryptic names
+IF(flag1, val1, val2)
+```
+
+### 3. Handle Edge Cases
+
+```javascript
+// Good: Handles null/undefined
+IF(AND(user.age, user.age >= 18), "Adult", "Minor")
+
+// Risky: Might fail with missing data
+IF(user.age >= 18, "Adult", "Minor")
+```
+
+### 4. Use Comments in Complex Schemas
+
+```json
+{
+  "type": "calculation",
+  "description": "Calculate shipping cost based on location and order value",
+  "expression": "SETRESULT(IF(country === 'US', IF(orderValue > 50, 0, 5.99), 15.99))"
+}
+```
+
+## Performance Considerations
+
+- **Short-circuit evaluation**: `AND` and `OR` stop evaluating once the result is determined
+- **Lazy evaluation**: Only necessary branches of `IF` statements are evaluated
+- **Minimal overhead**: Builtins are optimized for performance in form contexts
+
+## Security
+
+All builtins are designed to be safe for use in form contexts:
+
+- **No side effects**: Builtins don't modify external state
+- **Sandboxed execution**: Cannot access system resources
+- **Input validation**: Arguments are validated before processing
+
+## Extending Builtins
+
+While form0 comes with essential builtins, you can extend functionality by:
+
+1. **Custom helpers**: Define additional functions in your form engine configuration
+2. **Domain-specific functions**: Create business logic functions for your use case
+3. **Integration functions**: Connect to external services or APIs
+
+## Error Handling
+
+Builtins handle errors gracefully:
+
+- **Type coercion**: Automatic conversion when sensible
+- **Fallback values**: Sensible defaults for invalid inputs
+- **Error reporting**: Clear error messages for debugging
+
+## Examples by Use Case
+
+### E-commerce Forms
+
+```javascript
+// Dynamic pricing
+SETRESULT(
+  basePrice * 
+  IF(user.isPremium, 0.9, 1.0) * 
+  IF(quantity > 10, 0.95, 1.0)
+)
+
+// Shipping eligibility
+IF(AND(weight < 50, country === "US"), "Standard", "Express Only")
+```
+
+### User Registration
+
+```javascript
+// Validation rules
+AND(
+  email.includes("@"),
+  password.length >= 8,
+  age >= 13,
+  OR(phone.length > 0, alternateContact.length > 0)
+)
+
+// Account type determination
+IF(OR(emailDomain === "company.com", hasInviteCode), "Business", "Personal")
+```
+
+### Survey Forms
+
+```javascript
+// Conditional questions
+IF(satisfaction < 3, "What could we improve?", "")
+
+// Score calculation
+SETRESULT(
+  (question1 * 0.3) + 
+  (question2 * 0.4) + 
+  (question3 * 0.3)
+)
+```
+
+## Next Steps
+
+- Explore individual builtin documentation for detailed usage
+- Check out the [form0 examples](../examples.mdx) for real-world scenarios
+- Learn about [custom helpers](../custom-helpers.mdx) for extending functionality 
