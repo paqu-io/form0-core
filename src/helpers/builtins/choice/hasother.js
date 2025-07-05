@@ -1,11 +1,14 @@
 /**
  * @builtin HASOTHER
- * @description Returns true if user entered an other option, false otherwise
- * @param {Object} choiceField - The choice field object with choice and other arrays
+ * @description Returns true if user entered an other option, false otherwise. Works with both ChoiceField and MultiChoiceField.
+ * @param {Object} choiceField - The choice field object (ChoiceField with choice array or MultiChoiceField with choices array) and other array
  * @returns {boolean} True if user entered an other option, false otherwise
  * @example
- * // Check if user entered other option
+ * // Check if user entered other option in single choice field
  * HASOTHER($city)
+ * @example
+ * // Check if user entered other option in multi choice field
+ * HASOTHER($colors)
  * @example
  * // Use in conditional logic
  * IF(HASOTHER($city), "Custom city: " + OTHER($city), "Selected city: " + CHOICELABEL($city))
@@ -16,7 +19,15 @@ export const HASOTHER = (choiceField) => {
     return false;
   }
   
-  // Validate structure
+  // Validate structure - must have either choice array (ChoiceField) or choices array (MultiChoiceField)
+  const hasChoiceArray = Array.isArray(choiceField.choice);
+  const hasChoicesArray = Array.isArray(choiceField.choices);
+  
+  if (!hasChoiceArray && !hasChoicesArray) {
+    return false;
+  }
+  
+  // Validate other array structure
   if (!Array.isArray(choiceField.other)) {
     return false;
   }

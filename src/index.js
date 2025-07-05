@@ -8,7 +8,9 @@ export {
 } from './utils/security.js';
 export { 
   generateValueFromLabel,
-  processChoiceFieldChoices,
   isValidChoiceValue,
-  validateChoiceFieldChoices
+  processChoiceFieldChoices,
+  validateChoiceFieldChoices,
+  processMultiChoiceFieldChoices,
+  validateMultiChoiceFieldChoices
 } from './utils/choice-field-utils.js';

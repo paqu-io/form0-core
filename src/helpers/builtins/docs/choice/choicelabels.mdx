@@ -1,0 +1,230 @@
+---
+title: "CHOICELABELS Builtin"
+description: "Retrieve all selected choice labels from MultiChoiceField"
+category: "choice"
+tags: ["choice", "multichoice", "labels", "array"]
+---
+
+# CHOICELABELS Function
+
+The `CHOICELABELS` builtin retrieves an array of all selected choice field labels from a MultiChoiceField, preserving the type of each label. Returns an empty array if no selections are made.
+
+## Syntax
+
+```javascript
+CHOICELABELS(multiChoiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `multiChoiceField` | `Object` | The multi choice field object with choices and other arrays |
+
+## Return Value
+
+Returns an array of selected choice labels with preserved types. Returns an empty array if no selections are made.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Get all selected color labels
+CHOICELABELS($colors)
+```
+
+### Display Logic
+
+```javascript
+// Display selected labels in a sentence
+"Selected colors: " + CHOICELABELS($colors).join(", ")
+
+// Show count with labels
+CHOICELABELS($skills).length + " skills selected: " + CHOICELABELS($skills).join(" • ")
+```
+
+### Array Operations
+
+```javascript
+// Check if specific label is selected
+CHOICELABELS($categories).includes("Technology")
+
+// Get number of selected items
+CHOICELABELS($preferences).length
+
+// Join labels with custom separator
+CHOICELABELS($tags).join(" | ")
+```
+
+### Conditional Logic
+
+```javascript
+// Check if multiple items are selected
+CHOICELABELS($options).length > 1
+
+// Check if specific label is selected
+CHOICELABELS($features).includes("Premium Plan")
+```
+
+### Validation
+
+```javascript
+// Ensure at least 2 items are selected
+CHOICELABELS($skills).length >= 2
+
+// Validate maximum selections
+CHOICELABELS($interests).length <= 3
+```
+
+### User-Friendly Display
+
+```javascript
+// Create user-friendly summaries
+"Your interests: " + CHOICELABELS($interests).join(", ")
+
+// Display with proper grammar
+IF(CHOICELABELS($items).length === 1, 
+   "You selected: " + CHOICELABELS($items)[0], 
+   "You selected: " + CHOICELABELS($items).join(", "))
+```
+
+## Common Use Cases
+
+- **User interface**: Display human-readable labels to users
+- **Form summaries**: Show selected options in confirmation screens
+- **Validation**: Check selection counts and specific labels
+- **Reports**: Generate user-friendly reports with readable labels
+- **Email templates**: Include selected options in notifications
+
+## Best Practices
+
+1. **User-friendly display**: Use labels for showing selections to users (more readable than values)
+2. **Type preservation**: The function preserves the original type of each label (string, number, etc.)
+3. **Empty array handling**: Always check for empty arrays when no selections are made
+4. **Array methods**: Use JavaScript array methods for processing (includes, join, filter, etc.)
+5. **Internationalization**: Labels can be localized while values remain consistent
+
+## Related Functions
+
+- [`CHOICEVALUES`](./choicevalues.mdx) - Get all selected choice values (MultiChoiceField)
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (ChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (ChoiceField)
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`OTHER`](./other.mdx) - Get the other option value
+
+## Examples by Use Case
+
+### Form Summaries
+
+```javascript
+// Create a comprehensive form summary
+"Selected preferences: " + CHOICELABELS($preferences).join(", ")
+
+// Show selection count with labels
+"You have selected " + CHOICELABELS($courses).length + " courses: " + CHOICELABELS($courses).join(", ")
+```
+
+### Conditional Display
+
+```javascript
+// Show different content based on selections
+IF(CHOICELABELS($membership).includes("Premium"), "Premium features available", "Upgrade to access premium features")
+
+// Display based on selection count
+IF(CHOICELABELS($skills).length >= 3, "Expert level detected", "Beginner level")
+```
+
+### Email Templates
+
+```javascript
+// Generate email content with selected options
+"Dear user, you have selected the following services: " + CHOICELABELS($services).join(", ")
+
+// Confirmation messages
+"Your subscription includes: " + CHOICELABELS($subscription_features).join(" • ")
+```
+
+### Validation Messages
+
+```javascript
+// User-friendly validation messages
+IF(CHOICELABELS($required_skills).length < 2, 
+   "Please select at least 2 skills", 
+   "Skills selected: " + CHOICELABELS($required_skills).join(", "))
+```
+
+### Report Generation
+
+```javascript
+// Generate user-friendly reports
+"Popular choices: " + CHOICELABELS($popular_items).join(", ")
+
+// Statistical summaries
+CHOICELABELS($survey_responses).length + " responses recorded"
+```
+
+### Dynamic Content
+
+```javascript
+// Show content based on selected labels
+IF(CHOICELABELS($interests).includes("Sports"), "Check out our sports section!", "")
+
+// Personalized recommendations
+"Based on your selection of " + CHOICELABELS($preferences).join(" and ") + ", we recommend..."
+```
+
+## Type Preservation
+
+The function automatically preserves the original type of each label:
+
+```javascript
+// String labels remain strings
+CHOICELABELS($colors) // ["Red", "Blue", "Green"]
+
+// Numeric labels remain numbers
+CHOICELABELS($ratings) // [4, 5, 3]
+
+// Mixed types are preserved
+CHOICELABELS($mixed) // ["Text Label", 42, "Another Label"]
+```
+
+## Array Methods
+
+Use standard JavaScript array methods for processing:
+
+```javascript
+// Check if array contains label
+CHOICELABELS($skills).includes("JavaScript")
+
+// Get array length
+CHOICELABELS($items).length
+
+// Join with separator
+CHOICELABELS($tags).join(", ")
+
+// Filter labels
+CHOICELABELS($categories).filter(label => label.startsWith("Tech"))
+
+// Map labels
+CHOICELABELS($codes).map(label => label.toUpperCase())
+```
+
+## Labels vs Values
+
+Understanding when to use labels vs values:
+
+```javascript
+// Use CHOICELABELS for user display
+"You selected: " + CHOICELABELS($colors).join(", ") // "Red, Blue, Green"
+
+// Use CHOICEVALUES for logic/processing
+IF(CHOICEVALUES($colors).includes("red"), "Red color processing", "") // uses value "red"
+```
+
+## Field Type Compatibility
+
+- **MultiChoiceField**: Primary use case - returns array of selected labels
+- **ChoiceField**: Not applicable - use `CHOICELABEL()` instead
+- **Note**: Always returns an array, even if empty
+- **Localization**: Labels can be localized while maintaining consistent values 

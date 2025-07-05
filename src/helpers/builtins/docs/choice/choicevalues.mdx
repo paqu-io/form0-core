@@ -1,0 +1,196 @@
+---
+title: "CHOICEVALUES Builtin"
+description: "Retrieve all selected choice values from MultiChoiceField"
+category: "choice"
+tags: ["choice", "multichoice", "values", "array"]
+---
+
+# CHOICEVALUES Function
+
+The `CHOICEVALUES` builtin retrieves an array of all selected choice field values from a MultiChoiceField, preserving the type of each value. Returns an empty array if no selections are made.
+
+## Syntax
+
+```javascript
+CHOICEVALUES(multiChoiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `multiChoiceField` | `Object` | The multi choice field object with choices and other arrays |
+
+## Return Value
+
+Returns an array of selected choice values with preserved types. Returns an empty array if no selections are made.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Get all selected color values
+CHOICEVALUES($colors)
+```
+
+### Array Operations
+
+```javascript
+// Check if "red" is selected
+CHOICEVALUES($colors).includes("red")
+
+// Get number of selected items
+CHOICEVALUES($skills).length
+
+// Join values with separator
+CHOICEVALUES($categories).join(", ")
+```
+
+### Conditional Logic
+
+```javascript
+// Check if multiple items are selected
+CHOICEVALUES($preferences).length > 1
+
+// Check if specific value is selected
+CHOICEVALUES($features).includes("premium")
+```
+
+### Validation
+
+```javascript
+// Ensure at least 2 items are selected
+CHOICEVALUES($skills).length >= 2
+
+// Validate maximum selections
+CHOICEVALUES($options).length <= 5
+```
+
+### Data Processing
+
+```javascript
+// Process selected values
+"Selected: " + CHOICEVALUES($items).join(" | ")
+
+// Count selections
+"You selected " + CHOICEVALUES($choices).length + " items"
+```
+
+## Common Use Cases
+
+- **Data extraction**: Get all selected values for processing
+- **Validation**: Check selection counts and specific values
+- **Display logic**: Show selected values in custom format
+- **Conditional behavior**: Make decisions based on selected values
+- **Form calculations**: Use selected values in calculations
+
+## Best Practices
+
+1. **Type preservation**: The function preserves the original type of each value (string, number, etc.)
+2. **Empty array handling**: Always check for empty arrays when no selections are made
+3. **Array methods**: Use JavaScript array methods for processing (includes, join, filter, etc.)
+4. **Performance**: Efficient for checking multiple values at once
+5. **Validation**: Use for enforcing selection limits and requirements
+
+## Related Functions
+
+- [`CHOICELABELS`](./choicelabels.mdx) - Get all selected choice labels (MultiChoiceField)
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (ChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (ChoiceField)
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`OTHER`](./other.mdx) - Get the other option value
+
+## Examples by Use Case
+
+### Selection Validation
+
+```javascript
+// Require at least 2 skills
+CHOICEVALUES($skills).length >= 2
+
+// Ensure premium feature is selected if advanced is selected
+IF(CHOICEVALUES($features).includes("advanced"), CHOICEVALUES($features).includes("premium"), true)
+```
+
+### Display Logic
+
+```javascript
+// Show selected values in a custom format
+"Your selections: " + CHOICEVALUES($preferences).join(" • ")
+
+// Display count with proper pluralization
+CHOICEVALUES($items).length + (CHOICEVALUES($items).length === 1 ? " item" : " items") + " selected"
+```
+
+### Conditional Processing
+
+```javascript
+// Different logic based on selections
+IF(CHOICEVALUES($payment_methods).includes("credit_card"), "Credit card processing enabled", "Standard payment only")
+
+// Check for conflicting selections
+IF(AND(CHOICEVALUES($options).includes("basic"), CHOICEVALUES($options).includes("premium")), "Conflicting options selected", "Valid selection")
+```
+
+### Data Analysis
+
+```javascript
+// Calculate total based on selected values
+CHOICEVALUES($services).reduce((sum, value) => sum + (value === "premium" ? 100 : 50), 0)
+
+// Filter numeric values
+CHOICEVALUES($quantities).filter(val => typeof val === 'number').reduce((sum, val) => sum + val, 0)
+```
+
+### Form Behavior
+
+```javascript
+// Show additional fields based on selections
+IF(CHOICEVALUES($interests).includes("technology"), "Show tech-related questions", "")
+
+// Enable features based on selections
+IF(CHOICEVALUES($subscriptions).includes("pro"), "Pro features enabled", "Basic features only")
+```
+
+## Type Preservation
+
+The function automatically preserves the original type of each value:
+
+```javascript
+// String values remain strings
+CHOICEVALUES($colors) // ["red", "blue", "green"]
+
+// Numeric values remain numbers
+CHOICEVALUES($ratings) // [4, 5, 3]
+
+// Mixed types are preserved
+CHOICEVALUES($mixed) // ["text", 42, "another"]
+```
+
+## Array Methods
+
+Use standard JavaScript array methods for processing:
+
+```javascript
+// Check if array contains value
+CHOICEVALUES($skills).includes("javascript")
+
+// Get array length
+CHOICEVALUES($items).length
+
+// Join with separator
+CHOICEVALUES($tags).join(", ")
+
+// Filter values
+CHOICEVALUES($numbers).filter(n => n > 5)
+
+// Map values
+CHOICEVALUES($codes).map(code => code.toUpperCase())
+```
+
+## Field Type Compatibility
+
+- **MultiChoiceField**: Primary use case - returns array of selected values
+- **ChoiceField**: Not applicable - use `CHOICEVALUE()` instead
+- **Note**: Always returns an array, even if empty 

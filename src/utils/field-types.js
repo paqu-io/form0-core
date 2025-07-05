@@ -3,6 +3,7 @@ export const FIELD_TYPES = new Set([
   'NumericField',
   'CalculatedField',
   'ChoiceField',
+  'MultiChoiceField',
   'Section',
 ]);
 

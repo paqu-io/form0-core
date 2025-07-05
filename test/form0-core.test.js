@@ -1,4 +1,4 @@
-import { createFormEngine, generateValueFromLabel, processChoiceFieldChoices } from '../src/index.js';
+import { createFormEngine } from '../src/index.js';
 
 const schema = {
   form: {
@@ -59,6 +59,37 @@ const schema = {
             ],
           },
           {
+            type: 'MultiChoiceField',
+            key: '0332f',
+            data_name: 'colors',
+            label: 'Please select your favorite colors',
+            required: true,
+            required_conditions: null,
+            hidden: false,
+            visible_conditions: null,
+            read_only: false,
+            read_only_conditions: null,
+            allow_other: true, //ChoiceField can be true or false
+            choices: [
+              {
+                label: 'Red',
+                value: 'red',
+              },
+              {
+                label: 'Blue',
+                value: 'blue',
+              },
+              {
+                label: 'Orange',
+                value: 'orange',
+              },
+              {
+                label: 'Yellow',
+                value: 'yellow',
+              },
+            ],
+          },
+          {
             type: 'CalculatedField',
             key: 'ea322',
             data_name: 'city_calc',
@@ -67,7 +98,21 @@ const schema = {
             hidden: false,
             visible_conditions: null,
             read_only: true, //CalcualtedField is read_only = true by default
-            calculate: 'IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogotá!", "Welcome!")',
+            calculate: 'IF(OR(CHOICEVALUE($city) === "bogota", OTHER($city) === "Bogotá"), "Welcome to Bogotá!", "Welcome!")',
+            display: {
+              style: 'text', // or numeric, date, currency
+            },
+          },
+          {
+            type: 'CalculatedField',
+            key: 'aa123',
+            data_name: 'colors_calc',
+            label: 'colors_calc',
+            required: false, //CalcualtedField is required = false by default
+            hidden: false,
+            visible_conditions: null,
+            read_only: true, //CalcualtedField is read_only = true by default
+            calculate: 'CHOICELABELS($colors)',
             display: {
               style: 'text', // or numeric, date, currency
             },
@@ -212,6 +257,21 @@ const initialValues = {
       }
     ],
     other: []
+  },
+  colors: {
+    choices: [
+      {
+        value: 'red'  // label will be auto-populated from schema
+      },
+      {
+        value: 'yellow'  // label will be auto-populated from schema
+      }
+    ],
+    other: [
+      {
+        label: 'Purple'
+      }
+    ]
   }
 };
 

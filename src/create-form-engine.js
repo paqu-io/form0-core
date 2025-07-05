@@ -23,7 +23,7 @@ export function createFormEngine({
   // Create a lookup map for choice fields
   const choiceFieldMap = new Map();
   for (const field of allFields) {
-    if (field.type === 'ChoiceField') {
+    if (field.type === 'ChoiceField' || field.type === 'MultiChoiceField') {
       const valueToLabelMap = new Map();
       field.choices.forEach(choice => {
         valueToLabelMap.set(choice.value, choice.label);
@@ -40,6 +40,11 @@ export function createFormEngine({
           choice: [],
           other: []
         };
+      } else if (field.type === 'MultiChoiceField') {
+        values[field.data_name] = {
+          choices: [],
+          other: []
+        };
       } else {
         values[field.data_name] = null;
       }
@@ -49,6 +54,23 @@ export function createFormEngine({
       if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choice)) {
         const labelMap = choiceFieldMap.get(field.data_name);
         fieldValue.choice = fieldValue.choice.map(choice => {
+          if (choice && choice.value && !choice.label) {
+            // Auto-populate label from schema
+            const label = labelMap.get(choice.value);
+            return {
+              ...choice,
+              label: label || choice.value // fallback to value if label not found
+            };
+          }
+          return choice;
+        });
+      }
+    } else if (field.type === 'MultiChoiceField') {
+      // Enrich MultiChoiceField values with labels from schema
+      const fieldValue = values[field.data_name];
+      if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choices)) {
+        const labelMap = choiceFieldMap.get(field.data_name);
+        fieldValue.choices = fieldValue.choices.map(choice => {
           if (choice && choice.value && !choice.label) {
             // Auto-populate label from schema
             const label = labelMap.get(choice.value);

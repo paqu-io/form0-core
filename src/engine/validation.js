@@ -76,5 +76,52 @@ export function validateFields(schema, values, errors) {
         }
       }
     }
+
+    if (field.type === 'MultiChoiceField') {
+      if (value !== null && value !== undefined) {
+        // Validate the structure of MultiChoiceField value
+        if (typeof value !== 'object' || value === null) {
+          errors[field.data_name] = `${field.data_name} must be an object with 'choices' and 'other' arrays`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.choices)) {
+          errors[field.data_name] = `${field.data_name}.choices must be an array`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.other)) {
+          errors[field.data_name] = `${field.data_name}.other must be an array`;
+          continue;
+        }
+        
+        // Validate choice selections
+        const validChoiceValues = new Set(field.choices.map(c => c.value));
+        for (const choice of value.choices) {
+          if (!choice || typeof choice !== 'object' || !choice.value) {
+            errors[field.data_name] = `${field.data_name}.choices must contain objects with 'value' property`;
+            break;
+          }
+          
+          if (!validChoiceValues.has(choice.value)) {
+            errors[field.data_name] = `${field.data_name}.choices contains invalid value: ${choice.value}`;
+            break;
+          }
+        }
+        
+        // Validate other selections
+        for (const other of value.other) {
+          if (!other || typeof other !== 'object' || !other.label) {
+            errors[field.data_name] = `${field.data_name}.other must contain objects with 'label' property`;
+            break;
+          }
+        }
+        
+        // Check if allow_other is false but other array is not empty
+        if (!field.allow_other && value.other.length > 0) {
+          errors[field.data_name] = `${field.data_name} does not allow 'other' values`;
+        }
+      }
+    }
   }
 }

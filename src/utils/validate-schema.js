@@ -49,12 +49,23 @@ export function validateSchema(form) {
 
     if (field.type === 'ChoiceField') {
       if (!Array.isArray(field.choices)) {
-        throw new Error(`ChoiceField "${field.data_name}" must have a 'choices' array`);
+        throw new Error(`ChoiceField "${field.data_name}" must have a 'choice' array`);
       }
       
       const validation = validateChoiceFieldChoices(field.choices);
       if (!validation.isValid) {
         throw new Error(`ChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    if (field.type === 'MultiChoiceField') {
+      if (!Array.isArray(field.choices)) {
+        throw new Error(`MultiChoiceField "${field.data_name}" must have a 'choices' array`);
+      }
+      
+      const validation = validateChoiceFieldChoices(field.choices);
+      if (!validation.isValid) {
+        throw new Error(`MultiChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
       }
     }
 

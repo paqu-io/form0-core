@@ -142,4 +142,24 @@ export function validateChoiceFieldChoices(choices) {
   };
 }
 
+/**
+ * Processes MultiChoiceField choices to auto-generate missing values (same as ChoiceField)
+ * This is an alias for processChoiceFieldChoices for consistency
+ * @param {Array} choices - Array of choice objects
+ * @returns {Array} - Array of choices with generated values
+ */
+export function processMultiChoiceFieldChoices(choices) {
+  return processChoiceFieldChoices(choices);
+}
+
+/**
+ * Validates that all values in a MultiChoiceField choices are unique and valid (same as ChoiceField)
+ * This is an alias for validateChoiceFieldChoices for consistency
+ * @param {Array} choices - Array of choice objects
+ * @returns {Object} - Validation result with isValid and errors
+ */
+export function validateMultiChoiceFieldChoices(choices) {
+  return validateChoiceFieldChoices(choices);
+}
+
  

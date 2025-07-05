@@ -1,3 +1,5 @@
+import { builtins } from '../helpers/builtins.js';
+
 // Security modes for expression evaluation
 export const SECURITY_MODES = {
   TRUSTED: 'trusted',    // Full JavaScript access (current behavior)
@@ -7,7 +9,8 @@ export const SECURITY_MODES = {
 
 // Default security configuration (TRUSTED mode - no restrictions)
 export const DEFAULT_SECURITY_CONFIG = {
-  mode: SECURITY_MODES.TRUSTED
+  mode: SECURITY_MODES.TRUSTED,
+  validateBuiltins: true  // Enable builtin validation by default for performance
 };
 
 // Safe mode configuration
@@ -15,6 +18,7 @@ export const SAFE_SECURITY_CONFIG = {
   mode: SECURITY_MODES.SAFE,
   maxExecutionTime: 1000,
   maxCallStackDepth: 100,
+  validateBuiltins: true,  // Enable builtin validation by default for performance
   allowedGlobals: ['Math', 'Date', 'JSON', 'Number', 'String', 'Array', 'Object'],
   blockedPatterns: [
     /\beval\b/,
@@ -34,7 +38,66 @@ export const SAFE_SECURITY_CONFIG = {
   ]
 };
 
+// Cache valid builtins as a Set for O(1) lookups
+let validBuiltinsSet = null;
+
+// Helper function to validate builtin function names in expressions
+function validateBuiltinNames(expr) {
+  // Lazy initialization of valid builtins set
+  if (!validBuiltinsSet) {
+    validBuiltinsSet = new Set(Object.keys(builtins));
+  }
+  
+  // Extract function calls from the expression
+  // This regex matches function calls like FUNCTIONNAME( allowing for whitespace
+  const functionCallPattern = /\b([A-Z_][A-Z0-9_]*)\s*\(/g;
+  const matches = [...expr.matchAll(functionCallPattern)];
+  
+  for (const match of matches) {
+    const functionName = match[1];
+    
+    // Skip if it's a valid builtin
+    if (validBuiltinsSet.has(functionName)) {
+      continue;
+    }
+    
+    // Skip common JavaScript functions/objects that might be uppercase
+    const commonFunctions = ['Math', 'Date', 'JSON', 'Number', 'String', 'Array', 'Object', 'Boolean'];
+    if (commonFunctions.includes(functionName)) {
+      continue;
+    }
+    
+    // Check for potential typos by finding similar builtin names
+    const validBuiltins = [...validBuiltinsSet]; // Convert back to array for filtering
+    const similarBuiltins = validBuiltins.filter(builtin => {
+      // Simple similarity check - same length or very close
+      const lengthDiff = Math.abs(builtin.length - functionName.length);
+      return lengthDiff <= 2 && builtin.startsWith(functionName.substring(0, 3));
+    });
+    
+    let suggestion = '';
+    if (similarBuiltins.length > 0) {
+      suggestion = ` Did you mean ${similarBuiltins[0]}?`;
+    }
+    
+    return {
+      valid: false,
+      reason: `Unknown builtin function: ${functionName}.${suggestion}`
+    };
+  }
+  
+  return { valid: true };
+}
+
 export function validateExpression(expr, securityConfig = DEFAULT_SECURITY_CONFIG) {
+  // Only validate builtin names if explicitly enabled
+  if (securityConfig.validateBuiltins === true) {
+    const builtinValidation = validateBuiltinNames(expr);
+    if (!builtinValidation.valid) {
+      return builtinValidation;
+    }
+  }
+
   if (securityConfig.mode === SECURITY_MODES.TRUSTED) {
     return { valid: true };
   }

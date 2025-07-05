@@ -7,6 +7,8 @@ import { CHOICEVALUE } from './choice/choicevalue.js';
 import { CHOICELABEL } from './choice/choicelabel.js';
 import { HASOTHER } from './choice/hasother.js';
 import { OTHER } from './choice/other.js';
+import { CHOICEVALUES } from './choice/choicevalues.js';
+import { CHOICELABELS } from './choice/choicelabels.js';
 
 // Export individual builtins
 export { IF } from './logical/if.js';
@@ -17,6 +19,8 @@ export { CHOICEVALUE } from './choice/choicevalue.js';
 export { CHOICELABEL } from './choice/choicelabel.js';
 export { HASOTHER } from './choice/hasother.js';
 export { OTHER } from './choice/other.js';
+export { CHOICEVALUES } from './choice/choicevalues.js';
+export { CHOICELABELS } from './choice/choicelabels.js';
 
 // Main builtins object for backward compatibility
 export const builtins = {
@@ -28,4 +32,6 @@ export const builtins = {
   CHOICELABEL,
   HASOTHER,
   OTHER,
+  CHOICEVALUES,
+  CHOICELABELS,
 }; 
