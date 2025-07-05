@@ -1,4 +1,4 @@
-import { createFormEngine } from '../src/index.js';
+import { createFormEngine, generateValueFromLabel, processChoiceFieldChoices } from '../src/index.js';
 
 const schema = {
   form: {
@@ -52,7 +52,25 @@ const schema = {
                 label: 'New York',
                 value: 'new_york',
               },
+              {
+                label: 'São Paulo - Centro',
+                value: 'sao_paulo_centro',
+              },
             ],
+          },
+          {
+            type: 'CalculatedField',
+            key: 'ea322',
+            data_name: 'city_calc',
+            label: 'city_calc',
+            required: false, //CalcualtedField is required = false by default
+            hidden: false,
+            visible_conditions: null,
+            read_only: true, //CalcualtedField is read_only = true by default
+            calculate: 'IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogotá!", "Welcome!")',
+            display: {
+              style: 'text', // or numeric, date, currency
+            },
           },
           {
             type: 'NumericField',
@@ -164,6 +182,39 @@ const schema = {
   },
 };
 
-const engine = createFormEngine({ schema, initialValues: { first_name: 'Alice', age: 21 } });
+// Test the value generation utility
+// console.log('Testing value generation from labels:');
+// console.log('Bogotá ->', generateValueFromLabel('Bogotá'));
+// console.log('São Paulo - Centro ->', generateValueFromLabel('São Paulo - Centro'));
+// console.log('New York ->', generateValueFromLabel('New York'));
+// console.log('Recanati ->', generateValueFromLabel('Recanati'));
+// console.log();
+
+// // Test choice processing utility
+// console.log('Testing choice processing:');
+// const choicesWithMissingValues = [
+//   { label: 'Bogotá', value: 'bogota' },
+//   { label: 'Recanati' }, // missing value
+//   { label: 'São Paulo - Centro' }, // missing value with accents
+// ];
+// const processedChoices = processChoiceFieldChoices(choicesWithMissingValues);
+// console.log('Processed choices:', JSON.stringify(processedChoices, null, 2));
+// console.log();
+
+// Test with initial values - only value needed for predefined choices
+const initialValues = {
+  first_name: 'Alice',
+  age: 21,
+  city: {
+    choice: [
+      {
+        value: 'bogota'  // label will be auto-populated from schema
+      }
+    ],
+    other: []
+  }
+};
+
+const engine = createFormEngine({ schema, initialValues });
 engine.eval();
-console.log(engine.getState());
+console.log(JSON.stringify(engine.getState(), null, 2));

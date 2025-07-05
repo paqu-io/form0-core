@@ -1,0 +1,106 @@
+---
+title: "HASOTHER Builtin"
+description: "Check if user entered an other option in choice field"
+category: "choice"
+tags: ["choice", "other", "validation"]
+---
+
+# HASOTHER Function
+
+The `HASOTHER` builtin checks if the user has entered an "other" option in a choice field, returning `true` if an other option is present, `false` otherwise.
+
+## Syntax
+
+```javascript
+HASOTHER(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object with choice and other arrays |
+
+## Return Value
+
+Returns `true` if user entered an other option, `false` otherwise.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Check if user entered other option
+HASOTHER($city)
+```
+
+### Conditional Logic
+
+```javascript
+// Show different content based on other option
+IF(HASOTHER($city), "Custom city: " + OTHER($city), "Selected city: " + CHOICELABEL($city))
+```
+
+### Validation
+
+```javascript
+// Require additional validation when other is selected
+IF(HASOTHER($category), OTHER($category).length > 0, true)
+```
+
+### Form Behavior
+
+```javascript
+// Show additional fields when other is selected
+IF(HASOTHER($reason), "Please specify: " + OTHER($reason), "")
+```
+
+## Use Cases
+
+- **Conditional display**: Show additional fields or content when other options are selected
+- **Validation**: Apply different validation rules when other options are present
+- **Data processing**: Handle other options differently in calculations or logic
+- **User experience**: Provide context-aware feedback based on other selections
+
+## Best Practices
+
+1. **Combine with OTHER**: Use together with `OTHER()` function to get the actual other value
+2. **Validation**: Always validate other inputs when `HASOTHER` returns true
+3. **User feedback**: Provide clear feedback when other options are selected
+4. **Field dependencies**: Use to show/hide related fields
+
+## Related Functions
+
+- [`OTHER`](./other.mdx) - Get the other option value
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label
+
+## Examples by Use Case
+
+### Dynamic Field Display
+
+```javascript
+// Show additional input field when other is selected
+IF(HASOTHER($industry), "Specify industry: " + OTHER($industry), "")
+```
+
+### Validation Rules
+
+```javascript
+// Require other field to be non-empty when selected
+AND(HASOTHER($reason), OTHER($reason).length > 3)
+```
+
+### Conditional Processing
+
+```javascript
+// Different processing based on other selection
+IF(HASOTHER($payment_method), "Custom payment: " + OTHER($payment_method), "Standard payment")
+```
+
+### Form Completion
+
+```javascript
+// Check if form is complete including other fields
+AND(CHOICEVALUE($category) !== null, IF(HASOTHER($category), OTHER($category).length > 0, true))
+``` 

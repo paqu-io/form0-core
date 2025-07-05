@@ -1,0 +1,117 @@
+---
+title: "OTHER Builtin"
+description: "Retrieve the other option value from choice field"
+category: "choice"
+tags: ["choice", "other", "custom"]
+---
+
+# OTHER Function
+
+The `OTHER` builtin retrieves the other label if the user entered an other option in a choice field, returning `null` if no other option is present.
+
+## Syntax
+
+```javascript
+OTHER(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object with choice and other arrays |
+
+## Return Value
+
+Returns the other label as a string if user entered an other option, `null` otherwise.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Get the other value
+OTHER($city)
+```
+
+### Conditional Logic
+
+```javascript
+// Use in conditional expressions
+IF(HASOTHER($city), "Custom city: " + OTHER($city), "No custom city entered")
+```
+
+### Display Logic
+
+```javascript
+// Show other value in display
+"Additional info: " + OTHER($comments)
+```
+
+### Validation
+
+```javascript
+// Validate other input length
+OTHER($reason).length > 10
+```
+
+
+
+## Common Use Cases
+
+- **Custom input display**: Show user-entered custom values
+- **Conditional logic**: Make decisions based on other option content
+- **Validation**: Validate the content of other options
+- **Data processing**: Extract custom values for further processing
+
+## Best Practices
+
+1. **Check with HASOTHER**: Always use `HASOTHER()` to check if other option exists before using `OTHER()`
+2. **Handle null values**: Always handle the case where `OTHER()` returns null
+3. **Validation**: Validate other inputs for length, format, etc.
+4. **User feedback**: Provide clear feedback about other option values
+
+## Related Functions
+
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label
+
+## Examples by Use Case
+
+### Custom Input Display
+
+```javascript
+// Display custom input with fallback
+IF(HASOTHER($industry), "Industry: " + OTHER($industry), "Industry: " + CHOICELABEL($industry))
+```
+
+### Validation Rules
+
+```javascript
+// Ensure other input meets requirements
+IF(HASOTHER($reason), OTHER($reason).length >= 5, true)
+```
+
+### Data Processing
+
+```javascript
+// Process other values differently
+IF(HASOTHER($category), "CUSTOM: " + OTHER($category), "STANDARD: " + CHOICEVALUE($category))
+```
+
+### Form Summary
+
+```javascript
+// Include other values in form summary
+"Additional comments: " + (HASOTHER($comments) ? OTHER($comments) : "None")
+```
+
+## Null Handling
+
+Always handle the null case when using `OTHER()`:
+
+```javascript
+// Safe usage with null check
+IF(HASOTHER($field), OTHER($field) || "No value", "Standard selection")
+``` 

@@ -6,3 +6,9 @@ export {
   DEFAULT_SECURITY_CONFIG,
   SAFE_SECURITY_CONFIG 
 } from './utils/security.js';
+export { 
+  generateValueFromLabel,
+  processChoiceFieldChoices,
+  isValidChoiceValue,
+  validateChoiceFieldChoices
+} from './utils/choice-field-utils.js';

@@ -1,0 +1,110 @@
+---
+title: "CHOICELABEL Builtin"
+description: "Retrieve the selected choice field label with type preservation"
+category: "choice"
+tags: ["choice", "label", "display"]
+---
+
+# CHOICELABEL Function
+
+The `CHOICELABEL` builtin retrieves the currently selected choice field label, preserving the original data type. If the label is a number, it preserves the number type; otherwise, it returns a string.
+
+## Syntax
+
+```javascript
+CHOICELABEL(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object with choice and other arrays |
+
+## Return Value
+
+Returns the selected choice label with preserved type, or `null` if no selection is made.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Get the selected city label
+CHOICELABEL($city)
+```
+
+### Display Logic
+
+```javascript
+// Use in display expressions
+"You selected: " + CHOICELABEL($city)
+```
+
+### Conditional Display
+
+```javascript
+// Show different content based on label
+IF(CHOICELABEL($membership) === "Premium", "Premium benefits apply", "Standard benefits")
+```
+
+### Form Feedback
+
+```javascript
+// Provide user feedback
+"Your choice: " + CHOICELABEL($preference)
+```
+
+## Type Preservation
+
+The function preserves the original data type of the choice label:
+
+```javascript
+// If choice label is "42" (string), returns 42 (number)
+// If choice label is "Premium" (string), returns "Premium" (string)
+// If choice label is 5 (number), returns 5 (number)
+```
+
+
+
+## Common Use Cases
+
+- **User feedback**: Display the human-readable label of selected choices
+- **Conditional display**: Show different content based on selected labels
+- **Form summaries**: Include readable choice labels in form summaries
+- **Reporting**: Use labels in reports and analytics
+
+## Best Practices
+
+1. **User-friendly display**: Use labels for user-facing content instead of values
+2. **Handle null values**: Always check for null when no selection is made
+3. **Internationalization**: Consider that labels might be translated
+
+## Related Functions
+
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`OTHER`](./other.mdx) - Get the other option value
+
+## Examples by Use Case
+
+### User Confirmation
+
+```javascript
+// Confirm user selection
+"You have selected: " + CHOICELABEL($plan)
+```
+
+### Conditional Messaging
+
+```javascript
+// Show different messages based on selection
+IF(CHOICELABEL($support) === "Priority Support", "Priority support activated", "Standard support")
+```
+
+### Form Summary
+
+```javascript
+// Create form summary
+"Location: " + CHOICELABEL($location) + ", Plan: " + CHOICELABEL($plan)
+``` 
