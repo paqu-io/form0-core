@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>form0-core Security Test</title>
+</head>
+<body>
+    <h1>form0-core Security Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import { createFormEngine, SECURITY_MODES, SAFE_SECURITY_CONFIG } from '../src/index.js';
+
+        const testSchema = {
+            form: {
+                name: 'SecurityTest',
+                elements: [
+                    {
+                        type: 'NumericField',
+                        key: 'age1',
+                        data_name: 'age',
+                        label: 'Age',
+                        required: true,
+                    },
+                    {
+                        type: 'CalculatedField',
+                        key: 'calc1',
+                        data_name: 'safe_calc',
+                        label: 'Safe Calculation',
+                        calculate: 'Math.max($age, 18)',
+                        display: { style: 'numeric' },
+                    },
+                    {
+                        type: 'CalculatedField',
+                        key: 'calc2',
+                        data_name: 'dangerous_calc',
+                        label: 'Dangerous Calculation',
+                        calculate: 'window.location.href',
+                        display: { style: 'text' },
+                    },
+                    {
+                        type: 'CalculatedField',
+                        key: 'calc3',
+                        data_name: 'builtin_calc',
+                        label: 'Built-in Calculation',
+                        calculate: 'IF($age >= 18, "Adult", "Minor")',
+                        display: { style: 'text' },
+                    },
+                    {
+                        type: 'CalculatedField',
+                        key: 'calc4',
+                        data_name: 'localStorage_calc',
+                        label: 'localStorage Access',
+                        calculate: 'localStorage.getItem("test") || "no data"',
+                        display: { style: 'text' },
+                    }
+                ]
+            }
+        };
+
+        const output = document.getElementById('output');
+
+        function log(message) {
+            output.innerHTML += `<div style="margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 4px;">${message}</div>`;
+        }
+
+        function runTest(title, engineFactory) {
+            log(`<h3>${title}</h3>`);
+            try {
+                const engine = engineFactory();
+                engine.eval();
+                const state = engine.getState();
+                log(`<pre>${JSON.stringify(state, null, 2)}</pre>`);
+            } catch (error) {
+                log(`<span style="color: red;">Error: ${error.message}</span>`);
+            }
+        }
+
+        // Test 1: Trusted mode
+        runTest('1. TRUSTED MODE (default)', () => 
+            createFormEngine({ 
+                schema: testSchema, 
+                initialValues: { age: 25 }
+            })
+        );
+
+        // Test 2: Safe mode
+        runTest('2. SAFE MODE', () => 
+            createFormEngine({ 
+                schema: testSchema, 
+                initialValues: { age: 25 },
+                security: { mode: SECURITY_MODES.SAFE }
+            })
+        );
+
+        // Test 3: Custom mode
+        runTest('3. CUSTOM MODE (only Math allowed)', () => 
+            createFormEngine({ 
+                schema: testSchema, 
+                initialValues: { age: 25 },
+                security: { 
+                    mode: SECURITY_MODES.CUSTOM,
+                    allowedGlobals: ['Math'],
+                    blockedPatterns: [/\bwindow\b/, /\blocalStorage\b/]
+                }
+            })
+        );
+
+        log('<h3>Security Test Complete</h3>');
+    </script>
+</body>
+</html> 

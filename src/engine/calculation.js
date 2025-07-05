@@ -1,14 +1,14 @@
 import { runExpression } from '../evaluator.js';
 import { flattenFields } from '../utils/flatten-fields.js';
 
-export function evaluateCalculatedFields(schema, values, helpers) {
+export function evaluateCalculatedFields(schema, values, helpers, securityConfig) {
   const fields = flattenFields(schema.elements);
 
   fields.forEach((field) => {
     if (field.type === 'CalculatedField' && field.calculate) {
       try {
         const context = buildContext(values, helpers);
-        values[field.data_name] = runExpression(field.calculate, context);
+        values[field.data_name] = runExpression(field.calculate, context, securityConfig);
       } catch (e) {
         console.warn(`Calculation failed for ${field.data_name}:`, e.message);
       }
