@@ -47,14 +47,14 @@ export function validateSchema(form) {
       }
     }
 
-    if (field.type === 'ChoiceField') {
+    if (field.type === 'SingleChoiceField') {
       if (!Array.isArray(field.choices)) {
-        throw new Error(`ChoiceField "${field.data_name}" must have a 'choice' array`);
+        throw new Error(`SingleChoiceField "${field.data_name}" must have a 'choice' array`);
       }
       
       const validation = validateChoiceFieldChoices(field.choices);
       if (!validation.isValid) {
-        throw new Error(`ChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(`SingleChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
       }
     }
 

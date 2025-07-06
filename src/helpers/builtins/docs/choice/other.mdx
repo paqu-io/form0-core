@@ -1,13 +1,13 @@
 ---
 title: "OTHER Builtin"
-description: "Retrieve the other option value from choice field (ChoiceField or MultiChoiceField)"
+description: "Retrieve the other option value from choice field (SingleChoiceField or MultiChoiceField)"
 category: "choice"
 tags: ["choice", "other", "custom", "multichoice"]
 ---
 
 # OTHER Function
 
-The `OTHER` builtin retrieves the other label if the user entered an other option in a choice field, returning `null` if no other option is present. Works with both ChoiceField (single selection) and MultiChoiceField (multiple selections).
+The `OTHER` builtin retrieves the other label if the user entered an other option in a choice field, returning `null` if no other option is present. Works with both SingleChoiceField (single selection) and MultiChoiceField (multiple selections).
 
 ## Syntax
 
@@ -19,7 +19,7 @@ OTHER(choiceField)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `choiceField` | `Object` | The choice field object (ChoiceField with choice array or MultiChoiceField with choices array) and other array |
+| `choiceField` | `Object` | The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array |
 
 ## Return Value
 
@@ -27,7 +27,7 @@ Returns the other label as a string if user entered an other option, `null` othe
 
 ## Examples
 
-### Basic Usage - ChoiceField
+### Basic Usage - SingleChoiceField
 
 ```javascript
 // Get the other value from single choice field
@@ -79,19 +79,19 @@ OTHER($reason).length > 10
 2. **Handle null values**: Always handle the case where `OTHER()` returns null
 3. **Validation**: Validate other inputs for length, format, etc.
 4. **User feedback**: Provide clear feedback about other option values
-5. **Multi-choice compatibility**: Works with both ChoiceField and MultiChoiceField
+5. **Multi-choice compatibility**: Works with both SingleChoiceField and MultiChoiceField
 
 ## Related Functions
 
 - [`HASOTHER`](./hasother.mdx) - Check if other option is selected
-- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (ChoiceField)
-- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (ChoiceField)
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (SingleChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (SingleChoiceField)
 - [`CHOICEVALUES`](./choicevalues.mdx) - Get all selected choice values (MultiChoiceField)
 - [`CHOICELABELS`](./choicelabels.mdx) - Get all selected choice labels (MultiChoiceField)
 
 ## Examples by Use Case
 
-### Custom Input Display - ChoiceField
+### Custom Input Display - SingleChoiceField
 
 ```javascript
 // Display custom input with fallback
@@ -112,7 +112,7 @@ IF(HASOTHER($skills), "Custom skill: " + OTHER($skills), "Skills: " + CHOICELABE
 IF(HASOTHER($reason), OTHER($reason).length >= 5, true)
 ```
 
-### Data Processing - ChoiceField
+### Data Processing - SingleChoiceField
 
 ```javascript
 // Process other values differently
@@ -144,7 +144,7 @@ IF(HASOTHER($field), OTHER($field) || "No value", "Standard selection")
 
 ## Field Type Compatibility
 
-- **ChoiceField**: Single selection with optional other input
+- **SingleChoiceField**: Single selection with optional other input
 - **MultiChoiceField**: Multiple selections with optional other input
 - **Note**: User can only add 1 other option regardless of field type
 - **Return value**: Always returns a single string (the other label) or null 

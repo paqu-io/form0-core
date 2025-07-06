@@ -1,7 +1,7 @@
 /**
  * @builtin HASOTHER
- * @description Returns true if user entered an other option, false otherwise. Works with both ChoiceField and MultiChoiceField.
- * @param {Object} choiceField - The choice field object (ChoiceField with choice array or MultiChoiceField with choices array) and other array
+ * @description Returns true if user entered an other option, false otherwise. Works with both SingleChoiceField and MultiChoiceField.
+ * @param {Object} choiceField - The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array
  * @returns {boolean} True if user entered an other option, false otherwise
  * @example
  * // Check if user entered other option in single choice field
@@ -19,7 +19,7 @@ export const HASOTHER = (choiceField) => {
     return false;
   }
   
-  // Validate structure - must have either choice array (ChoiceField) or choices array (MultiChoiceField)
+  // Validate structure - must have either choice array (SingleChoiceField) or choices array (MultiChoiceField)
   const hasChoiceArray = Array.isArray(choiceField.choice);
   const hasChoicesArray = Array.isArray(choiceField.choices);
   

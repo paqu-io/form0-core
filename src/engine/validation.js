@@ -30,9 +30,9 @@ export function validateFields(schema, values, errors) {
       }
     }
     
-    if (field.type === 'ChoiceField') {
+    if (field.type === 'SingleChoiceField') {
       if (value !== null && value !== undefined) {
-        // Validate the structure of ChoiceField value
+        // Validate the structure of SingleChoiceField value
         if (typeof value !== 'object' || value === null) {
           errors[field.data_name] = `${field.data_name} must be an object with 'choice' and 'other' arrays`;
           continue;

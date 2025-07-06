@@ -23,7 +23,7 @@ export function createFormEngine({
   // Create a lookup map for choice fields
   const choiceFieldMap = new Map();
   for (const field of allFields) {
-    if (field.type === 'ChoiceField' || field.type === 'MultiChoiceField') {
+    if (field.type === 'SingleChoiceField' || field.type === 'MultiChoiceField') {
       const valueToLabelMap = new Map();
       field.choices.forEach(choice => {
         valueToLabelMap.set(choice.value, choice.label);
@@ -34,8 +34,8 @@ export function createFormEngine({
   
   for (const field of allFields) {
     if (!(field.data_name in values)) {
-      // Initialize ChoiceField with proper structure
-      if (field.type === 'ChoiceField') {
+      // Initialize SingleChoiceField with proper structure
+      if (field.type === 'SingleChoiceField') {
         values[field.data_name] = {
           choice: [],
           other: []
@@ -48,8 +48,8 @@ export function createFormEngine({
       } else {
         values[field.data_name] = null;
       }
-    } else if (field.type === 'ChoiceField') {
-      // Enrich ChoiceField values with labels from schema
+    } else if (field.type === 'SingleChoiceField') {
+      // Enrich SingleChoiceField values with labels from schema
       const fieldValue = values[field.data_name];
       if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choice)) {
         const labelMap = choiceFieldMap.get(field.data_name);

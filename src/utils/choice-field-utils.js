@@ -43,7 +43,7 @@ export function generateValueFromLabel(label) {
 }
 
 /**
- * Validates that a value follows the ChoiceField value rules
+ * Validates that a value follows the SingleChoiceField value rules
  * @param {string} value - The value to validate
  * @returns {boolean} - True if valid, false otherwise
  */
@@ -55,7 +55,7 @@ export function isValidChoiceValue(value) {
 }
 
 /**
- * Processes ChoiceField choices to auto-generate missing values
+ * Processes SingleChoiceField choices to auto-generate missing values
  * @param {Array} choices - Array of choice objects
  * @returns {Array} - Array of choices with generated values
  */
@@ -98,7 +98,7 @@ export function processChoiceFieldChoices(choices) {
 }
 
 /**
- * Validates that all values in a ChoiceField are unique and valid
+ * Validates that all values in a SingleChoiceField are unique and valid
  * @param {Array} choices - Array of choice objects
  * @returns {Object} - Validation result with isValid and errors
  */
@@ -143,7 +143,7 @@ export function validateChoiceFieldChoices(choices) {
 }
 
 /**
- * Processes MultiChoiceField choices to auto-generate missing values (same as ChoiceField)
+ * Processes MultiChoiceField choices to auto-generate missing values (same as SingleChoiceField)
  * This is an alias for processChoiceFieldChoices for consistency
  * @param {Array} choices - Array of choice objects
  * @returns {Array} - Array of choices with generated values
@@ -153,7 +153,7 @@ export function processMultiChoiceFieldChoices(choices) {
 }
 
 /**
- * Validates that all values in a MultiChoiceField choices are unique and valid (same as ChoiceField)
+ * Validates that all values in a MultiChoiceField choices are unique and valid (same as SingleChoiceField)
  * This is an alias for validateChoiceFieldChoices for consistency
  * @param {Array} choices - Array of choice objects
  * @returns {Object} - Validation result with isValid and errors

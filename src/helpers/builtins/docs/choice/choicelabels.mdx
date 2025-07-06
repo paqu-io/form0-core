@@ -108,8 +108,8 @@ IF(CHOICELABELS($items).length === 1,
 ## Related Functions
 
 - [`CHOICEVALUES`](./choicevalues.mdx) - Get all selected choice values (MultiChoiceField)
-- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (ChoiceField)
-- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (ChoiceField)
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (SingleChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (SingleChoiceField)
 - [`HASOTHER`](./hasother.mdx) - Check if other option is selected
 - [`OTHER`](./other.mdx) - Get the other option value
 
@@ -225,6 +225,6 @@ IF(CHOICEVALUES($colors).includes("red"), "Red color processing", "") // uses va
 ## Field Type Compatibility
 
 - **MultiChoiceField**: Primary use case - returns array of selected labels
-- **ChoiceField**: Not applicable - use `CHOICELABEL()` instead
+- **SingleChoiceField**: Not applicable - use `CHOICELABEL()` instead
 - **Note**: Always returns an array, even if empty
 - **Localization**: Labels can be localized while maintaining consistent values 

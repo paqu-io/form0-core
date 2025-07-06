@@ -1,7 +1,7 @@
 /**
  * @builtin OTHER
- * @description Retrieves the other label if user entered the other option, otherwise null. Works with both ChoiceField and MultiChoiceField.
- * @param {Object} choiceField - The choice field object (ChoiceField with choice array or MultiChoiceField with choices array) and other array
+ * @description Retrieves the other label if user entered the other option, otherwise null. Works with both SingleChoiceField and MultiChoiceField.
+ * @param {Object} choiceField - The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array
  * @returns {string|null} The other label if user entered an other option, null otherwise
  * @example
  * // Get the other value from single choice field
@@ -19,7 +19,7 @@ export const OTHER = (choiceField) => {
     return null;
   }
   
-  // Validate structure - must have either choice array (ChoiceField) or choices array (MultiChoiceField)
+  // Validate structure - must have either choice array (SingleChoiceField) or choices array (MultiChoiceField)
   const hasChoiceArray = Array.isArray(choiceField.choice);
   const hasChoicesArray = Array.isArray(choiceField.choices);
   
