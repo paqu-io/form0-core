@@ -1,5 +1,6 @@
 import { flattenFields } from './flatten-fields.js';
 import { isSupportedFieldType } from './field-types.js';
+import { validateChoiceFieldChoices } from './choice-field-utils.js';
 
 export function validateSchema(form) {
   const fields = flattenFields(form.elements);
@@ -46,8 +47,26 @@ export function validateSchema(form) {
       }
     }
 
-    if (field.type === 'ChoiceField' && !Array.isArray(field.choices)) {
-      throw new Error(`ChoiceField "${field.data_name}" must have a 'choices' array`);
+    if (field.type === 'SingleChoiceField') {
+      if (!Array.isArray(field.choices)) {
+        throw new Error(`SingleChoiceField "${field.data_name}" must have a 'choice' array`);
+      }
+      
+      const validation = validateChoiceFieldChoices(field.choices);
+      if (!validation.isValid) {
+        throw new Error(`SingleChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    if (field.type === 'MultiChoiceField') {
+      if (!Array.isArray(field.choices)) {
+        throw new Error(`MultiChoiceField "${field.data_name}" must have a 'choices' array`);
+      }
+      
+      const validation = validateChoiceFieldChoices(field.choices);
+      if (!validation.isValid) {
+        throw new Error(`MultiChoiceField "${field.data_name}" validation failed: ${validation.errors.join(', ')}`);
+      }
     }
 
     if (field.type === 'NumericField') {

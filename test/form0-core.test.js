@@ -28,17 +28,18 @@ const schema = {
               'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
           },
           {
-            type: 'ChoiceField',
+            type: 'SingleChoiceField',
             key: '0180f',
             data_name: 'city',
             label: 'City',
+            display: 'default', //SingleChoiceField can be 'default' or 'radio'
             required: true,
             required_conditions: null,
             hidden: false,
             visible_conditions: null,
             read_only: false,
             read_only_conditions: null,
-            allow_other: true, //ChoiceField can be true or false
+            allow_other: true, //SingleChoiceField can be true or false
             choices: [
               {
                 label: 'Bogotá',
@@ -52,7 +53,71 @@ const schema = {
                 label: 'New York',
                 value: 'new_york',
               },
+              {
+                label: 'São Paulo - Centro',
+                value: 'sao_paulo_centro',
+              },
             ],
+          },
+          {
+            type: 'MultiChoiceField',
+            key: '0332f',
+            data_name: 'colors',
+            label: 'Please select your favorite colors',
+            display: 'default', //MultiChoiceField can be 'default' or 'checkbox'
+            required: true,
+            required_conditions: null,
+            hidden: false,
+            visible_conditions: null,
+            read_only: false,
+            read_only_conditions: null,
+            allow_other: true, //MultiChoiceField can be true or false
+            choices: [
+              {
+                label: 'Red',
+                value: 'red',
+              },
+              {
+                label: 'Blue',
+                value: 'blue',
+              },
+              {
+                label: 'Orange',
+                value: 'orange',
+              },
+              {
+                label: 'Yellow',
+                value: 'yellow',
+              },
+            ],
+          },
+          {
+            type: 'CalculatedField',
+            key: 'ea322',
+            data_name: 'city_calc',
+            label: 'city_calc',
+            required: false, //CalcualtedField is required = false by default
+            hidden: false,
+            visible_conditions: null,
+            read_only: true, //CalcualtedField is read_only = true by default
+            calculate: 'IF(OR(CHOICEVALUE($city) === "bogota", OTHER($city) === "Bogotá"), "Welcome to Bogotá!", "Welcome!")',
+            display: {
+              style: 'text', // or numeric, date, currency
+            },
+          },
+          {
+            type: 'CalculatedField',
+            key: 'aa123',
+            data_name: 'colors_calc',
+            label: 'colors_calc',
+            required: false, //CalcualtedField is required = false by default
+            hidden: false,
+            visible_conditions: null,
+            read_only: true, //CalcualtedField is read_only = true by default
+            calculate: 'CHOICELABELS($colors)',
+            display: {
+              style: 'text', // or numeric, date, currency
+            },
           },
           {
             type: 'NumericField',
@@ -164,6 +229,54 @@ const schema = {
   },
 };
 
-const engine = createFormEngine({ schema, initialValues: { first_name: 'Alice', age: 21 } });
+// Test the value generation utility
+// console.log('Testing value generation from labels:');
+// console.log('Bogotá ->', generateValueFromLabel('Bogotá'));
+// console.log('São Paulo - Centro ->', generateValueFromLabel('São Paulo - Centro'));
+// console.log('New York ->', generateValueFromLabel('New York'));
+// console.log('Recanati ->', generateValueFromLabel('Recanati'));
+// console.log();
+
+// // Test choice processing utility
+// console.log('Testing choice processing:');
+// const choicesWithMissingValues = [
+//   { label: 'Bogotá', value: 'bogota' },
+//   { label: 'Recanati' }, // missing value
+//   { label: 'São Paulo - Centro' }, // missing value with accents
+// ];
+// const processedChoices = processChoiceFieldChoices(choicesWithMissingValues);
+// console.log('Processed choices:', JSON.stringify(processedChoices, null, 2));
+// console.log();
+
+// Test with initial values - only value needed for predefined choices
+const initialValues = {
+  first_name: 'Alice',
+  age: 21,
+  city: {
+    choice: [
+      {
+        value: 'bogota'  // label will be auto-populated from schema
+      }
+    ],
+    other: []
+  },
+  colors: {
+    choices: [
+      {
+        value: 'red'  // label will be auto-populated from schema
+      },
+      {
+        value: 'yellow'  // label will be auto-populated from schema
+      }
+    ],
+    other: [
+      {
+        label: 'Purple'
+      }
+    ]
+  }
+};
+
+const engine = createFormEngine({ schema, initialValues });
 engine.eval();
-console.log(engine.getState());
+console.log(JSON.stringify(engine.getState(), null, 2));

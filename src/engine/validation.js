@@ -8,12 +8,14 @@ export function validateFields(schema, values, errors) {
     delete errors[dataName]; // ✅ clear previous error
 
     const value = values[dataName];
+    
     if (field.type === 'TextField' && field.pattern) {
       const re = new RegExp(field.pattern);
       if (!re.test(value)) {
         errors[dataName] = `Invalid format for ${field.data_name}`;
       }
     }
+    
     if (field.type === 'NumericField') {
       if (typeof value === 'number') {
         if (field.format === 'integer' && !Number.isInteger(value)) {
@@ -24,6 +26,100 @@ export function validateFields(schema, values, errors) {
         }
         if (field.max !== undefined && value > field.max) {
           errors[field.data_name] = `Must be at most ${field.max}`;
+        }
+      }
+    }
+    
+    if (field.type === 'SingleChoiceField') {
+      if (value !== null && value !== undefined) {
+        // Validate the structure of SingleChoiceField value
+        if (typeof value !== 'object' || value === null) {
+          errors[field.data_name] = `${field.data_name} must be an object with 'choice' and 'other' arrays`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.choice)) {
+          errors[field.data_name] = `${field.data_name}.choice must be an array`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.other)) {
+          errors[field.data_name] = `${field.data_name}.other must be an array`;
+          continue;
+        }
+        
+        // Validate choice selections
+        const validChoiceValues = new Set(field.choices.map(c => c.value));
+        for (const choice of value.choice) {
+          if (!choice || typeof choice !== 'object' || !choice.value) {
+            errors[field.data_name] = `${field.data_name}.choice must contain objects with 'value' property`;
+            break;
+          }
+          
+          if (!validChoiceValues.has(choice.value)) {
+            errors[field.data_name] = `${field.data_name}.choice contains invalid value: ${choice.value}`;
+            break;
+          }
+        }
+        
+        // Validate other selections
+        for (const other of value.other) {
+          if (!other || typeof other !== 'object' || !other.label) {
+            errors[field.data_name] = `${field.data_name}.other must contain objects with 'label' property`;
+            break;
+          }
+        }
+        
+        // Check if allow_other is false but other array is not empty
+        if (!field.allow_other && value.other.length > 0) {
+          errors[field.data_name] = `${field.data_name} does not allow 'other' values`;
+        }
+      }
+    }
+
+    if (field.type === 'MultiChoiceField') {
+      if (value !== null && value !== undefined) {
+        // Validate the structure of MultiChoiceField value
+        if (typeof value !== 'object' || value === null) {
+          errors[field.data_name] = `${field.data_name} must be an object with 'choices' and 'other' arrays`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.choices)) {
+          errors[field.data_name] = `${field.data_name}.choices must be an array`;
+          continue;
+        }
+        
+        if (!Array.isArray(value.other)) {
+          errors[field.data_name] = `${field.data_name}.other must be an array`;
+          continue;
+        }
+        
+        // Validate choice selections
+        const validChoiceValues = new Set(field.choices.map(c => c.value));
+        for (const choice of value.choices) {
+          if (!choice || typeof choice !== 'object' || !choice.value) {
+            errors[field.data_name] = `${field.data_name}.choices must contain objects with 'value' property`;
+            break;
+          }
+          
+          if (!validChoiceValues.has(choice.value)) {
+            errors[field.data_name] = `${field.data_name}.choices contains invalid value: ${choice.value}`;
+            break;
+          }
+        }
+        
+        // Validate other selections
+        for (const other of value.other) {
+          if (!other || typeof other !== 'object' || !other.label) {
+            errors[field.data_name] = `${field.data_name}.other must contain objects with 'label' property`;
+            break;
+          }
+        }
+        
+        // Check if allow_other is false but other array is not empty
+        if (!field.allow_other && value.other.length > 0) {
+          errors[field.data_name] = `${field.data_name} does not allow 'other' values`;
         }
       }
     }
