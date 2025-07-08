@@ -82,4 +82,15 @@ export function validateSchema(form) {
       }
     }
   }
+  
+  // Validate events section if present
+  if (form.events) {
+    if (typeof form.events !== 'object') {
+      throw new Error('Form events must be an object');
+    }
+    
+    if (form.events.code && typeof form.events.code !== 'string') {
+      throw new Error('Form events.code must be a string');
+    }
+  }
 }

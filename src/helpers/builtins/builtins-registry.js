@@ -10,6 +10,10 @@ import { OTHER } from './choice/other.js';
 import { CHOICEVALUES } from './choice/choicevalues.js';
 import { CHOICELABELS } from './choice/choicelabels.js';
 
+// Import event builtins
+import { ALERT } from './event/ui/alert.js';
+import { __consumeEventOperations } from './event/event-operations-collector.js';
+
 // Export individual builtins
 export { IF } from './logical/if.js';
 export { AND } from './logical/and.js';
@@ -21,6 +25,10 @@ export { HASOTHER } from './choice/hasother.js';
 export { OTHER } from './choice/other.js';
 export { CHOICEVALUES } from './choice/choicevalues.js';
 export { CHOICELABELS } from './choice/choicelabels.js';
+
+// Export event builtins
+export { ALERT } from './event/ui/alert.js';
+export { __consumeEventOperations } from './event/event-operations-collector.js';
 
 // Main builtins object for backward compatibility
 export const builtins = {
@@ -35,3 +43,9 @@ export const builtins = {
   CHOICEVALUES,
   CHOICELABELS,
 }; 
+
+// Event-specific builtins (only available in event context)
+export const eventBuiltins = {
+  ALERT,
+  // Future: CONFIRM, NOTIFY, SETFIELD, etc.
+};

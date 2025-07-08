@@ -4,6 +4,18 @@ const schema = {
   form: {
     name: 'MyForm',
     description: 'This is a test description',
+    events: {
+      code: `
+        function alertTest (event) {
+          if (CHOICEVALUE($city) === 'bogota') {
+            ALERT('Welcome to South America!');
+            ALERT('Welcome to Colombia!');
+          }
+        }
+        
+        ON('load-record', alertTest);
+      `
+    },
     elements: [
       {
         type: 'Section',
@@ -100,7 +112,10 @@ const schema = {
             hidden: false,
             visible_conditions: null,
             read_only: true, //CalcualtedField is read_only = true by default
-            calculate: 'IF(OR(CHOICEVALUE($city) === "bogota", OTHER($city) === "Bogotá"), "Welcome to Bogotá!", "Welcome!")',
+            calculate: `
+            const citySelection = CHOICEVALUE($city);
+            SETRESULT(IF(OR(citySelection === "bogota", OTHER($city) === "Bogotá"), "Welcome to Bogotá!", "Welcome!"));
+            `,
             display: {
               style: 'text', // or numeric, date, currency
             },
@@ -114,7 +129,7 @@ const schema = {
             hidden: false,
             visible_conditions: null,
             read_only: true, //CalcualtedField is read_only = true by default
-            calculate: 'CHOICELABELS($colors)',
+            calculate: 'CHOICELABELS($colors) + " -> Other: " + OTHER($colors)',
             display: {
               style: 'text', // or numeric, date, currency
             },
@@ -280,3 +295,5 @@ const initialValues = {
 const engine = createFormEngine({ schema, initialValues });
 engine.eval();
 console.log(JSON.stringify(engine.getState(), null, 2));
+const operations = engine.trigger('load-record');
+console.log('Load operations:', operations);

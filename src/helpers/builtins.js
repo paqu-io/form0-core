@@ -1,2 +1,2 @@
 // Re-export everything from modular structure
-export { builtins, __consumeResult } from './builtins/builtins-registry.js';
+export { builtins, eventBuiltins, __consumeResult, __consumeEventOperations } from './builtins/builtins-registry.js';
