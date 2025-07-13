@@ -12,6 +12,7 @@ import { CHOICELABELS } from './choice/choicelabels.js';
 
 // Import event builtins
 import { ALERT } from './event/ui/alert.js';
+import { SETVALUE } from './event/field/setvalue.js';
 import { __consumeEventOperations } from './event/event-operations-collector.js';
 
 // Export individual builtins
@@ -28,6 +29,7 @@ export { CHOICELABELS } from './choice/choicelabels.js';
 
 // Export event builtins
 export { ALERT } from './event/ui/alert.js';
+export { SETVALUE } from './event/field/setvalue.js';
 export { __consumeEventOperations } from './event/event-operations-collector.js';
 
 // Main builtins object for backward compatibility
@@ -47,5 +49,6 @@ export const builtins = {
 // Event-specific builtins (only available in event context)
 export const eventBuiltins = {
   ALERT,
-  // Future: CONFIRM, NOTIFY, SETFIELD, etc.
-};
+  SETVALUE,
+  // Future: CONFIRM, NOTIFY, etc.
+}; 

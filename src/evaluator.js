@@ -34,10 +34,10 @@ export function runExpression(expr, context = {}, securityConfig = DEFAULT_SECUR
         return consumed.called ? consumed.value : result;
       } else {
         // Execute as expression (existing behavior)
-        const fn = new Function(...keys, `return (${expr});`);
-        const result = fn(...values);
-        const consumed = __consumeResult();
-        return consumed.called ? consumed.value : result;
+      const fn = new Function(...keys, `return (${expr});`);
+      const result = fn(...values);
+      const consumed = __consumeResult();
+      return consumed.called ? consumed.value : result;
       }
     };
 

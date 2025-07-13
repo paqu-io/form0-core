@@ -7,10 +7,8 @@ const schema = {
     events: {
       code: `
         function alertTest (event) {
-          if (CHOICEVALUE($city) === 'bogota') {
-            ALERT('Welcome to South America!');
-            ALERT('Welcome to Colombia!');
-          }
+          ALERT('Welcome to South America!');
+          ALERT('Welcome to Colombia!');
         }
         
         ON('load-record', alertTest);
@@ -195,7 +193,7 @@ const schema = {
       },
       {
         type: 'Section',
-        key: 'e4567',
+        key: 'e4568',
         data_name: 'section_drill',
         label: 'Drilldown section test',
         display: 'drilldown', //Section can be 'inline' or 'drilldown'
