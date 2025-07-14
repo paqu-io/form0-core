@@ -1,4 +1,4 @@
-import { builtins } from '../helpers/builtins.js';
+import { builtins, eventBuiltins } from '../helpers/builtins.js';
 
 // Security modes for expression evaluation
 export const SECURITY_MODES = {
@@ -38,15 +38,16 @@ export const SAFE_SECURITY_CONFIG = {
   ]
 };
 
-// Cache valid builtins as a Set for O(1) lookups
-let validBuiltinsSet = null;
-
 // Helper function to validate builtin function names in expressions
-function validateBuiltinNames(expr) {
-  // Lazy initialization of valid builtins set
-  if (!validBuiltinsSet) {
-    validBuiltinsSet = new Set(Object.keys(builtins));
-  }
+function validateBuiltinNames(expr, includeEventBuiltins = false) {
+  // Always use fresh builtin sets (no caching) to support dynamic builtin registration
+  const validBuiltinsSet = new Set(Object.keys(builtins));
+  const validEventBuiltinsSet = new Set(Object.keys(eventBuiltins));
+  
+  // Combine regular and event builtins if in event context
+  const allowedBuiltins = includeEventBuiltins 
+    ? new Set([...validBuiltinsSet, ...validEventBuiltinsSet])
+    : validBuiltinsSet;
   
   // Extract function calls from the expression
   // This regex matches function calls like FUNCTIONNAME( allowing for whitespace
@@ -57,7 +58,7 @@ function validateBuiltinNames(expr) {
     const functionName = match[1];
     
     // Skip if it's a valid builtin
-    if (validBuiltinsSet.has(functionName)) {
+    if (allowedBuiltins.has(functionName)) {
       continue;
     }
     
@@ -67,8 +68,13 @@ function validateBuiltinNames(expr) {
       continue;
     }
     
+    // Skip special event functions when in event context
+    if (includeEventBuiltins && functionName === 'ON') {
+      continue;
+    }
+    
     // Check for potential typos by finding similar builtin names
-    const validBuiltins = [...validBuiltinsSet]; // Convert back to array for filtering
+    const validBuiltins = [...allowedBuiltins]; // Convert back to array for filtering
     const similarBuiltins = validBuiltins.filter(builtin => {
       // Simple similarity check - same length or very close
       const lengthDiff = Math.abs(builtin.length - functionName.length);
@@ -89,10 +95,10 @@ function validateBuiltinNames(expr) {
   return { valid: true };
 }
 
-export function validateExpression(expr, securityConfig = DEFAULT_SECURITY_CONFIG) {
+export function validateExpression(expr, securityConfig = DEFAULT_SECURITY_CONFIG, includeEventBuiltins = false) {
   // Only validate builtin names if explicitly enabled
   if (securityConfig.validateBuiltins === true) {
-    const builtinValidation = validateBuiltinNames(expr);
+    const builtinValidation = validateBuiltinNames(expr, includeEventBuiltins);
     if (!builtinValidation.valid) {
       return builtinValidation;
     }

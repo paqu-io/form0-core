@@ -1,0 +1,239 @@
+---
+title: "SETVALUE Builtin"
+description: "Set field values in form0 event contexts"
+category: "event"
+tags: ["event", "field", "value", "manipulation"]
+---
+
+# SETVALUE Function
+
+The `SETVALUE` builtin sets a field value within event context, automatically collecting the operation for platform execution. This function supports multiple field types including TextField, NumericField, SingleChoiceField, and MultiChoiceField.
+
+## Syntax
+
+```javascript
+SETVALUE('field_dataname', value)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `fieldDataName` | `string` | The data name of the field to set |
+| `valueToSet` | `any` | The value to set (string, number, array, etc.) |
+
+## Return Value
+
+Returns an operation descriptor for platform execution (for backward compatibility), while internally collecting the operation for automatic execution.
+
+## Examples
+
+### TextField Value
+
+```javascript
+// Set text field value
+SETVALUE('field_dataname', 'value_to_set')
+```
+
+### NumericField Value
+
+```javascript
+// Set numeric field value
+SETVALUE('field_dataname', 12)
+```
+
+### SingleChoiceField Value
+
+```javascript
+// Set single choice field value
+SETVALUE('field_dataname', 'choicefield_value_to_set')
+```
+
+### MultiChoiceField Value
+
+```javascript
+// Set multiple choice field value
+SETVALUE('field_dataname', ['value1', 'value2', 'value3'])
+```
+
+### Conditional Value Setting
+
+```javascript
+// Set field value based on condition
+SETVALUE('discount_field', IF(user.isPremium, 20, 10))
+```
+
+### Dynamic Value Setting
+
+```javascript
+// Set field value based on other fields
+SETVALUE('full_name', firstName + " " + lastName)
+```
+
+## Field Type Compatibility
+
+The `SETVALUE` function supports different value formats for different field types:
+
+| Field Type | Value Format | Example |
+|------------|-------------|---------|
+| `TextField` | String | `'text value'` |
+| `NumericField` | Number | `42` or `3.14` |
+| `SingleChoiceField` | String choice value | `'option1'` |
+| `MultiChoiceField` | Array of strings | `['option1', 'option2']` |
+
+## How It Works
+
+1. **Operation Creation**: Creates a field operation descriptor with type 'FIELD_OPERATION'
+2. **Operation Collection**: Uses `__collectEventOperation` to collect the operation
+3. **Platform Execution**: The platform retrieves and executes collected operations
+4. **Value Formatting**: The platform handles appropriate value formatting for each field type
+5. **Field Update**: The field value is updated in the form state
+
+## Common Use Cases
+
+- **Field auto-population**: Setting field values based on other field changes
+- **Form validation responses**: Setting fields based on validation results
+- **Business rule applications**: Applying complex business logic to field values
+- **User interaction responses**: Updating fields based on user actions
+- **Data calculations**: Setting calculated values in fields
+- **Conditional field updates**: Setting different values based on conditions
+
+## Best Practices
+
+1. **Use correct field data names**: Ensure the field data name exists in your form
+2. **Match field types**: Use appropriate value formats for each field type
+3. **Handle null/undefined**: Consider edge cases in your value assignments
+4. **Event context only**: This function is only available in event contexts
+5. **Platform dependency**: The actual field update depends on platform implementation
+
+## Important Notes
+
+- **Event context only**: This builtin is only available in event contexts, not in calculations
+- **Platform execution**: The actual field value setting is handled by the platform
+- **Operation collection**: Operations are automatically collected and executed
+- **Type handling**: The platform handles value formatting for different field types
+- **Asynchronous execution**: Field updates may occur asynchronously after event completion
+
+## Related Functions
+
+- [`ALERT`](../ui/alert.mdx) - Display alert messages in event contexts
+- [`IF`](../../logical/if.mdx) - Conditional logic for value selection
+- [`AND`](../../logical/and.mdx) - Multiple condition checks
+- [`OR`](../../logical/or.mdx) - Alternative condition checks
+
+## Examples by Use Case
+
+### Auto-calculation Fields
+
+```javascript
+// Calculate and set total price
+SETVALUE('total_price', price * quantity * (1 + taxRate))
+```
+
+### Form Validation Responses
+
+```javascript
+// Set error message field based on validation
+SETVALUE('error_message', 
+  IF(email.isValid, '', 'Please enter a valid email address')
+)
+```
+
+### User Type Based Updates
+
+```javascript
+// Set discount based on user type
+SETVALUE('discount_amount', 
+  IF(user.isPremium, orderTotal * 0.2, orderTotal * 0.05)
+)
+```
+
+### Multi-field Calculations
+
+```javascript
+// Calculate and set BMI
+SETVALUE('bmi', weight / (height * height))
+```
+
+### Choice Field Updates
+
+```javascript
+// Set available options based on category
+SETVALUE('subcategory_options', 
+  IF(category === 'electronics', 
+    ['phone', 'laptop', 'tablet'],
+    ['shirt', 'pants', 'shoes']
+  )
+)
+```
+
+### Data Aggregation
+
+```javascript
+// Set summary field
+SETVALUE('order_summary', 
+  'Items: ' + itemCount + ', Total: $' + totalAmount
+)
+```
+
+## Advanced Examples
+
+### Complex Business Logic
+
+```javascript
+// Calculate shipping cost with multiple factors
+SETVALUE('shipping_cost',
+  IF(country === "US",
+    IF(orderValue > 50, 0, 5.99),
+    IF(orderValue > 100, 10, 15.99)
+  )
+)
+```
+
+### Multi-step Field Updates
+
+```javascript
+// Update multiple related fields
+SETVALUE('first_name', extractedFirstName)
+SETVALUE('last_name', extractedLastName)
+SETVALUE('full_name', extractedFirstName + " " + extractedLastName)
+```
+
+### Conditional Multi-choice Updates
+
+```javascript
+// Set permissions based on user role
+SETVALUE('user_permissions',
+  IF(userRole === 'admin',
+    ['read', 'write', 'delete', 'admin'],
+    IF(userRole === 'editor',
+      ['read', 'write'],
+      ['read']
+    )
+  )
+)
+```
+
+### Dynamic Field Population
+
+```javascript
+// Set field based on external data
+SETVALUE('user_profile', 
+  IF(userId.length > 0, 
+    lookupUserProfile(userId),
+    'No user selected'
+  )
+)
+```
+
+### Form State Management
+
+```javascript
+// Update form status field
+SETVALUE('form_status',
+  IF(allFieldsValid,
+    'ready_for_submission',
+    'incomplete'
+  )
+)
+``` 
