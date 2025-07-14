@@ -1,4 +1,5 @@
 import { __consumeResult } from './helpers/builtins.js';
+import { __setEvalContext, __clearEvalContext } from './helpers/builtins/control/eval.js';
 import { 
   validateExpression, 
   createSecureContext, 
@@ -22,22 +23,30 @@ export function runExpression(expr, context = {}, securityConfig = DEFAULT_SECUR
 
     // Execute expression
     const executeExpression = () => {
-      // Handle both expressions and multi-line code (Windows-safe)
-      const isMultiLine = expr.includes('\r\n') || expr.includes('\n') || expr.includes('function');
+      // Set context for EVAL() before execution
+      __setEvalContext(secureContext);
       
-      if (isMultiLine) {
-        // Execute as code block (recompile each time for now)
-        const fn = new Function(...keys, expr);
-        const result = fn(...values);
-        // Check for consumed result from SETRESULT() calls in multiline code
-        const consumed = __consumeResult();
-        return consumed.called ? consumed.value : result;
-      } else {
-        // Execute as expression (existing behavior)
-      const fn = new Function(...keys, `return (${expr});`);
-      const result = fn(...values);
-      const consumed = __consumeResult();
-      return consumed.called ? consumed.value : result;
+      try {
+        // Handle both expressions and multi-line code (Windows-safe)
+        const isMultiLine = expr.includes('\r\n') || expr.includes('\n') || expr.includes('function');
+        
+        if (isMultiLine) {
+          // Execute as code block (recompile each time for now)
+          const fn = new Function(...keys, expr);
+          const result = fn(...values);
+          // Check for consumed result from SETRESULT() calls in multiline code
+          const consumed = __consumeResult();
+          return consumed.called ? consumed.value : result;
+        } else {
+          // Execute as expression (existing behavior)
+          const fn = new Function(...keys, `return (${expr});`);
+          const result = fn(...values);
+          const consumed = __consumeResult();
+          return consumed.called ? consumed.value : result;
+        }
+      } finally {
+        // Always clear EVAL context after execution
+        __clearEvalContext();
       }
     };
 

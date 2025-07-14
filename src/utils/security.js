@@ -38,21 +38,11 @@ export const SAFE_SECURITY_CONFIG = {
   ]
 };
 
-// Cache valid builtins as a Set for O(1) lookups
-let validBuiltinsSet = null;
-let validEventBuiltinsSet = null;
-
 // Helper function to validate builtin function names in expressions
 function validateBuiltinNames(expr, includeEventBuiltins = false) {
-  // Lazy initialization of valid builtins set
-  if (!validBuiltinsSet) {
-    validBuiltinsSet = new Set(Object.keys(builtins));
-  }
-  
-  // Lazy initialization of valid event builtins set
-  if (!validEventBuiltinsSet) {
-    validEventBuiltinsSet = new Set(Object.keys(eventBuiltins));
-  }
+  // Always use fresh builtin sets (no caching) to support dynamic builtin registration
+  const validBuiltinsSet = new Set(Object.keys(builtins));
+  const validEventBuiltinsSet = new Set(Object.keys(eventBuiltins));
   
   // Combine regular and event builtins if in event context
   const allowedBuiltins = includeEventBuiltins 

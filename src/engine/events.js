@@ -1,6 +1,9 @@
 import { runExpression } from '../evaluator.js';
 import { __consumeEventOperations } from '../helpers/builtins.js';
 
+// Global registry to track logged event handlers (development only)
+const _loggedHandlers = new Set();
+
 /**
  * EventManager handles form event registration and execution
  */
@@ -32,30 +35,16 @@ export class EventManager {
    * @param {Object} context - The execution context
    */
   executeEventCode(code, context) {
-    // Create enhanced context with ON() builtin
-    const enhancedContext = {
-      ...context,
-      ON: this.createOnBuiltin(),
-    };
-    
     // Execute the code to register event listeners (same security as calculated fields)
-    runExpression(code, enhancedContext, this.securityConfig, true);
+    // ON() and OFF() are now available as regular event builtins
+    runExpression(code, context, this.securityConfig, true);
+    
+    // Process any ON/OFF operations that were collected during initialization
+    const initOperations = __consumeEventOperations();
+    this.processEventOperations(initOperations);
   }
   
-  /**
-   * Create the ON() builtin function
-   * @returns {Function} The ON builtin function
-   */
-  createOnBuiltin() {
-    return (eventType, fieldKeyOrCallback, callback) => {
-      // Handle both: ON('load-record', func) and ON('change', 'field', func)
-      if (typeof fieldKeyOrCallback === 'function') {
-        this.registerListener(eventType, '*', fieldKeyOrCallback);
-      } else {
-        this.registerListener(eventType, fieldKeyOrCallback, callback);
-      }
-    };
-  }
+
   
   /**
    * Register an event listener
@@ -75,7 +64,126 @@ export class EventManager {
     
     eventMap.get(fieldKey).push(callback);
   }
+
+  /**
+   * Remove event listener(s)
+   * @param {string} eventType - The event type
+   * @param {string} fieldKey - The field key or '*' for all fields
+   * @param {Function} [callback] - Specific callback to remove, or undefined to remove all
+   */
+  removeListener(eventType, fieldKey, callback) {
+    const eventMap = this.listeners.get(eventType);
+    if (!eventMap) return;
+    
+    const fieldListeners = eventMap.get(fieldKey);
+    if (!fieldListeners) return;
+    
+    if (callback) {
+      // Remove specific callback
+      const index = fieldListeners.indexOf(callback);
+      if (index > -1) {
+        fieldListeners.splice(index, 1);
+      }
+    } else {
+      // Remove all callbacks for this field
+      fieldListeners.length = 0;
+    }
+    
+    // Clean up empty arrays
+    if (fieldListeners.length === 0) {
+      eventMap.delete(fieldKey);
+    }
+    
+    // Clean up empty event maps
+    if (eventMap.size === 0) {
+      this.listeners.delete(eventType);
+    }
+  }
+
+  /**
+   * Process ON/OFF operations during event execution
+   * @param {Array} operations - Array of operation descriptors
+   */
+  processEventOperations(operations) {
+    operations.forEach(operation => {
+      if (operation.type === 'EVENT_OPERATION') {
+        const { operation: op, params } = operation;
+        
+        if (op === 'ON') {
+          this.registerListener(params.eventType, params.fieldKey, params.callback);
+          
+          // Only log if this handler hasn't been logged before (prevents spam during development)
+          const functionName = params.callback.name || 'function';
+          const handlerKey = `${params.eventType}:${params.fieldKey}:${functionName}`;
+          
+          if (!_loggedHandlers.has(handlerKey)) {
+            _loggedHandlers.add(handlerKey);
+            
+            // Format console output cleanly
+            const isGlobalEvent = params.fieldKey === '*';
+            const displayText = isGlobalEvent 
+              ? `ON('${params.eventType}', ${functionName})`
+              : `ON('${params.eventType}', '${params.fieldKey}', ${functionName})`;
+            console.log(`🔧 [EVENT HANDLER] Registered: ${displayText}`);
+          }
+          
+        } else if (op === 'OFF') {
+          this.removeListener(params.eventType, params.fieldKey, params.callback);
+          
+          // Always log OFF operations since they represent dynamic changes
+          const isGlobalEvent = params.fieldKey === '*';
+          const hasCallback = params.callback !== undefined;
+          
+          let displayText;
+          if (isGlobalEvent) {
+            displayText = hasCallback 
+              ? `OFF('${params.eventType}', ${params.callback.name || 'function'})`
+              : `OFF('${params.eventType}')`;
+          } else {
+            displayText = hasCallback 
+              ? `OFF('${params.eventType}', '${params.fieldKey}', ${params.callback.name || 'function'})`
+              : `OFF('${params.eventType}', '${params.fieldKey}')`;
+          }
+          console.log(`🔧 [EVENT HANDLER] Removed: ${displayText}`);
+          
+          // Clear logged handlers cache for removed handlers
+          if (hasCallback) {
+            const functionName = params.callback.name || 'function';
+            const handlerKey = `${params.eventType}:${params.fieldKey}:${functionName}`;
+            _loggedHandlers.delete(handlerKey);
+          } else {
+            // If removing all handlers, clear all related entries
+            const prefix = `${params.eventType}:${params.fieldKey}:`;
+            for (const key of _loggedHandlers) {
+              if (key.startsWith(prefix)) {
+                _loggedHandlers.delete(key);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
   
+  /**
+   * Execute event handler with current form context
+   * @param {Function} callback - The event handler function
+   * @param {Object} event - The event object
+   * @returns {*} The result of the event handler
+   */
+  executeHandlerWithContext(callback, event) {
+    // Create a context that includes the event object and current form state
+    const contextWithEvent = {
+      ...this.eventContext,
+      event: event
+    };
+    
+    // Execute the callback function with the current context
+    // This ensures EVAL() and other builtins have access to field values
+    const functionCall = `(${callback.toString()})(event)`;
+    return runExpression(functionCall, contextWithEvent, this.securityConfig, true);
+  }
+
   /**
    * Called when events are triggered
    * @param {string} eventType - The event type
@@ -104,12 +212,17 @@ export class EventManager {
     
     [...fieldListeners, ...wildcardListeners].forEach(callback => {
       try {
-        // Execute the callback
-        const result = callback(event);
+        // Execute the callback with current form context
+        // This ensures EVAL() and other builtins have access to field values
+        const result = this.executeHandlerWithContext(callback, event);
         
         // Consume any collected event operations
         const collectedOps = __consumeEventOperations();
         operations.push(...collectedOps);
+        
+        // Note: EVENT_OPERATION processing (ON/OFF) is handled only during initialization
+        // If event handlers contain ON/OFF calls, they will be in the operations array
+        // but won't be processed here to avoid duplicate registrations
         
         // For backward compatibility, still handle returned operations
         if (result && result.type === 'UI_OPERATION') {
