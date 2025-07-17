@@ -24,7 +24,7 @@ export function createFormEngine({
   // Create a lookup map for choice fields
   const choiceFieldMap = new Map();
   for (const field of allFields) {
-    if (field.type === 'SingleChoiceField' || field.type === 'MultiChoiceField') {
+    if (field.type === 'SingleChoiceField' || field.type === 'MultiChoiceField' || field.type === 'BooleanField') {
       const valueToLabelMap = new Map();
       field.choices.forEach(choice => {
         valueToLabelMap.set(choice.value, choice.label);
@@ -35,22 +35,10 @@ export function createFormEngine({
   
   for (const field of allFields) {
     if (!(field.data_name in values)) {
-      // Initialize SingleChoiceField with proper structure
-      if (field.type === 'SingleChoiceField') {
-        values[field.data_name] = {
-          choice: [],
-          other: []
-        };
-      } else if (field.type === 'MultiChoiceField') {
-        values[field.data_name] = {
-          choices: [],
-          other: []
-        };
-      } else {
-        values[field.data_name] = null;
-      }
-    } else if (field.type === 'SingleChoiceField') {
-      // Enrich SingleChoiceField values with labels from schema
+      // Initialize field with default value if specified
+      values[field.data_name] = getDefaultValue(field);
+    } else if (field.type === 'SingleChoiceField' || field.type === 'BooleanField') {
+      // Enrich SingleChoiceField and BooleanField values with labels from schema
       const fieldValue = values[field.data_name];
       if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choice)) {
         const labelMap = choiceFieldMap.get(field.data_name);
@@ -139,4 +127,73 @@ export function createFormEngine({
     trigger,
     getState,
   };
+}
+
+function getDefaultValue(field) {
+  if (field.default_value === null || field.default_value === undefined) {
+    // Return appropriate default structure for each field type
+    switch (field.type) {
+      case 'SingleChoiceField':
+      case 'BooleanField':
+        return { choice: [], other: [] };
+      case 'MultiChoiceField':
+        return { choices: [], other: [] };
+      case 'CalculatedField':
+        return null; // Calculated fields don't have user input
+      default:
+        return null;
+    }
+  }
+
+  switch (field.type) {
+    case 'TextField':
+      return field.default_value;
+      
+    case 'NumericField':
+      return field.default_value;
+      
+    case 'SingleChoiceField':
+    case 'BooleanField':
+      // For SingleChoiceField and BooleanField, we need to find the choice and create the proper structure
+      const choice = field.choices.find(c => c.value === field.default_value);
+      if (choice) {
+        return {
+          choice: [{ value: choice.value, label: choice.label }],
+          other: []
+        };
+      }
+      return { choice: [], other: [] };
+      
+    case 'MultiChoiceField':
+      // For MultiChoiceField, we need to find all choices and create the proper structure
+      const selectedChoices = field.choices
+        .filter(c => field.default_value.includes(c.value))
+        .map(c => ({ value: c.value, label: c.label }));
+      return {
+        choices: selectedChoices,
+        other: []
+      };
+      
+    case 'DateField':
+      if (field.default_value === 'now') {
+        const today = new Date();
+        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+      }
+      return null;
+      
+    case 'TimeField':
+      if (field.default_value === 'now') {
+        const now = new Date();
+        return now.toTimeString().split(' ')[0]; // HH:MM:SS format
+      }
+      return null;
+      
+    case 'CalculatedField':
+    case 'Section':
+    case 'LabelField':
+      return null; // These don't support default values
+      
+    default:
+      return null;
+  }
 }
