@@ -11,6 +11,7 @@ export const FIELD_TYPES = new Set([
   'LabelField',
   'SignatureField',
   'PhotoField',
+  'VideoField',
 ]);
 
 export function isSupportedFieldType(type) {

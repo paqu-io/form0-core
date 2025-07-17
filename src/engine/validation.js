@@ -181,5 +181,41 @@ export function validateFields(schema, values, errors) {
         // This allows the required validation to take priority
       }
     }
+
+    if (field.type === 'VideoField') {
+      if (value !== null && value !== undefined) {
+        if (!Array.isArray(value)) {
+          errors[field.data_name] = `${field.data_name} must be an array of video objects`;
+          continue;
+        }
+
+        let totalDuration = 0;
+        for (const video of value) {
+          if (typeof video !== 'object' || video === null) {
+            errors[field.data_name] = `${field.data_name} must contain only video objects`;
+            break;
+          }
+          if (typeof video.duration !== 'number' || video.duration < 0) {
+            errors[field.data_name] = `${field.data_name} contains a video with an invalid duration`;
+            break;
+          }
+          totalDuration += video.duration;
+        }
+
+        if (errors[field.data_name]) {
+          continue; // Stop if there was an error in the loop
+        }
+
+        // Only check min_length/max_length if there is at least one video with a valid duration
+        if (totalDuration > 0) {
+          if (field.min_length !== null && field.min_length !== undefined && totalDuration < (field.min_length * 60)) {
+            errors[field.data_name] = `${field.data_name} total duration must be at least ${field.min_length} minute(s)`;
+          }
+          if (field.max_length !== null && field.max_length !== undefined && totalDuration > (field.max_length * 60)) {
+            errors[field.data_name] = `${field.data_name} total duration must be at most ${field.max_length} minute(s)`;
+          }
+        }
+      }
+    }
   }
 }

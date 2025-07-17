@@ -209,6 +209,40 @@ export function validateSchema(form) {
         errors.push(`PhotoField "${field.data_name}" does not support third_option_enabled`);
       }
     }
+
+    if (field.type === 'VideoField') {
+      // Only allow display: 'default'
+      if (field.display !== 'default') {
+        errors.push(`VideoField "${field.data_name}" display must be 'default'`);
+      }
+      // Only allow default_value: null
+      if (field.default_value !== null) {
+        errors.push(`VideoField "${field.data_name}" default_value must be null`);
+      }
+      // min_length and max_length must be null or a number
+      if (field.min_length !== null && field.min_length !== undefined && typeof field.min_length !== 'number') {
+        errors.push(`VideoField "${field.data_name}" min_length must be null or a number`);
+      }
+      if (field.max_length !== null && field.max_length !== undefined && typeof field.max_length !== 'number') {
+        errors.push(`VideoField "${field.data_name}" max_length must be null or a number`);
+      }
+      // Forbid properties that don't make sense
+      if ('choices' in field) {
+        errors.push(`VideoField "${field.data_name}" does not support choices`);
+      }
+      if ('allow_other' in field) {
+        errors.push(`VideoField "${field.data_name}" does not support allow_other`);
+      }
+      if ('pattern' in field) {
+        errors.push(`VideoField "${field.data_name}" does not support pattern`);
+      }
+      if ('format' in field) {
+        errors.push(`VideoField "${field.data_name}" does not support format`);
+      }
+      if ('third_option_enabled' in field) {
+        errors.push(`VideoField "${field.data_name}" does not support third_option_enabled`);
+      }
+    }
   }
   
   // Add duplicate errors to the main errors array
