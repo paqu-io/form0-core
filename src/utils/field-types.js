@@ -4,7 +4,14 @@ export const FIELD_TYPES = new Set([
   'CalculatedField',
   'SingleChoiceField',
   'MultiChoiceField',
+  'DateField',
+  'TimeField',
   'Section',
+  'BooleanField',
+  'LabelField',
+  'SignatureField',
+  'PhotoField',
+  'VideoField',
 ]);
 
 export function isSupportedFieldType(type) {

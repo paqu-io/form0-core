@@ -55,7 +55,7 @@ export function isValidChoiceValue(value) {
 }
 
 /**
- * Processes SingleChoiceField choices to auto-generate missing values
+ * Processes SingleChoiceField and BooleanField choices to auto-generate missing values
  * @param {Array} choices - Array of choice objects
  * @returns {Array} - Array of choices with generated values
  */
@@ -98,7 +98,7 @@ export function processChoiceFieldChoices(choices) {
 }
 
 /**
- * Validates that all values in a SingleChoiceField are unique and valid
+ * Validates that all values in a SingleChoiceField or BooleanField are unique and valid
  * @param {Array} choices - Array of choice objects
  * @returns {Object} - Validation result with isValid and errors
  */
