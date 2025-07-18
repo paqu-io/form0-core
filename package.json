@@ -40,6 +40,9 @@
     "url": "https://github.com/paqu-io/form0-core/issues"
   },
   "homepage": "https://github.com/paqu-io/form0-core#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "ignore": "^7.0.5",
     "prettier": "^3.5.3"
