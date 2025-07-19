@@ -1,6 +1,30 @@
 import { flattenFields } from './flatten-fields.js';
+
+// /**
+//  * Utility to resolve the supporting image path for a field
+//  * If supporting_image_path is provided, use it; otherwise, default to data_name + '.jpg'
+//  * @param {object} field - The field definition
+//  * @returns {string|undefined} - The resolved image path or undefined
+//  */
+// export function resolveSupportingImagePath(field) {
+//   if (!field) return undefined;
+//   if (typeof field.supporting_image_path === 'string' && field.supporting_image_path.length > 0) {
+//     return field.supporting_image_path;
+//   }
+//   if (field.supporting_image) {
+//     // Try .jpg, .jpeg, .png in that order
+//     const exts = ['jpg', 'jpeg', 'png'];
+//     for (const ext of exts) {
+//       // In a real implementation, you might check file existence, but here just prefer .jpg > .jpeg > .png
+//       return `${field.data_name}.${ext}`;
+//     }
+//   }
+//   return undefined;
+// }
+
 import { isSupportedFieldType } from './field-types.js';
 import { validateChoiceFieldChoices } from './choice-field-utils.js';
+import { validateFieldConditions } from './operator-validation.js';
 
 export function validateSchema(form) {
   const fields = flattenFields(form.elements);
@@ -9,6 +33,14 @@ export function validateSchema(form) {
   const duplicateDataNames = new Set();
   const duplicateKeys = new Set();
   const errors = [];
+  
+  // Create a map of all fields by data_name for condition validation
+  const allFields = {};
+  fields.forEach(field => {
+    if (field.data_name) {
+      allFields[field.data_name] = field;
+    }
+  });
 
   for (const field of fields) {
     if (!isSupportedFieldType(field.type)) {
@@ -51,6 +83,36 @@ export function validateSchema(form) {
       const validation = validateDefaultValue(field, field.default_value);
       if (!validation.isValid) {
         errors.push(`Invalid default_value for ${field.data_name}: ${validation.error}`);
+      }
+    }
+
+    // Validate supporting_image attributes
+    const supportingImageAllowedTypes = ['TextField', 'NumericField', 'SingleChoiceField', 'MultiChoiceField', 'BooleanField', 'LabelField'];
+    
+    if ('supporting_image' in field) {
+      if (!supportingImageAllowedTypes.includes(field.type)) {
+        errors.push(`Field "${field.data_name}" (${field.type}) does not support supporting_image attribute`);
+      } else if (typeof field.supporting_image !== 'boolean') {
+        errors.push(`Field "${field.data_name}" has invalid supporting_image: must be boolean`);
+      }
+    }
+    
+    if ('supporting_image_path' in field) {
+      if (!supportingImageAllowedTypes.includes(field.type)) {
+        errors.push(`Field "${field.data_name}" (${field.type}) does not support supporting_image_path attribute`);
+      } else if (field.supporting_image_path !== null && typeof field.supporting_image_path !== 'string') {
+        errors.push(`Field "${field.data_name}" has invalid supporting_image_path: must be a string or null`);
+      }
+    }
+    
+    if ('supporting_image_display' in field) {
+      if (!supportingImageAllowedTypes.includes(field.type)) {
+        errors.push(`Field "${field.data_name}" (${field.type}) does not support supporting_image_display attribute`);
+      } else {
+        const validDisplays = [null, 'default', 'dialog'];
+        if (!validDisplays.includes(field.supporting_image_display)) {
+          errors.push(`Field "${field.data_name}" has invalid supporting_image_display: must be 'default', 'dialog', or null`);
+        }
       }
     }
 
@@ -243,6 +305,28 @@ export function validateSchema(form) {
         errors.push(`VideoField "${field.data_name}" does not support third_option_enabled`);
       }
     }
+
+    // Validate conditions for all field types
+    if (field.visible_conditions) {
+      const validation = validateFieldConditions(field, field.visible_conditions, allFields);
+      if (!validation.isValid) {
+        errors.push(...validation.errors);
+      }
+    }
+
+    if (field.requirement_conditions) {
+      const validation = validateFieldConditions(field, field.requirement_conditions, allFields);
+      if (!validation.isValid) {
+        errors.push(...validation.errors);
+      }
+    }
+
+    if (field.read_only_conditions) {
+      const validation = validateFieldConditions(field, field.read_only_conditions, allFields);
+      if (!validation.isValid) {
+        errors.push(...validation.errors);
+      }
+    }
   }
   
   // Add duplicate errors to the main errors array
@@ -267,7 +351,10 @@ export function validateSchema(form) {
   
   // Throw all errors at once if any were found
   if (errors.length > 0) {
-    throw new Error(errors.join('; '));
+    const errorMessage = errors.length === 1 
+      ? errors[0] 
+      : `Validation failed with ${errors.length} errors:\n${errors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`;
+    throw new Error(errorMessage);
   }
 }
 

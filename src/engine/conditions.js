@@ -5,7 +5,12 @@ const OPERATORS = {
   not_equal_to: (a, b) => a !== b,
   greater_than: (a, b) => a > b,
   less_than: (a, b) => a < b,
+  greater_or_equal_than: (a, b) => a >= b,
+  less_or_equal_than: (a, b) => a <= b,
   contains: (a, b) => Array.isArray(a) && a.includes(b),
+  starts_with: (a, b) => typeof a === 'string' && a.startsWith(b),
+  is_empty: (a) => a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0),
+  is_not_empty: (a) => !(a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0)),
 };
 
 export function evaluateConditions(conditions, values) {
@@ -34,7 +39,7 @@ export function evaluateVisibility(schema, values, visible) {
       const isVisible = evaluateConditions(field.visible_conditions, values);
       visible[field.data_name] = isVisible;
     } else {
-      visible[field.data_name] = field.hidden !== true;
+      visible[field.data_name] = field.visible === true;
     }
   });
 }
@@ -64,3 +69,6 @@ export function evaluateReadOnly(schema, values, read_only) {
     }
   });
 }
+
+// Export available operators for external use
+export { OPERATORS };
