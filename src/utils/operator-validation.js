@@ -110,20 +110,21 @@ export function validateFieldConditions(field, conditions, allFields = {}) {
       return;
     }
     
-    if (condition.operator && condition.field_key) {
+    // Use field_id (normalized to key by ensure-keys.js)
+    if (condition.operator && condition.field_id) {
       // Find the target field being referenced
-      const targetField = allFields[condition.field_key];
+      const targetField = allFields[condition.field_id];
       
       if (!targetField) {
         errors.push(
-          `Condition references unknown field "${condition.field_key}" in field "${field.data_name || field.key}"`
+          `Condition references unknown field "${condition.field_id}" in field "${field.data_name || field.key}"`
         );
         return;
       }
       
       if (!targetField.type) {
         errors.push(
-          `Target field "${condition.field_key}" has no type defined`
+          `Target field "${condition.field_id}" has no type defined`
         );
         return;
       }
@@ -132,7 +133,7 @@ export function validateFieldConditions(field, conditions, allFields = {}) {
       if (!isValidOperator(condition.operator, targetField.type, targetField)) {
         const validOperators = getValidOperators(targetField.type, targetField);
         errors.push(
-          `Field "${field.data_name || field.key}" (${field.type}): Operator "${condition.operator}" is not valid for field "${condition.field_key}" (${targetField.type}). ` +
+          `Field "${field.data_name || field.key}" (${field.type}): Operator "${condition.operator}" is not valid for field "${condition.field_id}" (${targetField.type}). ` +
           `Valid operators: ${validOperators.join(', ')}`
         );
       }
