@@ -46,6 +46,8 @@ const schema = {
         display: 'inline', //Section can be 'inline' or 'drilldown'
         description: 'This is a test description', //description can be null or a string
         description_mode: 'default', //description_mode can be null,'default' or 'subtext'
+        visible: true,
+        visible_conditions: null,
         elements: [
           {
             type: 'TextField',
@@ -88,6 +90,8 @@ const schema = {
             supporting_image: false, //supporting_image can be true or false
             supporting_image_path: null, //supporting_image_path can be null or a string
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+            is_searchable: true,
+            is_searchable_mode: 'default',
             choices: [
               {
                 label: 'Bogotá',
@@ -126,6 +130,8 @@ const schema = {
             supporting_image: false, //supporting_image can be true or false
             supporting_image_path: null, //supporting_image_path can be null or a string
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+            is_searchable: false,
+            is_searchable_mode: null,
             choices: [
               {
                 label: 'Red',
@@ -163,6 +169,9 @@ const schema = {
             const citySelection = CHOICEVALUE($city);
             SETRESULT(IF(OR(citySelection === "bogota", OTHER($city) === "Bogotá"), "Welcome to Bogotá!", "Welcome!"));
             `,
+            supporting_image: false, //supporting_image can be true or false
+            supporting_image_path: null, //supporting_image_path can be null or a string
+            supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
           },
           {
             type: 'CalculatedField',
@@ -179,6 +188,9 @@ const schema = {
             visible_conditions: null,
             read_only: true, //CalcualtedField is always read_only = true
             calculate: 'CHOICELABELS($colors) + " -> Other: " + OTHER($colors)',
+            supporting_image: false, //supporting_image can be true or false
+            supporting_image_path: null, //supporting_image_path can be null or a string
+            supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
           },
           {
             type: 'NumericField',
@@ -219,6 +231,9 @@ const schema = {
         visible_conditions: null,
         read_only: true, //CalcualtedField is always read_only = true
         calculate: 'IF($age >= 18, "yes", "no")',
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
       },
       {
         type: 'CalculatedField',
@@ -235,6 +250,9 @@ const schema = {
         visible_conditions: null,
         read_only: true, //CalcualtedField is always read_only = true
         calculate: 'SETRESULT($age + 10 >= 30 ? true : false)',
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
       },
       {
         type: 'CalculatedField',
@@ -251,6 +269,9 @@ const schema = {
         visible_conditions: null,
         read_only: true, //CalcualtedField is always read_only = true
         calculate: '$age + 88',
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
       },
       {
         type: 'DateField',
@@ -327,11 +348,9 @@ const schema = {
         description: null, //description can be null or a string
         description_mode: null, //description_mode can be null, 'default' or 'subtext'
         required: false, //LabelField is always required = false
-        required_conditions: null, //LabelField is always required_conditions = null
         visible: true,
         visible_conditions: null,
         read_only: true, //LabelField is always read_only = true
-        read_only_conditions: null, //LabelField is always read_only_conditions = null
         default_value: null, //LabelField is always default_value = null
         supporting_image: false, //supporting_image can be true or false
         supporting_image_path: null, //supporting_image_path can be null or a string
@@ -342,6 +361,8 @@ const schema = {
         key: '1955ff',
         data_name: 'calc_test_new_bis',
         label: 'calc_test_new_bis',
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
         required: false,
         visible: true,
         visible_conditions: null,
@@ -350,6 +371,9 @@ const schema = {
         display: {
           style: 'text',
         },
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
       },
       {
         type: 'SignatureField',
@@ -412,6 +436,8 @@ const schema = {
         display: 'drilldown', //Section can be 'inline' or 'drilldown'
         description: null, //description can be null or a string
         description_mode: null, //description_mode can be null, 'default' or 'subtext'
+        visible: true,
+        visible_conditions: null,
         elements: [
           {
             type: 'TextField',
@@ -430,6 +456,9 @@ const schema = {
             default_value: null,
             pattern: null,
             pattern_description: null,
+            supporting_image: false, //supporting_image can be true or false
+            supporting_image_path: null, //supporting_image_path can be null or a string
+            supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
           },
         ],
       },
@@ -470,6 +499,8 @@ const schema = {
         data_name: 'fruit',
         label: 'Fruit',
         display: 'default',
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
         required: true,
         required_conditions: null,
         visible: true,
@@ -481,6 +512,8 @@ const schema = {
         supporting_image: false, //supporting_image can be true or false
         supporting_image_path: null, //supporting_image_path can be null or a string
         supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+        is_searchable: false,
+        is_searchable_mode: null,
         choices: [
           {
             label: 'Mela',
@@ -502,6 +535,8 @@ const schema = {
         data_name: 'food',
         label: 'Please select your favorite food!',
         display: 'default',
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
         required: true,
         required_conditions: null,
         visible: true,
@@ -513,6 +548,8 @@ const schema = {
         supporting_image: false, //supporting_image can be true or false
         supporting_image_path: null, //supporting_image_path can be null or a string
         supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+        is_searchable: false,
+        is_searchable_mode: null,
         choices: [
           {
             label: 'Pasta',
@@ -530,6 +567,41 @@ const schema = {
             label: 'Salumi',
             value: 'salumi'
           }
+        ],
+      },
+      {
+        type: 'RepeatableSection',
+        key: 'zxwk1',
+        data_name: 'evaluation_tests',
+        label: 'Evaluation tests',
+        display: 'drilldown', //Section can be only 'drilldown'
+        description: 'This is a repeatable section for evaluation tests', //description can be null or a string
+        description_mode: 'default', //description_mode can be null,'default' or 'subtext'
+        visible: true,
+        visible_conditions: null,
+        elements: [
+          {
+            type: 'TextField',
+            key: '8877c',
+            data_name: 'email',
+            label: 'Email',
+            display: 'default', //TextField can only be 'default'
+            description: null, //description can be null or a string
+            description_mode: null, //description_mode can be null, 'default' or 'subtext'
+            required: true,
+            required_conditions: null,
+            visible: true,
+            visible_conditions: null,
+            read_only: false,
+            read_only_conditions: null,
+            default_value: null,
+            pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+            pattern_description:
+              'Valid email address format (e.g., user@example.com)',
+            supporting_image: false, //supporting_image can be true or false
+            supporting_image_path: null, //supporting_image_path can be null or a string
+            supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+          },
         ],
       },
     ],

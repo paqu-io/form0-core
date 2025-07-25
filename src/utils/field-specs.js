@@ -7,25 +7,25 @@ import { validateChoiceFieldChoices } from './choice-field-utils.js';
 export const FIELD_SPECS = {
   TextField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'TextField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true, dependentOn: 'description_mode'  },
-      description_mode: { type: 'string', nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true },
-      pattern: { type: 'string', nullable: true, dependentOn: 'pattern_description' },
-      pattern_description: { type: 'string', nullable: true, dependentOn: 'pattern' },
-      supporting_image: { type: 'boolean', nullable: false },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: ['default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'TextField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true, dependentOn: 'description_mode'  },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true },
+      pattern: { type: 'string', required: true, nullable: true, dependentOn: 'pattern_description' },
+      pattern_description: { type: 'string', required: true, nullable: true, dependentOn: 'pattern' },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -50,26 +50,26 @@ export const FIELD_SPECS = {
 
   NumericField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'NumericField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'number', nullable: true },
-      min: { type: 'number', nullable: true },
-      max: { type: 'number', nullable: true },
-      format: { type: 'string', nullable: true, allowedValues: ['integer', 'float'] },
-      supporting_image: { type: 'boolean', nullable: true },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: [null, 'default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'NumericField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'number', required: true, nullable: true },
+      min: { type: 'number', required: true, nullable: true },
+      max: { type: 'number', required: true, nullable: true },
+      format: { type: 'string', required: true, nullable: false, allowedValues: ['integer', 'float'] },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] }
     },
     schemaValidators: [
       // Validate min/max relationship (cross-attribute validation)
@@ -101,25 +101,27 @@ export const FIELD_SPECS = {
 
   SingleChoiceField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'SingleChoiceField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default', 'radio'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true },
-      allow_other: { type: 'boolean', nullable: true },
-      choices: { type: 'array', required: true },
-      supporting_image: { type: 'boolean', nullable: true },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: [null, 'default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'SingleChoiceField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default', 'radio'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true },
+      allow_other: { type: 'boolean', required: true, nullable: false },
+      choices: { type: 'array', required: true, nullable: false },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] },
+      is_searchable: { type: 'boolean', required: true, nullable: false, notTrueOn: { display: 'radio' } },
+      is_searchable_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default'], notNullOn: { is_searchable: true } }
     },
     schemaValidators: [
       // Validate choices array (cross-attribute validation)
@@ -191,25 +193,27 @@ export const FIELD_SPECS = {
 
   MultiChoiceField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'MultiChoiceField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default', 'checkbox'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'array', nullable: true },
-      allow_other: { type: 'boolean', nullable: true },
-      choices: { type: 'array', required: true },
-      supporting_image: { type: 'boolean', nullable: true },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: [null, 'default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'MultiChoiceField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default', 'checkbox'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'array', required: true, nullable: true },
+      allow_other: { type: 'boolean', required: true, nullable: false },
+      choices: { type: 'array', required: true, nullable: false },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] },
+      is_searchable: { type: 'boolean', required: true, nullable: false, notTrueOn: { display: 'checkbox' } },
+      is_searchable_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default'], notNullOn: { is_searchable: true } }
     },
     schemaValidators: [
       // Validate choices array (cross-attribute validation)
@@ -281,25 +285,25 @@ export const FIELD_SPECS = {
 
   BooleanField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'BooleanField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true },
-      choices: { type: 'array', required: true },
-      third_option_enabled: { type: 'boolean', nullable: true },
-      supporting_image: { type: 'boolean', nullable: true },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: [null, 'default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'BooleanField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true },
+      choices: { type: 'array', required: true, nullable: false },
+      third_option_enabled: { type: 'boolean', required: true, nullable: false },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] }
     },
     schemaValidators: [
       // Validate choices array and third_option_enabled relationship (cross-attribute validation)
@@ -363,20 +367,20 @@ export const FIELD_SPECS = {
 
   DateField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'DateField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true, allowedValues: [null, 'now'] }
+      type: { type: 'string', required: true, nullable: false, value: 'DateField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true, allowedValues: ['now'] }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -395,20 +399,20 @@ export const FIELD_SPECS = {
 
   TimeField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'TimeField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true, allowedValues: [null, 'now'] }
+      type: { type: 'string', required: true, nullable: false, value: 'TimeField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true, allowedValues: ['now'] }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -427,19 +431,21 @@ export const FIELD_SPECS = {
 
   CalculatedField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'CalculatedField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'object', nullable: false },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false, value: false },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false, value: true },
-      read_only_conditions: { type: 'object', nullable: true },
-      calculate: { type: 'string', required: true }
+      type: { type: 'string', required: true, nullable: false, value: 'CalculatedField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'object', required: true, nullable: false },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, value: false },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, value: true },
+      calculate: { type: 'string', required: true, nullable: false },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] }
     },
     schemaValidators: [
       // Validate display.style (cross-attribute validation)
@@ -463,20 +469,22 @@ export const FIELD_SPECS = {
 
   Section: {
     attributes: {
-      type: { type: 'string', required: true, value: 'Section' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: true, allowedValues: ['inline', 'drilldown'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      elements: { type: 'array', required: true }
+      type: { type: 'string', required: true, nullable: false, value: 'Section' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['inline', 'drilldown'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      elements: { type: 'array', required: true, nullable: false }
     },
     schemaValidators: [
       // Validate elements array (cross-attribute validation)
       (field) => {
         if (!Array.isArray(field.elements) || field.elements.length === 0) {
-          return { isValid: false, error: `Section "${field.data_name}" must contain at least one element` };
+          return { isValid: false, error: `Section \"${field.data_name}\" must contain at least one element` };
         }
         return { isValid: true };
       }
@@ -489,25 +497,53 @@ export const FIELD_SPECS = {
     }
   },
 
+  RepeatableSection: {
+    attributes: {
+      type: { type: 'string', required: true, nullable: false, value: 'RepeatableSection' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['drilldown'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      elements: { type: 'array', required: true, nullable: false }
+    },
+    schemaValidators: [
+      // Validate elements array (cross-attribute validation)
+      (field) => {
+        if (!Array.isArray(field.elements) || field.elements.length === 0) {
+          return { isValid: false, error: `RepeatableSection \"${field.data_name}\" must contain at least one element` };
+        }
+        return { isValid: true };
+      }
+    ],
+    valueValidator: (field, value) => {
+      return null; // RepeatableSection has no runtime validation
+    },
+    defaultProducer: (field) => {
+      return null; // RepeatableSection doesn't support default values
+    }
+  },
+
   LabelField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'LabelField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: true },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true , value: null },
-      supporting_image: { type: 'boolean', nullable: true },
-      supporting_image_path: { type: 'string', nullable: true },
-      supporting_image_display: { type: 'string', nullable: true, allowedValues: [null, 'default', 'dialog'] }
+      type: { type: 'string', required: true, nullable: false, value: 'LabelField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, value: false },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, value: true },
+      default_value: { type: 'string', required: true, nullable: true , value: null },
+      supporting_image: { type: 'boolean', required: true, nullable: false },
+      supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_display: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'dialog'] }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -522,21 +558,21 @@ export const FIELD_SPECS = {
 
   SignatureField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'SignatureField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'string', nullable: true },
-      agreement_text: { type: 'string', nullable: true }
+      type: { type: 'string', required: true, nullable: false, value: 'SignatureField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true, value: null },
+      agreement_text: { type: 'string', required: true, nullable: true }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -551,22 +587,22 @@ export const FIELD_SPECS = {
 
   PhotoField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'PhotoField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'null', nullable: true, value: null },
-      min_length: { type: 'number', nullable: true },
-      max_length: { type: 'number', nullable: true }
+      type: { type: 'string', required: true, nullable: false, value: 'PhotoField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'null', required: true, nullable: true, value: null },
+      min_length: { type: 'number', required: true, nullable: true },
+      max_length: { type: 'number', required: true, nullable: true }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
@@ -601,22 +637,22 @@ export const FIELD_SPECS = {
 
   VideoField: {
     attributes: {
-      type: { type: 'string', required: true, value: 'VideoField' },
-      key: { type: 'string', required: true },
-      data_name: { type: 'string', required: true },
-      label: { type: 'string', required: true },
-      display: { type: 'string', nullable: false, allowedValues: ['default'] },
-      description: { type: 'string', nullable: true },
-      description_mode: { type: 'string', nullable: true, allowedValues: [null, 'default', 'subtext'], dependentOn: 'description' },
-      required: { type: 'boolean', nullable: false },
-      required_conditions: { type: 'object', nullable: true },
-      visible: { type: 'boolean', nullable: false },
-      visible_conditions: { type: 'object', nullable: true },
-      read_only: { type: 'boolean', nullable: false },
-      read_only_conditions: { type: 'object', nullable: true },
-      default_value: { type: 'null', nullable: true, value: null },
-      min_length: { type: 'number', nullable: true },
-      max_length: { type: 'number', nullable: true }
+      type: { type: 'string', required: true, nullable: false, value: 'VideoField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
+      required: { type: 'boolean', required: true, nullable: false, notTrueOn: { required_conditions: (val) => val != null } },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, notTrueOn: { read_only_conditions: (val) => val != null } },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'null', required: true, nullable: true, value: null },
+      min_length: { type: 'number', required: true, nullable: true },
+      max_length: { type: 'number', required: true, nullable: true }
     },
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes

@@ -201,6 +201,7 @@ function getDefaultValueLegacy(field) {
       
     case 'CalculatedField':
     case 'Section':
+    case 'RepeatableSection':
     case 'LabelField':
       return null; // These don't support default values
       

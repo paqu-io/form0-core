@@ -177,6 +177,7 @@ export function validateDefaultValue(field, defaultValue) {
       
     case 'CalculatedField':
     case 'Section':
+    case 'RepeatableSection':
       // These field types don't support default_value
       return { isValid: false, error: `${field.type} does not support default_value` };
 

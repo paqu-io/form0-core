@@ -25,6 +25,7 @@ const FIELD_TYPE_OPERATORS = {
   
   // Container fields (no operators)
   Section: [],
+  RepeatableSection: [],
   LabelField: [],
 };
 
@@ -95,7 +96,7 @@ export function validateFieldConditions(field, conditions, allFields = {}) {
   }
   
   // Skip validation for container fields
-  if (field.type === 'Section' || field.type === 'LabelField') {
+  if (field.type === 'Section' || field.type === 'LabelField' || field.type === 'RepeatableSection') {
     return { isValid: true, errors: [] };
   }
   

@@ -12,8 +12,8 @@
  * @returns {object} - Validation result with isValid and error
  */
 export function validateAttribute(name, definition, value, field) {
-  // Check if required attribute is missing
-  if (definition.required && (value === undefined || value === null)) {
+  // Check if required attribute is missing (allow null if nullable is true)
+  if (definition.required && value === undefined) {
     return { isValid: false, error: `Missing required attribute: ${name}` };
   }
 
