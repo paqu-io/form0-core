@@ -4,12 +4,30 @@ const schema = {
   form: {
     name: 'MyForm',
     description: 'This is a test description',
-    record_count: 0,
-    last_record_created_at: null,
-    last_record_updated_at: null,
-    last_record_deleted_by: null,
-    status: 'active', //status can be active or inactive
-    version: 1,
+    id: null, //This should be the unique identifier of the form (UUIDv4 or UUIDv7 - TBD).
+    record_count: 0, //This should count the number of records in the form. Available in reform.
+    form_created_at: null, //This should be the date and time of the form creation in ISO 8601 format. Available in reform.
+    form_updated_at: null, //This should be the date and time of the form update in ISO 8601 format. Available in reform.
+    form_created_by: null, //This should be the user who created the form. Available in reform. Available in reform.
+    form_updated_by: null, //This should be the user who updated the form. Available in reform. Available in reform.
+    status: 'active', //status can be active or inactive. Available in reform.
+    version: 1, //This should be the version of the form and it's updated every time the form is saved. Available in reform.
+    main_org_id: 'personal', //This should be the unique identifier of the main organization of the form (it can be 'personal' or one of the main organizations in the account). Available in reform.
+    main_org_metadata: null, //This should be the metadata of the main organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    sub_org_id: null, //This should be the unique identifier of the sub-organization of the form (it can be null or one of the sub-organizations in the account). Available in reform.
+    sub_org_metadata: null, //This should be the metadata of the sub-organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    project_id: null, //This should be the unique identifier of the project of the form (it can be null or one of the projects in the account). Available in reform.
+    project_metadata: null, //This should be the metadata of the project of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    bounding_box: [
+      0,
+      0,
+      0,
+      0
+    ], //Bounding box containing all the form's records. Format is [min_lat, min_long, max_lat, max_long]. Available in reform.
+    image: null, //The URL to the original image which was uploaded as this app's icon. Available in reform.
+    image_thumbnail: null, //The URL to the thumbnail-sized image which was uploaded as this app's icon. 160x160 px. Available in reform.
+    image_small: null, //The URL to the small-sized image which was uploaded as this app's icon. 320x320 px. Available in reform.
+    image_large: null, //The URL to the medium-sized image which was uploaded as this app's icon. 640x640 px. Available in reform.
     events: {
       code: `
         function alertTest(event) {
