@@ -8,6 +8,7 @@ import { validateSchema } from './utils/validate-schema.js';
 import { flattenFields } from './utils/flatten-fields.js';
 import { DEFAULT_SECURITY_CONFIG } from './utils/security.js';
 import { EventManager } from './engine/events.js';
+import { FIELD_SPECS } from './utils/field-specs.js';
 
 export function createFormEngine({ 
   schema, 
@@ -130,6 +131,16 @@ export function createFormEngine({
 }
 
 function getDefaultValue(field) {
+  const spec = FIELD_SPECS[field.type];
+  if (spec && spec.defaultProducer) {
+    return spec.defaultProducer(field);
+  }
+  
+  // Fallback to existing logic for safety
+  return getDefaultValueLegacy(field);
+}
+
+function getDefaultValueLegacy(field) {
   if (field.default_value === null || field.default_value === undefined) {
     // Return appropriate default structure for each field type
     switch (field.type) {
@@ -190,6 +201,7 @@ function getDefaultValue(field) {
       
     case 'CalculatedField':
     case 'Section':
+    case 'RepeatableSection':
     case 'LabelField':
       return null; // These don't support default values
       
