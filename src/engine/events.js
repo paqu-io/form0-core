@@ -1,5 +1,5 @@
-import { runExpression } from '../evaluator.js';
-import { __consumeEventOperations } from '../helpers/builtins.js';
+import { runExpression } from './evaluator.js';
+import { __consumeEventOperations } from '../builtins/registry.js';
 
 // Global registry to track logged event handlers (development only)
 const _loggedHandlers = new Set();

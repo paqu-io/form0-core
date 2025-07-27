@@ -1,14 +1,15 @@
-import { evaluateCalculatedFields } from './engine/calculation.js';
-import { evaluateVisibility } from './engine/conditions.js';
-import { evaluateRequirement } from './engine/conditions.js';
-import { evaluateReadOnly } from './engine/conditions.js';
-import { validateFields } from './engine/validation.js';
-import { builtins, eventBuiltins } from './helpers/builtins.js';
-import { validateSchema } from './utils/validate-schema.js';
-import { flattenFields } from './utils/flatten-fields.js';
-import { DEFAULT_SECURITY_CONFIG } from './utils/security.js';
-import { EventManager } from './engine/events.js';
-import { FIELD_SPECS } from './utils/field-specs.js';
+import { evaluateCalculatedFields } from './calculation.js';
+import { evaluateVisibility } from './conditions.js';
+import { evaluateRequirement } from './conditions.js';
+import { evaluateReadOnly } from './conditions.js';
+import { validateFields } from './field-validation.js';
+import { builtins, eventBuiltins } from '../builtins/registry.js';
+import { validateSchema } from '../schema/schema-validator.js';
+import { flattenFields } from '../utilities/field-helpers.js';
+import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
+import { EventManager } from './events.js';
+import { FIELD_SPECS } from '../schema/field-specs.js';
+
 
 export function createFormEngine({ 
   schema, 

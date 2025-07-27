@@ -1,4 +1,4 @@
-import { FIELD_TYPES } from './field-types.js';
+import { FIELD_TYPES } from '../utilities/field-types.js';
 
 // Define which operators are valid for each field type
 const FIELD_TYPE_OPERATORS = {

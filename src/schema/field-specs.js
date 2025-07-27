@@ -1,4 +1,4 @@
-import { validateChoiceFieldChoices } from './choice-field-utils.js';
+import { validateChoiceFieldChoices } from '../utilities/field-helpers.js';
 
 /**
  * Central field specification registry

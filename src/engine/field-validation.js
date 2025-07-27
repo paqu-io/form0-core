@@ -1,5 +1,5 @@
-import { flattenFields } from '../utils/flatten-fields.js';
-import { validateFieldValue } from '../utils/field-value-registry.js';
+import { flattenFields } from '../utilities/field-helpers.js';
+import { validateFieldValue } from '../schema/field-value-registry.js';
 
 export function validateFields(schema, values, errors) {
   const fields = flattenFields(schema.elements);
