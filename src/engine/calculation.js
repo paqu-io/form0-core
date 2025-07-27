@@ -1,5 +1,5 @@
-import { runExpression } from '../evaluator.js';
-import { flattenFields } from '../utils/flatten-fields.js';
+import { runExpression } from './evaluator.js';
+import { flattenFields } from '../utilities/field-helpers.js';
 
 export function evaluateCalculatedFields(schema, values, helpers, securityConfig) {
   const fields = flattenFields(schema.elements);

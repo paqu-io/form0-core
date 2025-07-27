@@ -1,23 +1,25 @@
-export { createFormEngine } from './create-form-engine.js';
-export { validateSchema } from './utils/validate-schema.js';
-//export { validateSchema, resolveSupportingImagePath } from './utils/validate-schema.js';
-export { generateKey } from './helpers/hash.js';
+export { createFormEngine } from './engine/form-engine.js';
+export { createStructuredRecord } from './utilities/record-transformer.js';
+export { validateSchema } from './schema/schema-validator.js';
+//export { validateSchema, resolveSupportingImagePath } from './schema/schema-validator.js';
+export { generateKey } from './utilities/hash.js';
 export { 
   SECURITY_MODES, 
   DEFAULT_SECURITY_CONFIG,
   SAFE_SECURITY_CONFIG 
-} from './utils/security.js';
+} from './security/config.js';
 export { 
   generateValueFromLabel,
   isValidChoiceValue,
   processChoiceFieldChoices,
   validateChoiceFieldChoices,
   processMultiChoiceFieldChoices,
-  validateMultiChoiceFieldChoices
-} from './utils/choice-field-utils.js';
+  validateMultiChoiceFieldChoices,
+  flattenFields
+} from './utilities/field-helpers.js';
 
 export { 
   getValidOperators,
   isValidOperator,
   validateFieldConditions
-} from './utils/operator-validation.js';
+} from './schema/operators.js';

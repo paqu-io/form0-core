@@ -1,4 +1,4 @@
-import { FIELD_SPECS } from './field-specs.js';
+import { FIELD_SPECS } from '../schema/field-specs.js';
 
 export const FIELD_TYPES = new Set(Object.keys(FIELD_SPECS));
 

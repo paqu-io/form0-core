@@ -1,4 +1,4 @@
-import { createFormEngine } from '../src/index.js';
+import { createFormEngine, createStructuredRecord, flattenFields } from '../src/index.js';
 
 const schema = {
   form: {
@@ -677,6 +677,15 @@ const initialValues = {
 const engine = createFormEngine({ schema, initialValues });
 engine.eval();
 console.log(JSON.stringify(engine.getState(), null, 2));
+
+// Get flattened fields for key mapping
+const fields = flattenFields(schema.form.elements);
+
+console.log(JSON.stringify(createStructuredRecord(engine.getState(), fields, {
+  status: 'incomplete',
+  id: 'f8e9d0c1-b2a3-4567-8901-234567890abc',
+  form_id: 'a7b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d'
+}), null, 2));
 const operations = engine.trigger('load-record');
 console.log('Load operations:', operations);
 

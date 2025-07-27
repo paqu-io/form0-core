@@ -1,7 +1,7 @@
-import { flattenFields } from './flatten-fields.js';
+import { flattenFields } from '../utilities/field-helpers.js';
 import { validateFieldSchema, validateDefaultValue } from './field-schema-registry.js';
-import { isSupportedFieldType } from './field-types.js';
-import { validateFieldConditions } from './operator-validation.js';
+import { isSupportedFieldType } from '../utilities/field-types.js';
+import { validateFieldConditions } from './operators.js';
 
 export function validateSchema(form) {
   const fields = flattenFields(form.elements);

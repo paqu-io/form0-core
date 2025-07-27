@@ -1,11 +1,11 @@
-import { __consumeResult } from './helpers/builtins.js';
-import { __setEvalContext, __clearEvalContext } from './helpers/builtins/control/eval.js';
+import { __consumeResult } from '../builtins/registry.js';
+import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.js';
 import { 
   validateExpression, 
   createSecureContext, 
-  withTimeout,
-  DEFAULT_SECURITY_CONFIG 
-} from './utils/security.js';
+  withTimeout 
+} from '../security/validation.js';
+import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 
 export function runExpression(expr, context = {}, securityConfig = DEFAULT_SECURITY_CONFIG, includeEventBuiltins = false) {
   try {

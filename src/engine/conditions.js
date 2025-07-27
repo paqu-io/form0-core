@@ -1,4 +1,4 @@
-import { flattenFields } from '../utils/flatten-fields.js';
+import { flattenFields } from '../utilities/field-helpers.js';
 
 const OPERATORS = {
   equal_to: (a, b) => a === b,

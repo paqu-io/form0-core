@@ -1,4 +1,5 @@
-import { validateExpression, SAFE_SECURITY_CONFIG } from '../../../utils/security.js';
+import { validateExpression } from '../../security/validation.js';
+import { SAFE_SECURITY_CONFIG } from '../../security/config.js';
 
 /**
  * @builtin EVAL

@@ -1,3 +1,23 @@
+// Field utility functions for form0-core
+
+// =============================================================================
+// Field Flattening Utilities
+// =============================================================================
+
+export function flattenFields(elements) {
+  return elements.flatMap((el) => {
+    if (el.type === 'Section' || el.type === 'RepeatableSection') {
+      return [el, ...flattenFields(el.elements)];
+    }
+
+    return [el];
+  });
+}
+
+// =============================================================================
+// Choice Field Utilities
+// =============================================================================
+
 /**
  * Converts accented characters to their basic Latin equivalents
  * @param {string} str - The string to normalize
@@ -160,6 +180,4 @@ export function processMultiChoiceFieldChoices(choices) {
  */
 export function validateMultiChoiceFieldChoices(choices) {
   return validateChoiceFieldChoices(choices);
-}
-
- 
+} 
