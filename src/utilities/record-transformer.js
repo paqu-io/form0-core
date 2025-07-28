@@ -10,6 +10,7 @@
  * @param {Object} options - Additional options for record creation
  *   - mainRecordId: UUID for the main record
  *   - childRecordIds: Nested object structure for RepeatableSection child record UUIDs
+ *   - originalElements: Original nested form elements (for proper RepeatableSection nesting)
  * @param {string} [id] - DEPRECATED: Use options.mainRecordId instead
  * @returns {Object} Structured record ready for submission
  * 
@@ -67,7 +68,8 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     elements.forEach(element => {
       if (element.type === 'Section') {
         sectionFields.add(element.data_name);
-        // Recursively process Section children
+        // Recursively process Section children with same parentPath
+        // (Sections don't change the RepeatableSection parentage)
         if (Array.isArray(element.elements)) {
           buildRepeatableSectionTree(element.elements, parentPath);
         }
@@ -79,13 +81,13 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         repeatableSectionTree.set(element.data_name, {
           preferredKey,
           field: element,
-          parentPath,
-          currentPath,
+          parentPath: [...parentPath], // Copy to avoid reference issues
+          currentPath: [...currentPath], // Copy to avoid reference issues
           children: new Map(), // Will store child RepeatableSections
           fields: new Map()    // Will store direct child fields
         });
         
-        // Recursively process RepeatableSection children
+        // Recursively process RepeatableSection children with updated path
         if (Array.isArray(element.elements)) {
           buildRepeatableSectionTree(element.elements, currentPath);
         }
@@ -97,27 +99,14 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           field: element,
           parentPath: [...parentPath] // Copy the current path
         });
-        
-        // If this field belongs to a RepeatableSection, add it to that section's fields
-        if (parentPath.length > 0) {
-          const parentRepeatableKey = parentPath[parentPath.length - 1];
-          // Find the RepeatableSection by its preferred key
-          for (const [dataName, repInfo] of repeatableSectionTree) {
-            if (repInfo.preferredKey === parentRepeatableKey) {
-              repInfo.fields.set(element.data_name, {
-                preferredKey: preferredFieldKey,
-                field: element
-              });
-              break;
-            }
-          }
-        }
       }
     });
   };
   
-  // Build the tree structure
-  if (Array.isArray(fields)) {
+  // Build the tree structure from original nested schema elements (if available)
+  if (options.originalElements && Array.isArray(options.originalElements)) {
+    buildRepeatableSectionTree(options.originalElements);
+  } else if (Array.isArray(fields)) {
     buildRepeatableSectionTree(fields);
   }
   
@@ -134,8 +123,26 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       }
     }
   }
+  
+  // Populate fields for each RepeatableSection based on field ownership
+  for (const [fieldDataName, fieldInfo] of fieldOwnership) {
+    if (fieldInfo.parentPath.length > 0) {
+      // Find the immediate parent RepeatableSection for this field
+      const immediateParentKey = fieldInfo.parentPath[fieldInfo.parentPath.length - 1];
+      // Find the RepeatableSection with this preferred key
+      for (const [dataName, repInfo] of repeatableSectionTree) {
+        if (repInfo.preferredKey === immediateParentKey) {
+          repInfo.fields.set(fieldDataName, {
+            preferredKey: fieldInfo.preferredKey,
+            field: fieldInfo.field
+          });
+          break;
+        }
+      }
+    }
+  }
 
-  // Transform the values object using the preferred keys
+    // Transform the values object using the preferred keys
   for (const [dataName, value] of Object.entries(state.values)) {
     // Skip flattened choice fields (created by form renderer for allow_other fields)
     if (dataName.endsWith('_choice') || dataName.endsWith('_choices') || dataName.endsWith('_other')) {
@@ -146,7 +153,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     if (sectionFields.has(dataName)) {
       continue;
     }
-
+    
     // Skip RepeatableSection fields (handled separately below)
     if (repeatableSectionTree.has(dataName)) {
       continue;
@@ -242,19 +249,19 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           }
         }
         
-        // Recursively process child RepeatableSections
-        for (const [childDataName, childRepInfo] of repInfo.children) {
-          const childRepeatableArray = processRepeatableSection(childRepInfo, [...currentPath, pathKey]);
-          if (childRepeatableArray.length > 0) {
-            // For now, add the child RepeatableSection to the first record
-            if (i === 0) {
-              childRecord.form_values[childRepInfo.preferredKey] = childRepeatableArray;
-            } else {
-              // For additional records, create empty arrays (ready for future implementation)
-              childRecord.form_values[childRepInfo.preferredKey] = [];
-            }
-          }
-        }
+                 // Recursively process child RepeatableSections
+         for (const [childDataName, childRepInfo] of repInfo.children) {
+           const childRepeatableArray = processRepeatableSection(childRepInfo, [...currentPath, pathKey]);
+           if (childRepeatableArray.length > 0) {
+             // For now, add the child RepeatableSection to the first record
+             if (i === 0) {
+               childRecord.form_values[childRepInfo.preferredKey] = childRepeatableArray;
+             } else {
+               // For additional records, create empty arrays (ready for future implementation)
+               childRecord.form_values[childRepInfo.preferredKey] = [];
+             }
+           }
+         }
         
         childRecords.push(childRecord);
       }
