@@ -3,6 +3,8 @@
  * Creates structured record format for submission with metadata
  */
 
+import { FIELD_SPECS } from '../schema/field-specs.js';
+
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
  * @param {Object} state - Form engine state {values, errors, visible, required, read_only}
@@ -54,6 +56,14 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     });
   } else {
     console.warn('[form0] createStructuredRecord: fields parameter is not an array, using data_names as keys');
+  }
+  
+  // Create mapping from data_name to field for output formatting
+  const dataNameToFieldMap = new Map();
+  if (Array.isArray(fields)) {
+    fields.forEach(field => {
+      dataNameToFieldMap.set(field.data_name, field);
+    });
   }
   
   // Build a comprehensive tree structure for nested RepeatableSections
@@ -166,8 +176,20 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     }
     
     const preferredKey = dataNameToKeyMap.get(dataName);
+    const field = dataNameToFieldMap.get(dataName);
+    
     if (preferredKey) {
-      form_values[preferredKey] = value;
+      // Apply output formatting if field spec exists
+      let processedValue = value;
+      if (field && field.type && FIELD_SPECS[field.type] && FIELD_SPECS[field.type].outputProducer) {
+        try {
+          processedValue = FIELD_SPECS[field.type].outputProducer(field, value);
+        } catch (err) {
+          console.warn(`[form0] createStructuredRecord: outputProducer failed for ${field.type} field "${dataName}":`, err);
+          processedValue = value; // Fallback to raw value
+        }
+      }
+      form_values[preferredKey] = processedValue;
     } else {
       // Final fallback: keep original data_name if no field mapping found
       form_values[dataName] = value;
@@ -239,9 +261,21 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         for (const [fieldDataName, fieldInfo] of repInfo.fields) {
           const fieldValue = state.values[fieldDataName];
           if (fieldValue !== undefined) {
+            // Apply output formatting if field spec exists
+            let processedValue = fieldValue;
+            const field = fieldInfo.field;
+            if (field && field.type && FIELD_SPECS[field.type] && FIELD_SPECS[field.type].outputProducer) {
+              try {
+                processedValue = FIELD_SPECS[field.type].outputProducer(field, fieldValue);
+              } catch (err) {
+                console.warn(`[form0] createStructuredRecord: outputProducer failed for ${field.type} field "${fieldDataName}" in RepeatableSection:`, err);
+                processedValue = fieldValue; // Fallback to raw value
+              }
+            }
+            
             // For now, all field values go into the first record
             if (i === 0) {
-              childRecord.form_values[fieldInfo.preferredKey] = fieldValue;
+              childRecord.form_values[fieldInfo.preferredKey] = processedValue;
             } else {
               // For additional records, set null values (ready for future implementation)
               childRecord.form_values[fieldInfo.preferredKey] = null;

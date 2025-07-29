@@ -45,6 +45,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return field.default_value || null;
+    },
+    outputProducer: (field, value) => {
+      // TextField output is just the raw string value
+      return value;
     }
   },
 
@@ -96,6 +100,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return field.default_value || null;
+    },
+    outputProducer: (field, value) => {
+      // NumericField output is just the raw numeric value
+      return value;
     }
   },
 
@@ -188,6 +196,16 @@ export const FIELD_SPECS = {
         }
       }
       return { choice: [], other: [] };
+    },
+    outputProducer: (field, value) => {
+      // SingleChoiceField output structure: {choice_value: [...], other_value: [...]}
+      if (value && typeof value === 'object') {
+        return {
+          choice_value: value.choice || [],
+          other_value: value.other || []
+        };
+      }
+      return { choice_value: [], other_value: [] };
     }
   },
 
@@ -280,6 +298,16 @@ export const FIELD_SPECS = {
         };
       }
       return { choices: [], other: [] };
+    },
+    outputProducer: (field, value) => {
+      // MultiChoiceField output structure: {choices_value: [...], other_value: [...]}
+      if (value && typeof value === 'object') {
+        return {
+          choices_value: value.choices || [],
+          other_value: value.other || []
+        };
+      }
+      return { choices_value: [], other_value: [] };
     }
   },
 
@@ -362,6 +390,16 @@ export const FIELD_SPECS = {
         }
       }
       return { choice: [], other: [] };
+    },
+    outputProducer: (field, value) => {
+      // BooleanField output structure: {choice_value: [...], other_value: [...]}
+      if (value && typeof value === 'object') {
+        return {
+          choice_value: value.choice || [],
+          other_value: [] // BooleanField doesn't support other values
+        };
+      }
+      return { choice_value: [], other_value: [] };
     }
   },
 
@@ -394,6 +432,10 @@ export const FIELD_SPECS = {
         return today.toISOString().split('T')[0]; // YYYY-MM-DD format
       }
       return null;
+    },
+    outputProducer: (field, value) => {
+      // DateField output is just the raw date string (YYYY-MM-DD)
+      return value;
     }
   },
 
@@ -426,6 +468,10 @@ export const FIELD_SPECS = {
         return now.toTimeString().split(' ')[0]; // HH:MM:SS format
       }
       return null;
+    },
+    outputProducer: (field, value) => {
+      // TimeField output is just the raw time string (HH:MM:SS)
+      return value;
     }
   },
 
@@ -464,6 +510,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // Calculated fields don't have user input
+    },
+    outputProducer: (field, value) => {
+      // CalculatedField output is just the calculated value
+      return value;
     }
   },
 
@@ -494,6 +544,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // Section doesn't support default values
+    },
+    outputProducer: (field, value) => {
+      // Section has no output value (organizational container only)
+      return null;
     }
   },
 
@@ -524,6 +578,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // RepeatableSection doesn't support default values
+    },
+    outputProducer: (field, value) => {
+      // RepeatableSection has no output value (organizational container only)
+      return null;
     }
   },
 
@@ -553,6 +611,10 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // LabelField doesn't support default values
+    },
+    outputProducer: (field, value) => {
+      // LabelField has no output value (display only)
+      return null;
     }
   },
 
@@ -582,6 +644,23 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return field.default_value || null;
+    },
+    outputProducer: (field, value) => {
+      // SignatureField output structure: {signature_id: null, data: base64String}
+      if (value && typeof value === 'object' && value.data) {
+        // Value is already in the correct structure from form-renderer.js
+        return {
+          signature_id: value.signature_id || null,
+          data: value.data
+        };
+      } else if (value && typeof value === 'string') {
+        // Fallback: if value is just the base64 string
+        return {
+          signature_id: null,
+          data: value
+        };
+      }
+      return null;
     }
   },
 
@@ -632,6 +711,17 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // PhotoField default_value must be null
+    },
+    outputProducer: (field, value) => {
+      // PhotoField output structure: array of {photo_id: null, filename: string, caption: string|null}
+      if (Array.isArray(value)) {
+        return value.map(photo => ({
+          photo_id: null,
+          filename: photo.filename || photo.name || 'unknown',
+          caption: photo.caption || null
+        }));
+      }
+      return [];
     }
   },
 
@@ -688,6 +778,18 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       return null; // VideoField default_value must be null
+    },
+    outputProducer: (field, value) => {
+      // VideoField output structure: array of {video_id: null, filename: string, duration: number, caption: string|null}
+      if (Array.isArray(value)) {
+        return value.map(video => ({
+          video_id: null,
+          filename: video.filename || video.name || 'unknown',
+          duration: video.duration || 0,
+          caption: video.caption || null
+        }));
+      }
+      return [];
     }
   }
 };
