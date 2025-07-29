@@ -690,4 +690,4 @@ export const FIELD_SPECS = {
       return null; // VideoField default_value must be null
     }
   }
-}; 
+};
