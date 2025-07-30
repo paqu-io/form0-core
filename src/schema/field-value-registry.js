@@ -263,4 +263,4 @@ export function validateVideoFieldValue(field, value) {
     }
   }
   return null;
-} 
+}
