@@ -78,7 +78,9 @@ export class WarningSystem {
    * @returns {boolean} True if warning should be suppressed
    */
   shouldThrottleWarning(warning) {
-    const warningKey = `${warning.type}:${warning.fieldName}:${JSON.stringify(warning.executionContext)}`;
+    // Use a simpler key that focuses on the core warning identity
+    // Don't include executionContext as it may contain timestamps or other changing data
+    const warningKey = `${warning.type}:${warning.fieldName}:${warning.message}:${warning.reason || ''}`;
     const now = Date.now();
     const lastEmitted = this.recentWarnings.get(warningKey);
     

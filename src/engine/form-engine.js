@@ -17,7 +17,8 @@ export function createFormEngine({
   schema, 
   initialValues = {}, 
   helpers = {},
-  security = DEFAULT_SECURITY_CONFIG 
+  security = DEFAULT_SECURITY_CONFIG,
+  warningSystem = null 
 }) {
   validateSchema(schema.form);
 
@@ -86,10 +87,10 @@ export function createFormEngine({
   
   // Initialize context resolution system
   const contextResolver = new ContextResolver(schema.form);
-  const warningSystem = new WarningSystem();
+  const sharedWarningSystem = warningSystem || new WarningSystem();
   
   // Initialize event system with context resolution
-  const eventManager = new EventManager(schema.form, contextResolver, warningSystem);
+  const eventManager = new EventManager(schema.form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...builtins, ...eventBuiltins, ...helpers };
   
@@ -113,7 +114,7 @@ export function createFormEngine({
   }
 
   function evalForm() {
-    evaluateCalculatedFields(form, values, allHelpers, security, contextResolver, warningSystem);
+    evaluateCalculatedFields(form, values, allHelpers, security, contextResolver, sharedWarningSystem);
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);
     evaluateReadOnly(form, values, read_only);
@@ -135,7 +136,7 @@ export function createFormEngine({
     eval: evalForm,
     trigger,
     getState,
-    getWarningSystem: () => warningSystem,
+    getWarningSystem: () => sharedWarningSystem,
     getContextResolver: () => contextResolver,
   };
 }

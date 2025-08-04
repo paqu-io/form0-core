@@ -1,4 +1,5 @@
 export { createFormEngine } from './engine/form-engine.js';
+export { WarningSystem } from './engine/warning-system.js';
 export { createStructuredRecord } from './utilities/record-transformer.js';
 export { validateSchema } from './schema/schema-validator.js';
 //export { validateSchema, resolveSupportingImagePath } from './schema/schema-validator.js';
