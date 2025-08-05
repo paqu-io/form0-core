@@ -4,6 +4,7 @@
  */
 
 import { FIELD_SPECS } from '../schema/field-specs.js';
+import { recordVersion } from './version-utils.js';
 
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
@@ -39,6 +40,19 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
  * }
  */
 export function createStructuredRecord(state, fields = null, options = {}, id = null ) {
+  // Compute final version values
+  const finalVersion = options.version || 1;
+  const finalChildVersion = options.childVersion || 1;
+  
+  // Validate final computed versions (including fallbacks)
+  if (!recordVersion.isValid(finalVersion)) {
+    throw new Error(`Invalid record version: ${finalVersion}. Must be a positive integer (e.g., 1, 2, 3)`);
+  }
+  
+  if (!recordVersion.isValid(finalChildVersion)) {
+    throw new Error(`Invalid child record version: ${finalChildVersion}. Must be a positive integer (e.g., 1, 2, 3)`);
+  }
+  
   const now = new Date().toISOString();
   
   // Determine client timestamps (only set if not already provided)
@@ -282,7 +296,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           updated_duration: null,
           created_location: null,
           updated_duration_cumulative: null,
-          version: 1,
+          version: finalChildVersion,
           created_by_id: null,
           updated_by_id: null,
           changeset_id: options.changeset_id || null, // Same changeset as main record
@@ -352,7 +366,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   // Build structured record with metadata
   const record = {
     status: null,
-    version: 1,
+    version: finalVersion,
     draft: false,
     id: options.mainRecordId || id || null, // Use new options structure, fallback to old id param
     changeset_id: options.changeset_id || null, // Changeset for grouping related changes
