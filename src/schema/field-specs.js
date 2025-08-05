@@ -713,10 +713,10 @@ export const FIELD_SPECS = {
       return null; // PhotoField default_value must be null
     },
     outputProducer: (field, value) => {
-      // PhotoField output structure: array of {photo_id: null, filename: string, caption: string|null}
+      // PhotoField output structure: array of {photo_id: null|uuid, filename: string, caption: string|null}
       if (Array.isArray(value)) {
         return value.map(photo => ({
-          photo_id: null,
+          photo_id: photo.photo_id || null,
           filename: photo.filename || photo.name || 'unknown',
           caption: photo.caption || null
         }));
@@ -780,10 +780,10 @@ export const FIELD_SPECS = {
       return null; // VideoField default_value must be null
     },
     outputProducer: (field, value) => {
-      // VideoField output structure: array of {video_id: null, filename: string, duration: number, caption: string|null}
+      // VideoField output structure: array of {video_id: null|uuid, filename: string, duration: number, caption: string|null}
       if (Array.isArray(value)) {
         return value.map(video => ({
-          video_id: null,
+          video_id: video.video_id || null,
           filename: video.filename || video.name || 'unknown',
           duration: video.duration || 0,
           caption: video.caption || null
