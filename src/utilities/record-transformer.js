@@ -281,7 +281,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           created_duration: null,
           updated_duration: null,
           created_location: null,
-          edited_duration: null,
+          updated_duration_cumulative: null,
           version: 1,
           created_by_id: null,
           updated_by_id: null,
@@ -385,7 +385,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Duration metadata (null by default)
     created_duration: null,
     updated_duration: null,
-    edited_duration: null,
+    updated_duration_cumulative: null,
     
     // Form identification
     form_id: null, // To be set by the application
