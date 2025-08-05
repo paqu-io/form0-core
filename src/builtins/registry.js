@@ -10,6 +10,7 @@ import { HASOTHER } from './choice/hasother.js';
 import { OTHER } from './choice/other.js';
 import { CHOICEVALUES } from './choice/choicevalues.js';
 import { CHOICELABELS } from './choice/choicelabels.js';
+import { FORM } from './schema/form.js';
 
 // Import event builtins
 import { ALERT } from './event/ui/alert.js';
@@ -30,6 +31,7 @@ export { HASOTHER } from './choice/hasother.js';
 export { OTHER } from './choice/other.js';
 export { CHOICEVALUES } from './choice/choicevalues.js';
 export { CHOICELABELS } from './choice/choicelabels.js';
+export { FORM } from './schema/form.js';
 
 // Export event builtins
 export { ALERT } from './event/ui/alert.js';
@@ -51,6 +53,7 @@ export const builtins = {
   OTHER,
   CHOICEVALUES,
   CHOICELABELS,
+  FORM, // Available in both calculations and events
 }; 
 
 // Event-specific builtins (only available in event context)

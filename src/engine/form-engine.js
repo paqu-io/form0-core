@@ -9,13 +9,16 @@ import { flattenFields } from '../utilities/field-helpers.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import { EventManager } from './events.js';
 import { FIELD_SPECS } from '../schema/field-specs.js';
+import { ContextResolver } from './context-resolver.js';
+import { WarningSystem } from './warning-system.js';
 
 
 export function createFormEngine({ 
   schema, 
   initialValues = {}, 
   helpers = {},
-  security = DEFAULT_SECURITY_CONFIG 
+  security = DEFAULT_SECURITY_CONFIG,
+  warningSystem = null 
 }) {
   validateSchema(schema.form);
 
@@ -82,8 +85,12 @@ export function createFormEngine({
 
   const allHelpers = { ...builtins, ...helpers };
   
-  // Initialize event system
-  const eventManager = new EventManager();
+  // Initialize context resolution system
+  const contextResolver = new ContextResolver(schema.form);
+  const sharedWarningSystem = warningSystem || new WarningSystem();
+  
+  // Initialize event system with context resolution
+  const eventManager = new EventManager(schema.form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...builtins, ...eventBuiltins, ...helpers };
   
@@ -107,7 +114,7 @@ export function createFormEngine({
   }
 
   function evalForm() {
-    evaluateCalculatedFields(form, values, allHelpers, security);
+    evaluateCalculatedFields(form, values, allHelpers, security, contextResolver, sharedWarningSystem);
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);
     evaluateReadOnly(form, values, read_only);
@@ -115,8 +122,9 @@ export function createFormEngine({
   }
 
   function trigger(eventType, fieldKey, metadata = {}) {
-    // Update event context with current values
+    // Update event context with current values for event execution
     const eventContext = buildEventContext(values, eventHelpers, { eventType, fieldKey, ...metadata });
+    eventManager.eventContext = eventContext; // Update the event context
     return eventManager.trigger(eventType, fieldKey, metadata);
   }
 
@@ -128,6 +136,8 @@ export function createFormEngine({
     eval: evalForm,
     trigger,
     getState,
+    getWarningSystem: () => sharedWarningSystem,
+    getContextResolver: () => contextResolver,
   };
 }
 

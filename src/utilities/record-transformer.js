@@ -4,6 +4,7 @@
  */
 
 import { FIELD_SPECS } from '../schema/field-specs.js';
+import { recordVersion } from './version-utils.js';
 
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
@@ -39,7 +40,28 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
  * }
  */
 export function createStructuredRecord(state, fields = null, options = {}, id = null ) {
+  // Compute final version values
+  const finalVersion = options.version || 1;
+  const finalChildVersion = options.childVersion || 1;
+  
+  // Validate final computed versions (including fallbacks)
+  if (!recordVersion.isValid(finalVersion)) {
+    throw new Error(`Invalid record version: ${finalVersion}. Must be a positive integer (e.g., 1, 2, 3)`);
+  }
+  
+  if (!recordVersion.isValid(finalChildVersion)) {
+    throw new Error(`Invalid child record version: ${finalChildVersion}. Must be a positive integer (e.g., 1, 2, 3)`);
+  }
+  
   const now = new Date().toISOString();
+  
+  // Determine client timestamps (only set if not already provided)
+  const clientCreatedAt = options.created_at_client || now;
+  const clientUpdatedAt = now; // Always updated on each submission
+  
+  // Server timestamps (null for now, will be set by actual server/database)
+  const serverCreatedAt = options.created_at_server || null;
+  const serverUpdatedAt = options.updated_at_server || null;
   
   // Transform values from data_name keys to field keys (with fallback to data_name)
   const form_values = {};
@@ -204,10 +226,30 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Get child record IDs from options using the full path
     const getNestedChildIds = (path) => {
       let current = options.childRecordIds || {};
-      for (const key of path) {
-        current = current[key];
-        if (!current) return [];
+      
+      for (let i = 0; i < path.length; i++) {
+        const key = path[i];
+        
+        if (i === path.length - 1) {
+          // Last key: this is the RepeatableSection we want
+          if (current[key]) {
+            return Array.isArray(current[key]) ? current[key] : (current[key]._records || []);
+          }
+          return [];
+        } else {
+          // Intermediate key: navigate through the nested structure
+          current = current[key];
+          if (!current) return [];
+          
+          // If current has _records, we need to navigate to the first record
+          if (current._records && current._records.length > 0) {
+            const recordId = current._records[0];
+            current = current[recordId];
+            if (!current) return [];
+          }
+        }
       }
+      
       return Array.isArray(current) ? current : (current._records || []);
     };
     
@@ -240,20 +282,24 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       
       for (let i = 0; i < recordCount; i++) {
         const childRecord = {
-          updated_at: now,
+          created_at: clientCreatedAt, // User's creation time is canonical
+          updated_at: serverUpdatedAt, // Server's update time is canonical
+          created_at_client: clientCreatedAt,
+          updated_at_client: clientUpdatedAt,
+          created_at_server: serverCreatedAt,
+          updated_at_server: serverUpdatedAt,
           updated_location: null,
           draft: false,
-          created_at: now,
           id: childIds[i] || null,
           form_values: {},
           created_duration: null,
           updated_duration: null,
           created_location: null,
-          edited_duration: null,
-          version: 1,
+          updated_duration_cumulative: null,
+          version: finalChildVersion,
           created_by_id: null,
           updated_by_id: null,
-          changeset_id: null,
+          changeset_id: options.changeset_id || null, // Same changeset as main record
           geometry: null
         };
         
@@ -320,13 +366,16 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   // Build structured record with metadata
   const record = {
     status: null,
-    version: 1,
+    version: finalVersion,
     draft: false,
     id: options.mainRecordId || id || null, // Use new options structure, fallback to old id param
-    created_at: now,
-    updated_at: now,
-    client_created_at: now,
-    client_updated_at: now,
+    changeset_id: options.changeset_id || null, // Changeset for grouping related changes
+    created_at: clientCreatedAt, // User's creation time is canonical
+    updated_at: serverUpdatedAt, // Server's update time is canonical
+    created_at_client: clientCreatedAt,
+    updated_at_client: clientUpdatedAt,
+    created_at_server: serverCreatedAt,
+    updated_at_server: serverUpdatedAt,
     
     // User/organization metadata (null by default)
     created_by: null,
@@ -350,7 +399,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Duration metadata (null by default)
     created_duration: null,
     updated_duration: null,
-    edited_duration: null,
+    updated_duration_cumulative: null,
     
     // Form identification
     form_id: null, // To be set by the application
@@ -358,11 +407,18 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Form values
     form_values,
     
-    // Override any defaults with provided options (excluding our special handling keys)
-    ...options,
+    // Override any defaults with provided options (excluding our internal processing keys)
+    ...Object.fromEntries(
+      Object.entries(options).filter(([key]) => 
+        !['mainRecordId', 'childRecordIds', 'originalElements'].includes(key)
+      )
+    ),
     
     // Ensure our specific handling isn't overridden
     id: options.mainRecordId || id || null,
+    changeset_id: options.changeset_id || null, // Ensure changeset_id isn't overridden
+    created_at: clientCreatedAt, // Ensure canonical created_at isn't overridden
+    updated_at: serverUpdatedAt, // Ensure canonical updated_at isn't overridden
     form_values // Ensure form_values isn't overridden
   };
 

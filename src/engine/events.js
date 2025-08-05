@@ -1,5 +1,7 @@
 import { runExpression } from './evaluator.js';
 import { __consumeEventOperations } from '../builtins/registry.js';
+import { ContextResolver } from './context-resolver.js';
+import { WarningSystem } from './warning-system.js';
 
 // Global registry to track logged event handlers (development only)
 const _loggedHandlers = new Set();
@@ -8,10 +10,15 @@ const _loggedHandlers = new Set();
  * EventManager handles form event registration and execution
  */
 export class EventManager {
-  constructor() {
+  constructor(schema = null, contextResolver = null, warningSystem = null) {
     this.listeners = new Map(); // eventType -> Map<fieldKey, callback[]>
     this.eventContext = null;
     this.securityConfig = null;
+    
+    // Context resolution for scoped field access
+    this.contextResolver = contextResolver || (schema ? new ContextResolver(schema) : null);
+    this.warningSystem = warningSystem || new WarningSystem();
+    this.schema = schema;
   }
   
   /**
@@ -172,16 +179,189 @@ export class EventManager {
    * @returns {*} The result of the event handler
    */
   executeHandlerWithContext(callback, event) {
-    // Create a context that includes the event object and current form state
-    const contextWithEvent = {
-      ...this.eventContext,
-      event: event
+    // Create execution context for this event
+    const executionContext = {
+      type: 'event',
+      eventType: event.type,
+      fieldName: event.fieldKey || null
     };
     
-    // Execute the callback function with the current context
+    // Get the callback code for field reference analysis
+    const callbackCode = callback.toString();
+    
+    // Build scoped context if context resolver is available
+    let contextWithEvent;
+    if (this.contextResolver && this.warningSystem) {
+      contextWithEvent = this.buildScopedEventContext(this.eventContext, executionContext, event, callbackCode);
+    } else {
+      // Fallback to legacy context building for backward compatibility
+      contextWithEvent = {
+        ...this.eventContext,
+        event: event
+      };
+    }
+    
+    // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
-    const functionCall = `(${callback.toString()})(event)`;
+    const functionCall = `(${callbackCode})(event)`;
     return runExpression(functionCall, contextWithEvent, this.securityConfig, true);
+  }
+
+  /**
+   * Build scoped event context with field access restrictions
+   * @param {Object} baseContext - Base event context with helpers and field values
+   * @param {Object} executionContext - Execution context for the event
+   * @param {Object} event - Event object
+   * @returns {Object} Scoped context with restricted field access
+   */
+  buildScopedEventContext(baseContext, executionContext, event, expressionCode) {
+    // Separate field values from helpers/builtins
+    const fieldValues = {};
+    const helpers = {};
+    
+    for (const [key, value] of Object.entries(baseContext)) {
+      if (key.startsWith('$')) {
+        const fieldName = key.substring(1); // Remove $ prefix
+        fieldValues[fieldName] = value;
+      } else {
+        helpers[key] = value;
+      }
+    }
+    
+    // Find which fields are actually referenced in the expression
+    const referencedFields = this.extractFieldReferences(expressionCode);
+    
+    // Build scoped context
+    const ctx = { ...helpers, event };
+    
+    // Track problematic fields that are actually accessed
+    const restrictedAccessedFields = [];
+    const notFoundAccessedFields = [];
+    
+    // Add scoped field access
+    for (const [fieldName, value] of Object.entries(fieldValues)) {
+      const accessLevel = this.contextResolver.resolveFieldAccess(executionContext, fieldName);
+      
+      if (accessLevel === 'accessible') {
+        ctx[`$${fieldName}`] = value;
+      } else if (accessLevel === 'restricted') {
+        // Only add restricted fields to context if they're actually referenced
+        if (referencedFields.has(fieldName)) {
+          ctx[`$${fieldName}`] = undefined;
+          restrictedAccessedFields.push(fieldName);
+        }
+        // If not referenced, don't add to context at all
+      }
+      // 'not_found' fields are not added to context at all
+    }
+    
+    // Check for not_found fields that are actually referenced
+    for (const fieldName of referencedFields) {
+      // Check if this field was processed above (exists in fieldValues)
+      if (!(fieldName in fieldValues)) {
+        const accessLevel = this.contextResolver.resolveFieldAccess(executionContext, fieldName);
+        if (accessLevel === 'not_found') {
+          notFoundAccessedFields.push(fieldName);
+          // Don't add to context - it will be undefined when accessed
+        }
+      }
+    }
+    
+    // Emit warnings for restricted fields that are actually accessed
+    restrictedAccessedFields.forEach(fieldName => {
+      const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, 'restricted');
+      this.warningSystem.emitWarning(warning);
+    });
+    
+    // Emit warnings for not_found fields that are actually accessed
+    notFoundAccessedFields.forEach(fieldName => {
+      const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, 'not_found');
+      this.warningSystem.emitWarning(warning);
+    });
+    
+    return ctx;
+  }
+  
+  /**
+   * Extract field references from expression code (simple regex-based approach)
+   * Skips field references inside EVAL() calls to avoid false positives from dynamic field construction
+   * @param {string} code - The expression/code to analyze
+   * @returns {Set<string>} Set of field names referenced in the code
+   */
+  extractFieldReferences(code) {
+    const fieldReferences = new Set();
+    
+    // Remove content inside EVAL() calls to avoid false positives
+    // This handles complex patterns like EVAL('string' + variable + 'more')
+    const cleanedCode = this.removeEvalContents(code);
+    
+    // Simple regex to find $fieldname patterns in the cleaned code
+    // This matches $ followed by valid JavaScript identifier characters
+    const fieldRegex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
+    let match;
+    
+    while ((match = fieldRegex.exec(cleanedCode)) !== null) {
+      fieldReferences.add(match[1]); // Add the field name (without $)
+    }
+    
+    return fieldReferences;
+  }
+
+  /**
+   * Remove EVAL() function calls and their contents from code
+   * Handles nested parentheses and complex expressions inside EVAL()
+   * @param {string} code - The code to clean
+   * @returns {string} Code with EVAL() contents removed
+   */
+  removeEvalContents(code) {
+    let result = '';
+    let i = 0;
+    
+    while (i < code.length) {
+      // Look for EVAL pattern
+      const evalMatch = code.substring(i).match(/^EVAL\s*\(/);
+      if (evalMatch) {
+        // Found EVAL(, add "EVAL()" to result and skip the entire call
+        result += 'EVAL()';
+        i += evalMatch[0].length;
+        
+        // Skip everything until we find the matching closing parenthesis
+        let parenCount = 1;
+        let inSingleQuote = false;
+        let inDoubleQuote = false;
+        let inBacktick = false;
+        
+        while (i < code.length && parenCount > 0) {
+          const char = code[i];
+          
+          // Handle string literals (ignore parentheses inside strings)
+          if (char === "'" && !inDoubleQuote && !inBacktick) {
+            inSingleQuote = !inSingleQuote;
+          } else if (char === '"' && !inSingleQuote && !inBacktick) {
+            inDoubleQuote = !inDoubleQuote;
+          } else if (char === '`' && !inSingleQuote && !inDoubleQuote) {
+            inBacktick = !inBacktick;
+          }
+          
+          // Only count parentheses when not inside strings
+          if (!inSingleQuote && !inDoubleQuote && !inBacktick) {
+            if (char === '(') {
+              parenCount++;
+            } else if (char === ')') {
+              parenCount--;
+            }
+          }
+          
+          i++;
+        }
+      } else {
+        // Not an EVAL call, add character to result
+        result += code[i];
+        i++;
+      }
+    }
+    
+    return result;
   }
 
   /**
@@ -206,6 +386,13 @@ export class EventManager {
       ...eventMetadata
     };
     
+    // Create execution context for operation validation
+    const executionContext = {
+      type: 'event',
+      eventType: eventType,
+      fieldName: fieldKey || null
+    };
+    
     // Execute specific field listeners
     const fieldListeners = eventMap.get(fieldKey) || [];
     const wildcardListeners = eventMap.get('*') || [];
@@ -218,7 +405,10 @@ export class EventManager {
         
         // Consume any collected event operations
         const collectedOps = __consumeEventOperations();
-        operations.push(...collectedOps);
+        
+        // Validate operations against context restrictions before adding them
+        const validOps = this.validateOperations(collectedOps, executionContext);
+        operations.push(...validOps);
         
         // Note: EVENT_OPERATION processing (ON/OFF) is handled only during initialization
         // If event handlers contain ON/OFF calls, they will be in the operations array
@@ -237,5 +427,43 @@ export class EventManager {
     });
     
     return operations;
+  }
+
+  /**
+   * Validate operations against context restrictions
+   * Filters out invalid field operations and generates warnings for them
+   * @param {Array} operations - Array of operation objects to validate
+   * @param {Object} executionContext - Current execution context
+   * @returns {Array} Array of valid operations
+   */
+  validateOperations(operations, executionContext) {
+    if (!this.contextResolver || !this.warningSystem) {
+      return operations; // No validation available, return all operations
+    }
+
+    const validOperations = [];
+
+    operations.forEach(operation => {
+      // Only validate field operations that access fields
+      if (operation.type === 'FIELD_OPERATION' && operation.operation === 'SETVALUE') {
+        const fieldName = operation.params.fieldDataName;
+        const accessLevel = this.contextResolver.resolveFieldAccess(executionContext, fieldName);
+        
+        if (accessLevel === 'accessible') {
+          // Field is accessible, operation is valid
+          validOperations.push(operation);
+        } else {
+          // Field is not accessible, generate warning and block operation
+          const reason = accessLevel === 'not_found' ? 'not_found' : 'restricted';
+          const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, reason);
+          this.warningSystem.emitWarning(warning);
+        }
+      } else {
+        // Non-field operations (like ALERT) are always valid
+        validOperations.push(operation);
+      }
+    });
+
+    return validOperations;
   }
 } 

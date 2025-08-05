@@ -60,10 +60,10 @@ export function validateNumericFieldValue(field, value) {
     if (field.format === 'integer' && !Number.isInteger(value)) {
       return `${field.data_name} must be an integer`;
     }
-    if (field.min !== undefined && value < field.min) {
+    if (field.min !== null && field.min !== undefined && value < field.min) {
       return `Must be at least ${field.min}`;
     }
-    if (field.max !== undefined && value > field.max) {
+    if (field.max !== null && field.max !== undefined && value > field.max) {
       return `Must be at most ${field.max}`;
     }
   }

@@ -133,10 +133,10 @@ export function validateDefaultValue(field, defaultValue) {
         return { isValid: false, error: 'NumericField with integer format must have integer default_value' };
       }
       // Check min/max constraints
-      if (field.min !== undefined && defaultValue < field.min) {
+      if (field.min !== null && field.min !== undefined && defaultValue < field.min) {
         return { isValid: false, error: `NumericField default_value ${defaultValue} is less than min ${field.min}` };
       }
-      if (field.max !== undefined && defaultValue > field.max) {
+      if (field.max !== null && field.max !== undefined && defaultValue > field.max) {
         return { isValid: false, error: `NumericField default_value ${defaultValue} is greater than max ${field.max}` };
       }
       break;

@@ -33,6 +33,7 @@ const schema = {
         function alertTest(event) {
           ALERT('Warning!', 'Welcome to South America!');
           ALERT('Warning!', 'Welcome to Colombia!');
+          ALERT($email);
         }
 
         ON('load-record', alertTest);
@@ -43,6 +44,10 @@ const schema = {
           SETVALUE('age', 33);
           SETVALUE('fruit', 'banana');
           SETVALUE('food', ['pasta', 'focaccia']);
+        });
+
+        ON('change', 'age', function (event) {
+          ALERT('Warning!', 'Email changed to ' + $email);
         });
 
         function colorsF(event) {
@@ -620,6 +625,108 @@ const schema = {
             supporting_image_path: null, //supporting_image_path can be null or a string
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
           },
+          {
+            type: 'CalculatedField',
+            key: '4ff44',
+            data_name: 'age_division',
+            label: 'Age divided by 2',
+            display: {
+              style: 'numeric', // or numeric, date, currency
+            },
+            description: null, //description can be null or a string
+            description_mode: null, //description_mode can be null, 'default' or 'subtext'
+            required: false, //CalcualtedField is always required = false
+            visible: true,
+            visible_conditions: null,
+            read_only: true, //CalcualtedField is always read_only = true
+            calculate: '$age/2',
+            supporting_image: false, //supporting_image can be true or false
+            supporting_image_path: null, //supporting_image_path can be null or a string
+            supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+          },
+          {
+            type: "Section",
+            key: "546aa",
+            data_name: "non_structural_assessment",
+            label: "Non-structural assessment",
+            display: "inline",
+            description: "This is a test34",
+            description_mode: "default",
+            visible: true,
+            visible_conditions: null,
+            elements: [
+              {
+                type: "RepeatableSection",
+                key: "9944a",
+                data_name: "water_sanitation",
+                label: "Water & Sanitation",
+                display: "drilldown",
+                description: "This is a NESTED repeatable section for evaluation tests",
+                description_mode: "default",
+                visible: true,
+                visible_conditions: null,
+                elements: [
+                  {
+                    type: "Section",
+                    key: "1234c",
+                    data_name: "first_phase",
+                    label: "First phase",
+                    display: "inline",
+                    description: "This is a test88",
+                    description_mode: "default",
+                    visible: true,
+                    visible_conditions: null,
+                    elements: [
+                      {
+                        type: "TextField",
+                        key: "8877e",
+                        data_name: "email_test_bis",
+                        label: "Email Bis",
+                        display: "default",
+                        description: null,
+                        description_mode: null,
+                        required: true,
+                        required_conditions: null,
+                        visible: true,
+                        visible_conditions: null,
+                        read_only: false,
+                        read_only_conditions: null,
+                        default_value: "stefano@form0.dev",
+                        pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$",
+                        pattern_description: "Valid email address format (e.g., user@example.com)",
+                        supporting_image: false,
+                        supporting_image_path: null,
+                        supporting_image_display: null,
+                      },
+                      {
+                        type: 'NumericField',
+                        key: '451e3',
+                        data_name: 'random_number',
+                        label: 'Random number',
+                        display: 'default', //NumericField can only be 'default'
+                        description: null, //description can be null or a string
+                        description_mode: null, //description_mode can be null, 'default' or 'subtext'
+                        required: true,
+                        required_conditions: null,
+                        visible: true,
+                        visible_conditions: null,
+                        read_only: false,
+                        read_only_conditions: null,
+                        default_value: 10.84,
+                        min: null,
+                        max: null,
+                        format: 'float', //NumericField can be 'integer' or 'float'
+                        supporting_image: false, //supporting_image can be true or false
+                        supporting_image_path: null, //supporting_image_path can be null or a string
+                        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+                      },
+                    ],
+                  }
+                ],
+              },
+              
+            ],
+          },
         ],
       },
     ],
@@ -681,11 +788,16 @@ console.log(JSON.stringify(engine.getState(), null, 2));
 // Get flattened fields for key mapping
 const fields = flattenFields(schema.form.elements);
 
-console.log(JSON.stringify(createStructuredRecord(engine.getState(), fields, {
+const record = createStructuredRecord(engine.getState(), fields, {
   status: 'incomplete',
   id: 'f8e9d0c1-b2a3-4567-8901-234567890abc',
-  form_id: 'a7b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d'
-}), null, 2));
+  form_id: 'a7b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d',
+  originalElements: schema.form.elements
+});
+
+// Create clean output without internal processing properties
+const { originalElements, childRecordIds, mainRecordId, ...cleanRecord } = record;
+console.log(JSON.stringify(cleanRecord, null, 2));
 const operations = engine.trigger('load-record');
 console.log('Load operations:', operations);
 
