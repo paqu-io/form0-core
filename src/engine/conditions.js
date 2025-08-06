@@ -36,23 +36,70 @@ export function evaluateConditions(conditions, values, allFields) {
   return fn ? fn(val, conditions.value) : false;
 }
 
+/**
+ * Recursively evaluates visibility for both fields and sections in bottom-up order
+ * @param {Array} elements - Form elements to evaluate
+ * @param {Object} values - Current form values
+ * @param {Object} visible - Visibility state object to populate
+ * @param {Object} allFields - Map of all fields by key for condition evaluation
+ */
+function evaluateVisibilityRecursive(elements, values, visible, allFields) {
+  elements.forEach(element => {
+    if (element.type === 'Section' || element.type === 'RepeatableSection') {
+      // First evaluate children (bottom-up approach)
+      if (element.elements && element.elements.length > 0) {
+        evaluateVisibilityRecursive(element.elements, values, visible, allFields);
+        
+        // Check if any child is visible
+        const hasVisibleChild = element.elements.some(child => 
+          visible[child.data_name] !== false
+        );
+        
+        if (!hasVisibleChild) {
+          // All children hidden → force hide section (override explicit settings)
+          visible[element.data_name] = false;
+        } else {
+          // At least one child visible → respect explicit section visibility settings
+          if (element.visible_conditions) {
+            const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+            visible[element.data_name] = isVisible;
+          } else {
+            visible[element.data_name] = element.visible === true;
+          }
+        }
+      } else {
+        // Empty section fallback (though schema validation should prevent this)
+        if (element.visible_conditions) {
+          const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+          visible[element.data_name] = isVisible;
+        } else {
+          visible[element.data_name] = element.visible === true;
+        }
+      }
+    } else {
+      // Regular field - existing logic
+      if (element.visible_conditions) {
+        const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+        visible[element.data_name] = isVisible;
+      } else {
+        visible[element.data_name] = element.visible === true;
+      }
+    }
+  });
+}
+
 export function evaluateVisibility(schema, values, visible) {
-  const fields = flattenFields(schema.elements);
-  // Build allFields map by key
+  // Build allFields map by key using flattened fields for condition evaluation
   // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
   // to avoid rebuilding on every evaluation. See #perf-caching-idea.
+  const fields = flattenFields(schema.elements);
   const allFields = {};
   fields.forEach(field => {
     if (field.key) allFields[field.key] = field;
   });
-  fields.forEach((field) => {
-    if (field.visible_conditions) {
-      const isVisible = evaluateConditions(field.visible_conditions, values, allFields);
-      visible[field.data_name] = isVisible;
-    } else {
-      visible[field.data_name] = field.visible === true;
-    }
-  });
+  
+  // Use recursive approach for single-pass visibility evaluation
+  evaluateVisibilityRecursive(schema.elements, values, visible, allFields);
 }
 
 export function evaluateRequirement(schema, values, required) {
