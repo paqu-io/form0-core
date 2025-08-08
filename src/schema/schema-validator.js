@@ -95,6 +95,27 @@ export function validateSchema(form) {
     }
   }
   
+  // Validate top-level status_field and title_field if present
+  if (form.status_field) {
+    const statusValidation = validateFieldSchema(form.status_field);
+    if (!statusValidation.isValid) {
+      errors.push(...statusValidation.errors.map(e => `status_field: ${e}`));
+    }
+    // Validate default_value if present
+    if (form.status_field.default_value !== undefined && form.status_field.default_value !== null) {
+      const dv = validateDefaultValue(form.status_field, form.status_field.default_value);
+      if (!dv.isValid) {
+        errors.push(`status_field default_value: ${dv.error}`);
+      }
+    }
+  }
+  if (form.title_field) {
+    const titleValidation = validateFieldSchema(form.title_field);
+    if (!titleValidation.isValid) {
+      errors.push(...titleValidation.errors.map(e => `title_field: ${e}`));
+    }
+  }
+
   // Add duplicate errors to the main errors array
   if (duplicateDataNames.size > 0) {
     errors.push(`Duplicate data_name(s): ${Array.from(duplicateDataNames).join(', ')}`);

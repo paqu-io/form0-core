@@ -6,6 +6,7 @@ const schema = {
     description: 'This is a test description',
     id: null, //This should be the unique identifier of the form (UUIDv4 or UUIDv7 - TBD).
     record_count: 0, //This should count the number of records in the form. Available in reform.
+    record_last_change_at: null, //This should be the date and time of the last record change in ISO 8601 format. Available in reform.
     form_created_at: null, //This should be the date and time of the form creation in ISO 8601 format. Available in reform.
     form_updated_at: null, //This should be the date and time of the form update in ISO 8601 format. Available in reform.
     form_created_by: null, //This should be the user who created the form. Available in reform. Available in reform.
@@ -18,12 +19,60 @@ const schema = {
     sub_org_metadata: null, //This should be the metadata of the sub-organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
     project_id: null, //This should be the unique identifier of the project of the form (it can be null or one of the projects in the account). Available in reform.
     project_metadata: null, //This should be the metadata of the project of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    status_field: {
+      type: 'StatusField',
+      key: '@status',
+      data_name: 'status',
+      label: 'Status',
+      display: 'default', //StatusField can only be 'default'
+      enabled: true, //StatusField can be true or false
+      visible: true,
+      visible_conditions: null,
+      read_only: false,
+      read_only_conditions: null,
+      default_value: 'pending',
+      choices: [
+        {
+          label: 'Enrolled',
+          value: 'enrolled',
+          color: '#87D30F'
+        },
+        {
+          label: 'Not Enrolled',
+          value: 'not_enrolled',
+          color: '#FF0000'
+        },
+        {
+          label: 'Pending',
+          value: 'pending',
+          color: '#FFA500'
+        },
+      ],
+    },
+    title_field: {
+      type: 'TitleField',
+      key: '@title',
+      data_name: 'title',
+      label: 'Title',
+      display: 'default', //TitleField   can only be 'default'
+      enabled: true, //TitleField can only be true
+      visible: true, //TitleField can only be true
+      visible_conditions: null,
+      read_only: true, //TitleField is always read_only = true
+      read_only_conditions: null,
+      elements: [ //Elements can be an array of elements or a single element. Elements should be field keys but field data_name can be used as fallback. Elements, when rendered, will be concatenated with each other with a comma and displayed at the top of the record as a title.
+        'ef661',
+        '0180f' //If a key/data_name refers to a SingleChoiceField, MultiChoiceField or BooleanField, we should always show the choice label.
+      ],
+    },
     bounding_box: [
       0,
       0,
       0,
       0
     ], //Bounding box containing all the form's records. Format is [min_lat, min_long, max_lat, max_long]. Available in reform.
+    location_enabled: true, //location_enabled can be true or false
+    location_required: true, //location_required can be true or false
     image: null, //The URL to the original image which was uploaded as this app's icon. Available in reform.
     image_thumbnail: null, //The URL to the thumbnail-sized image which was uploaded as this app's icon. 160x160 px. Available in reform.
     image_small: null, //The URL to the small-sized image which was uploaded as this app's icon. 320x320 px. Available in reform.
@@ -602,6 +651,8 @@ const schema = {
         description_mode: 'default', //description_mode can be null,'default' or 'subtext'
         visible: true,
         visible_conditions: null,
+        location_enabled: true, //location_enabled can be true or false
+        location_required: true, //location_required can be true or false
         elements: [
           {
             type: 'TextField',
@@ -665,6 +716,8 @@ const schema = {
                 description_mode: "default",
                 visible: true,
                 visible_conditions: null,
+                location_enabled: true, //location_enabled can be true or false
+                location_required: true, //location_required can be true or false
                 elements: [
                   {
                     type: "Section",

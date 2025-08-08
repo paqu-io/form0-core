@@ -87,6 +87,13 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       dataNameToFieldMap.set(field.data_name, field);
     });
   }
+  // Create mapping from key to field for title resolution
+  const keyToFieldMap = new Map();
+  if (Array.isArray(fields)) {
+    fields.forEach(field => {
+      if (field.key) keyToFieldMap.set(field.key, field);
+    });
+  }
   
   // Build a comprehensive tree structure for nested RepeatableSections
   const sectionFields = new Set();
@@ -365,7 +372,8 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   
   // Build structured record with metadata
   const record = {
-    status: null,
+    '@status': options['@status'] || null,
+    '@title': options['@title'] || null,
     version: finalVersion,
     draft: false,
     id: options.mainRecordId || id || null, // Use new options structure, fallback to old id param
@@ -410,7 +418,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Override any defaults with provided options (excluding our internal processing keys)
     ...Object.fromEntries(
       Object.entries(options).filter(([key]) => 
-        !['mainRecordId', 'childRecordIds', 'originalElements'].includes(key)
+        !['mainRecordId', 'childRecordIds', 'originalElements', 'status_field', 'title_field'].includes(key)
       )
     ),
     
@@ -421,6 +429,93 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     updated_at: serverUpdatedAt, // Ensure canonical updated_at isn't overridden
     form_values // Ensure form_values isn't overridden
   };
+
+  // ==============================
+  // Add top-level @title and @status
+  // ==============================
+  try {
+    // Compute @title from TitleField elements if provided in options
+    const titleField = options.title_field;
+    if (titleField && Array.isArray(titleField.elements)) {
+      const parts = [];
+      for (const ref of titleField.elements) {
+        let fieldDef = null;
+        // Prefer key lookup
+        if (keyToFieldMap.has(ref)) {
+          fieldDef = keyToFieldMap.get(ref);
+        } else if (dataNameToFieldMap.has(ref)) {
+          fieldDef = dataNameToFieldMap.get(ref);
+        }
+        if (!fieldDef) continue;
+        const value = state.values[fieldDef.data_name];
+        if (value == null) continue;
+        // Extract display text by field type
+        if (fieldDef.type === 'SingleChoiceField') {
+          let labels = [];
+          if (value.choice && Array.isArray(value.choice) && value.choice.length > 0) {
+            const v = value.choice[0].value;
+            const found = (fieldDef.choices || []).find(c => c.value === v);
+            labels.push(found?.label || value.choice[0].label || v);
+          }
+          if (value.other && Array.isArray(value.other)) {
+            for (const o of value.other) {
+              if (o && (o.label || o.value)) labels.push(o.label || o.value);
+            }
+          }
+          const text = labels.filter(Boolean).join(', ');
+          if (text) parts.push(text);
+        } else if (fieldDef.type === 'MultiChoiceField') {
+          let labels = [];
+          if (value.choices && Array.isArray(value.choices)) {
+            for (const c of value.choices) {
+              const found = (fieldDef.choices || []).find(cc => cc.value === c.value);
+              labels.push(found?.label || c.label || c.value);
+            }
+          }
+          if (value.other && Array.isArray(value.other)) {
+            for (const o of value.other) {
+              if (o && (o.label || o.value)) labels.push(o.label || o.value);
+            }
+          }
+          const text = labels.filter(Boolean).join(', ');
+          if (text) parts.push(text);
+        } else if (fieldDef.type === 'BooleanField') {
+          let label = '';
+          if (value.choice && Array.isArray(value.choice) && value.choice.length > 0) {
+            const v = value.choice[0].value;
+            const found = (fieldDef.choices || []).find(c => c.value === v);
+            label = found?.label || value.choice[0].label || v;
+          }
+          if (label) parts.push(label);
+        } else {
+          const text = typeof value === 'object' ? null : String(value);
+          if (text && text.trim() !== '') parts.push(text);
+        }
+      }
+      const titleText = parts.join(', ');
+      if (titleText) {
+        record['@title'] = titleText;
+      } else {
+        record['@title'] = null;
+      }
+    }
+  } catch (err) {
+    console.warn('[form0] createStructuredRecord: failed to compute @title:', err);
+  }
+
+  try {
+    // Determine @status preference: explicit option -> option.status (compat) -> default
+    let statusValue = options['@status'];
+    if (statusValue == null && options.status != null) statusValue = options.status;
+    if (statusValue == null && options.status_field && typeof options.status_field === 'object') {
+      statusValue = options.status_field.default_value || null;
+    }
+    if (statusValue !== undefined) {
+      record['@status'] = statusValue;
+    }
+  } catch (err) {
+    console.warn('[form0] createStructuredRecord: failed to set @status:', err);
+  }
 
   return record;
 } 

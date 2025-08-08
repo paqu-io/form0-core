@@ -562,6 +562,8 @@ export const FIELD_SPECS = {
       description_mode: { type: 'string', required: true, nullable: true, allowedValues: ['default', 'subtext'], dependentOn: 'description' },
       visible: { type: 'boolean', required: true, nullable: false, notTrueOn: { visible_conditions: (val) => val != null } },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      location_enabled: { type: 'boolean', required: true, nullable: false },
+      location_required: { type: 'boolean', required: true, nullable: false },
       elements: { type: 'array', required: true, nullable: false }
     },
     schemaValidators: [
@@ -790,6 +792,101 @@ export const FIELD_SPECS = {
         }));
       }
       return [];
+    }
+  }
+  ,
+  
+  StatusField: {
+    attributes: {
+      type: { type: 'string', required: true, nullable: false, value: 'StatusField' },
+      key: { type: 'string', required: true, nullable: false, value: '@status' },
+      data_name: { type: 'string', required: true, nullable: false, value: 'status' },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, value: 'default' },
+      enabled: { type: 'boolean', required: true, nullable: false },
+      visible: { type: 'boolean', required: true, nullable: false },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'string', required: true, nullable: true },
+      choices: { type: 'array', required: true, nullable: false }
+    },
+    schemaValidators: [
+      (field) => {
+        // Validate choices array
+        if (!Array.isArray(field.choices) || field.choices.length === 0) {
+          return { isValid: false, error: `StatusField "${field.data_name}" must have a non-empty 'choices' array` };
+        }
+        const hexColorRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+        const baseValidation = validateChoiceFieldChoices(field.choices);
+        if (!baseValidation.isValid) {
+          return { isValid: false, error: `StatusField "${field.data_name}" validation failed: ${baseValidation.errors.join(', ')}` };
+        }
+        for (let i = 0; i < field.choices.length; i++) {
+          const c = field.choices[i];
+          if (!c.color || typeof c.color !== 'string' || !hexColorRegex.test(c.color)) {
+            return { isValid: false, error: `StatusField "${field.data_name}" choice at index ${i} must include a valid hex 'color'` };
+          }
+        }
+        return { isValid: true };
+      }
+    ],
+    valueValidator: (field, value) => {
+      // Runtime value (when provided) must be one of the choice values
+      if (value !== null && value !== undefined) {
+        const allowed = new Set((field.choices || []).map(c => c.value));
+        if (typeof value !== 'string' || !allowed.has(value)) {
+          return `${field.data_name} must be one of the allowed status values`;
+        }
+      }
+      return null;
+    },
+    defaultProducer: (field) => {
+      return field.default_value || null;
+    },
+    outputProducer: (field, value) => {
+      // Output is the selected status value string
+      return value == null ? null : value;
+    }
+  },
+  
+  TitleField: {
+    attributes: {
+      type: { type: 'string', required: true, nullable: false, value: 'TitleField' },
+      key: { type: 'string', required: true, nullable: false, value: '@title' },
+      data_name: { type: 'string', required: true, nullable: false, value: 'title' },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, value: 'default' },
+      enabled: { type: 'boolean', required: true, nullable: false, value: true },
+      visible: { type: 'boolean', required: true, nullable: false, value: true },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: { type: 'boolean', required: true, nullable: false, value: true },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      elements: { type: 'array', required: true, nullable: false }
+    },
+    schemaValidators: [
+      (field) => {
+        if (!Array.isArray(field.elements) || field.elements.length === 0) {
+          return { isValid: false, error: `TitleField "${field.data_name}" must contain a non-empty elements array` };
+        }
+        // Elements should be strings (keys or data_names)
+        for (let i = 0; i < field.elements.length; i++) {
+          const ref = field.elements[i];
+          if (typeof ref !== 'string') {
+            return { isValid: false, error: `TitleField elements must be strings (key or data_name). Invalid at index ${i}` };
+          }
+        }
+        return { isValid: true };
+      }
+    ],
+    valueValidator: (field, value) => {
+      // Title is derived; no user-provided runtime value
+      return null;
+    },
+    defaultProducer: () => null,
+    outputProducer: (field, value) => {
+      // Output is the final string title if provided
+      return value == null ? null : String(value);
     }
   }
 };
