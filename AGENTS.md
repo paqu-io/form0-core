@@ -1,18 +1,25 @@
 # Repository Guidelines
-
 This project, `form0-core`, is the foundational JavaScript library that powers the entire form0 ecosystem. It provides a form engine that handles calculations, visibility, requirements, and validation based on a JSON schema. The library is designed to be used in both Node.js and browser environments.
 
 ## Role in the form0 Ecosystem
-
 `form0-core` serves as the core engine for:
 
 - **form0-cli**: Command-line tools that use the core engine for form schema validation, testing, and development workflows
 - **form0-react**: React components and hooks that wrap the core engine to provide seamless integration with React applications
 - **form0-react-native**: React Native components that leverage the core engine for mobile form experiences
 
-## Role in reform SaaS
-
+### Role in reform SaaS
 `form0-core` is the underlying engine that powers **reform**, a commercial SaaS product. While form0 is open-source and framework-agnostic, reform builds upon this foundation to provide a complete form management solution with additional enterprise features, hosting, and support.
+
+## Key Features
+- **Schema-driven forms:** Define form structure, logic, and behavior using a JSON schema.
+- **Form Engine:** A core engine that processes the form schema and manages the form state.
+- **Calculated Fields:** Define fields whose values are calculated based on other fields.
+- **Conditional Logic:** Control field visibility, requirements, and read-only status based on conditions.
+- **Event System:** Trigger custom actions based on form events (e.g., `load-record`, `change`).
+- **Built-in Functions:** A set of built-in functions for performing logical operations, calculations, and more.
+- **Extensible:** The engine can be extended with custom helper functions.
+- **Security:** The library includes a security model to control the execution of code.
 
 ## Project Structure & Module Organization
 - `src/`: Library source (ESM). Key areas: `engine/` (form engine, warnings), `schema/` (validators, field specs, operators), `utilities/` (helpers, hashing, versioning), `security/` (config), `builtins/` (field implementations), `index.js` (public exports).
@@ -44,5 +51,10 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 
 ## Security & Configuration Tips
 - Review `SECURITY.md` and prefer `SAFE_SECURITY_CONFIG`/`SECURITY_MODES` from `src/security/config.js`.
+- Never introduce unvetted dynamic code execution or imports in core paths.
+- Validate any untrusted schema input via existing validators.
 - Do not commit secrets; keep test data non-sensitive. Validate untrusted input through schema validators.
 
+## Language policy
+- JavaScript only in this repo. No TypeScript source files.
+- Optional types via JSDoc (@typedef, @param, @returns) to improve DX without adding a TS build step.
