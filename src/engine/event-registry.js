@@ -5,10 +5,10 @@
 
 /**
  * Event registry with scoping rules
- * 
+ *
  * Categories:
  * - record: Events that operate at the record level (main form only)
- * - field: Events that operate at the field level (contextual scope)  
+ * - field: Events that operate at the field level (contextual scope)
  * - repeatable: Events that operate at the RepeatableSection level (specific instance scope)
  *
  * Scopes:
@@ -23,19 +23,19 @@ export const EVENT_REGISTRY = {
   'new-record': { category: 'record', scope: 'main' },
   'save-record': { category: 'record', scope: 'main' },
   'validate-record': { category: 'record', scope: 'main' },
-  
+
   // Field-level events (contextual scope)
-  'change': { category: 'field', scope: 'contextual' },
-  'blur': { category: 'field', scope: 'contextual' },
-  'focus': { category: 'field', scope: 'contextual' },
-  'click': { category: 'field', scope: 'contextual' },
-  
+  change: { category: 'field', scope: 'contextual' },
+  blur: { category: 'field', scope: 'contextual' },
+  focus: { category: 'field', scope: 'contextual' },
+  click: { category: 'field', scope: 'contextual' },
+
   // RepeatableSection-level events (specific instance scope)
   'new-repeatable': { category: 'repeatable', scope: 'repeatable' },
   'load-repeatable': { category: 'repeatable', scope: 'repeatable' },
   'edit-repeatable': { category: 'repeatable', scope: 'repeatable' },
   'save-repeatable': { category: 'repeatable', scope: 'repeatable' },
-  'validate-repeatable': { category: 'repeatable', scope: 'repeatable' }
+  'validate-repeatable': { category: 'repeatable', scope: 'repeatable' },
 };
 
 /**
@@ -63,7 +63,7 @@ export function isValidEventType(eventType) {
  */
 export function getEventsByCategory(category) {
   return Object.keys(EVENT_REGISTRY).filter(
-    eventType => EVENT_REGISTRY[eventType].category === category
+    (eventType) => EVENT_REGISTRY[eventType].category === category
   );
 }
 

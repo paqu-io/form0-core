@@ -5,7 +5,7 @@
  * @example
  * // Get form title
  * FORM().title
- * @example  
+ * @example
  * // Access field definitions
  * FORM().elements[0].label
  * @example

@@ -9,8 +9,10 @@ const OPERATORS = {
   less_or_equal_than: (a, b) => a <= b,
   contains: (a, b) => Array.isArray(a) && a.includes(b),
   starts_with: (a, b) => typeof a === 'string' && a.startsWith(b),
-  is_empty: (a) => a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0),
-  is_not_empty: (a) => !(a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0)),
+  is_empty: (a) =>
+    a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0),
+  is_not_empty: (a) =>
+    !(a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0)),
 };
 
 export function evaluateConditions(conditions, values, allFields) {
@@ -44,17 +46,17 @@ export function evaluateConditions(conditions, values, allFields) {
  * @param {Object} allFields - Map of all fields by key for condition evaluation
  */
 function evaluateVisibilityRecursive(elements, values, visible, allFields) {
-  elements.forEach(element => {
+  elements.forEach((element) => {
     if (element.type === 'Section' || element.type === 'RepeatableSection') {
       // First evaluate children (bottom-up approach)
       if (element.elements && element.elements.length > 0) {
         evaluateVisibilityRecursive(element.elements, values, visible, allFields);
-        
+
         // Check if any child is visible
-        const hasVisibleChild = element.elements.some(child => 
-          visible[child.data_name] !== false
+        const hasVisibleChild = element.elements.some(
+          (child) => visible[child.data_name] !== false
         );
-        
+
         if (!hasVisibleChild) {
           // All children hidden → force hide section (override explicit settings)
           visible[element.data_name] = false;
@@ -94,10 +96,10 @@ export function evaluateVisibility(schema, values, visible) {
   // to avoid rebuilding on every evaluation. See #perf-caching-idea.
   const fields = flattenFields(schema.elements);
   const allFields = {};
-  fields.forEach(field => {
+  fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
   });
-  
+
   // Use recursive approach for single-pass visibility evaluation
   evaluateVisibilityRecursive(schema.elements, values, visible, allFields);
 }
@@ -108,7 +110,7 @@ export function evaluateRequirement(schema, values, required) {
   // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
   // to avoid rebuilding on every evaluation. See #perf-caching-idea.
   const allFields = {};
-  fields.forEach(field => {
+  fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
   });
   fields.forEach((field) => {
@@ -127,7 +129,7 @@ export function evaluateReadOnly(schema, values, read_only) {
   // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
   // to avoid rebuilding on every evaluation. See #perf-caching-idea.
   const allFields = {};
-  fields.forEach(field => {
+  fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
   });
   fields.forEach((field) => {

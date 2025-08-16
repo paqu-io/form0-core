@@ -12,4 +12,4 @@
  * // Nested conditions for shipping cost
  * IF(country === "US", IF(state === "CA", 8.99, 5.99), 15.99)
  */
-export const IF = (cond, a, b) => (cond ? a : b); 
+export const IF = (cond, a, b) => (cond ? a : b);

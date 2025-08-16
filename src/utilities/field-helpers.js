@@ -41,24 +41,24 @@ export function generateValueFromLabel(label) {
   if (!label || typeof label !== 'string') {
     return '';
   }
-  
+
   // Normalize accents and convert to lowercase
   let value = normalizeAccents(label).toLowerCase();
-  
+
   // Convert spaces and dashes to underscores
   value = value.replace(/[\s-]+/g, '_');
-  
+
   // Remove all characters that are not a-z, 0-9, or underscore
   value = value.replace(/[^a-z0-9_]/g, '');
-  
+
   // Remove consecutive underscores and trim underscores from start/end
   value = value.replace(/_+/g, '_').replace(/^_|_$/g, '');
-  
+
   // If the result is empty, generate a fallback
   if (!value) {
     value = 'option';
   }
-  
+
   return value;
 }
 
@@ -83,22 +83,22 @@ export function processChoiceFieldChoices(choices) {
   if (!Array.isArray(choices)) {
     return [];
   }
-  
+
   const processedChoices = [];
   const usedValues = new Set();
-  
+
   for (const choice of choices) {
     if (!choice || typeof choice !== 'object' || !choice.label) {
       continue;
     }
-    
+
     let value = choice.value;
-    
+
     // Generate value if not provided
     if (!value) {
       value = generateValueFromLabel(choice.label);
     }
-    
+
     // Ensure uniqueness by adding numbers if needed
     let finalValue = value;
     let counter = 1;
@@ -106,14 +106,14 @@ export function processChoiceFieldChoices(choices) {
       finalValue = `${value}_${counter}`;
       counter++;
     }
-    
+
     usedValues.add(finalValue);
     processedChoices.push({
       ...choice,
       value: finalValue,
     });
   }
-  
+
   return processedChoices;
 }
 
@@ -126,28 +126,30 @@ export function validateChoiceFieldChoices(choices) {
   if (!Array.isArray(choices)) {
     return { isValid: false, errors: ['choices must be an array'] };
   }
-  
+
   const errors = [];
   const values = new Set();
-  
+
   for (let i = 0; i < choices.length; i++) {
     const choice = choices[i];
-    
+
     if (!choice || typeof choice !== 'object') {
       errors.push(`Choice at index ${i} must be an object`);
       continue;
     }
-    
+
     if (!choice.label || typeof choice.label !== 'string') {
       errors.push(`Choice at index ${i} must have a label`);
       continue;
     }
-    
+
     if (choice.value !== undefined) {
       if (!isValidChoiceValue(choice.value)) {
-        errors.push(`Choice at index ${i} has invalid value "${choice.value}". Values must contain only a-z, 0-9, and underscores`);
+        errors.push(
+          `Choice at index ${i} has invalid value "${choice.value}". Values must contain only a-z, 0-9, and underscores`
+        );
       }
-      
+
       if (values.has(choice.value)) {
         errors.push(`Duplicate value "${choice.value}" found in choices`);
       } else {
@@ -155,7 +157,7 @@ export function validateChoiceFieldChoices(choices) {
       }
     }
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -180,4 +182,4 @@ export function processMultiChoiceFieldChoices(choices) {
  */
 export function validateMultiChoiceFieldChoices(choices) {
   return validateChoiceFieldChoices(choices);
-} 
+}

@@ -12,32 +12,35 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 
-
-export function createFormEngine({ 
-  schema, 
-  initialValues = {}, 
+export function createFormEngine({
+  schema,
+  initialValues = {},
   helpers = {},
   security = DEFAULT_SECURITY_CONFIG,
-  warningSystem = null 
+  warningSystem = null,
 }) {
   validateSchema(schema.form);
 
   const { form } = schema;
   const values = { ...initialValues };
   const allFields = flattenFields(form.elements);
-  
+
   // Create a lookup map for choice fields
   const choiceFieldMap = new Map();
   for (const field of allFields) {
-    if (field.type === 'SingleChoiceField' || field.type === 'MultiChoiceField' || field.type === 'BooleanField') {
+    if (
+      field.type === 'SingleChoiceField' ||
+      field.type === 'MultiChoiceField' ||
+      field.type === 'BooleanField'
+    ) {
       const valueToLabelMap = new Map();
-      field.choices.forEach(choice => {
+      field.choices.forEach((choice) => {
         valueToLabelMap.set(choice.value, choice.label);
       });
       choiceFieldMap.set(field.data_name, valueToLabelMap);
     }
   }
-  
+
   for (const field of allFields) {
     if (!(field.data_name in values)) {
       // Initialize field with default value if specified
@@ -47,13 +50,13 @@ export function createFormEngine({
       const fieldValue = values[field.data_name];
       if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choice)) {
         const labelMap = choiceFieldMap.get(field.data_name);
-        fieldValue.choice = fieldValue.choice.map(choice => {
+        fieldValue.choice = fieldValue.choice.map((choice) => {
           if (choice && choice.value && !choice.label) {
             // Auto-populate label from schema
             const label = labelMap.get(choice.value);
             return {
               ...choice,
-              label: label || choice.value // fallback to value if label not found
+              label: label || choice.value, // fallback to value if label not found
             };
           }
           return choice;
@@ -64,13 +67,13 @@ export function createFormEngine({
       const fieldValue = values[field.data_name];
       if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choices)) {
         const labelMap = choiceFieldMap.get(field.data_name);
-        fieldValue.choices = fieldValue.choices.map(choice => {
+        fieldValue.choices = fieldValue.choices.map((choice) => {
           if (choice && choice.value && !choice.label) {
             // Auto-populate label from schema
             const label = labelMap.get(choice.value);
             return {
               ...choice,
-              label: label || choice.value // fallback to value if label not found
+              label: label || choice.value, // fallback to value if label not found
             };
           }
           return choice;
@@ -84,37 +87,44 @@ export function createFormEngine({
   const read_only = {};
 
   const allHelpers = { ...builtins, ...helpers };
-  
+
   // Initialize context resolution system
   const contextResolver = new ContextResolver(schema.form);
   const sharedWarningSystem = warningSystem || new WarningSystem();
-  
+
   // Initialize event system with context resolution
   const eventManager = new EventManager(schema.form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...builtins, ...eventBuiltins, ...helpers };
-  
+
   // Initialize event code if present
   if (schema.form.events && schema.form.events.code) {
     const eventContext = buildEventContext(values, eventHelpers, {});
     eventManager.initializeEventCode(schema.form.events.code, eventContext);
   }
-  
+
   function buildEventContext(values, helpers, eventMeta) {
     const ctx = {};
-    
+
     // Add field values with $ prefix
     for (const key in values) {
       ctx[`$${key}`] = values[key];
     }
-    
+
     // Add helpers and event-specific builtins
     // TODO: Add form/record metadata builtins (THIS, ALTITUDE, etc.)
     return { ...ctx, ...helpers };
   }
 
   function evalForm() {
-    evaluateCalculatedFields(form, values, allHelpers, security, contextResolver, sharedWarningSystem);
+    evaluateCalculatedFields(
+      form,
+      values,
+      allHelpers,
+      security,
+      contextResolver,
+      sharedWarningSystem
+    );
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);
     evaluateReadOnly(form, values, read_only);
@@ -123,7 +133,11 @@ export function createFormEngine({
 
   function trigger(eventType, fieldKey, metadata = {}) {
     // Update event context with current values for event execution
-    const eventContext = buildEventContext(values, eventHelpers, { eventType, fieldKey, ...metadata });
+    const eventContext = buildEventContext(values, eventHelpers, {
+      eventType,
+      fieldKey,
+      ...metadata,
+    });
     eventManager.eventContext = eventContext; // Update the event context
     return eventManager.trigger(eventType, fieldKey, metadata);
   }
@@ -146,7 +160,7 @@ function getDefaultValue(field) {
   if (spec && spec.defaultProducer) {
     return spec.defaultProducer(field);
   }
-  
+
   // Fallback to existing logic for safety
   return getDefaultValueLegacy(field);
 }
@@ -170,52 +184,52 @@ function getDefaultValueLegacy(field) {
   switch (field.type) {
     case 'TextField':
       return field.default_value;
-      
+
     case 'NumericField':
       return field.default_value;
-      
+
     case 'SingleChoiceField':
     case 'BooleanField':
       // For SingleChoiceField and BooleanField, we need to find the choice and create the proper structure
-      const choice = field.choices.find(c => c.value === field.default_value);
+      const choice = field.choices.find((c) => c.value === field.default_value);
       if (choice) {
         return {
           choice: [{ value: choice.value, label: choice.label }],
-          other: []
+          other: [],
         };
       }
       return { choice: [], other: [] };
-      
+
     case 'MultiChoiceField':
       // For MultiChoiceField, we need to find all choices and create the proper structure
       const selectedChoices = field.choices
-        .filter(c => field.default_value.includes(c.value))
-        .map(c => ({ value: c.value, label: c.label }));
+        .filter((c) => field.default_value.includes(c.value))
+        .map((c) => ({ value: c.value, label: c.label }));
       return {
         choices: selectedChoices,
-        other: []
+        other: [],
       };
-      
+
     case 'DateField':
       if (field.default_value === 'now') {
         const today = new Date();
         return today.toISOString().split('T')[0]; // YYYY-MM-DD format
       }
       return null;
-      
+
     case 'TimeField':
       if (field.default_value === 'now') {
         const now = new Date();
         return now.toTimeString().split(' ')[0]; // HH:MM:SS format
       }
       return null;
-      
+
     case 'CalculatedField':
     case 'Section':
     case 'RepeatableSection':
     case 'LabelField':
       return null; // These don't support default values
-      
+
     default:
       return null;
   }

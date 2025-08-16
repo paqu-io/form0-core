@@ -30,4 +30,4 @@ export function __consumeResult() {
   _resultSet = false;
   _resultValue = undefined;
   return { called, value };
-} 
+}

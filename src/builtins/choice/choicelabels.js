@@ -15,19 +15,19 @@ export const CHOICELABELS = (multiChoiceField) => {
   if (!multiChoiceField || typeof multiChoiceField !== 'object') {
     return [];
   }
-  
+
   // Validate structure
   if (!Array.isArray(multiChoiceField.choices)) {
     return [];
   }
-  
+
   // Get all selected choices
   const labels = [];
   for (const choice of multiChoiceField.choices) {
     if (choice && choice.label !== undefined) {
       // Preserve type - if it's a number, keep it as number
       const label = choice.label;
-      
+
       // Try to parse as number if it's a string that represents a number
       if (typeof label === 'string' && !isNaN(label) && !isNaN(parseFloat(label))) {
         // Check if it's an integer or float
@@ -38,6 +38,6 @@ export const CHOICELABELS = (multiChoiceField) => {
       }
     }
   }
-  
+
   return labels;
-}; 
+};

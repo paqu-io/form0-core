@@ -4,28 +4,21 @@ export { createStructuredRecord } from './utilities/record-transformer.js';
 export { validateSchema } from './schema/schema-validator.js';
 //export { validateSchema, resolveSupportingImagePath } from './schema/schema-validator.js';
 export { generateKey } from './utilities/hash.js';
-export { 
-  SECURITY_MODES, 
+export {
+  SECURITY_MODES,
   DEFAULT_SECURITY_CONFIG,
-  SAFE_SECURITY_CONFIG 
+  SAFE_SECURITY_CONFIG,
 } from './security/config.js';
-export { 
+export {
   generateValueFromLabel,
   isValidChoiceValue,
   processChoiceFieldChoices,
   validateChoiceFieldChoices,
   processMultiChoiceFieldChoices,
   validateMultiChoiceFieldChoices,
-  flattenFields
+  flattenFields,
 } from './utilities/field-helpers.js';
 
-export { 
-  getValidOperators,
-  isValidOperator,
-  validateFieldConditions
-} from './schema/operators.js';
+export { getValidOperators, isValidOperator, validateFieldConditions } from './schema/operators.js';
 
-export { 
-  recordVersion,
-  formVersion
-} from './utilities/version-utils.js';
+export { recordVersion, formVersion } from './utilities/version-utils.js';

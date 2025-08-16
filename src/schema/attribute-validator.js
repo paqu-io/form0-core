@@ -35,7 +35,10 @@ export function validateAttribute(name, definition, value, field) {
 
   // Enum validation
   if (definition.allowedValues && !definition.allowedValues.includes(value)) {
-    return { isValid: false, error: `Attribute ${name} must be one of: ${definition.allowedValues.join(', ')}` };
+    return {
+      isValid: false,
+      error: `Attribute ${name} must be one of: ${definition.allowedValues.join(', ')}`,
+    };
   }
 
   // Specific value validation
@@ -46,8 +49,15 @@ export function validateAttribute(name, definition, value, field) {
   // Dependent validation
   if (definition.dependentOn && field) {
     const dependentValue = field[definition.dependentOn];
-    if (value !== null && value !== undefined && (dependentValue === null || dependentValue === undefined)) {
-      return { isValid: false, error: `Attribute ${name} cannot be set when ${definition.dependentOn} is null or missing` };
+    if (
+      value !== null &&
+      value !== undefined &&
+      (dependentValue === null || dependentValue === undefined)
+    ) {
+      return {
+        isValid: false,
+        error: `Attribute ${name} cannot be set when ${definition.dependentOn} is null or missing`,
+      };
     }
   }
 
@@ -56,7 +66,10 @@ export function validateAttribute(name, definition, value, field) {
     for (const [depAttr, depValue] of Object.entries(definition.notNullOn)) {
       if (typeof depValue === 'function' ? depValue(field[depAttr]) : field[depAttr] === depValue) {
         if (value == null) {
-          return { isValid: false, error: `Attribute ${name} must not be null when ${depAttr} is ${depValue}` };
+          return {
+            isValid: false,
+            error: `Attribute ${name} must not be null when ${depAttr} is ${depValue}`,
+          };
         }
       }
     }
@@ -67,7 +80,10 @@ export function validateAttribute(name, definition, value, field) {
     for (const [depAttr, depValue] of Object.entries(definition.notTrueOn)) {
       if (typeof depValue === 'function' ? depValue(field[depAttr]) : field[depAttr] === depValue) {
         if (value === true) {
-          return { isValid: false, error: `Attribute ${name} must not be true when ${depAttr} is ${depValue}` };
+          return {
+            isValid: false,
+            error: `Attribute ${name} must not be true when ${depAttr} is ${depValue}`,
+          };
         }
       }
     }
@@ -78,7 +94,10 @@ export function validateAttribute(name, definition, value, field) {
     for (const [depAttr, depValue] of Object.entries(definition.notFalseOn)) {
       if (typeof depValue === 'function' ? depValue(field[depAttr]) : field[depAttr] === depValue) {
         if (value === false) {
-          return { isValid: false, error: `Attribute ${name} must not be false when ${depAttr} is ${depValue}` };
+          return {
+            isValid: false,
+            error: `Attribute ${name} must not be false when ${depAttr} is ${depValue}`,
+          };
         }
       }
     }
@@ -100,41 +119,41 @@ export function validateAttributeType(value, expectedType) {
         return { isValid: false, error: 'must be a string' };
       }
       break;
-      
+
     case 'number':
       if (typeof value !== 'number') {
         return { isValid: false, error: 'must be a number' };
       }
       break;
-      
+
     case 'boolean':
       if (typeof value !== 'boolean') {
         return { isValid: false, error: 'must be a boolean' };
       }
       break;
-      
+
     case 'array':
       if (!Array.isArray(value)) {
         return { isValid: false, error: 'must be an array' };
       }
       break;
-      
+
     case 'object':
       if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return { isValid: false, error: 'must be an object' };
       }
       break;
-      
+
     case 'null':
       if (value !== null) {
         return { isValid: false, error: 'must be null' };
       }
       break;
-      
+
     default:
       return { isValid: false, error: `unknown type: ${expectedType}` };
   }
-  
+
   return { isValid: true };
 }
 
@@ -158,7 +177,7 @@ export function validatePattern(value, pattern) {
   if (typeof value !== 'string') {
     return { isValid: false, error: 'must be a string' };
   }
-  
+
   try {
     const re = new RegExp(pattern);
     if (!re.test(value)) {
@@ -167,7 +186,7 @@ export function validatePattern(value, pattern) {
   } catch (e) {
     return { isValid: false, error: 'invalid pattern' };
   }
-  
+
   return { isValid: true };
 }
 
@@ -182,15 +201,15 @@ export function validateRange(value, min, max) {
   if (typeof value !== 'number') {
     return { isValid: false, error: 'must be a number' };
   }
-  
+
   if (min !== undefined && value < min) {
     return { isValid: false, error: `must be at least ${min}` };
   }
-  
+
   if (max !== undefined && value > max) {
     return { isValid: false, error: `must be at most ${max}` };
   }
-  
+
   return { isValid: true };
 }
 
@@ -205,14 +224,14 @@ export function validateArrayLength(value, minLength, maxLength) {
   if (!Array.isArray(value)) {
     return { isValid: false, error: 'must be an array' };
   }
-  
+
   if (minLength !== undefined && value.length < minLength) {
     return { isValid: false, error: `must have at least ${minLength} items` };
   }
-  
+
   if (maxLength !== undefined && value.length > maxLength) {
     return { isValid: false, error: `must have at most ${maxLength} items` };
   }
-  
+
   return { isValid: true };
-} 
+}

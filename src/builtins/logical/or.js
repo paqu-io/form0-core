@@ -10,4 +10,4 @@
  * // Validation - either email or phone is required
  * OR(email.length > 0, phone.length > 0)
  */
-export const OR = (...args) => args.some(Boolean); 
+export const OR = (...args) => args.some(Boolean);

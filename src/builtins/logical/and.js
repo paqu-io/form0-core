@@ -10,4 +10,4 @@
  * // Multiple conditions
  * AND(name.length > 0, email.includes("@"), age >= 13)
  */
-export const AND = (...args) => args.every(Boolean); 
+export const AND = (...args) => args.every(Boolean);
