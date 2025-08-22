@@ -28,7 +28,7 @@ When I say "commit" or "generate commit message":
   - Lowercase start
   - No period at end
   - Under 72 characters
-  - Focus on WHAT changed, not implementation details
+  - Focus on **WHAT changed**, not implementation details
 
 - **Breaking changes**: Add `!` after scope: `feat(api)!: remove deprecated endpoint`
 
