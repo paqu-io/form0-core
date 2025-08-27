@@ -11,6 +11,7 @@ import { OTHER } from './choice/other.js';
 import { CHOICEVALUES } from './choice/choicevalues.js';
 import { CHOICELABELS } from './choice/choicelabels.js';
 import { FORM } from './schema/form.js';
+import { ABS } from './math/abs.js';
 
 // Import event builtins
 import { ALERT } from './event/ui/alert.js';
@@ -32,6 +33,7 @@ export { OTHER } from './choice/other.js';
 export { CHOICEVALUES } from './choice/choicevalues.js';
 export { CHOICELABELS } from './choice/choicelabels.js';
 export { FORM } from './schema/form.js';
+export { ABS } from './math/abs.js';
 
 // Export event builtins
 export { ALERT } from './event/ui/alert.js';
@@ -54,6 +56,7 @@ export const builtins = {
   CHOICEVALUES,
   CHOICELABELS,
   FORM, // Available in both calculations and events
+  ABS,
 };
 
 // Event-specific builtins (only available in event context)
