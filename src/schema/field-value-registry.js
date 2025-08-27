@@ -11,11 +11,11 @@ export function validateFieldValue(field, value) {
   if (!spec) {
     return `Unsupported field type: ${field.type}`;
   }
-  
+
   if (spec.valueValidator) {
     return spec.valueValidator(field, value);
   }
-  
+
   return null;
 }
 
@@ -82,34 +82,34 @@ export function validateSingleChoiceFieldValue(field, value) {
     if (typeof value !== 'object' || value === null) {
       return `${field.data_name} must be an object with 'choice' and 'other' arrays`;
     }
-    
+
     if (!Array.isArray(value.choice)) {
       return `${field.data_name}.choice must be an array`;
     }
-    
+
     if (!Array.isArray(value.other)) {
       return `${field.data_name}.other must be an array`;
     }
-    
+
     // Validate choice selections
-    const validChoiceValues = new Set(field.choices.map(c => c.value));
+    const validChoiceValues = new Set(field.choices.map((c) => c.value));
     for (const choice of value.choice) {
       if (!choice || typeof choice !== 'object' || !choice.value) {
         return `${field.data_name}.choice must contain objects with 'value' property`;
       }
-      
+
       if (!validChoiceValues.has(choice.value)) {
         return `${field.data_name}.choice contains invalid value: ${choice.value}`;
       }
     }
-    
+
     // Validate other selections
     for (const other of value.other) {
       if (!other || typeof other !== 'object' || !other.label) {
         return `${field.data_name}.other must contain objects with 'label' property`;
       }
     }
-    
+
     // Check if allow_other is false but other array is not empty
     if (!field.allow_other && value.other.length > 0) {
       return `${field.data_name} does not allow 'other' values`;
@@ -130,34 +130,34 @@ export function validateMultiChoiceFieldValue(field, value) {
     if (typeof value !== 'object' || value === null) {
       return `${field.data_name} must be an object with 'choices' and 'other' arrays`;
     }
-    
+
     if (!Array.isArray(value.choices)) {
       return `${field.data_name}.choices must be an array`;
     }
-    
+
     if (!Array.isArray(value.other)) {
       return `${field.data_name}.other must be an array`;
     }
-    
+
     // Validate choice selections
-    const validChoiceValues = new Set(field.choices.map(c => c.value));
+    const validChoiceValues = new Set(field.choices.map((c) => c.value));
     for (const choice of value.choices) {
       if (!choice || typeof choice !== 'object' || !choice.value) {
         return `${field.data_name}.choices must contain objects with 'value' property`;
       }
-      
+
       if (!validChoiceValues.has(choice.value)) {
         return `${field.data_name}.choices contains invalid value: ${choice.value}`;
       }
     }
-    
+
     // Validate other selections
     for (const other of value.other) {
       if (!other || typeof other !== 'object' || !other.label) {
         return `${field.data_name}.other must contain objects with 'label' property`;
       }
     }
-    
+
     // Check if allow_other is false but other array is not empty
     if (!field.allow_other && value.other.length > 0) {
       return `${field.data_name} does not allow 'other' values`;
@@ -186,7 +186,7 @@ export function validateBooleanFieldValue(field, value) {
       return `${field.data_name} does not support 'other' values`;
     }
     // Validate choice selections
-    const validChoiceValues = new Set(field.choices.map(c => c.value));
+    const validChoiceValues = new Set(field.choices.map((c) => c.value));
     for (const choice of value.choice) {
       if (!choice || typeof choice !== 'object' || !choice.value) {
         return `${field.data_name}.choice must contain objects with 'value' property`;
@@ -218,10 +218,18 @@ export function validatePhotoFieldValue(field, value) {
     }
     // Only check min_length/max_length if field has some value
     if (value.length > 0) {
-      if (field.min_length !== null && field.min_length !== undefined && value.length < field.min_length) {
+      if (
+        field.min_length !== null &&
+        field.min_length !== undefined &&
+        value.length < field.min_length
+      ) {
         return `${field.data_name} must have at least ${field.min_length} photo(s)`;
       }
-      if (field.max_length !== null && field.max_length !== undefined && value.length > field.max_length) {
+      if (
+        field.max_length !== null &&
+        field.max_length !== undefined &&
+        value.length > field.max_length
+      ) {
         return `${field.data_name} must have at most ${field.max_length} photo(s)`;
       }
     }
@@ -254,10 +262,18 @@ export function validateVideoFieldValue(field, value) {
 
     // Only check min_length/max_length if there is at least one video with a valid duration
     if (totalDuration > 0) {
-      if (field.min_length !== null && field.min_length !== undefined && totalDuration < (field.min_length * 60)) {
+      if (
+        field.min_length !== null &&
+        field.min_length !== undefined &&
+        totalDuration < field.min_length * 60
+      ) {
         return `${field.data_name} total duration must be at least ${field.min_length} minute(s)`;
       }
-      if (field.max_length !== null && field.max_length !== undefined && totalDuration > (field.max_length * 60)) {
+      if (
+        field.max_length !== null &&
+        field.max_length !== undefined &&
+        totalDuration > field.max_length * 60
+      ) {
         return `${field.data_name} total duration must be at most ${field.max_length} minute(s)`;
       }
     }

@@ -34,18 +34,18 @@ const testSchema = {
         label: 'Built-in Calculation',
         calculate: 'IF($age >= 18, "Adult", "Minor")',
         display: { style: 'text' },
-      }
-    ]
-  }
+      },
+    ],
+  },
 };
 
 console.log('=== Testing Security Implementation ===\n');
 
 // Test 1: Trusted mode (default - current behavior)
 console.log('1. TRUSTED MODE (default):');
-const trustedEngine = createFormEngine({ 
-  schema: testSchema, 
-  initialValues: { age: 25 }
+const trustedEngine = createFormEngine({
+  schema: testSchema,
+  initialValues: { age: 25 },
 });
 trustedEngine.eval();
 console.log('State:', trustedEngine.getState());
@@ -53,10 +53,10 @@ console.log('');
 
 // Test 2: Safe mode (simple)
 console.log('2. SAFE MODE (simple):');
-const safeEngine = createFormEngine({ 
-  schema: testSchema, 
+const safeEngine = createFormEngine({
+  schema: testSchema,
   initialValues: { age: 25 },
-  security: { mode: SECURITY_MODES.SAFE }
+  security: { mode: SECURITY_MODES.SAFE },
 });
 safeEngine.eval();
 console.log('State:', safeEngine.getState());
@@ -64,10 +64,10 @@ console.log('');
 
 // Test 2b: Safe mode (using predefined config)
 console.log('2b. SAFE MODE (using predefined config):');
-const safeEngine2 = createFormEngine({ 
-  schema: testSchema, 
+const safeEngine2 = createFormEngine({
+  schema: testSchema,
   initialValues: { age: 25 },
-  security: SAFE_SECURITY_CONFIG
+  security: SAFE_SECURITY_CONFIG,
 });
 safeEngine2.eval();
 console.log('State:', safeEngine2.getState());
@@ -75,18 +75,18 @@ console.log('');
 
 // Test 3: Custom mode with specific restrictions
 console.log('3. CUSTOM MODE:');
-const customEngine = createFormEngine({ 
-  schema: testSchema, 
+const customEngine = createFormEngine({
+  schema: testSchema,
   initialValues: { age: 25 },
-  security: { 
+  security: {
     mode: SECURITY_MODES.CUSTOM,
     maxExecutionTime: 500,
     allowedGlobals: ['Math', 'Date'],
-    blockedPatterns: [/\bwindow\b/, /\balert\b/]
-  }
+    blockedPatterns: [/\bwindow\b/, /\balert\b/],
+  },
 });
 customEngine.eval();
 console.log('State:', customEngine.getState());
 console.log('');
 
-console.log('=== Security Test Complete ==='); 
+console.log('=== Security Test Complete ===');

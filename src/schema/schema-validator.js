@@ -10,10 +10,10 @@ export function validateSchema(form) {
   const duplicateDataNames = new Set();
   const duplicateKeys = new Set();
   const errors = [];
-  
+
   // Create a map of all fields by key and data_name for condition validation
   const allFields = {};
-  fields.forEach(field => {
+  fields.forEach((field) => {
     if (field.key) {
       allFields[field.key] = field;
     }
@@ -94,35 +94,54 @@ export function validateSchema(form) {
       }
     }
   }
-  
+
+  // Validate top-level status_field and title_field if present
+  if (form.status_field) {
+    const statusValidation = validateFieldSchema(form.status_field);
+    if (!statusValidation.isValid) {
+      errors.push(...statusValidation.errors.map((e) => `status_field: ${e}`));
+    }
+    // Validate default_value if present
+    if (form.status_field.default_value !== undefined && form.status_field.default_value !== null) {
+      const dv = validateDefaultValue(form.status_field, form.status_field.default_value);
+      if (!dv.isValid) {
+        errors.push(`status_field default_value: ${dv.error}`);
+      }
+    }
+  }
+  if (form.title_field) {
+    const titleValidation = validateFieldSchema(form.title_field);
+    if (!titleValidation.isValid) {
+      errors.push(...titleValidation.errors.map((e) => `title_field: ${e}`));
+    }
+  }
+
   // Add duplicate errors to the main errors array
   if (duplicateDataNames.size > 0) {
     errors.push(`Duplicate data_name(s): ${Array.from(duplicateDataNames).join(', ')}`);
   }
-  
+
   if (duplicateKeys.size > 0) {
     errors.push(`Duplicate key(s): ${Array.from(duplicateKeys).join(', ')}`);
   }
-  
+
   // Validate events section if present
   if (form.events) {
     if (typeof form.events !== 'object') {
       errors.push('Form events must be an object');
     }
-    
+
     if (form.events.code && typeof form.events.code !== 'string') {
       errors.push('Form events.code must be a string');
     }
   }
-  
+
   // Throw all errors at once if any were found
   if (errors.length > 0) {
-    const errorMessage = errors.length === 1 
-      ? errors[0] 
-      : `Validation failed with ${errors.length} errors:\n${errors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`;
+    const errorMessage =
+      errors.length === 1
+        ? errors[0]
+        : `Validation failed with ${errors.length} errors:\n${errors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`;
     throw new Error(errorMessage);
   }
 }
-
-
-

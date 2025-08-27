@@ -6,6 +6,7 @@ const schema = {
     description: 'This is a test description',
     id: null, //This should be the unique identifier of the form (UUIDv4 or UUIDv7 - TBD).
     record_count: 0, //This should count the number of records in the form. Available in reform.
+    record_last_change_at: null, //This should be the date and time of the last record change in ISO 8601 format. Available in reform.
     form_created_at: null, //This should be the date and time of the form creation in ISO 8601 format. Available in reform.
     form_updated_at: null, //This should be the date and time of the form update in ISO 8601 format. Available in reform.
     form_created_by: null, //This should be the user who created the form. Available in reform. Available in reform.
@@ -18,12 +19,56 @@ const schema = {
     sub_org_metadata: null, //This should be the metadata of the sub-organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
     project_id: null, //This should be the unique identifier of the project of the form (it can be null or one of the projects in the account). Available in reform.
     project_metadata: null, //This should be the metadata of the project of the form (it can be null or an array of fields to be included in each form). Available in reform.
-    bounding_box: [
-      0,
-      0,
-      0,
-      0
-    ], //Bounding box containing all the form's records. Format is [min_lat, min_long, max_lat, max_long]. Available in reform.
+    status_field: {
+      type: 'StatusField',
+      key: '@status',
+      data_name: 'status',
+      label: 'Status',
+      display: 'default', //StatusField can only be 'default'
+      enabled: true, //StatusField can be true or false
+      visible: true,
+      visible_conditions: null,
+      read_only: false,
+      read_only_conditions: null,
+      default_value: 'pending',
+      choices: [
+        {
+          label: 'Enrolled',
+          value: 'enrolled',
+          color: '#87D30F',
+        },
+        {
+          label: 'Not Enrolled',
+          value: 'not_enrolled',
+          color: '#FF0000',
+        },
+        {
+          label: 'Pending',
+          value: 'pending',
+          color: '#FFA500',
+        },
+      ],
+    },
+    title_field: {
+      type: 'TitleField',
+      key: '@title',
+      data_name: 'title',
+      label: 'Title',
+      display: 'default', //TitleField   can only be 'default'
+      enabled: true, //TitleField can only be true
+      visible: true, //TitleField can only be true
+      visible_conditions: null,
+      read_only: true, //TitleField is always read_only = true
+      read_only_conditions: null,
+      elements: [
+        //Elements can be an array of elements or a single element. Elements should be field keys but field data_name can be used as fallback. Elements, when rendered, will be concatenated with each other with a comma and displayed at the top of the record as a title.
+        'ef661',
+        '0180f', //If a key/data_name refers to a SingleChoiceField, MultiChoiceField or BooleanField, we should always show the choice label.
+      ],
+    },
+    bounding_box: [0, 0, 0, 0], //Bounding box containing all the form's records. Format is [min_lat, min_long, max_lat, max_long]. Available in reform.
+    location_enabled: true, //location_enabled can be true or false
+    location_required: true, //location_required can be true or false
     image: null, //The URL to the original image which was uploaded as this app's icon. Available in reform.
     image_thumbnail: null, //The URL to the thumbnail-sized image which was uploaded as this app's icon. 160x160 px. Available in reform.
     image_small: null, //The URL to the small-sized image which was uploaded as this app's icon. 320x320 px. Available in reform.
@@ -58,7 +103,7 @@ const schema = {
         }
 
         ON('change', 'colors', colorsF);
-      `
+      `,
     },
     elements: [
       {
@@ -366,7 +411,8 @@ const schema = {
         type: 'LabelField',
         key: '1985ff',
         data_name: 'photo_consent',
-        label: 'Please be aware that photographs may be taken at this Community Engagement event. By submitting this form, you consent to the use of any photos in which you appear in reports related to the Housing Improvement under PDUNM project and in Build Change marketing materials. You also acknowledge that the information you provide on this form will only be used for the purposes of this project.',
+        label:
+          'Please be aware that photographs may be taken at this Community Engagement event. By submitting this form, you consent to the use of any photos in which you appear in reports related to the Housing Improvement under PDUNM project and in Build Change marketing materials. You also acknowledge that the information you provide on this form will only be used for the purposes of this project.',
         display: 'default', //LabelField can only be 'default'
         description: null, //description can be null or a string
         description_mode: null, //description_mode can be null, 'default' or 'subtext'
@@ -469,7 +515,7 @@ const schema = {
             label: 'Comments',
             display: 'default', //TextField can only be 'default'
             description: null, //description can be null or a string
-            description_mode: null, //description_mode can be null, 'default' or 'subtext' 
+            description_mode: null, //description_mode can be null, 'default' or 'subtext'
             required: false,
             required_conditions: null,
             visible: true,
@@ -540,16 +586,16 @@ const schema = {
         choices: [
           {
             label: 'Mela',
-            value: 'mela'
+            value: 'mela',
           },
           {
             label: 'Banana',
-            value: 'banana'
+            value: 'banana',
           },
           {
             label: 'Fragola',
-            value: 'fragola'
-          }
+            value: 'fragola',
+          },
         ],
       },
       {
@@ -576,20 +622,20 @@ const schema = {
         choices: [
           {
             label: 'Pasta',
-            value: 'pasta'
+            value: 'pasta',
           },
           {
             label: 'Pizza',
-            value: 'pizza'
+            value: 'pizza',
           },
           {
             label: 'Focaccia',
-            value: 'focaccia'
+            value: 'focaccia',
           },
           {
             label: 'Salumi',
-            value: 'salumi'
-          }
+            value: 'salumi',
+          },
         ],
       },
       {
@@ -602,6 +648,8 @@ const schema = {
         description_mode: 'default', //description_mode can be null,'default' or 'subtext'
         visible: true,
         visible_conditions: null,
+        location_enabled: true, //location_enabled can be true or false
+        location_required: true, //location_required can be true or false
         elements: [
           {
             type: 'TextField',
@@ -619,8 +667,7 @@ const schema = {
             read_only_conditions: null,
             default_value: null,
             pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
-            pattern_description:
-              'Valid email address format (e.g., user@example.com)',
+            pattern_description: 'Valid email address format (e.g., user@example.com)',
             supporting_image: false, //supporting_image can be true or false
             supporting_image_path: null, //supporting_image_path can be null or a string
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
@@ -645,44 +692,46 @@ const schema = {
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
           },
           {
-            type: "Section",
-            key: "546aa",
-            data_name: "non_structural_assessment",
-            label: "Non-structural assessment",
-            display: "inline",
-            description: "This is a test34",
-            description_mode: "default",
+            type: 'Section',
+            key: '546aa',
+            data_name: 'non_structural_assessment',
+            label: 'Non-structural assessment',
+            display: 'inline',
+            description: 'This is a test34',
+            description_mode: 'default',
             visible: true,
             visible_conditions: null,
             elements: [
               {
-                type: "RepeatableSection",
-                key: "9944a",
-                data_name: "water_sanitation",
-                label: "Water & Sanitation",
-                display: "drilldown",
-                description: "This is a NESTED repeatable section for evaluation tests",
-                description_mode: "default",
+                type: 'RepeatableSection',
+                key: '9944a',
+                data_name: 'water_sanitation',
+                label: 'Water & Sanitation',
+                display: 'drilldown',
+                description: 'This is a NESTED repeatable section for evaluation tests',
+                description_mode: 'default',
                 visible: true,
                 visible_conditions: null,
+                location_enabled: true, //location_enabled can be true or false
+                location_required: true, //location_required can be true or false
                 elements: [
                   {
-                    type: "Section",
-                    key: "1234c",
-                    data_name: "first_phase",
-                    label: "First phase",
-                    display: "inline",
-                    description: "This is a test88",
-                    description_mode: "default",
+                    type: 'Section',
+                    key: '1234c',
+                    data_name: 'first_phase',
+                    label: 'First phase',
+                    display: 'inline',
+                    description: 'This is a test88',
+                    description_mode: 'default',
                     visible: true,
                     visible_conditions: null,
                     elements: [
                       {
-                        type: "TextField",
-                        key: "8877e",
-                        data_name: "email_test_bis",
-                        label: "Email Bis",
-                        display: "default",
+                        type: 'TextField',
+                        key: '8877e',
+                        data_name: 'email_test_bis',
+                        label: 'Email Bis',
+                        display: 'default',
                         description: null,
                         description_mode: null,
                         required: true,
@@ -691,9 +740,9 @@ const schema = {
                         visible_conditions: null,
                         read_only: false,
                         read_only_conditions: null,
-                        default_value: "stefano@form0.dev",
-                        pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$",
-                        pattern_description: "Valid email address format (e.g., user@example.com)",
+                        default_value: 'stefano@form0.dev',
+                        pattern: '^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$',
+                        pattern_description: 'Valid email address format (e.g., user@example.com)',
                         supporting_image: false,
                         supporting_image_path: null,
                         supporting_image_display: null,
@@ -721,10 +770,9 @@ const schema = {
                         supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
                       },
                     ],
-                  }
+                  },
                 ],
               },
-              
             ],
           },
         ],
@@ -759,26 +807,26 @@ const initialValues = {
   city: {
     choice: [
       {
-        value: 'bogota'  // label will be auto-populated from schema
-      }
+        value: 'bogota', // label will be auto-populated from schema
+      },
     ],
-    other: []
+    other: [],
   },
   colors: {
     choices: [
       {
-        value: 'red'  // label will be auto-populated from schema
+        value: 'red', // label will be auto-populated from schema
       },
       {
-        value: 'yellow'  // label will be auto-populated from schema
-      }
+        value: 'yellow', // label will be auto-populated from schema
+      },
     ],
     other: [
       {
-        label: 'Purple'
-      }
-    ]
-  }
+        label: 'Purple',
+      },
+    ],
+  },
 };
 
 const engine = createFormEngine({ schema, initialValues });
@@ -792,7 +840,7 @@ const record = createStructuredRecord(engine.getState(), fields, {
   status: 'incomplete',
   id: 'f8e9d0c1-b2a3-4567-8901-234567890abc',
   form_id: 'a7b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d',
-  originalElements: schema.form.elements
+  originalElements: schema.form.elements,
 });
 
 // Create clean output without internal processing properties

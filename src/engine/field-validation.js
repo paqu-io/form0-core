@@ -9,7 +9,7 @@ export function validateFields(schema, values, errors) {
     delete errors[dataName]; // ✅ clear previous error
 
     const value = values[dataName];
-    
+
     const error = validateFieldValue(field, value);
     if (error) {
       errors[dataName] = error;

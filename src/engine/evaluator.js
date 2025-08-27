@@ -1,13 +1,14 @@
 import { __consumeResult } from '../builtins/registry.js';
 import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.js';
-import { 
-  validateExpression, 
-  createSecureContext, 
-  withTimeout 
-} from '../security/validation.js';
+import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 
-export function runExpression(expr, context = {}, securityConfig = DEFAULT_SECURITY_CONFIG, includeEventBuiltins = false) {
+export function runExpression(
+  expr,
+  context = {},
+  securityConfig = DEFAULT_SECURITY_CONFIG,
+  includeEventBuiltins = false
+) {
   try {
     // Validate expression based on security mode
     const validation = validateExpression(expr, securityConfig, includeEventBuiltins);
@@ -25,11 +26,12 @@ export function runExpression(expr, context = {}, securityConfig = DEFAULT_SECUR
     const executeExpression = () => {
       // Set context for EVAL() before execution
       __setEvalContext(secureContext);
-      
+
       try {
         // Handle both expressions and multi-line code (Windows-safe)
-        const isMultiLine = expr.includes('\r\n') || expr.includes('\n') || expr.includes('function');
-        
+        const isMultiLine =
+          expr.includes('\r\n') || expr.includes('\n') || expr.includes('function');
+
         if (isMultiLine) {
           // Execute as code block (recompile each time for now)
           const fn = new Function(...keys, expr);

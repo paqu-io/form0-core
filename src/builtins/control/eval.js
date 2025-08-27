@@ -29,7 +29,7 @@ export function __setEvalContext(context) {
 
 /**
  * Clear the EVAL() context after expression evaluation
- * Called internally by the expression evaluator  
+ * Called internally by the expression evaluator
  */
 export function __clearEvalContext() {
   _evalContext = null;
@@ -41,7 +41,7 @@ export const EVAL = (expression) => {
     console.warn('[form0] EVAL() requires a string expression');
     return null;
   }
-  
+
   if (!expression || expression.trim() === '') {
     console.warn('[form0] EVAL() requires a non-empty expression');
     return null;
@@ -96,18 +96,18 @@ function validateEvalExpression(expression) {
     /\{\s*\.\.\./,
     /\[\s*\.\.\./,
     // Block assignment operators beyond basic =
-    /[+\-*/%^&|]=/, 
+    /[+\-*/%^&|]=/,
     // Block increment/decrement
     /\+\+/,
-    /--/
+    /--/,
   ];
 
-  // Check EVAL-specific blocked patterns  
+  // Check EVAL-specific blocked patterns
   for (const pattern of evalBlockedPatterns) {
     if (pattern.test(expression)) {
       return {
         valid: false,
-        reason: `EVAL() blocked potentially unsafe pattern: ${pattern.source}`
+        reason: `EVAL() blocked potentially unsafe pattern: ${pattern.source}`,
       };
     }
   }
@@ -119,11 +119,11 @@ function validateEvalExpression(expression) {
     /\$[a-zA-Z_][a-zA-Z0-9_]*/, // Field references
   ];
 
-  const hasAllowedPattern = allowedPatterns.some(pattern => pattern.test(expression));
+  const hasAllowedPattern = allowedPatterns.some((pattern) => pattern.test(expression));
   if (!hasAllowedPattern) {
     return {
       valid: false,
-      reason: 'EVAL() expression contains unsupported syntax'
+      reason: 'EVAL() expression contains unsupported syntax',
     };
   }
 
@@ -145,7 +145,7 @@ function evaluateHybridExpression(expression, formContext) {
       console.log('[form0] EVAL() simple string:', expression, '→', result);
       return result;
     }
-    
+
     if (isFieldReference(expression)) {
       // Field reference - resolve from context
       const fieldValue = formContext?.[expression];
@@ -157,42 +157,48 @@ function evaluateHybridExpression(expression, formContext) {
         return null;
       }
     }
-    
+
     // Step 3b: Handle complex expressions that need evaluation
     const basicContext = {
       // Safe string/math operations
       String: String,
       Number: Number,
-      Math: Math
+      Math: Math,
     };
-    
+
     // Step 3c: Add form context for variable access
     Object.assign(basicContext, formContext || {});
-    
+
     // Step 3d: Evaluate expression for string building
     const keys = Object.keys(basicContext);
     const values = Object.values(basicContext);
-    
+
     const fn = new Function(...keys, `return (${expression});`);
     const result = fn(...values);
-    
+
     // Step 3e: Check if result should be resolved as field reference
     if (typeof result === 'string' && result.startsWith('$')) {
       // This is a field reference - resolve it from context
       const fieldValue = formContext?.[result];
       if (fieldValue !== undefined) {
-        console.log('[form0] EVAL() resolved field reference:', expression, '→', result, '→', fieldValue);
+        console.log(
+          '[form0] EVAL() resolved field reference:',
+          expression,
+          '→',
+          result,
+          '→',
+          fieldValue
+        );
         return fieldValue;
       } else {
         console.warn('[form0] EVAL() field reference not found:', result);
         return null;
       }
     }
-    
+
     // Step 3f: Return string result for dataname references
     console.log('[form0] EVAL() built string:', expression, '→', result);
     return result;
-    
   } catch (error) {
     console.warn('[form0] EVAL() execution failed:', error.message);
     return null;
@@ -214,4 +220,4 @@ function isFieldReference(expr) {
   return typeof expr === 'string' && expr.startsWith('$');
 }
 
-// Remove the old createRestrictedEvalContext function as it's no longer needed 
+// Remove the old createRestrictedEvalContext function as it's no longer needed

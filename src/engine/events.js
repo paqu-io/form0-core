@@ -14,13 +14,13 @@ export class EventManager {
     this.listeners = new Map(); // eventType -> Map<fieldKey, callback[]>
     this.eventContext = null;
     this.securityConfig = null;
-    
+
     // Context resolution for scoped field access
     this.contextResolver = contextResolver || (schema ? new ContextResolver(schema) : null);
     this.warningSystem = warningSystem || new WarningSystem();
     this.schema = schema;
   }
-  
+
   /**
    * Called once during form initialization to register listeners
    * @param {string} eventCode - The event code to execute
@@ -35,7 +35,7 @@ export class EventManager {
       console.warn('[form0] Event code initialization failed:', error.message);
     }
   }
-  
+
   /**
    * Execute event code to register listeners
    * @param {string} code - The event code
@@ -45,14 +45,12 @@ export class EventManager {
     // Execute the code to register event listeners (same security as calculated fields)
     // ON() and OFF() are now available as regular event builtins
     runExpression(code, context, this.securityConfig, true);
-    
+
     // Process any ON/OFF operations that were collected during initialization
     const initOperations = __consumeEventOperations();
     this.processEventOperations(initOperations);
   }
-  
 
-  
   /**
    * Register an event listener
    * @param {string} eventType - The event type
@@ -63,12 +61,12 @@ export class EventManager {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Map());
     }
-    
+
     const eventMap = this.listeners.get(eventType);
     if (!eventMap.has(fieldKey)) {
       eventMap.set(fieldKey, []);
     }
-    
+
     eventMap.get(fieldKey).push(callback);
   }
 
@@ -81,10 +79,10 @@ export class EventManager {
   removeListener(eventType, fieldKey, callback) {
     const eventMap = this.listeners.get(eventType);
     if (!eventMap) return;
-    
+
     const fieldListeners = eventMap.get(fieldKey);
     if (!fieldListeners) return;
-    
+
     if (callback) {
       // Remove specific callback
       const index = fieldListeners.indexOf(callback);
@@ -95,12 +93,12 @@ export class EventManager {
       // Remove all callbacks for this field
       fieldListeners.length = 0;
     }
-    
+
     // Clean up empty arrays
     if (fieldListeners.length === 0) {
       eventMap.delete(fieldKey);
     }
-    
+
     // Clean up empty event maps
     if (eventMap.size === 0) {
       this.listeners.delete(eventType);
@@ -112,47 +110,46 @@ export class EventManager {
    * @param {Array} operations - Array of operation descriptors
    */
   processEventOperations(operations) {
-    operations.forEach(operation => {
+    operations.forEach((operation) => {
       if (operation.type === 'EVENT_OPERATION') {
         const { operation: op, params } = operation;
-        
+
         if (op === 'ON') {
           this.registerListener(params.eventType, params.fieldKey, params.callback);
-          
+
           // Only log if this handler hasn't been logged before (prevents spam during development)
           const functionName = params.callback.name || 'function';
           const handlerKey = `${params.eventType}:${params.fieldKey}:${functionName}`;
-          
+
           if (!_loggedHandlers.has(handlerKey)) {
             _loggedHandlers.add(handlerKey);
-            
+
             // Format console output cleanly
             const isGlobalEvent = params.fieldKey === '*';
-            const displayText = isGlobalEvent 
+            const displayText = isGlobalEvent
               ? `ON('${params.eventType}', ${functionName})`
               : `ON('${params.eventType}', '${params.fieldKey}', ${functionName})`;
             console.log(`🔧 [EVENT HANDLER] Registered: ${displayText}`);
           }
-          
         } else if (op === 'OFF') {
           this.removeListener(params.eventType, params.fieldKey, params.callback);
-          
+
           // Always log OFF operations since they represent dynamic changes
           const isGlobalEvent = params.fieldKey === '*';
           const hasCallback = params.callback !== undefined;
-          
+
           let displayText;
           if (isGlobalEvent) {
-            displayText = hasCallback 
+            displayText = hasCallback
               ? `OFF('${params.eventType}', ${params.callback.name || 'function'})`
               : `OFF('${params.eventType}')`;
           } else {
-            displayText = hasCallback 
+            displayText = hasCallback
               ? `OFF('${params.eventType}', '${params.fieldKey}', ${params.callback.name || 'function'})`
               : `OFF('${params.eventType}', '${params.fieldKey}')`;
           }
           console.log(`🔧 [EVENT HANDLER] Removed: ${displayText}`);
-          
+
           // Clear logged handlers cache for removed handlers
           if (hasCallback) {
             const functionName = params.callback.name || 'function';
@@ -171,7 +168,7 @@ export class EventManager {
       }
     });
   }
-  
+
   /**
    * Execute event handler with current form context
    * @param {Function} callback - The event handler function
@@ -183,24 +180,29 @@ export class EventManager {
     const executionContext = {
       type: 'event',
       eventType: event.type,
-      fieldName: event.fieldKey || null
+      fieldName: event.fieldKey || null,
     };
-    
+
     // Get the callback code for field reference analysis
     const callbackCode = callback.toString();
-    
+
     // Build scoped context if context resolver is available
     let contextWithEvent;
     if (this.contextResolver && this.warningSystem) {
-      contextWithEvent = this.buildScopedEventContext(this.eventContext, executionContext, event, callbackCode);
+      contextWithEvent = this.buildScopedEventContext(
+        this.eventContext,
+        executionContext,
+        event,
+        callbackCode
+      );
     } else {
       // Fallback to legacy context building for backward compatibility
       contextWithEvent = {
         ...this.eventContext,
-        event: event
+        event: event,
       };
     }
-    
+
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
     const functionCall = `(${callbackCode})(event)`;
@@ -218,7 +220,7 @@ export class EventManager {
     // Separate field values from helpers/builtins
     const fieldValues = {};
     const helpers = {};
-    
+
     for (const [key, value] of Object.entries(baseContext)) {
       if (key.startsWith('$')) {
         const fieldName = key.substring(1); // Remove $ prefix
@@ -227,21 +229,21 @@ export class EventManager {
         helpers[key] = value;
       }
     }
-    
+
     // Find which fields are actually referenced in the expression
     const referencedFields = this.extractFieldReferences(expressionCode);
-    
+
     // Build scoped context
     const ctx = { ...helpers, event };
-    
+
     // Track problematic fields that are actually accessed
     const restrictedAccessedFields = [];
     const notFoundAccessedFields = [];
-    
+
     // Add scoped field access
     for (const [fieldName, value] of Object.entries(fieldValues)) {
       const accessLevel = this.contextResolver.resolveFieldAccess(executionContext, fieldName);
-      
+
       if (accessLevel === 'accessible') {
         ctx[`$${fieldName}`] = value;
       } else if (accessLevel === 'restricted') {
@@ -254,7 +256,7 @@ export class EventManager {
       }
       // 'not_found' fields are not added to context at all
     }
-    
+
     // Check for not_found fields that are actually referenced
     for (const fieldName of referencedFields) {
       // Check if this field was processed above (exists in fieldValues)
@@ -266,22 +268,30 @@ export class EventManager {
         }
       }
     }
-    
+
     // Emit warnings for restricted fields that are actually accessed
-    restrictedAccessedFields.forEach(fieldName => {
-      const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, 'restricted');
+    restrictedAccessedFields.forEach((fieldName) => {
+      const warning = this.contextResolver.generateAccessWarning(
+        executionContext,
+        fieldName,
+        'restricted'
+      );
       this.warningSystem.emitWarning(warning);
     });
-    
+
     // Emit warnings for not_found fields that are actually accessed
-    notFoundAccessedFields.forEach(fieldName => {
-      const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, 'not_found');
+    notFoundAccessedFields.forEach((fieldName) => {
+      const warning = this.contextResolver.generateAccessWarning(
+        executionContext,
+        fieldName,
+        'not_found'
+      );
       this.warningSystem.emitWarning(warning);
     });
-    
+
     return ctx;
   }
-  
+
   /**
    * Extract field references from expression code (simple regex-based approach)
    * Skips field references inside EVAL() calls to avoid false positives from dynamic field construction
@@ -290,20 +300,20 @@ export class EventManager {
    */
   extractFieldReferences(code) {
     const fieldReferences = new Set();
-    
+
     // Remove content inside EVAL() calls to avoid false positives
     // This handles complex patterns like EVAL('string' + variable + 'more')
     const cleanedCode = this.removeEvalContents(code);
-    
+
     // Simple regex to find $fieldname patterns in the cleaned code
     // This matches $ followed by valid JavaScript identifier characters
     const fieldRegex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
     let match;
-    
+
     while ((match = fieldRegex.exec(cleanedCode)) !== null) {
       fieldReferences.add(match[1]); // Add the field name (without $)
     }
-    
+
     return fieldReferences;
   }
 
@@ -316,7 +326,7 @@ export class EventManager {
   removeEvalContents(code) {
     let result = '';
     let i = 0;
-    
+
     while (i < code.length) {
       // Look for EVAL pattern
       const evalMatch = code.substring(i).match(/^EVAL\s*\(/);
@@ -324,16 +334,16 @@ export class EventManager {
         // Found EVAL(, add "EVAL()" to result and skip the entire call
         result += 'EVAL()';
         i += evalMatch[0].length;
-        
+
         // Skip everything until we find the matching closing parenthesis
         let parenCount = 1;
         let inSingleQuote = false;
         let inDoubleQuote = false;
         let inBacktick = false;
-        
+
         while (i < code.length && parenCount > 0) {
           const char = code[i];
-          
+
           // Handle string literals (ignore parentheses inside strings)
           if (char === "'" && !inDoubleQuote && !inBacktick) {
             inSingleQuote = !inSingleQuote;
@@ -342,7 +352,7 @@ export class EventManager {
           } else if (char === '`' && !inSingleQuote && !inDoubleQuote) {
             inBacktick = !inBacktick;
           }
-          
+
           // Only count parentheses when not inside strings
           if (!inSingleQuote && !inDoubleQuote && !inBacktick) {
             if (char === '(') {
@@ -351,7 +361,7 @@ export class EventManager {
               parenCount--;
             }
           }
-          
+
           i++;
         }
       } else {
@@ -360,7 +370,7 @@ export class EventManager {
         i++;
       }
     }
-    
+
     return result;
   }
 
@@ -374,46 +384,46 @@ export class EventManager {
   trigger(eventType, fieldKey, eventMetadata) {
     const operations = [];
     const eventMap = this.listeners.get(eventType);
-    
+
     if (!eventMap) return operations;
-    
+
     // Build event object (placeholder structure for now)
     const event = {
       type: eventType,
       fieldKey: fieldKey,
       timestamp: Date.now(),
       // TODO: Add more metadata as needed
-      ...eventMetadata
+      ...eventMetadata,
     };
-    
+
     // Create execution context for operation validation
     const executionContext = {
       type: 'event',
       eventType: eventType,
-      fieldName: fieldKey || null
+      fieldName: fieldKey || null,
     };
-    
+
     // Execute specific field listeners
     const fieldListeners = eventMap.get(fieldKey) || [];
     const wildcardListeners = eventMap.get('*') || [];
-    
-    [...fieldListeners, ...wildcardListeners].forEach(callback => {
+
+    [...fieldListeners, ...wildcardListeners].forEach((callback) => {
       try {
         // Execute the callback with current form context
         // This ensures EVAL() and other builtins have access to field values
         const result = this.executeHandlerWithContext(callback, event);
-        
+
         // Consume any collected event operations
         const collectedOps = __consumeEventOperations();
-        
+
         // Validate operations against context restrictions before adding them
         const validOps = this.validateOperations(collectedOps, executionContext);
         operations.push(...validOps);
-        
+
         // Note: EVENT_OPERATION processing (ON/OFF) is handled only during initialization
         // If event handlers contain ON/OFF calls, they will be in the operations array
         // but won't be processed here to avoid duplicate registrations
-        
+
         // For backward compatibility, still handle returned operations
         if (result && result.type === 'UI_OPERATION') {
           operations.push(result);
@@ -425,7 +435,7 @@ export class EventManager {
         __consumeEventOperations();
       }
     });
-    
+
     return operations;
   }
 
@@ -443,19 +453,23 @@ export class EventManager {
 
     const validOperations = [];
 
-    operations.forEach(operation => {
+    operations.forEach((operation) => {
       // Only validate field operations that access fields
       if (operation.type === 'FIELD_OPERATION' && operation.operation === 'SETVALUE') {
         const fieldName = operation.params.fieldDataName;
         const accessLevel = this.contextResolver.resolveFieldAccess(executionContext, fieldName);
-        
+
         if (accessLevel === 'accessible') {
           // Field is accessible, operation is valid
           validOperations.push(operation);
         } else {
           // Field is not accessible, generate warning and block operation
           const reason = accessLevel === 'not_found' ? 'not_found' : 'restricted';
-          const warning = this.contextResolver.generateAccessWarning(executionContext, fieldName, reason);
+          const warning = this.contextResolver.generateAccessWarning(
+            executionContext,
+            fieldName,
+            reason
+          );
           this.warningSystem.emitWarning(warning);
         }
       } else {
@@ -466,4 +480,4 @@ export class EventManager {
 
     return validOperations;
   }
-} 
+}

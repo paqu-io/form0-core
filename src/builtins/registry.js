@@ -54,7 +54,7 @@ export const builtins = {
   CHOICEVALUES,
   CHOICELABELS,
   FORM, // Available in both calculations and events
-}; 
+};
 
 // Event-specific builtins (only available in event context)
 export const eventBuiltins = {
@@ -63,4 +63,4 @@ export const eventBuiltins = {
   ON,
   OFF,
   // Future: CONFIRM, NOTIFY, etc.
-}; 
+};

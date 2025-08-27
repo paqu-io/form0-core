@@ -18,20 +18,20 @@ export const OTHER = (choiceField) => {
   if (!choiceField || typeof choiceField !== 'object') {
     return null;
   }
-  
+
   // Validate structure - must have either choice array (SingleChoiceField) or choices array (MultiChoiceField)
   const hasChoiceArray = Array.isArray(choiceField.choice);
   const hasChoicesArray = Array.isArray(choiceField.choices);
-  
+
   if (!hasChoiceArray && !hasChoicesArray) {
     return null;
   }
-  
+
   // Validate other array structure
   if (!Array.isArray(choiceField.other)) {
     return null;
   }
-  
+
   // Get the other entry (single selection - user can only add 1 other option)
   if (choiceField.other.length > 0) {
     const otherEntry = choiceField.other[0];
@@ -39,6 +39,6 @@ export const OTHER = (choiceField) => {
       return otherEntry.label;
     }
   }
-  
+
   return null;
-}; 
+};

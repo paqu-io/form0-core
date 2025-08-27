@@ -12,15 +12,15 @@ export function ALERT(title, message = '') {
   const operation = {
     type: 'UI_OPERATION',
     operation: 'ALERT',
-    params: { 
+    params: {
       title: String(title),
-      message: String(message)
-    }
+      message: String(message),
+    },
   };
-  
+
   // Collect operation for automatic execution
   __collectEventOperation(operation);
-  
+
   // Return operation descriptor for backward compatibility
   return operation;
-} 
+}

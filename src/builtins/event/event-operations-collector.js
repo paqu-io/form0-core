@@ -17,4 +17,4 @@ export function __consumeEventOperations() {
   const operations = [..._eventOperations]; // Copy array
   _eventOperations = []; // Clear for next execution
   return operations;
-} 
+}
