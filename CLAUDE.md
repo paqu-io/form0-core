@@ -85,6 +85,11 @@ Use `createFormEngine({ schema, initialValues, helpers, security })` to create a
 - **CUSTOM**: User-defined security rules
 Import security configs from `src/security/config.js`
 
+### Security Analysis
+- **TRUSTED** (default): N/A
+- **SAFE**: @SAFE_MODE_SECURITY_ANALYSIS.md
+- **CUSTOM**: N/A
+
 ### Field Types
 Core field types include TextField, NumericField, SingleChoiceField, MultiChoiceField, BooleanField, DateField, TimeField, CalculatedField, Section, RepeatableSection, LabelField.
 
