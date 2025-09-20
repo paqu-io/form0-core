@@ -16,6 +16,7 @@ import { CEILING } from './math/ceiling.js';
 import { COS } from './math/cos.js';
 import { SIN } from './math/sin.js';
 import { ROUND } from './math/round.js';
+import { UPPER } from './string/upper.js';
 
 // Import event builtins
 import { ALERT } from './event/ui/alert.js';
@@ -42,6 +43,7 @@ export { CEILING } from './math/ceiling.js';
 export { COS } from './math/cos.js';
 export { SIN } from './math/sin.js';
 export { ROUND } from './math/round.js';
+export { UPPER } from './string/upper.js';
 
 // Export event builtins
 export { ALERT } from './event/ui/alert.js';
@@ -69,6 +71,7 @@ export const builtins = {
   COS,
   SIN,
   ROUND,
+  UPPER,
 };
 
 // Event-specific builtins (only available in event context)
