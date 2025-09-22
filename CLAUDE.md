@@ -60,6 +60,8 @@ form0-core's architecture is organized into several key modules:
 - **control/**: Form control operations (eval, setresult)
 - **event/**: Event handling operations
 - **logical/**: Logical operations (and, or, if)
+- **math/**: Mathematical operations (ROUND)
+- **string/**: Text manipulation functions (UPPER)
 
 ### Security (`src/security/`)
 - **config.js**: Security configurations (TRUSTED, SAFE, CUSTOM modes)
@@ -100,8 +102,9 @@ Core field types include TextField, NumericField, SingleChoiceField, MultiChoice
 - Prettier: 2 spaces, single quotes, semicolons, trailing commas (ES5), max width 100
 - File names: `kebab-case.js`
 - Functions: `camelCase`
-- Classes/Types: `PascalCase` 
+- Classes/Types: `PascalCase`
 - Constants: `UPPER_SNAKE_CASE`
+- Builtin functions: Follow JSDoc pattern with @builtin, @description, @param, @returns, @example tags
 
 ### Export Strategy
 - All public API exports go through `src/index.js`
@@ -123,6 +126,10 @@ Core field types include TextField, NumericField, SingleChoiceField, MultiChoice
 ## Language Policy
 - JavaScript only - no TypeScript source files
 - Optional JSDoc types for better DX (@typedef, @param, @returns)
+
+---
+
+<!-- END UPDATABLE SECTIONS - /check-docs command updates sections above this line -->
 
 ## MCP Memory
 
