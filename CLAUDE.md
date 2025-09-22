@@ -148,7 +148,7 @@ Use the MCP Memory server as an ENGINEERING KNOWLEDGE LOG (not source code).
 - After we converge on a choice, finish a spike/fix, capture a trade-off, or log a blocking TODO/open question.
 - De-dupe first (search by scope + similar text). If superseded, add a new DECISION and mark the older via OUTCOME [deprecated] with a ref.
 
-### What to store (one-line facts)
+### What to store (one-line facts, examples)
 - **DECISION**: [DECISION] [scope:form0-core] [date:2025-01-15] Use kebab-case for builtin file names [refs:CLAUDE.md]
 - **CONSTRAINT**: [CONSTRAINT] [scope:form0-core] [date:2025-01-15] No TypeScript source files, JavaScript only [refs:package.json]
 - **APPROACH**: [APPROACH] [scope:form0-core] [date:2025-01-15] String functions follow math function patterns [refs:src/builtins/math/]
