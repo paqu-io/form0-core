@@ -1,5 +1,35 @@
 import { createFormEngine, SECURITY_MODES, SAFE_SECURITY_CONFIG } from '../src/index.js';
 
+const NUMERIC_FIELD_DEFAULTS = {
+  display: 'default',
+  description: null,
+  description_mode: null,
+  required_conditions: null,
+  visible: true,
+  visible_conditions: null,
+  read_only: false,
+  read_only_conditions: null,
+  default_value: null,
+  min: null,
+  max: null,
+  format: 'integer',
+  supporting_image: false,
+  supporting_image_path: null,
+  supporting_image_display: null,
+};
+
+const CALCULATED_FIELD_DEFAULTS = {
+  description: null,
+  description_mode: null,
+  required: false,
+  visible: true,
+  visible_conditions: null,
+  read_only: true,
+  supporting_image: false,
+  supporting_image_path: null,
+  supporting_image_display: null,
+};
+
 const testSchema = {
   form: {
     name: 'SecurityTest',
@@ -10,6 +40,7 @@ const testSchema = {
         data_name: 'age',
         label: 'Age',
         required: true,
+        ...NUMERIC_FIELD_DEFAULTS,
       },
       {
         type: 'CalculatedField',
@@ -18,6 +49,7 @@ const testSchema = {
         label: 'Safe Calculation',
         calculate: 'Math.max($age, 18)',
         display: { style: 'numeric' },
+        ...CALCULATED_FIELD_DEFAULTS,
       },
       {
         type: 'CalculatedField',
@@ -26,6 +58,7 @@ const testSchema = {
         label: 'Unsafe Calculation',
         calculate: 'window.alert("This should be blocked")',
         display: { style: 'text' },
+        ...CALCULATED_FIELD_DEFAULTS,
       },
       {
         type: 'CalculatedField',
@@ -34,6 +67,7 @@ const testSchema = {
         label: 'Built-in Calculation',
         calculate: 'IF($age >= 18, "Adult", "Minor")',
         display: { style: 'text' },
+        ...CALCULATED_FIELD_DEFAULTS,
       },
     ],
   },

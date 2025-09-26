@@ -22,3 +22,4 @@ export {
 export { getValidOperators, isValidOperator, validateFieldConditions } from './schema/operators.js';
 
 export { recordVersion, formVersion } from './utilities/version-utils.js';
+export { buildRepeatableMetadata } from './utilities/repeatable-helpers.js';
