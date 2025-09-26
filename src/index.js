@@ -23,3 +23,4 @@ export { getValidOperators, isValidOperator, validateFieldConditions } from './s
 
 export { recordVersion, formVersion } from './utilities/version-utils.js';
 export { buildRepeatableMetadata } from './utilities/repeatable-helpers.js';
+export { generateUuidV7 } from './utilities/uuid.js';

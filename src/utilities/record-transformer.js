@@ -217,12 +217,14 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         const instanceState = structuredInstances[i] || {};
         const instanceValues = instanceState.values || {};
         const instanceRepeatable = instanceState.repeatable || {};
+        const instanceCreatedAtClient = instanceState.created_at_client || clientCreatedAt;
+        const instanceUpdatedAtClient = instanceState.updated_at_client || instanceCreatedAtClient;
 
         const childRecord = {
-          created_at: clientCreatedAt,
+          created_at: instanceCreatedAtClient,
           updated_at: serverUpdatedAt,
-          created_at_client: clientCreatedAt,
-          updated_at_client: clientUpdatedAt,
+          created_at_client: instanceCreatedAtClient,
+          updated_at_client: instanceUpdatedAtClient,
           created_at_server: serverCreatedAt,
           updated_at_server: serverUpdatedAt,
           updated_location: null,
