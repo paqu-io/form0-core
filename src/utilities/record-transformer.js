@@ -5,6 +5,7 @@
 
 import { FIELD_SPECS } from '../schema/field-specs.js';
 import { recordVersion } from './version-utils.js';
+import { buildRepeatableMetadata } from './repeatable-helpers.js';
 
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
@@ -102,92 +103,17 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   }
 
   // Build a comprehensive tree structure for nested RepeatableSections
-  const sectionFields = new Set();
-  const repeatableSectionTree = new Map(); // Map to store RepeatableSection hierarchy
-  const fieldOwnership = new Map(); // Map field data_name to its parent RepeatableSection path
+  const elementsSource = Array.isArray(options.originalElements)
+    ? options.originalElements
+    : Array.isArray(fields)
+    ? fields
+    : [];
 
-  // Helper function to build RepeatableSection tree and field ownership
-  const buildRepeatableSectionTree = (elements, parentPath = []) => {
-    if (!Array.isArray(elements)) return;
-
-    elements.forEach((element) => {
-      if (element.type === 'Section') {
-        sectionFields.add(element.data_name);
-        // Recursively process Section children with same parentPath
-        // (Sections don't change the RepeatableSection parentage)
-        if (Array.isArray(element.elements)) {
-          buildRepeatableSectionTree(element.elements, parentPath);
-        }
-      } else if (element.type === 'RepeatableSection') {
-        const preferredKey =
-          element.key && element.key.trim() !== '' ? element.key : element.data_name;
-        const currentPath = [...parentPath, preferredKey];
-
-        // Store this RepeatableSection in the tree
-        repeatableSectionTree.set(element.data_name, {
-          preferredKey,
-          field: element,
-          parentPath: [...parentPath], // Copy to avoid reference issues
-          currentPath: [...currentPath], // Copy to avoid reference issues
-          children: new Map(), // Will store child RepeatableSections
-          fields: new Map(), // Will store direct child fields
-        });
-
-        // Recursively process RepeatableSection children with updated path
-        if (Array.isArray(element.elements)) {
-          buildRepeatableSectionTree(element.elements, currentPath);
-        }
-      } else {
-        // This is a regular field - determine its ownership
-        const preferredFieldKey =
-          element.key && element.key.trim() !== '' ? element.key : element.data_name;
-        fieldOwnership.set(element.data_name, {
-          preferredKey: preferredFieldKey,
-          field: element,
-          parentPath: [...parentPath], // Copy the current path
-        });
-      }
-    });
-  };
-
-  // Build the tree structure from original nested schema elements (if available)
-  if (options.originalElements && Array.isArray(options.originalElements)) {
-    buildRepeatableSectionTree(options.originalElements);
-  } else if (Array.isArray(fields)) {
-    buildRepeatableSectionTree(fields);
-  }
-
-  // Establish parent-child relationships between RepeatableSections
-  for (const [dataName, repInfo] of repeatableSectionTree) {
-    if (repInfo.parentPath.length > 0) {
-      const parentKey = repInfo.parentPath[repInfo.parentPath.length - 1];
-      // Find the parent RepeatableSection
-      for (const [parentDataName, parentRepInfo] of repeatableSectionTree) {
-        if (parentRepInfo.preferredKey === parentKey) {
-          parentRepInfo.children.set(dataName, repInfo);
-          break;
-        }
-      }
-    }
-  }
-
-  // Populate fields for each RepeatableSection based on field ownership
-  for (const [fieldDataName, fieldInfo] of fieldOwnership) {
-    if (fieldInfo.parentPath.length > 0) {
-      // Find the immediate parent RepeatableSection for this field
-      const immediateParentKey = fieldInfo.parentPath[fieldInfo.parentPath.length - 1];
-      // Find the RepeatableSection with this preferred key
-      for (const [dataName, repInfo] of repeatableSectionTree) {
-        if (repInfo.preferredKey === immediateParentKey) {
-          repInfo.fields.set(fieldDataName, {
-            preferredKey: fieldInfo.preferredKey,
-            field: fieldInfo.field,
-          });
-          break;
-        }
-      }
-    }
-  }
+  const {
+    repeatableSectionTree,
+    fieldOwnership,
+    sectionFields,
+  } = buildRepeatableMetadata(elementsSource);
 
   // Transform the values object using the preferred keys
   for (const [dataName, value] of Object.entries(state.values)) {
@@ -246,7 +172,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   }
 
   // Enhanced recursive function to process nested RepeatableSections
-  const processRepeatableSection = (repInfo, currentPath = []) => {
+  const processRepeatableSection = (repInfo, currentPath = [], structuredInstances = null) => {
     const repeatableField = repInfo.field;
     const pathKey = repInfo.preferredKey;
 
@@ -282,16 +208,94 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
 
     const childIds = getNestedChildIds([...currentPath, pathKey]);
 
-    // Determine how many child records to create
+    // Structured RepeatableSection state supplied (new format)
+    if (Array.isArray(structuredInstances) && structuredInstances.length > 0) {
+      const recordCount = Math.max(structuredInstances.length, childIds.length);
+      const childRecords = [];
+
+      for (let i = 0; i < recordCount; i++) {
+        const instanceState = structuredInstances[i] || {};
+        const instanceValues = instanceState.values || {};
+        const instanceRepeatable = instanceState.repeatable || {};
+        const instanceCreatedAtClient = instanceState.created_at_client || clientCreatedAt;
+        const instanceUpdatedAtClient = instanceState.updated_at_client || instanceCreatedAtClient;
+
+        const childRecord = {
+          created_at: instanceCreatedAtClient,
+          updated_at: serverUpdatedAt,
+          created_at_client: instanceCreatedAtClient,
+          updated_at_client: instanceUpdatedAtClient,
+          created_at_server: serverCreatedAt,
+          updated_at_server: serverUpdatedAt,
+          updated_location: null,
+          draft: false,
+          id: instanceState.id ?? instanceState.record_id ?? childIds[i] ?? null,
+          form_values: {},
+          created_duration: null,
+          updated_duration: null,
+          created_location: null,
+          updated_duration_cumulative: null,
+          version: instanceState.version || finalChildVersion,
+          created_by_id: null,
+          updated_by_id: null,
+          changeset_id: options.changeset_id || null,
+          geometry: instanceState.geometry ?? null,
+        };
+
+        for (const [fieldDataName, fieldInfo] of repInfo.fields) {
+          if (!Object.prototype.hasOwnProperty.call(instanceValues, fieldDataName)) {
+            continue;
+          }
+
+          const fieldValue = instanceValues[fieldDataName];
+          let processedValue = fieldValue;
+          const field = fieldInfo.field;
+          if (
+            field &&
+            field.type &&
+            FIELD_SPECS[field.type] &&
+            FIELD_SPECS[field.type].outputProducer
+          ) {
+            try {
+              processedValue = FIELD_SPECS[field.type].outputProducer(field, fieldValue);
+            } catch (err) {
+              console.warn(
+                `[form0] createStructuredRecord: outputProducer failed for ${field.type} field "${fieldDataName}" in RepeatableSection:`,
+                err
+              );
+              processedValue = fieldValue;
+            }
+          }
+
+          childRecord.form_values[fieldInfo.preferredKey] = processedValue;
+        }
+
+        for (const [, childRepInfo] of repInfo.children) {
+          const nestedInstances = instanceRepeatable[childRepInfo.preferredKey] || [];
+          const childRepeatableArray = processRepeatableSection(
+            childRepInfo,
+            [...currentPath, pathKey],
+            nestedInstances
+          );
+          if (childRepeatableArray.length > 0) {
+            childRecord.form_values[childRepInfo.preferredKey] = childRepeatableArray;
+          }
+        }
+
+        childRecords.push(childRecord);
+      }
+
+      return childRecords;
+    }
+
+    // Legacy flattened RepeatableSection handling (single-instance only)
     let recordCount = 1; // Default to 1 record for CLI compatibility
 
-    // Check if any fields in this RepeatableSection have values
     const hasDirectFieldValues = Array.from(repInfo.fields.values()).some((fieldInfo) => {
       const fieldValue = state.values[fieldInfo.field.data_name];
       return fieldValue !== null && fieldValue !== undefined;
     });
 
-    // Check if any child RepeatableSections have values
     const hasChildRepeatableSectionValues = Array.from(repInfo.children.values()).some(
       (childRepInfo) => {
         return Array.from(childRepInfo.fields.values()).some((fieldInfo) => {
@@ -306,7 +310,6 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     if (hasAnyValues || childIds.length > 0) {
       recordCount = Math.max(1, childIds.length);
 
-      // Create child records array
       const childRecords = [];
 
       for (let i = 0; i < recordCount; i++) {
@@ -393,10 +396,15 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   };
 
   // Process all top-level RepeatableSections (those with no parent)
-  for (const [dataName, repInfo] of repeatableSectionTree) {
+  for (const [, repInfo] of repeatableSectionTree) {
     if (repInfo.parentPath.length === 0) {
       // This is a top-level RepeatableSection
-      const childRecords = processRepeatableSection(repInfo);
+      const structuredInstances =
+        state.repeatable && state.repeatable[repInfo.preferredKey]
+          ? state.repeatable[repInfo.preferredKey]
+          : null;
+
+      const childRecords = processRepeatableSection(repInfo, [], structuredInstances);
       if (childRecords.length > 0) {
         form_values[repInfo.preferredKey] = childRecords;
       }

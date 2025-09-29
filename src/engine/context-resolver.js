@@ -159,14 +159,52 @@ export class ContextResolver {
    * @returns {boolean} True if they share the same RepeatableSection context
    */
   haveSameRepeatableSectionContext(parentPath1, parentPath2) {
-    // Both should have same length and same path elements
-    if (parentPath1.length !== parentPath2.length) {
+    const contextPath = parentPath1;
+    const targetPath = parentPath2;
+
+    // Main form calculations can only access other main form fields
+    if (contextPath.length === 0) {
+      return targetPath.length === 0;
+    }
+
+    // Child context can access its own fields
+    if (ContextResolver.pathsEqual(contextPath, targetPath)) {
+      return true;
+    }
+
+    // Child context can access ancestors (including main form)
+    if (targetPath.length < contextPath.length && ContextResolver.isPrefix(targetPath, contextPath)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static isPrefix(prefix, fullPath) {
+    if (prefix.length === 0) {
+      return true;
+    }
+
+    if (prefix.length > fullPath.length) {
       return false;
     }
 
-    // Compare each level of the path
-    for (let i = 0; i < parentPath1.length; i++) {
-      if (parentPath1[i] !== parentPath2[i]) {
+    for (let i = 0; i < prefix.length; i++) {
+      if (prefix[i] !== fullPath[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  static pathsEqual(pathA, pathB) {
+    if (pathA.length !== pathB.length) {
+      return false;
+    }
+
+    for (let i = 0; i < pathA.length; i++) {
+      if (pathA[i] !== pathB[i]) {
         return false;
       }
     }
