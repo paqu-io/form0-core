@@ -93,6 +93,71 @@ export function validateSchema(form) {
         errors.push(...validation.errors);
       }
     }
+
+    if (field.type === 'FormLinkField') {
+      if (field.record_defaults != null && !Array.isArray(field.record_defaults)) {
+        errors.push(
+          `FormLinkField "${field.data_name}" record_defaults must be an array when provided`
+        );
+      } else if (Array.isArray(field.record_defaults)) {
+        field.record_defaults.forEach((mapping, index) => {
+          if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+            errors.push(
+              `FormLinkField "${field.data_name}" record_defaults[${index}] must be an object`
+            );
+            return;
+          }
+
+          const destinationId = mapping.destination_field_id;
+          if (!destinationId || typeof destinationId !== 'string' || destinationId.trim() === '') {
+            errors.push(
+              `FormLinkField "${field.data_name}" record_defaults[${index}].destination_field_id must be a non-empty string`
+            );
+            return;
+          }
+
+          const destinationField = allFields[destinationId];
+          if (!destinationField) {
+            errors.push(
+              `FormLinkField "${field.data_name}" record_defaults[${index}].destination_field_id "${destinationId}" does not match any field in this form`
+            );
+            return;
+          }
+
+          const destinationType = destinationField.type;
+          const allowMultiple = field.allow_multiple_records === true;
+          const allowedSingleValueTypes = new Set([
+            'TextField',
+            'SingleChoiceField',
+            'MultiChoiceField',
+            'BooleanField',
+            'NumericField',
+            'DateField',
+            'TimeField',
+          ]);
+
+          if (allowMultiple) {
+            if (destinationType !== 'TextField') {
+              errors.push(
+                `FormLinkField "${field.data_name}" record_defaults[${index}].destination_field_id "${destinationId}" must reference a TextField when allow_multiple_records is true`
+              );
+            }
+          } else if (!allowedSingleValueTypes.has(destinationType)) {
+            errors.push(
+              `FormLinkField "${field.data_name}" record_defaults[${index}].destination_field_id "${destinationId}" must reference one of: ${Array.from(allowedSingleValueTypes).join(', ')}`
+            );
+          }
+        });
+      }
+
+      if (field.record_conditions != null) {
+        if (typeof field.record_conditions !== 'object' || Array.isArray(field.record_conditions)) {
+          errors.push(
+            `FormLinkField "${field.data_name}" record_conditions must be an object when provided`
+          );
+        }
+      }
+    }
   }
 
   // Validate top-level status_field and title_field if present
@@ -123,6 +188,72 @@ export function validateSchema(form) {
 
   if (duplicateKeys.size > 0) {
     errors.push(`Duplicate key(s): ${Array.from(duplicateKeys).join(', ')}`);
+  }
+
+  if (form.form_links !== undefined) {
+    const links = form.form_links;
+    if (typeof links !== 'object' || links === null || Array.isArray(links)) {
+      errors.push('form_links must be an object when provided');
+    } else {
+      const { to = [], from = [] } = links;
+
+      if (to !== undefined) {
+        if (!Array.isArray(to)) {
+          errors.push('form_links.to must be an array when provided');
+        } else {
+          to.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+              errors.push(`form_links.to[${index}] must be an object`);
+              return;
+            }
+
+            const key = entry.form_link_field_key;
+            if (!key || typeof key !== 'string' || key.trim() === '') {
+              errors.push(`form_links.to[${index}].form_link_field_key must be a non-empty string`);
+            } else {
+              const fieldRef = allFields[key];
+              if (fieldRef && fieldRef.type !== 'FormLinkField') {
+                errors.push(
+                  `form_links.to[${index}].form_link_field_key "${key}" must reference a FormLinkField`
+                );
+              }
+            }
+
+            if (!entry.form_id || typeof entry.form_id !== 'string' || entry.form_id.trim() === '') {
+              errors.push(`form_links.to[${index}].form_id must be a non-empty string`);
+            }
+          });
+        }
+      }
+
+      if (from !== undefined) {
+        if (!Array.isArray(from)) {
+          errors.push('form_links.from must be an array when provided');
+        } else {
+          from.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+              errors.push(`form_links.from[${index}] must be an object`);
+              return;
+            }
+
+            if (!entry.form_id || typeof entry.form_id !== 'string' || entry.form_id.trim() === '') {
+              errors.push(`form_links.from[${index}].form_id must be a non-empty string`);
+            }
+
+            if (
+              entry.form_link_field_key !== undefined &&
+              entry.form_link_field_key !== null &&
+              entry.form_link_field_key !== '' &&
+              typeof entry.form_link_field_key !== 'string'
+            ) {
+              errors.push(
+                `form_links.from[${index}].form_link_field_key must be a string when provided`
+              );
+            }
+          });
+        }
+      }
+    }
   }
 
   // Validate events section if present
