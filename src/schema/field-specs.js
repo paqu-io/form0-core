@@ -1,4 +1,9 @@
 import { validateChoiceFieldChoices } from '../utilities/field-helpers.js';
+import {
+  isNonEmptyString,
+  validateFormLinkRecordDefaults,
+  validateFormLinkRecordConditions,
+} from './form-link-validators.js';
 
 /**
  * Central field specification registry
@@ -1189,6 +1194,133 @@ export const FIELD_SPECS = {
       return [];
     },
   },
+
+  FormLinkField: {
+    attributes: {
+      type: { type: 'string', required: true, nullable: false, value: 'FormLinkField' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      display: { type: 'string', required: true, nullable: false, allowedValues: ['default'] },
+      description: {
+        type: 'string',
+        required: true,
+        nullable: true,
+        dependentOn: 'description_mode',
+      },
+      description_mode: {
+        type: 'string',
+        required: true,
+        nullable: true,
+        allowedValues: ['default', 'subtext'],
+        dependentOn: 'description',
+      },
+      required: {
+        type: 'boolean',
+        required: true,
+        nullable: false,
+        notTrueOn: { required_conditions: (val) => val != null },
+      },
+      required_conditions: { type: 'object', required: true, nullable: true },
+      visible: {
+        type: 'boolean',
+        required: true,
+        nullable: false,
+        notTrueOn: { visible_conditions: (val) => val != null },
+      },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: {
+        type: 'boolean',
+        required: true,
+        nullable: false,
+        notTrueOn: { read_only_conditions: (val) => val != null },
+      },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      default_value: { type: 'null', required: true, nullable: true },
+      allow_creating_records: { type: 'boolean', required: true, nullable: false },
+      allow_existing_records: { type: 'boolean', required: true, nullable: false },
+      allow_updating_records: { type: 'boolean', required: true, nullable: false },
+      allow_multiple_records: { type: 'boolean', required: true, nullable: false },
+      form_id: { type: 'string', required: true, nullable: false },
+      record_conditions: { type: 'object', required: true, nullable: true },
+      record_defaults: { type: 'array', required: true, nullable: true },
+    },
+    schemaValidators: [
+      (field) => {
+        if (!isNonEmptyString(field.form_id)) {
+          return {
+            isValid: false,
+            error: `FormLinkField "${field.data_name}" form_id must be a non-empty string`,
+          };
+        }
+
+        if (field.default_value !== null && field.default_value !== undefined) {
+          return {
+            isValid: false,
+            error: `FormLinkField "${field.data_name}" default_value must be null`,
+          };
+        }
+
+        if (field.allow_creating_records !== true && field.allow_existing_records !== true) {
+          return {
+            isValid: false,
+            error: `FormLinkField "${field.data_name}" must enable either allow_creating_records or allow_existing_records`,
+          };
+        }
+
+        const defaultsValidation = validateFormLinkRecordDefaults(field);
+        if (!defaultsValidation.isValid) {
+          return defaultsValidation;
+        }
+
+        const conditionsValidation = validateFormLinkRecordConditions(field);
+        if (!conditionsValidation.isValid) {
+          return conditionsValidation;
+        }
+
+        return { isValid: true };
+      },
+    ],
+    valueValidator: (field, value) => {
+      if (value == null) {
+        return null;
+      }
+
+      if (!Array.isArray(value)) {
+        return `${field.data_name} must be an array of linked record references`;
+      }
+
+      if (field.allow_multiple_records !== true && value.length > 1) {
+        return `${field.data_name} allows only a single linked record`;
+      }
+
+      for (let index = 0; index < value.length; index += 1) {
+        const entry = value[index];
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+          return `${field.data_name}[${index}] must be an object`;
+        }
+        if (!isNonEmptyString(entry.record_id)) {
+          return `${field.data_name}[${index}].record_id must be a non-empty string`;
+        }
+      }
+
+      return null;
+    },
+    defaultProducer: () => {
+      return [];
+    },
+    outputProducer: (field, value) => {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+
+      return value
+        .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+        .map((entry) => ({ record_id: entry.record_id }))
+        .filter((entry) => isNonEmptyString(entry.record_id));
+    },
+  },
+
   StatusField: {
     attributes: {
       type: { type: 'string', required: true, nullable: false, value: 'StatusField' },

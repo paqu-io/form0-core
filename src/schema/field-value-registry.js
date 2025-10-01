@@ -280,3 +280,35 @@ export function validateVideoFieldValue(field, value) {
   }
   return null;
 }
+
+/**
+ * Validates FormLinkField value
+ * @param {object} field - The field definition
+ * @param {any} value - The value to validate
+ * @returns {string|null} - Error message if validation fails, or null if valid
+ */
+export function validateFormLinkFieldValue(field, value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    return `${field.data_name} must be an array of linked record references`;
+  }
+
+  if (field.allow_multiple_records !== true && value.length > 1) {
+    return `${field.data_name} allows only a single linked record`;
+  }
+
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return `${field.data_name}[${index}] must be an object`;
+    }
+    if (typeof entry.record_id !== 'string' || entry.record_id.trim() === '') {
+      return `${field.data_name}[${index}].record_id must be a non-empty string`;
+    }
+  }
+
+  return null;
+}

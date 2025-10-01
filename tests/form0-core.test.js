@@ -1,4 +1,10 @@
-import { createFormEngine, createStructuredRecord, flattenFields } from '../src/index.js';
+import {
+  createFormEngine,
+  createStructuredRecord,
+  flattenFields,
+  applyLinkedRecordSelection,
+  FORM_LINK_VALUE_DELIMITER,
+} from '../src/index.js';
 
 const schema = {
   form: {
@@ -105,6 +111,14 @@ const schema = {
         ON('change', 'colors', colorsF);
       `,
     },
+    form_links: { //Used in conjuncture with a FormLinkField, this object stores form_link_field_key and form_id to or from which the form is linked. To evaluate if this attribute is needed (for AI agent to answer this).
+      to: [{
+          form_link_field_key: '1f92ff', //form_link_field_key can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
+          form_id: '01936b8e-7f2a-7c3d-9e4f-123456789abc' //form_id cannot be null. form_id specify the id of the form that will be linked to the FormLinkField.
+        },
+      ],
+      from: [],
+    },
     elements: [
       {
         type: 'Section',
@@ -133,8 +147,7 @@ const schema = {
             read_only_conditions: null,
             default_value: null,
             pattern: '^[a-zA-Z]+$',
-            pattern_description:
-              'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
+            pattern_description: 'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
             supporting_image: true, //supporting_image can be true or false
             supporting_image_path: 'first_name.jpg', //supporting_image_path can be null or a string
             supporting_image_display: 'default', //supporting_image_display can be 'default', 'dialog' or null
@@ -498,6 +511,101 @@ const schema = {
         max_length: null, //max_length can be null or a number representing maximum number of video minutes
       },
       {
+        type: 'FormLinkField',
+        key: '1f92ff',
+        data_name: 'test_form_link',
+        label: 'This is a form link test',
+        display: 'default', //FormLinkField can only be 'default'
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
+        required: false,
+        required_conditions: null,
+        visible: true,
+        visible_conditions: null,
+        read_only: false,
+        read_only_conditions: null,
+        default_value: null, //FormLinkField is always default_value = null
+        allow_creating_records: false, //allow_creating_records can be true or false. It specifies if the user is allowed to create new records in the linked form specificed by form_id.
+        allow_existing_records: true, //allow_existing_records can be true or false. It specifies if the user is allowed to select existing records in the linked form specificed by form_id.
+        allow_updating_records: false, //allow_updating_records can be true or false. It specifies if the user is allowed to update existing records in the linked form specificed by form_id.
+        allow_multiple_records: false, //allow_multiple_records can be true or false. It specifies if the user is allowed to select multiple records in the linked form specificed by form_id.
+        form_id: '01936b8e-7f2a-7c3d-9e4f-123456789abc', //form_id cannot be null. form_id specify the id of the form that will be linked to the FormLinkField.
+        record_conditions: { // operator can be any of the ones defined in src/engine/conditions.js. record_conditions specify the conditions that will be applied to filter the linked records.
+          and: [
+            { linked_form_field_id: 'sample123', operator: 'equal_to', value: 'test_value_1' }, // linked_form_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
+            {
+              or: [
+                { linked_form_field_id: 'sample456', operator: 'greater_than', value: 1.55 },
+                { linked_form_field_id: 'sample789', operator: 'equal_to', value: 'test_value_3' },
+              ],
+            },
+          ],
+        },
+        record_defaults: [ //record_defaults specify the fields of the current form that will be populated by the fields of the linked form. source_field_id is the field of the linked form and destination_field_id is the field of the current form to populate.
+          {
+            source_field_id: 'sample567', //source_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
+            destination_field_id: 'ee748' //source_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
+          },
+          {
+            source_field_id: 'sample234',
+            destination_field_id: 'ee749'
+          }
+        ],
+      },
+      {
+        type: 'TextField',
+        key: 'ee748',
+        data_name: 'first_import',
+        label: 'First IMPORT',
+        display: 'default', //TextField can only be 'default'
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
+        required: false,
+        required_conditions: null,
+        visible: true,
+        visible_conditions: null,
+        read_only: true,
+        read_only_conditions: null,
+        default_value: null,
+        pattern: null,
+        pattern_description: null,
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+      },
+      {
+        type: 'SingleChoiceField',
+        key: 'ee749',
+        data_name: 'second_import',
+        label: 'Second IMPORT',
+        display: 'default', //SingleChoiceField can be 'default' or 'radio'
+        description: null, //description can be null or a string
+        description_mode: null, //description_mode can be null, 'default' or 'subtext'
+        required: false,
+        required_conditions: null,
+        visible: true,
+        visible_conditions: null,
+        read_only: true,
+        read_only_conditions: null,
+        default_value: null,
+        allow_other: false, //SingleChoiceField can be true or false
+        supporting_image: false, //supporting_image can be true or false
+        supporting_image_path: null, //supporting_image_path can be null or a string
+        supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
+        is_searchable: false,
+        is_searchable_mode: null,
+        choices: [
+          {
+            label: 'Airplane',
+            value: 'airplane',
+          },
+          {
+            label: 'Car',
+            value: 'car',
+          },
+        ],
+      },
+      {
         type: 'Section',
         key: 'e4568',
         data_name: 'section_drill',
@@ -831,12 +939,79 @@ const initialValues = {
 
 const engine = createFormEngine({ schema, initialValues });
 engine.eval();
-console.log(JSON.stringify(engine.getState(), null, 2));
+
+const engineState = engine.getState();
+console.log(JSON.stringify(engineState, null, 2));
+
+const linkedRecordsSample = [
+  {
+    record_id: 'd65e06d1-510f-435d-8d18-f60701dafba4',
+    title: 'Sample linked record',
+    defaults: {
+      sample567: 'Linked default value 1',
+      sample234: 'car',
+    },
+  },
+];
+
+try {
+  applyLinkedRecordSelection({
+    form: schema.form,
+    values: engineState.values,
+    fieldIdentifier: '1f92ff',
+    records: [...linkedRecordsSample, {
+      record_id: 'a9c51b21-1234-4567-89ab-ffffffffffff',
+      defaults: {},
+    }],
+  });
+  throw new Error('FormLinkField allow_multiple_records constraint was not enforced');
+} catch (error) {
+  if (!/does not allow multiple records/.test(error.message)) {
+    throw error;
+  }
+}
+
+applyLinkedRecordSelection({
+  form: schema.form,
+  values: engineState.values,
+  fieldIdentifier: '1f92ff',
+  records: linkedRecordsSample,
+});
+
+engine.eval();
+
+const postSelectionState = engine.getState();
+const linkValue = postSelectionState.values.test_form_link;
+if (!Array.isArray(linkValue) || linkValue.length !== 1) {
+  throw new Error('FormLinkField did not store the selected linked record');
+}
+if (linkValue[0].record_id !== linkedRecordsSample[0].record_id) {
+  throw new Error('FormLinkField stored an unexpected record_id');
+}
+
+const expectedFirstImport = ['Linked default value 1'].join(FORM_LINK_VALUE_DELIMITER);
+if (postSelectionState.values.first_import !== expectedFirstImport) {
+  throw new Error('record_defaults did not populate first_import correctly');
+}
+
+const expectedSecondImportChoice = {
+  choice: [
+    {
+      value: 'car',
+      label: 'Car',
+    },
+  ],
+  other: [],
+};
+
+if (JSON.stringify(postSelectionState.values.second_import) !== JSON.stringify(expectedSecondImportChoice)) {
+  throw new Error('record_defaults did not populate second_import correctly');
+}
 
 // Get flattened fields for key mapping
 const fields = flattenFields(schema.form.elements);
 
-const record = createStructuredRecord(engine.getState(), fields, {
+const record = createStructuredRecord(postSelectionState, fields, {
   status: 'incomplete',
   id: 'f8e9d0c1-b2a3-4567-8901-234567890abc',
   form_id: 'a7b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d',
@@ -846,6 +1021,29 @@ const record = createStructuredRecord(engine.getState(), fields, {
 // Create clean output without internal processing properties
 const { originalElements, childRecordIds, mainRecordId, ...cleanRecord } = record;
 console.log(JSON.stringify(cleanRecord, null, 2));
+
+const linkedOutput = cleanRecord.form_values['1f92ff'];
+if (!Array.isArray(linkedOutput) || linkedOutput.length !== 1) {
+  throw new Error('Structured record did not include linked record references');
+}
+if (linkedOutput[0].record_id !== linkedRecordsSample[0].record_id) {
+  throw new Error('Structured record output has an unexpected record_id');
+}
+
+if (cleanRecord.form_values.ee748 !== expectedFirstImport) {
+  throw new Error('Structured record did not capture first_import value');
+}
+
+const structuredSecondImport = cleanRecord.form_values.ee749;
+if (
+  !structuredSecondImport ||
+  !Array.isArray(structuredSecondImport.choice_value) ||
+  structuredSecondImport.choice_value.length !== 1 ||
+  structuredSecondImport.choice_value[0].value !== 'car'
+) {
+  throw new Error('Structured record did not capture second_import choice value');
+}
+
 const operations = engine.trigger('load-record');
 console.log('Load operations:', operations);
 
