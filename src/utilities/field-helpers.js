@@ -5,8 +5,12 @@
 // =============================================================================
 
 export function flattenFields(elements) {
+  if (!Array.isArray(elements)) {
+    return [];
+  }
+
   return elements.flatMap((el) => {
-    if (el.type === 'Section' || el.type === 'RepeatableSection') {
+    if (el.type === 'Section' || el.type === 'RepeatableSection' || el.type === 'BuildingPlanSection') {
       return [el, ...flattenFields(el.elements)];
     }
 

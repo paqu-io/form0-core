@@ -47,7 +47,11 @@ export function evaluateConditions(conditions, values, allFields) {
  */
 function evaluateVisibilityRecursive(elements, values, visible, allFields) {
   elements.forEach((element) => {
-    if (element.type === 'Section' || element.type === 'RepeatableSection') {
+    if (
+      element.type === 'Section' ||
+      element.type === 'RepeatableSection' ||
+      element.type === 'BuildingPlanSection'
+    ) {
       // First evaluate children (bottom-up approach)
       if (element.elements && element.elements.length > 0) {
         evaluateVisibilityRecursive(element.elements, values, visible, allFields);

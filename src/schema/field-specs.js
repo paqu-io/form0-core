@@ -4,6 +4,7 @@ import {
   validateFormLinkRecordDefaults,
   validateFormLinkRecordConditions,
 } from './form-link-validators.js';
+import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
 
 /**
  * Central field specification registry
@@ -890,6 +891,101 @@ export const FIELD_SPECS = {
       // RepeatableSection has no output value (organizational container only)
       return null;
     },
+  },
+
+  BuildingPlanSection: {
+    attributes: {
+      type: { type: 'string', required: true, nullable: false, value: 'BuildingPlanSection' },
+      key: { type: 'string', required: true, nullable: false },
+      data_name: { type: 'string', required: true, nullable: false },
+      label: { type: 'string', required: true, nullable: false },
+      description: { type: 'string', required: true, nullable: true },
+      description_mode: {
+        type: 'string',
+        required: true,
+        nullable: true,
+        allowedValues: ['default', 'subtext'],
+        dependentOn: 'description',
+      },
+      visible: {
+        type: 'boolean',
+        required: true,
+        nullable: false,
+        notTrueOn: { visible_conditions: (val) => val != null },
+      },
+      visible_conditions: { type: 'object', required: true, nullable: true },
+      read_only: {
+        type: 'boolean',
+        required: true,
+        nullable: false,
+        notTrueOn: { read_only_conditions: (val) => val != null },
+      },
+      read_only_conditions: { type: 'object', required: true, nullable: true },
+      node_overrides: { type: 'object', required: false, nullable: true },
+      elements: { type: 'array', required: false, nullable: false },
+      building_plan: { type: 'object', required: false, nullable: false },
+    },
+    schemaValidators: [
+      (field) => {
+        const overrides = field.node_overrides;
+        if (overrides == null) {
+          return { isValid: true };
+        }
+
+        if (typeof overrides !== 'object' || Array.isArray(overrides)) {
+          return {
+            isValid: false,
+            error: `BuildingPlanSection "${field.data_name}" node_overrides must be an object`,
+          };
+        }
+
+        for (const [nodeKey, override] of Object.entries(overrides)) {
+          if (!BUILDING_PLAN_BLUEPRINT.nodes[nodeKey]) {
+            return {
+              isValid: false,
+              error: `BuildingPlanSection "${field.data_name}" references unknown node "${nodeKey}"`,
+            };
+          }
+
+          if (override == null || typeof override !== 'object' || Array.isArray(override)) {
+            return {
+              isValid: false,
+              error: `BuildingPlanSection "${field.data_name}" override for node "${nodeKey}" must be an object`,
+            };
+          }
+
+          if (override.extra_elements != null && !Array.isArray(override.extra_elements)) {
+            return {
+              isValid: false,
+              error: `BuildingPlanSection "${field.data_name}" override for node "${nodeKey}" extra_elements must be an array`,
+            };
+          }
+
+          if (Array.isArray(override.extra_elements)) {
+            for (let i = 0; i < override.extra_elements.length; i += 1) {
+              const extra = override.extra_elements[i];
+              if (!extra || typeof extra !== 'object') {
+                return {
+                  isValid: false,
+                  error: `BuildingPlanSection "${field.data_name}" extra_elements[${i}] for node "${nodeKey}" must be an object`,
+                };
+              }
+              if (!extra.type || typeof extra.type !== 'string') {
+                return {
+                  isValid: false,
+                  error: `BuildingPlanSection "${field.data_name}" extra_elements[${i}] for node "${nodeKey}" is missing type`,
+                };
+              }
+            }
+          }
+        }
+
+        return { isValid: true };
+      },
+    ],
+    valueValidator: () => null,
+    defaultProducer: () => null,
+    outputProducer: () => null,
   },
 
   LabelField: {

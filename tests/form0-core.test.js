@@ -5,6 +5,8 @@ import {
   applyLinkedRecordSelection,
   FORM_LINK_VALUE_DELIMITER,
 } from '../src/index.js';
+import { expandBuildingPlanSchema } from '../src/schema/building-plan-expander.js';
+import assert from 'node:assert/strict';
 
 const schema = {
   form: {
@@ -1153,3 +1155,51 @@ console.log('Load operations:', operations);
 // } catch (error) {
 //   console.log('❌ Validation error:', error.message);
 // }
+
+// -----------------------------------------------------------------------------
+// BuildingPlanSection prototype expansion test
+// -----------------------------------------------------------------------------
+
+const buildingPlanPrototype = {
+  type: 'BuildingPlanSection',
+  key: 'bp001',
+  data_name: 'building_plan',
+  label: 'Building Plan',
+  description: null,
+  description_mode: null,
+  visible: true,
+  visible_conditions: null,
+  read_only: false,
+  read_only_conditions: null,
+  node_overrides: null,
+};
+
+const buildingPlanTestSchema = {
+  form: {
+    name: 'Building Plan Expansion Test',
+    elements: [buildingPlanPrototype],
+  },
+};
+
+const { schema: expandedBuildingPlanSchema, buildingPlanMeta } = expandBuildingPlanSchema(
+  buildingPlanTestSchema
+);
+
+const expandedBuildingPlan = expandedBuildingPlanSchema.form.elements[0];
+assert.equal(expandedBuildingPlan.type, 'BuildingPlanSection');
+assert.ok(Array.isArray(expandedBuildingPlan.elements), 'BuildingPlanSection should expose elements');
+
+const floorRepeatable = expandedBuildingPlan.elements[0];
+assert.equal(floorRepeatable.type, 'RepeatableSection');
+assert.equal(floorRepeatable.data_name, 'building_plan_floors');
+assert.ok(
+  Array.isArray(floorRepeatable.elements) && floorRepeatable.elements.length > 0,
+  'Floors repeatable should include mandatory elements'
+);
+
+const roomRepeatable = floorRepeatable.elements.find((el) => el.type === 'RepeatableSection');
+assert.ok(roomRepeatable, 'Floor should generate Rooms repeatable');
+assert.equal(roomRepeatable.data_name, 'building_plan_rooms');
+
+console.log('✅ BuildingPlanSection expansion produced default hierarchy');
+console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));

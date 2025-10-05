@@ -28,3 +28,4 @@ export {
   FORM_LINK_VALUE_DELIMITER,
   applyLinkedRecordSelection,
 } from './utilities/form-link-helpers.js';
+export { expandBuildingPlanSchema } from './schema/building-plan-expander.js';

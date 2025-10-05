@@ -64,6 +64,7 @@ const FIELD_TYPE_OPERATORS = {
   // Container fields (no operators)
   Section: [],
   RepeatableSection: [],
+  BuildingPlanSection: [],
   LabelField: [],
 };
 

@@ -11,6 +11,7 @@ import { EventManager } from './events.js';
 import { FIELD_SPECS } from '../schema/field-specs.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
+import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
 
 export function createFormEngine({
   schema,
@@ -19,9 +20,11 @@ export function createFormEngine({
   security = DEFAULT_SECURITY_CONFIG,
   warningSystem = null,
 }) {
-  validateSchema(schema.form);
+  const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
-  const { form } = schema;
+  validateSchema(preparedSchema.form);
+
+  const { form } = preparedSchema;
   const values = { ...initialValues };
   const allFields = flattenFields(form.elements);
 
@@ -89,18 +92,18 @@ export function createFormEngine({
   const allHelpers = { ...builtins, ...helpers };
 
   // Initialize context resolution system
-  const contextResolver = new ContextResolver(schema.form);
+  const contextResolver = new ContextResolver(form);
   const sharedWarningSystem = warningSystem || new WarningSystem();
 
   // Initialize event system with context resolution
-  const eventManager = new EventManager(schema.form, contextResolver, sharedWarningSystem);
+  const eventManager = new EventManager(form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...builtins, ...eventBuiltins, ...helpers };
 
   // Initialize event code if present
-  if (schema.form.events && schema.form.events.code) {
+  if (form.events && form.events.code) {
     const eventContext = buildEventContext(values, eventHelpers, {});
-    eventManager.initializeEventCode(schema.form.events.code, eventContext);
+    eventManager.initializeEventCode(form.events.code, eventContext);
   }
 
   function buildEventContext(values, helpers, eventMeta) {
@@ -152,6 +155,8 @@ export function createFormEngine({
     getState,
     getWarningSystem: () => sharedWarningSystem,
     getContextResolver: () => contextResolver,
+    getBuildingPlanMeta: () => buildingPlanMeta,
+    getPreparedSchema: () => preparedSchema,
   };
 }
 
@@ -227,6 +232,7 @@ function getDefaultValueLegacy(field) {
     case 'CalculatedField':
     case 'Section':
     case 'RepeatableSection':
+    case 'BuildingPlanSection':
     case 'LabelField':
       return null; // These don't support default values
 
