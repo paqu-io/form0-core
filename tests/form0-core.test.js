@@ -6,6 +6,7 @@ import {
   FORM_LINK_VALUE_DELIMITER,
 } from '../src/index.js';
 import { expandBuildingPlanSchema } from '../src/schema/building-plan-expander.js';
+import { generateKey } from '../src/utilities/hash.js';
 import assert from 'node:assert/strict';
 
 const schema = {
@@ -1191,7 +1192,8 @@ assert.ok(Array.isArray(expandedBuildingPlan.elements), 'BuildingPlanSection sho
 
 const floorRepeatable = expandedBuildingPlan.elements[0];
 assert.equal(floorRepeatable.type, 'RepeatableSection');
-assert.equal(floorRepeatable.data_name, 'building_plan_floors');
+const floorSuffix = generateKey(`${buildingPlanPrototype.data_name}:floors`);
+assert.equal(floorRepeatable.data_name, `building_plan_floors_${floorSuffix}`);
 assert.ok(
   Array.isArray(floorRepeatable.elements) && floorRepeatable.elements.length > 0,
   'Floors repeatable should include mandatory elements'
@@ -1199,7 +1201,25 @@ assert.ok(
 
 const roomRepeatable = floorRepeatable.elements.find((el) => el.type === 'RepeatableSection');
 assert.ok(roomRepeatable, 'Floor should generate Rooms repeatable');
-assert.equal(roomRepeatable.data_name, 'building_plan_rooms');
+const roomSuffix = generateKey(`${buildingPlanPrototype.data_name}:floors:rooms`);
+assert.equal(roomRepeatable.data_name, `building_plan_rooms_${roomSuffix}`);
+
+const floorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.floors;
+assert.ok(floorsMeta, 'Building plan meta should expose floors node');
+assert.equal(floorsMeta.dataName, floorRepeatable.data_name);
+assert.equal(floorsMeta.preferredKey, floorRepeatable.key);
+
+const roomsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.rooms;
+assert.ok(roomsMeta, 'Building plan meta should expose rooms node');
+assert.equal(roomsMeta.dataName, roomRepeatable.data_name);
+assert.equal(roomsMeta.preferredKey, roomRepeatable.key);
+
+const roomVerticesMeta = roomsMeta?.fieldsByOriginalDataName?.room_vertices;
+assert.ok(roomVerticesMeta, 'Rooms meta should expose room_vertices field mapping');
+assert.ok(
+  roomVerticesMeta.dataName.startsWith('room_vertices_'),
+  'Mapped room_vertices should include deterministic suffix'
+);
 
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');
 console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));

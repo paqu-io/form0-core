@@ -1,4 +1,45 @@
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
+import { generateKey } from '../utilities/hash.js';
+
+const DATA_NAME_MAX_LENGTH = 42;
+
+function appendSuffix(base, suffix, maxLength = null) {
+  const sanitizedBase = typeof base === 'string' ? base.replace(/_+$/, '') : '';
+  const joiner = sanitizedBase === '' ? '' : '_';
+  let combined = `${sanitizedBase}${joiner}${suffix}`;
+
+  if (maxLength && combined.length > maxLength) {
+    const available = Math.max(1, maxLength - suffix.length - (joiner ? 1 : 0));
+    const trimmedBase = sanitizedBase.slice(0, available).replace(/_+$/, '');
+    const trimmedJoiner = trimmedBase === '' ? '' : '_';
+    combined = `${trimmedBase}${trimmedJoiner}${suffix}`;
+  }
+
+  return combined;
+}
+
+function createScopedKey(baseKey, suffix) {
+  const cleanBase = typeof baseKey === 'string' ? baseKey.replace(/^~+/, '').replace(/_+$/, '') : '';
+  const scopedBase = appendSuffix(cleanBase, suffix);
+  return `~${scopedBase}`;
+}
+
+function createScopedDataName(baseDataName, suffix) {
+  return appendSuffix(baseDataName, suffix, DATA_NAME_MAX_LENGTH);
+}
+
+function recordFieldMeta(container, entry) {
+  if (!container) {
+    return;
+  }
+  container.fields.push(entry);
+  if (entry.originalDataName) {
+    container.fieldsByOriginalDataName[entry.originalDataName] = entry;
+  }
+  if (entry.originalKey) {
+    container.fieldsByOriginalKey[entry.originalKey] = entry;
+  }
+}
 
 function deepClone(value) {
   if (typeof structuredClone === 'function') {
@@ -20,7 +61,14 @@ function mergeNodeOverrides(baseNode, override = {}) {
   return merged;
 }
 
-function buildRepeatableTree(nodeKey, blueprint, overridesByNode, buildingPlanMeta, ancestor = []) {
+function buildRepeatableTree(
+  nodeKey,
+  blueprint,
+  overridesByNode,
+  buildingPlanMeta,
+  ancestorDataNames = [],
+  namespaceParts = []
+) {
   const baseNode = blueprint.nodes[nodeKey];
   const nodeOverride = overridesByNode[nodeKey] || {};
   const mergedNode = mergeNodeOverrides(baseNode, nodeOverride);
@@ -28,25 +76,103 @@ function buildRepeatableTree(nodeKey, blueprint, overridesByNode, buildingPlanMe
   const repeatable = deepClone(mergedNode.repeatable);
   repeatable.elements = [];
 
-  const scopePath = [...ancestor, repeatable.data_name];
+  const originalKey = repeatable.key;
+  const originalDataName = repeatable.data_name;
 
-  const mandatoryElements = mergedNode.mandatory_elements.map((field) => deepClone(field));
+  const nodeNamespaceParts = [...namespaceParts, nodeKey];
+  const namespaceSeed = nodeNamespaceParts.join(':');
+  const repeatableSuffix = generateKey(namespaceSeed);
 
-  const extraElements = (mergedNode.extra_elements || []).map((field) => deepClone(field));
+  repeatable.key = createScopedKey(originalKey, repeatableSuffix);
+  repeatable.data_name = createScopedDataName(originalDataName, repeatableSuffix);
 
-  const children = (mergedNode.children || []).map((childKey) =>
-    buildRepeatableTree(childKey, blueprint, overridesByNode, buildingPlanMeta, scopePath)
-  );
+  const scopePath = [...ancestorDataNames, repeatable.data_name];
 
-  repeatable.elements.push(...mandatoryElements, ...extraElements, ...children);
-
-  buildingPlanMeta.repeatables.push({
+  const repeatableMeta = {
     nodeKey,
+    originalKey,
+    originalDataName,
+    key: repeatable.key,
     preferredKey: repeatable.key,
     dataName: repeatable.data_name,
     path: scopePath,
     canvas: mergedNode.canvas || null,
+    fields: [],
+    fieldsByOriginalDataName: {},
+    fieldsByOriginalKey: {},
+  };
+
+  let fieldCounter = 0;
+
+  const mandatoryElements = (mergedNode.mandatory_elements || []).map((field) => {
+    const cloned = deepClone(field);
+    if (cloned && cloned.data_name) {
+      const fieldSeed = `${cloned.data_name}:${fieldCounter}`;
+      const fieldSuffix = generateKey(`${namespaceSeed}:${fieldSeed}`);
+      const originalFieldKey = cloned.key || null;
+      const originalFieldDataName = cloned.data_name || null;
+      cloned.key = createScopedKey(cloned.key || cloned.data_name, fieldSuffix);
+      cloned.data_name = createScopedDataName(cloned.data_name, fieldSuffix);
+      recordFieldMeta(repeatableMeta, {
+        nodeKey,
+        type: cloned.type || null,
+        originalKey: originalFieldKey,
+        originalDataName: originalFieldDataName,
+        key: cloned.key,
+        preferredKey: cloned.key,
+        dataName: cloned.data_name,
+      });
+    }
+    fieldCounter += 1;
+    return cloned;
   });
+
+  const extraElements = (mergedNode.extra_elements || []).map((field) => {
+    const cloned = deepClone(field);
+    if (cloned && cloned.data_name) {
+      const fieldSeed = `${cloned.data_name}:${fieldCounter}`;
+      const fieldSuffix = generateKey(`${namespaceSeed}:${fieldSeed}`);
+      const originalFieldKey = cloned.key || null;
+      const originalFieldDataName = cloned.data_name || null;
+      cloned.key = createScopedKey(cloned.key || cloned.data_name, fieldSuffix);
+      cloned.data_name = createScopedDataName(cloned.data_name, fieldSuffix);
+      recordFieldMeta(repeatableMeta, {
+        nodeKey,
+        type: cloned.type || null,
+        originalKey: originalFieldKey,
+        originalDataName: originalFieldDataName,
+        key: cloned.key,
+        preferredKey: cloned.key,
+        dataName: cloned.data_name,
+      });
+    }
+    fieldCounter += 1;
+    return cloned;
+  });
+
+  const children = (mergedNode.children || []).map((childKey) =>
+    buildRepeatableTree(
+      childKey,
+      blueprint,
+      overridesByNode,
+      buildingPlanMeta,
+      scopePath,
+      nodeNamespaceParts
+    )
+  );
+
+  repeatable.elements.push(...mandatoryElements, ...extraElements, ...children);
+
+  if (Array.isArray(repeatableMeta.fields) && repeatableMeta.fields.length === 0) {
+    delete repeatableMeta.fields;
+    delete repeatableMeta.fieldsByOriginalDataName;
+    delete repeatableMeta.fieldsByOriginalKey;
+  }
+
+  buildingPlanMeta.repeatables.push(repeatableMeta);
+  if (buildingPlanMeta.repeatablesByNodeKey) {
+    buildingPlanMeta.repeatablesByNodeKey[nodeKey] = repeatableMeta;
+  }
 
   return repeatable;
 }
@@ -67,6 +193,7 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
     dataName: field.data_name,
     key: field.key,
     repeatables: [],
+    repeatablesByNodeKey: {},
   };
 
   const rootRepeatable = buildRepeatableTree(
@@ -74,6 +201,7 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
     blueprint,
     overridesByNode,
     localMeta,
+    [field.data_name],
     [field.data_name]
   );
 
