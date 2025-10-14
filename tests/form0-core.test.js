@@ -1158,6 +1158,99 @@ console.log('Load operations:', operations);
 // }
 
 // -----------------------------------------------------------------------------
+// createStructuredRecord field key mode tests
+// -----------------------------------------------------------------------------
+
+(() => {
+  console.log('\n=== Testing createStructuredRecord field key modes ===');
+
+  const elements = [
+    {
+      type: 'TextField',
+      key: 'top_text_key',
+      data_name: 'top_text_data',
+      label: 'Top Text',
+    },
+    {
+      type: 'RepeatableSection',
+      key: 'repeat_section_key',
+      data_name: 'repeat_section_data',
+      label: 'Repeat Section',
+      elements: [
+        {
+          type: 'TextField',
+          key: 'child_text_key',
+          data_name: 'child_text_data',
+          label: 'Child Text',
+        },
+      ],
+    },
+  ];
+
+  const flattened = flattenFields(elements);
+
+  const structuredState = {
+    values: {
+      top_text_data: 'Structured Top',
+    },
+    repeatable: {
+      repeat_section_key: [
+        {
+          id: 'child-1',
+          values: {
+            child_text_data: 'Structured Child',
+          },
+          repeatable: {},
+        },
+      ],
+    },
+  };
+
+  const recordWithKeys = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+  });
+
+  assert.equal(recordWithKeys.form_values.top_text_key, 'Structured Top');
+  assert.ok(Array.isArray(recordWithKeys.form_values.repeat_section_key));
+  assert.equal(
+    recordWithKeys.form_values.repeat_section_key[0].form_values.child_text_key,
+    'Structured Child'
+  );
+  assert.ok(!Object.prototype.hasOwnProperty.call(recordWithKeys.form_values, 'top_text_data'));
+
+  const recordWithDataNames = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+    fieldKeyMode: 'data-name',
+  });
+
+  assert.equal(recordWithDataNames.form_values.top_text_data, 'Structured Top');
+  assert.ok(!Object.prototype.hasOwnProperty.call(recordWithDataNames.form_values, 'top_text_key'));
+  assert.ok(Array.isArray(recordWithDataNames.form_values.repeat_section_data));
+  assert.equal(
+    recordWithDataNames.form_values.repeat_section_data[0].form_values.child_text_data,
+    'Structured Child'
+  );
+
+  const legacyState = {
+    values: {
+      top_text_data: 'Legacy Top',
+      child_text_data: 'Legacy Child',
+    },
+    repeatable: {},
+  };
+
+  const legacyRecord = createStructuredRecord(legacyState, flattened, {
+    originalElements: elements,
+    field_key_mode: 'data_name',
+  });
+
+  assert.equal(legacyRecord.form_values.top_text_data, 'Legacy Top');
+  const legacyRepeatable = legacyRecord.form_values.repeat_section_data;
+  assert.ok(Array.isArray(legacyRepeatable) && legacyRepeatable.length === 1);
+  assert.equal(legacyRepeatable[0].form_values.child_text_data, 'Legacy Child');
+})();
+
+// -----------------------------------------------------------------------------
 // BuildingPlanSection prototype expansion test
 // -----------------------------------------------------------------------------
 
