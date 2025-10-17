@@ -1314,5 +1314,38 @@ assert.ok(
   'Mapped room_vertices should include deterministic suffix'
 );
 
+const wallsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.walls;
+assert.ok(wallsMeta, 'Building plan meta should expose walls node');
+
+const doorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.doors;
+assert.ok(doorsMeta, 'Building plan meta should expose doors node');
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_start_ratio,
+  'Doors meta should expose door_start_ratio field mapping'
+);
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_end_ratio,
+  'Doors meta should expose door_end_ratio field mapping'
+);
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_segment_index,
+  'Doors meta should expose door_segment_index field mapping'
+);
+
+const windowsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.windows;
+assert.ok(windowsMeta, 'Building plan meta should expose windows node');
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_start_ratio,
+  'Windows meta should expose window_start_ratio field mapping'
+);
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_end_ratio,
+  'Windows meta should expose window_end_ratio field mapping'
+);
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_distance_from_floor_m,
+  'Windows meta should expose window_distance_from_floor_m field mapping'
+);
+
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');
 console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));
