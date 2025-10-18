@@ -1317,6 +1317,28 @@ assert.ok(
 const wallsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.walls;
 assert.ok(wallsMeta, 'Building plan meta should expose walls node');
 
+const columnsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.columns;
+assert.ok(columnsMeta, 'Building plan meta should expose columns node');
+assert.ok(
+  columnsMeta?.fieldsByOriginalDataName?.column_center_u,
+  'Columns meta should expose column_center_u field mapping'
+);
+assert.ok(
+  columnsMeta?.fieldsByOriginalDataName?.column_cross_section_width_m,
+  'Columns meta should expose column_cross_section_width_m field mapping'
+);
+
+const beamsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.beams;
+assert.ok(beamsMeta, 'Building plan meta should expose beams node');
+assert.ok(
+  beamsMeta?.fieldsByOriginalDataName?.beam_start_u,
+  'Beams meta should expose beam_start_u field mapping'
+);
+assert.ok(
+  beamsMeta?.fieldsByOriginalDataName?.beam_length_m,
+  'Beams meta should expose beam_length_m field mapping'
+);
+
 const doorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.doors;
 assert.ok(doorsMeta, 'Building plan meta should expose doors node');
 assert.ok(
