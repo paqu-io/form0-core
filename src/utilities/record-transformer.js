@@ -7,6 +7,43 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
 import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
 
+const hasMeaningfulValue = (value) => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasMeaningfulValue(item));
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value).some((item) => hasMeaningfulValue(item));
+  }
+
+  // Numbers, booleans, dates, etc. are considered meaningful if present
+  return true;
+};
+
+const hasMeaningfulRecord = (record) => {
+  if (!record || typeof record !== 'object') {
+    return false;
+  }
+
+  if (hasMeaningfulValue(record.geometry)) {
+    return true;
+  }
+
+  if (record.form_values && typeof record.form_values === 'object') {
+    return hasMeaningfulValue(record.form_values);
+  }
+
+  return false;
+};
+
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
  * @param {Object} state - Form engine state {values, errors, visible, required, read_only}
@@ -325,7 +362,9 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           }
         }
 
-        childRecords.push(childRecord);
+        if (hasMeaningfulRecord(childRecord)) {
+          childRecords.push(childRecord);
+        }
       }
 
       return childRecords;
@@ -437,7 +476,9 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           }
         }
 
-        childRecords.push(childRecord);
+        if (hasMeaningfulRecord(childRecord)) {
+          childRecords.push(childRecord);
+        }
       }
 
       return childRecords;

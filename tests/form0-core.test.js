@@ -1371,3 +1371,106 @@ assert.ok(
 
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');
 console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));
+
+// -----------------------------------------------------------------------------
+// Structured record repeatable filtering
+// -----------------------------------------------------------------------------
+
+(() => {
+  const elements = [
+    {
+      type: 'RepeatableSection',
+      key: 'rooms',
+      data_name: 'rooms_data',
+      elements: [
+        {
+          type: 'TextField',
+          key: 'room_label',
+          data_name: 'room_label',
+        },
+        {
+          type: 'RepeatableSection',
+          key: 'columns',
+          data_name: 'columns_data',
+          elements: [
+            {
+              type: 'TextField',
+              key: 'column_label',
+              data_name: 'column_label',
+            },
+            {
+              type: 'NumericField',
+              key: 'column_height',
+              data_name: 'column_height',
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const flattened = flattenFields(elements);
+
+  const structuredState = {
+    values: {},
+    repeatable: {
+      rooms: [
+        {
+          id: 'room-1',
+          values: {
+            room_label: 'First room',
+          },
+          repeatable: {
+            columns: [
+              {
+                id: 'column-empty',
+                values: {
+                  column_label: '',
+                  column_height: null,
+                },
+                repeatable: {},
+              },
+              {
+                id: 'column-valid',
+                values: {
+                  column_label: 'C1',
+                  column_height: 3,
+                },
+                repeatable: {},
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+
+  const structuredRecord = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+  });
+
+  const roomRecords = structuredRecord.form_values.rooms;
+  assert.ok(Array.isArray(roomRecords) && roomRecords.length === 1, 'Expected a single room record');
+  const columnsOutput = roomRecords[0].form_values.columns;
+  assert.ok(Array.isArray(columnsOutput), 'Columns repeatable should be present');
+  assert.equal(columnsOutput.length, 1, 'Only non-empty column records should be retained');
+  assert.equal(columnsOutput[0].form_values.column_label, 'C1');
+
+  const legacyState = {
+    values: {
+      room_label: '',
+      column_label: '',
+      column_height: null,
+    },
+    repeatable: {},
+  };
+
+  const legacyRecord = createStructuredRecord(legacyState, flattened, {
+    originalElements: elements,
+  });
+
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(legacyRecord.form_values, 'rooms'),
+    'Legacy flattened repeatables with no values should be omitted'
+  );
+})();
