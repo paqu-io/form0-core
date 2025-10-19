@@ -5,6 +5,9 @@ import {
   applyLinkedRecordSelection,
   FORM_LINK_VALUE_DELIMITER,
 } from '../src/index.js';
+import { expandBuildingPlanSchema } from '../src/schema/building-plan-expander.js';
+import { generateKey } from '../src/utilities/hash.js';
+import assert from 'node:assert/strict';
 
 const schema = {
   form: {
@@ -1153,3 +1156,321 @@ console.log('Load operations:', operations);
 // } catch (error) {
 //   console.log('❌ Validation error:', error.message);
 // }
+
+// -----------------------------------------------------------------------------
+// createStructuredRecord field key mode tests
+// -----------------------------------------------------------------------------
+
+(() => {
+  console.log('\n=== Testing createStructuredRecord field key modes ===');
+
+  const elements = [
+    {
+      type: 'TextField',
+      key: 'top_text_key',
+      data_name: 'top_text_data',
+      label: 'Top Text',
+    },
+    {
+      type: 'RepeatableSection',
+      key: 'repeat_section_key',
+      data_name: 'repeat_section_data',
+      label: 'Repeat Section',
+      elements: [
+        {
+          type: 'TextField',
+          key: 'child_text_key',
+          data_name: 'child_text_data',
+          label: 'Child Text',
+        },
+      ],
+    },
+  ];
+
+  const flattened = flattenFields(elements);
+
+  const structuredState = {
+    values: {
+      top_text_data: 'Structured Top',
+    },
+    repeatable: {
+      repeat_section_key: [
+        {
+          id: 'child-1',
+          values: {
+            child_text_data: 'Structured Child',
+          },
+          repeatable: {},
+        },
+      ],
+    },
+  };
+
+  const recordWithKeys = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+  });
+
+  assert.equal(recordWithKeys.form_values.top_text_key, 'Structured Top');
+  assert.ok(Array.isArray(recordWithKeys.form_values.repeat_section_key));
+  assert.equal(
+    recordWithKeys.form_values.repeat_section_key[0].form_values.child_text_key,
+    'Structured Child'
+  );
+  assert.ok(!Object.prototype.hasOwnProperty.call(recordWithKeys.form_values, 'top_text_data'));
+
+  const recordWithDataNames = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+    fieldKeyMode: 'data-name',
+  });
+
+  assert.equal(recordWithDataNames.form_values.top_text_data, 'Structured Top');
+  assert.ok(!Object.prototype.hasOwnProperty.call(recordWithDataNames.form_values, 'top_text_key'));
+  assert.ok(Array.isArray(recordWithDataNames.form_values.repeat_section_data));
+  assert.equal(
+    recordWithDataNames.form_values.repeat_section_data[0].form_values.child_text_data,
+    'Structured Child'
+  );
+
+  const legacyState = {
+    values: {
+      top_text_data: 'Legacy Top',
+      child_text_data: 'Legacy Child',
+    },
+    repeatable: {},
+  };
+
+  const legacyRecord = createStructuredRecord(legacyState, flattened, {
+    originalElements: elements,
+    field_key_mode: 'data_name',
+  });
+
+  assert.equal(legacyRecord.form_values.top_text_data, 'Legacy Top');
+  const legacyRepeatable = legacyRecord.form_values.repeat_section_data;
+  assert.ok(Array.isArray(legacyRepeatable) && legacyRepeatable.length === 1);
+  assert.equal(legacyRepeatable[0].form_values.child_text_data, 'Legacy Child');
+})();
+
+// -----------------------------------------------------------------------------
+// BuildingPlanSection prototype expansion test
+// -----------------------------------------------------------------------------
+
+const buildingPlanPrototype = {
+  type: 'BuildingPlanSection',
+  key: 'bp001',
+  data_name: 'building_plan',
+  label: 'Building Plan',
+  description: null,
+  description_mode: null,
+  visible: true,
+  visible_conditions: null,
+  read_only: false,
+  read_only_conditions: null,
+  node_overrides: null,
+};
+
+const buildingPlanTestSchema = {
+  form: {
+    name: 'Building Plan Expansion Test',
+    elements: [buildingPlanPrototype],
+  },
+};
+
+const { schema: expandedBuildingPlanSchema, buildingPlanMeta } = expandBuildingPlanSchema(
+  buildingPlanTestSchema
+);
+
+const expandedBuildingPlan = expandedBuildingPlanSchema.form.elements[0];
+assert.equal(expandedBuildingPlan.type, 'BuildingPlanSection');
+assert.ok(Array.isArray(expandedBuildingPlan.elements), 'BuildingPlanSection should expose elements');
+
+const floorRepeatable = expandedBuildingPlan.elements[0];
+assert.equal(floorRepeatable.type, 'RepeatableSection');
+const floorSuffix = generateKey(`${buildingPlanPrototype.data_name}:floors`);
+assert.equal(floorRepeatable.data_name, `building_plan_floors_${floorSuffix}`);
+assert.ok(
+  Array.isArray(floorRepeatable.elements) && floorRepeatable.elements.length > 0,
+  'Floors repeatable should include mandatory elements'
+);
+
+const roomRepeatable = floorRepeatable.elements.find((el) => el.type === 'RepeatableSection');
+assert.ok(roomRepeatable, 'Floor should generate Rooms repeatable');
+const roomSuffix = generateKey(`${buildingPlanPrototype.data_name}:floors:rooms`);
+assert.equal(roomRepeatable.data_name, `building_plan_rooms_${roomSuffix}`);
+
+const floorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.floors;
+assert.ok(floorsMeta, 'Building plan meta should expose floors node');
+assert.equal(floorsMeta.dataName, floorRepeatable.data_name);
+assert.equal(floorsMeta.preferredKey, floorRepeatable.key);
+
+const roomsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.rooms;
+assert.ok(roomsMeta, 'Building plan meta should expose rooms node');
+assert.equal(roomsMeta.dataName, roomRepeatable.data_name);
+assert.equal(roomsMeta.preferredKey, roomRepeatable.key);
+
+const roomVerticesMeta = roomsMeta?.fieldsByOriginalDataName?.room_vertices;
+assert.ok(roomVerticesMeta, 'Rooms meta should expose room_vertices field mapping');
+assert.ok(
+  roomVerticesMeta.dataName.startsWith('room_vertices_'),
+  'Mapped room_vertices should include deterministic suffix'
+);
+
+const wallsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.walls;
+assert.ok(wallsMeta, 'Building plan meta should expose walls node');
+
+const columnsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.columns;
+assert.ok(columnsMeta, 'Building plan meta should expose columns node');
+assert.ok(
+  columnsMeta?.fieldsByOriginalDataName?.column_center_u,
+  'Columns meta should expose column_center_u field mapping'
+);
+assert.ok(
+  columnsMeta?.fieldsByOriginalDataName?.column_cross_section_width_m,
+  'Columns meta should expose column_cross_section_width_m field mapping'
+);
+
+const beamsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.beams;
+assert.ok(beamsMeta, 'Building plan meta should expose beams node');
+assert.ok(
+  beamsMeta?.fieldsByOriginalDataName?.beam_start_u,
+  'Beams meta should expose beam_start_u field mapping'
+);
+assert.ok(
+  beamsMeta?.fieldsByOriginalDataName?.beam_length_m,
+  'Beams meta should expose beam_length_m field mapping'
+);
+
+const doorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.doors;
+assert.ok(doorsMeta, 'Building plan meta should expose doors node');
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_start_ratio,
+  'Doors meta should expose door_start_ratio field mapping'
+);
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_end_ratio,
+  'Doors meta should expose door_end_ratio field mapping'
+);
+assert.ok(
+  doorsMeta?.fieldsByOriginalDataName?.door_segment_index,
+  'Doors meta should expose door_segment_index field mapping'
+);
+
+const windowsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.windows;
+assert.ok(windowsMeta, 'Building plan meta should expose windows node');
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_start_ratio,
+  'Windows meta should expose window_start_ratio field mapping'
+);
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_end_ratio,
+  'Windows meta should expose window_end_ratio field mapping'
+);
+assert.ok(
+  windowsMeta?.fieldsByOriginalDataName?.window_distance_from_floor_m,
+  'Windows meta should expose window_distance_from_floor_m field mapping'
+);
+
+console.log('✅ BuildingPlanSection expansion produced default hierarchy');
+console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));
+
+// -----------------------------------------------------------------------------
+// Structured record repeatable filtering
+// -----------------------------------------------------------------------------
+
+(() => {
+  const elements = [
+    {
+      type: 'RepeatableSection',
+      key: 'rooms',
+      data_name: 'rooms_data',
+      elements: [
+        {
+          type: 'TextField',
+          key: 'room_label',
+          data_name: 'room_label',
+        },
+        {
+          type: 'RepeatableSection',
+          key: 'columns',
+          data_name: 'columns_data',
+          elements: [
+            {
+              type: 'TextField',
+              key: 'column_label',
+              data_name: 'column_label',
+            },
+            {
+              type: 'NumericField',
+              key: 'column_height',
+              data_name: 'column_height',
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const flattened = flattenFields(elements);
+
+  const structuredState = {
+    values: {},
+    repeatable: {
+      rooms: [
+        {
+          id: 'room-1',
+          values: {
+            room_label: 'First room',
+          },
+          repeatable: {
+            columns: [
+              {
+                id: 'column-empty',
+                values: {
+                  column_label: '',
+                  column_height: null,
+                },
+                repeatable: {},
+              },
+              {
+                id: 'column-valid',
+                values: {
+                  column_label: 'C1',
+                  column_height: 3,
+                },
+                repeatable: {},
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+
+  const structuredRecord = createStructuredRecord(structuredState, flattened, {
+    originalElements: elements,
+  });
+
+  const roomRecords = structuredRecord.form_values.rooms;
+  assert.ok(Array.isArray(roomRecords) && roomRecords.length === 1, 'Expected a single room record');
+  const columnsOutput = roomRecords[0].form_values.columns;
+  assert.ok(Array.isArray(columnsOutput), 'Columns repeatable should be present');
+  assert.equal(columnsOutput.length, 1, 'Only non-empty column records should be retained');
+  assert.equal(columnsOutput[0].form_values.column_label, 'C1');
+
+  const legacyState = {
+    values: {
+      room_label: '',
+      column_label: '',
+      column_height: null,
+    },
+    repeatable: {},
+  };
+
+  const legacyRecord = createStructuredRecord(legacyState, flattened, {
+    originalElements: elements,
+  });
+
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(legacyRecord.form_values, 'rooms'),
+    'Legacy flattened repeatables with no values should be omitted'
+  );
+})();

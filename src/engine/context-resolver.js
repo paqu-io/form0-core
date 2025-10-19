@@ -26,7 +26,7 @@ export class ContextResolver {
     if (!Array.isArray(elements)) return;
 
     elements.forEach((element) => {
-      if (element.type === 'Section') {
+      if (element.type === 'Section' || element.type === 'BuildingPlanSection') {
         this.sectionFields.add(element.data_name);
         // Recursively process Section children with same parentPath
         // (Sections don't change the RepeatableSection parentage)

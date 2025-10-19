@@ -7,6 +7,43 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
 import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
 
+const hasMeaningfulValue = (value) => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasMeaningfulValue(item));
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value).some((item) => hasMeaningfulValue(item));
+  }
+
+  // Numbers, booleans, dates, etc. are considered meaningful if present
+  return true;
+};
+
+const hasMeaningfulRecord = (record) => {
+  if (!record || typeof record !== 'object') {
+    return false;
+  }
+
+  if (hasMeaningfulValue(record.geometry)) {
+    return true;
+  }
+
+  if (record.form_values && typeof record.form_values === 'object') {
+    return hasMeaningfulValue(record.form_values);
+  }
+
+  return false;
+};
+
 /**
  * Create structured record from form engine state with support for unlimited RepeatableSection nesting
  * @param {Object} state - Form engine state {values, errors, visible, required, read_only}
@@ -44,6 +81,43 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   // Compute final version values
   const finalVersion = options.version || 1;
   const finalChildVersion = options.childVersion || 1;
+
+  const rawFieldKeyMode = options.fieldKeyMode ?? options.field_key_mode ?? 'prefer-key';
+  const normalizedFieldKeyMode =
+    typeof rawFieldKeyMode === 'string' ? rawFieldKeyMode.toLowerCase() : 'prefer-key';
+  const useDataNameKeys =
+    normalizedFieldKeyMode === 'data-name' ||
+    normalizedFieldKeyMode === 'data_name' ||
+    normalizedFieldKeyMode === 'dataname';
+  if (
+    !useDataNameKeys &&
+    normalizedFieldKeyMode !== 'prefer-key' &&
+    normalizedFieldKeyMode !== 'key' &&
+    normalizedFieldKeyMode !== 'keys'
+  ) {
+    console.warn(
+      `[form0] createStructuredRecord: unrecognized fieldKeyMode "${rawFieldKeyMode}", falling back to preferred keys`
+    );
+  }
+
+  const resolveFieldOutputKey = (field, preferredKey, dataName) => {
+    if (useDataNameKeys) {
+      if (field && field.data_name) return field.data_name;
+      if (dataName) return dataName;
+    }
+
+    if (preferredKey) return preferredKey;
+    if (field && field.data_name) return field.data_name;
+    return dataName || preferredKey;
+  };
+
+  const resolveRepeatableOutputKey = (repInfo) => {
+    const dataName = repInfo?.field?.data_name;
+    if (useDataNameKeys && dataName) {
+      return dataName;
+    }
+    return repInfo?.preferredKey ?? dataName;
+  };
 
   // Validate final computed versions (including fallbacks)
   if (!recordVersion.isValid(finalVersion)) {
@@ -142,38 +216,37 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       continue;
     }
 
-    const preferredKey = dataNameToKeyMap.get(dataName);
     const field = dataNameToFieldMap.get(dataName);
+    const preferredKey = dataNameToKeyMap.get(dataName);
 
-    if (preferredKey) {
-      // Apply output formatting if field spec exists
-      let processedValue = value;
-      if (
-        field &&
-        field.type &&
-        FIELD_SPECS[field.type] &&
-        FIELD_SPECS[field.type].outputProducer
-      ) {
-        try {
-          processedValue = FIELD_SPECS[field.type].outputProducer(field, value);
-        } catch (err) {
-          console.warn(
-            `[form0] createStructuredRecord: outputProducer failed for ${field.type} field "${dataName}":`,
-            err
-          );
-          processedValue = value; // Fallback to raw value
-        }
+    // Apply output formatting if field spec exists
+    let processedValue = value;
+    if (
+      field &&
+      field.type &&
+      FIELD_SPECS[field.type] &&
+      FIELD_SPECS[field.type].outputProducer
+    ) {
+      try {
+        processedValue = FIELD_SPECS[field.type].outputProducer(field, value);
+      } catch (err) {
+        console.warn(
+          `[form0] createStructuredRecord: outputProducer failed for ${field.type} field "${dataName}":`,
+          err
+        );
+        processedValue = value; // Fallback to raw value
       }
-      form_values[preferredKey] = processedValue;
-    } else {
-      // Final fallback: keep original data_name if no field mapping found
-      form_values[dataName] = value;
     }
+
+    const outputKey = preferredKey
+      ? resolveFieldOutputKey(field, preferredKey, dataName)
+      : resolveFieldOutputKey(field, null, dataName);
+
+    form_values[outputKey] = processedValue;
   }
 
   // Enhanced recursive function to process nested RepeatableSections
   const processRepeatableSection = (repInfo, currentPath = [], structuredInstances = null) => {
-    const repeatableField = repInfo.field;
     const pathKey = repInfo.preferredKey;
 
     // Get child record IDs from options using the full path
@@ -267,7 +340,13 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
             }
           }
 
-          childRecord.form_values[fieldInfo.preferredKey] = processedValue;
+          const outputKey = resolveFieldOutputKey(
+            fieldInfo.field,
+            fieldInfo.preferredKey,
+            fieldInfo.field?.data_name || fieldDataName
+          );
+
+          childRecord.form_values[outputKey] = processedValue;
         }
 
         for (const [, childRepInfo] of repInfo.children) {
@@ -278,11 +357,14 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
             nestedInstances
           );
           if (childRepeatableArray.length > 0) {
-            childRecord.form_values[childRepInfo.preferredKey] = childRepeatableArray;
+            const childOutputKey = resolveRepeatableOutputKey(childRepInfo);
+            childRecord.form_values[childOutputKey] = childRepeatableArray;
           }
         }
 
-        childRecords.push(childRecord);
+        if (hasMeaningfulRecord(childRecord)) {
+          childRecords.push(childRecord);
+        }
       }
 
       return childRecords;
@@ -359,12 +441,18 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
               }
             }
 
+            const outputKey = resolveFieldOutputKey(
+              fieldInfo.field,
+              fieldInfo.preferredKey,
+              fieldInfo.field?.data_name || fieldDataName
+            );
+
             // For now, all field values go into the first record
             if (i === 0) {
-              childRecord.form_values[fieldInfo.preferredKey] = processedValue;
+              childRecord.form_values[outputKey] = processedValue;
             } else {
               // For additional records, set null values (ready for future implementation)
-              childRecord.form_values[fieldInfo.preferredKey] = null;
+              childRecord.form_values[outputKey] = null;
             }
           }
         }
@@ -378,15 +466,19 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           if (childRepeatableArray.length > 0) {
             // For now, add the child RepeatableSection to the first record
             if (i === 0) {
-              childRecord.form_values[childRepInfo.preferredKey] = childRepeatableArray;
+              const childOutputKey = resolveRepeatableOutputKey(childRepInfo);
+              childRecord.form_values[childOutputKey] = childRepeatableArray;
             } else {
               // For additional records, create empty arrays (ready for future implementation)
-              childRecord.form_values[childRepInfo.preferredKey] = [];
+              const childOutputKey = resolveRepeatableOutputKey(childRepInfo);
+              childRecord.form_values[childOutputKey] = [];
             }
           }
         }
 
-        childRecords.push(childRecord);
+        if (hasMeaningfulRecord(childRecord)) {
+          childRecords.push(childRecord);
+        }
       }
 
       return childRecords;
@@ -406,7 +498,8 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
 
       const childRecords = processRepeatableSection(repInfo, [], structuredInstances);
       if (childRecords.length > 0) {
-        form_values[repInfo.preferredKey] = childRecords;
+        const repeatableOutputKey = resolveRepeatableOutputKey(repInfo);
+        form_values[repeatableOutputKey] = childRecords;
       }
     }
   }
@@ -466,6 +559,8 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
             'originalElements',
             'status_field',
             'title_field',
+            'fieldKeyMode',
+            'field_key_mode',
           ].includes(key)
       )
     ),

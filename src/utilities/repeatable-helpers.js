@@ -26,7 +26,7 @@ export function buildRepeatableSectionTree(
   };
 
   elements.forEach((element) => {
-    if (element.type === 'Section') {
+    if (element.type === 'Section' || element.type === 'BuildingPlanSection') {
       sectionFields.add(element.data_name);
       if (Array.isArray(element.elements)) {
         buildRepeatableSectionTree(
