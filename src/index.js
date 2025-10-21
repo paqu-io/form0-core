@@ -29,3 +29,4 @@ export {
   applyLinkedRecordSelection,
 } from './utilities/form-link-helpers.js';
 export { expandBuildingPlanSchema } from './schema/building-plan-expander.js';
+export { FIELD_SPECS } from './schema/field-specs.js';
