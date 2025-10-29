@@ -1,5 +1,6 @@
 import { FIELD_SPECS } from './field-specs.js';
 import { validateAttribute } from './attribute-validator.js';
+import { validateFieldAIMetadata } from './ai-metadata-validator.js';
 
 /**
  * Validates a field definition against its specification
@@ -39,6 +40,11 @@ export function validateFieldSchema(field) {
     if (attrDef.required && !(attrName in field)) {
       errors.push(`Field "${field.data_name}": Missing required attribute: ${attrName}`);
     }
+  }
+
+  const aiValidation = validateFieldAIMetadata(field);
+  if (!aiValidation.isValid) {
+    errors.push(...aiValidation.errors);
   }
 
   // Run cross-attribute validators

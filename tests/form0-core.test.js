@@ -4,6 +4,21 @@ import {
   flattenFields,
   applyLinkedRecordSelection,
   FORM_LINK_VALUE_DELIMITER,
+  validateSchema,
+  getFormAIMetadata,
+  getFormAIContext,
+  getFormAIInstructions,
+  getFormAITasks,
+  getFormAINamingPolicy,
+  getFieldAIMetadata,
+  getFieldAIContext,
+  getFieldAIInstructions,
+  getFieldAIExamples,
+  getFieldAISynonyms,
+  getFieldAITasks,
+  isFieldAIInferrable,
+  getFieldAIChoicePolicy,
+  getFieldAIProviderHints,
 } from '../src/index.js';
 import { expandBuildingPlanSchema } from '../src/schema/building-plan-expander.js';
 import { generateKey } from '../src/utilities/hash.js';
@@ -28,6 +43,12 @@ const schema = {
     sub_org_metadata: null, //This should be the metadata of the sub-organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
     project_id: null, //This should be the unique identifier of the project of the form (it can be null or one of the projects in the account). Available in reform.
     project_metadata: null, //This should be the metadata of the project of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    ai: {
+      context: ['safety_inspections', 'incident_reporting'],
+      instructions: ['Keep data identifiers in English', 'Avoid personal identifiers in suggestions'],
+      namingPolicy: { language: 'en', case: 'snake', asciiOnly: true, maxLength: 32 },
+      tasks: ['suggestFieldNames', 'suggestFieldValues'],
+    },
     status_field: {
       type: 'StatusField',
       key: '@status',
@@ -154,6 +175,14 @@ const schema = {
             supporting_image: true, //supporting_image can be true or false
             supporting_image_path: 'first_name.jpg', //supporting_image_path can be null or a string
             supporting_image_display: 'default', //supporting_image_display can be 'default', 'dialog' or null
+            ai: {
+              context: ['person_name', 'given_name'],
+              instructions: ['Return names as they should appear on official documents'],
+              examples: ['Maria', 'John'],
+              synonyms: ['given_name', 'first'],
+              tasks: ['semanticValidation'],
+              providerHints: { minConfidence: 0.7 },
+            },
           },
           {
             type: 'SingleChoiceField',
@@ -194,6 +223,21 @@ const schema = {
                 value: 'sao_paulo_centro',
               },
             ],
+            ai: {
+              context: ['geography', 'city'],
+              instructions: [
+                'Prefer internationally recognized city forms',
+                'Suggest values from the provided list when possible',
+              ],
+              tasks: ['suggestChoices'],
+              inferrable: true,
+              choicePolicy: {
+                valueFromLabel: 'slug',
+                language: 'en',
+                case: 'snake',
+                allowUnicode: false,
+              },
+            },
           },
           {
             type: 'MultiChoiceField',
@@ -216,6 +260,13 @@ const schema = {
             supporting_image_display: null, //supporting_image_display can be 'default', 'dialog' or null
             is_searchable: false,
             is_searchable_mode: null,
+            ai: {
+              context: 'favorite_colors',
+              instructions: ['Map informal color names to the closest option'],
+              examples: ['red', 'navy blue'],
+              tasks: ['suggestChoices', 'suggestFieldValues'],
+              providerHints: { palette: 'basic' },
+            },
             choices: [
               {
                 label: 'Red',
@@ -1248,6 +1299,152 @@ console.log('Load operations:', operations);
   const legacyRepeatable = legacyRecord.form_values.repeat_section_data;
   assert.ok(Array.isArray(legacyRepeatable) && legacyRepeatable.length === 1);
   assert.equal(legacyRepeatable[0].form_values.child_text_data, 'Legacy Child');
+})();
+
+// -----------------------------------------------------------------------------
+// AI metadata scaffolding tests
+// -----------------------------------------------------------------------------
+
+(() => {
+  const baseForm = schema.form;
+  assert.deepEqual(getFormAIContext(baseForm), ['safety_inspections', 'incident_reporting']);
+  assert.deepEqual(getFormAIInstructions(baseForm), [
+    'Keep data identifiers in English',
+    'Avoid personal identifiers in suggestions',
+  ]);
+  assert.deepEqual(getFormAITasks(baseForm), ['suggestFieldNames', 'suggestFieldValues']);
+  assert.deepEqual(getFormAINamingPolicy(baseForm), {
+    language: 'en',
+    case: 'snake',
+    asciiOnly: true,
+    maxLength: 32,
+  });
+
+  const baseFields = flattenFields(baseForm.elements);
+  const baseNameField = baseFields.find((field) => field.data_name === 'first_name');
+  assert.ok(baseNameField, 'Expected first_name field in base schema');
+  assert.deepEqual(getFieldAIContext(baseNameField), ['person_name', 'given_name']);
+  assert.deepEqual(getFieldAIInstructions(baseNameField), [
+    'Return names as they should appear on official documents',
+  ]);
+  assert.deepEqual(getFieldAIExamples(baseNameField), ['Maria', 'John']);
+  assert.deepEqual(getFieldAISynonyms(baseNameField), ['given_name', 'first']);
+  assert.equal(isFieldAIInferrable(baseNameField), false);
+
+  const baseCityField = baseFields.find((field) => field.data_name === 'city');
+  assert.ok(baseCityField, 'Expected city field in base schema');
+  assert.deepEqual(getFieldAITasks(baseCityField), ['suggestChoices']);
+  assert.equal(isFieldAIInferrable(baseCityField), true);
+  assert.deepEqual(getFieldAIChoicePolicy(baseCityField), {
+    valueFromLabel: 'slug',
+    language: 'en',
+    case: 'snake',
+    allowUnicode: false,
+  });
+})();
+
+(() => {
+  const aiForm = JSON.parse(JSON.stringify(schema.form));
+  aiForm.ai = {
+    context: 'Safety inspections',
+    instructions: ['Use English-friendly identifiers'],
+    namingPolicy: { language: 'en', case: 'snake', asciiOnly: true, maxLength: 32 },
+    tasks: ['suggestFieldNames'],
+    allowCloud: true,
+  };
+
+  const flattened = flattenFields(aiForm.elements);
+  const textField = flattened.find((field) => field.type === 'TextField');
+  const choiceField = flattened.find((field) => field.type === 'SingleChoiceField');
+
+  assert.ok(textField, 'Expected a TextField for AI metadata test');
+  assert.ok(choiceField, 'Expected a SingleChoiceField for AI metadata test');
+
+  textField.ai = {
+    context: 'Short incident summary from responder',
+    instructions: ['Prefer concise statements'],
+    examples: ['Slip on wet floor', 'Equipment failure during inspection'],
+    synonyms: ['description', 'incident_summary'],
+    tasks: ['semanticValidation'],
+    inferrable: false,
+    providerHints: { minConfidence: 0.75 },
+  };
+
+  const choicePolicy = {
+    valueFromLabel: 'slug',
+    language: 'en',
+    case: 'kebab',
+    allowUnicode: false,
+  };
+
+  choiceField.ai = {
+    context: ['Geography', 'Location'],
+    instructions: ['Return canonical English city names'],
+    tasks: ['suggestChoices'],
+    inferrable: true,
+    choicePolicy,
+  };
+
+  assert.doesNotThrow(() => validateSchema(aiForm));
+
+  assert.equal(getFormAIMetadata(aiForm), aiForm.ai);
+  assert.deepEqual(getFormAIContext(aiForm), ['Safety inspections']);
+  assert.deepEqual(getFormAIInstructions(aiForm), ['Use English-friendly identifiers']);
+  assert.deepEqual(getFormAITasks(aiForm), ['suggestFieldNames']);
+  assert.equal(getFormAINamingPolicy(aiForm), aiForm.ai.namingPolicy);
+
+  assert.equal(getFieldAIMetadata(textField), textField.ai);
+  assert.deepEqual(getFieldAIContext(textField), [
+    'Short incident summary from responder',
+  ]);
+  assert.deepEqual(getFieldAIInstructions(textField), ['Prefer concise statements']);
+  assert.deepEqual(getFieldAIExamples(textField), [
+    'Slip on wet floor',
+    'Equipment failure during inspection',
+  ]);
+  assert.deepEqual(getFieldAISynonyms(textField), ['description', 'incident_summary']);
+  assert.deepEqual(getFieldAITasks(textField), ['semanticValidation']);
+  assert.equal(isFieldAIInferrable(textField), false);
+  assert.deepEqual(getFieldAIProviderHints(textField), textField.ai.providerHints);
+
+  assert.deepEqual(getFieldAITasks(choiceField), ['suggestChoices']);
+  assert.equal(isFieldAIInferrable(choiceField), true);
+  assert.equal(getFieldAIChoicePolicy(choiceField), choicePolicy);
+})();
+
+(() => {
+  const invalidForm = JSON.parse(JSON.stringify(schema.form));
+  invalidForm.ai = { instructions: 'should be array' };
+  assert.throws(
+    () => validateSchema(invalidForm),
+    /form\.ai\.instructions must be an array of non-empty strings/
+  );
+
+  const invalidFieldForm = JSON.parse(JSON.stringify(schema.form));
+  const firstField = flattenFields(invalidFieldForm.elements).find(
+    (field) => field.type === 'TextField'
+  );
+  assert.ok(firstField, 'Expected a TextField while building invalid AI metadata scenario');
+  firstField.ai = 'invalid';
+
+  assert.throws(() => validateSchema(invalidFieldForm), /Field "first_name": ai must be an object/);
+
+  const invalidHintsForm = JSON.parse(JSON.stringify(schema.form));
+  const hintsField = flattenFields(invalidHintsForm.elements).find(
+    (field) => field.data_name === 'first_name'
+  );
+  assert.ok(hintsField, 'Expected first_name field while building invalid providerHints scenario');
+  hintsField.ai = {
+    providerHints: {
+      '': true,
+      limit: null,
+    },
+  };
+
+  assert.throws(
+    () => validateSchema(invalidHintsForm),
+    /Field "first_name" ai\.providerHints keys must be non-empty strings[\s\S]*Field "first_name" ai\.providerHints\["limit"\] must be a string, number \(non-NaN\), or boolean/
+  );
 })();
 
 // -----------------------------------------------------------------------------

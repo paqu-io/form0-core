@@ -35,7 +35,7 @@
       "name": "aragornii"
     }
   ],
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/paqu-io/form0-core/issues"
   },

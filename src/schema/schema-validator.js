@@ -2,6 +2,7 @@ import { flattenFields } from '../utilities/field-helpers.js';
 import { validateFieldSchema, validateDefaultValue } from './field-schema-registry.js';
 import { isSupportedFieldType } from '../utilities/field-types.js';
 import { validateFieldConditions } from './operators.js';
+import { validateFormAIMetadata } from './ai-metadata-validator.js';
 
 export function validateSchema(form) {
   const fields = flattenFields(form.elements);
@@ -10,6 +11,11 @@ export function validateSchema(form) {
   const duplicateDataNames = new Set();
   const duplicateKeys = new Set();
   const errors = [];
+
+  const formAIValidation = validateFormAIMetadata(form);
+  if (!formAIValidation.isValid) {
+    errors.push(...formAIValidation.errors);
+  }
 
   // Create a map of all fields by key and data_name for condition validation
   const allFields = {};
