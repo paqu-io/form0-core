@@ -95,6 +95,8 @@ The EVAL builtin has additional restrictions, but:
 - Still vulnerable to the same bypass techniques
 - Extra pattern blocking can also be evaded
 - Security validation is applied after the bypass occurs
+- Blocking the literal identifier `eval` and only exposing the `EVAL()` helper does **not** help, because the compiled expression still runs via `new Function` with the host global bound to `this`, so attackers can recreate `eval` (`this['ev' + 'al']`) or reach the function constructor (`("".constructor.constructor)("return ...")`) without touching the blocked keywords.
+- The only effective mitigation is to change how expressions execute: either bind evaluation to a hardened context or isolated VM (so `this`/`globalThis` cannot escape), or replace `new Function` with an AST parser plus whitelist that emits only approved operations. Without that deeper isolation, keeping `EVAL()` available still leaves the door open to regain `eval`/`Function`.
 
 ### 4.2 Symbol and Reflection APIs
 Some modern JavaScript APIs remain accessible:
