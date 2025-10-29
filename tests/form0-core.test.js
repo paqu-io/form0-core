@@ -1428,6 +1428,23 @@ console.log('Load operations:', operations);
   firstField.ai = 'invalid';
 
   assert.throws(() => validateSchema(invalidFieldForm), /Field "first_name": ai must be an object/);
+
+  const invalidHintsForm = JSON.parse(JSON.stringify(schema.form));
+  const hintsField = flattenFields(invalidHintsForm.elements).find(
+    (field) => field.data_name === 'first_name'
+  );
+  assert.ok(hintsField, 'Expected first_name field while building invalid providerHints scenario');
+  hintsField.ai = {
+    providerHints: {
+      '': true,
+      limit: null,
+    },
+  };
+
+  assert.throws(
+    () => validateSchema(invalidHintsForm),
+    /Field "first_name" ai\.providerHints keys must be non-empty strings[\s\S]*Field "first_name" ai\.providerHints\["limit"\] must be a string, number \(non-NaN\), or boolean/
+  );
 })();
 
 // -----------------------------------------------------------------------------

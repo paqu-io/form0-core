@@ -170,7 +170,7 @@ function validateProviderHints(hints, errors, prefix) {
   for (const [key, value] of Object.entries(hints)) {
     if (!isString(key)) {
       errors.push(`${prefix}providerHints keys must be non-empty strings`);
-      break;
+      continue;
     }
     if (
       !['string', 'number', 'boolean'].includes(typeof value) ||
