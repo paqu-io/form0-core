@@ -1,0 +1,150 @@
+---
+title: "OTHER Builtin"
+description: "Retrieve the other option value from choice field (SingleChoiceField or MultiChoiceField)"
+category: "choice"
+tags: ["choice", "other", "custom", "multichoice"]
+---
+
+# OTHER Function
+
+The `OTHER` builtin retrieves the other label if the user entered an other option in a choice field, returning `null` if no other option is present. Works with both SingleChoiceField (single selection) and MultiChoiceField (multiple selections).
+
+## Syntax
+
+```javascript
+OTHER(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array |
+
+## Return Value
+
+Returns the other label as a string if user entered an other option, `null` otherwise.
+
+## Examples
+
+### Basic Usage - SingleChoiceField
+
+```javascript
+// Get the other value from single choice field
+OTHER($city)
+```
+
+### Basic Usage - MultiChoiceField
+
+```javascript
+// Get the other value from multi choice field
+OTHER($colors)
+```
+
+### Conditional Logic
+
+```javascript
+// Use in conditional expressions for single choice
+IF(HASOTHER($city), "Custom city: " + OTHER($city), "No custom city entered")
+
+// Use in conditional expressions for multi choice
+IF(HASOTHER($colors), "Custom color: " + OTHER($colors), "No custom color entered")
+```
+
+### Display Logic
+
+```javascript
+// Show other value in display
+"Additional info: " + OTHER($comments)
+```
+
+### Validation
+
+```javascript
+// Validate other input length
+OTHER($reason).length > 10
+```
+
+## Common Use Cases
+
+- **Custom input display**: Show user-entered custom values
+- **Conditional logic**: Make decisions based on other option content
+- **Validation**: Validate the content of other options
+- **Data processing**: Extract custom values for further processing
+- **Multi-choice support**: Works seamlessly with both single and multiple choice fields
+
+## Best Practices
+
+1. **Check with HASOTHER**: Always use `HASOTHER()` to check if other option exists before using `OTHER()`
+2. **Handle null values**: Always handle the case where `OTHER()` returns null
+3. **Validation**: Validate other inputs for length, format, etc.
+4. **User feedback**: Provide clear feedback about other option values
+5. **Multi-choice compatibility**: Works with both SingleChoiceField and MultiChoiceField
+
+## Related Functions
+
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (SingleChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (SingleChoiceField)
+- [`CHOICEVALUES`](./choicevalues.mdx) - Get all selected choice values (MultiChoiceField)
+- [`CHOICELABELS`](./choicelabels.mdx) - Get all selected choice labels (MultiChoiceField)
+
+## Examples by Use Case
+
+### Custom Input Display - SingleChoiceField
+
+```javascript
+// Display custom input with fallback
+IF(HASOTHER($industry), "Industry: " + OTHER($industry), "Industry: " + CHOICELABEL($industry))
+```
+
+### Custom Input Display - MultiChoiceField
+
+```javascript
+// Display custom input with fallback for multi-choice
+IF(HASOTHER($skills), "Custom skill: " + OTHER($skills), "Skills: " + CHOICELABELS($skills).join(", "))
+```
+
+### Validation Rules
+
+```javascript
+// Ensure other input meets requirements
+IF(HASOTHER($reason), OTHER($reason).length >= 5, true)
+```
+
+### Data Processing - SingleChoiceField
+
+```javascript
+// Process other values differently
+IF(HASOTHER($category), "CUSTOM: " + OTHER($category), "STANDARD: " + CHOICEVALUE($category))
+```
+
+### Data Processing - MultiChoiceField
+
+```javascript
+// Process other values differently for multi-choice
+IF(HASOTHER($categories), "CUSTOM: " + OTHER($categories), "STANDARD: " + CHOICEVALUES($categories).join(", "))
+```
+
+### Form Summary
+
+```javascript
+// Include other values in form summary
+"Additional comments: " + (HASOTHER($comments) ? OTHER($comments) : "None")
+```
+
+## Null Handling
+
+Always handle the null case when using `OTHER()`:
+
+```javascript
+// Safe usage with null check
+IF(HASOTHER($field), OTHER($field) || "No value", "Standard selection")
+```
+
+## Field Type Compatibility
+
+- **SingleChoiceField**: Single selection with optional other input
+- **MultiChoiceField**: Multiple selections with optional other input
+- **Note**: User can only add 1 other option regardless of field type
+- **Return value**: Always returns a single string (the other label) or null 

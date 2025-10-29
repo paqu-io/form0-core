@@ -46,10 +46,10 @@ jobs:
         run: |
           if [[ "${{ env.STABLE }}" == "true" ]]; then
             # For stable versions - set public access
-            jq '.name = "@paqu-io/form0" | .publishConfig = {"access": "public"}' package.json > temp.json && mv temp.json package.json
+            jq '.name = "@paqu-io/form0-core" | .publishConfig = {"access": "public"}' package.json > temp.json && mv temp.json package.json
           else
             # For non-stable versions - set restricted access
-            jq '.name = "@paqu-io/form0" | .publishConfig = {"access": "restricted"}' package.json > temp.json && mv temp.json package.json
+            jq '.name = "@paqu-io/form0-core" | .publishConfig = {"access": "restricted"}' package.json > temp.json && mv temp.json package.json
           fi
 
       - name: Publish to GitHub Packages
@@ -62,7 +62,7 @@ jobs:
       - name: Modify package.json for npm
         if: env.STABLE == 'true'
         run: |
-          jq '.name = "form0" | .publishConfig = {"access": "public"}' package.json > temp.json && mv temp.json package.json
+          jq '.name = "form0-core" | .publishConfig = {"access": "public"}' package.json > temp.json && mv temp.json package.json
 
       # For npm registry, we need to switch the configuration
       - name: Setup npm registry

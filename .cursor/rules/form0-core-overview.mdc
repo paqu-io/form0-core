@@ -1,0 +1,60 @@
+---
+description: form0-core package overview and key concepts
+globs: 
+alwaysApply: false
+---
+# form0 Core - Package Overview
+
+form0 Core is a dynamic form engine that provides form validation, calculation, and conditional logic capabilities. It's designed to be framework-agnostic and can be used with React, React Native, or any other frontend framework.
+
+## Main Entry Points
+
+- **Main Export**: [src/index.js](mdc:form0-core/form0-core/src/index.js) - Exports the core functionality
+- **Form Engine**: [src/create-form-engine.js](mdc:form0-core/form0-core/src/create-form-engine.js) - Creates and manages form instances
+- **Package Config**: [package.json](mdc:form0-core/form0-core/package.json) - Project configuration and dependencies
+
+## Core Architecture
+
+The form engine consists of three main subsystems:
+
+### 1. Engine Core ([src/engine/](mdc:form0-core/form0-core/src/engine))
+- **Calculations**: [src/engine/calculation.js](mdc:form0-core/form0-core/src/engine/calculation.js) - Handles calculated fields and expressions
+- **Conditions**: [src/engine/conditions.js](mdc:form0-core/form0-core/src/engine/conditions.js) - Manages visibility, requirement, and read-only conditions
+- **Validation**: [src/engine/validation.js](mdc:form0-core/form0-core/src/engine/validation.js) - Validates field values against rules
+
+### 2. Utilities ([src/utils/](mdc:form0-core/form0-core/src/utils))
+- **Schema Validation**: [src/utils/validate-schema.js](mdc:form0-core/form0-core/src/utils/validate-schema.js) - Validates form schemas
+- **Field Flattening**: [src/utils/flatten-fields.js](mdc:form0-core/form0-core/src/utils/flatten-fields.js) - Flattens nested field structures
+- **Field Types**: [src/utils/field-types.js](mdc:form0-core/form0-core/src/utils/field-types.js) - Defines supported field types
+
+### 3. Helpers ([src/helpers/](mdc:form0-core/form0-core/src/helpers))
+- **Built-in Functions**: [src/helpers/builtins.js](mdc:form0-core/form0-core/src/helpers/builtins.js) - Provides common calculation functions
+- **Hash Generation**: [src/helpers/hash.js](mdc:form0-core/form0-core/src/helpers/hash.js) - Generates unique keys for fields
+
+## Testing
+
+- **Test Suite**: [test/form0-core.test.js](mdc:form0-core/form0-core/test/form0-core.test.js) - Comprehensive test examples showing form schemas and usage
+
+## Key Concepts
+
+1. **Form Schema**: JSON-based form definition with nested elements
+2. **Field Types**: TextField, NumericField, CalculatedField, Section
+3. **Conditions**: Visibility, requirement, and read-only logic
+4. **Calculations**: Expression-based field calculations
+5. **Validation**: Pattern matching and constraint validation
+
+## Usage Pattern
+
+```javascript
+import { createFormEngine } from 'form0-core';
+
+const engine = createFormEngine({ 
+  schema, 
+  initialValues: {}, 
+  helpers: {} 
+});
+
+engine.eval(); // Evaluate all form logic
+const state = engine.getState(); // Get current form state
+```
+

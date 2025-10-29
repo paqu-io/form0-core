@@ -1,0 +1,133 @@
+---
+title: "HASOTHER Builtin"
+description: "Check if user entered an other option in choice field (SingleChoiceField or MultiChoiceField)"
+category: "choice"
+tags: ["choice", "other", "validation", "multichoice"]
+---
+
+# HASOTHER Function
+
+The `HASOTHER` builtin checks if the user has entered an "other" option in a choice field, returning `true` if an other option is present, `false` otherwise. Works with both SingleChoiceField (single selection) and MultiChoiceField (multiple selections).
+
+## Syntax
+
+```javascript
+HASOTHER(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array |
+
+## Return Value
+
+Returns `true` if user entered an other option, `false` otherwise.
+
+## Examples
+
+### Basic Usage - SingleChoiceField
+
+```javascript
+// Check if user entered other option in single choice field
+HASOTHER($city)
+```
+
+### Basic Usage - MultiChoiceField
+
+```javascript
+// Check if user entered other option in multi choice field
+HASOTHER($colors)
+```
+
+### Conditional Logic
+
+```javascript
+// Show different content based on other option in single choice
+IF(HASOTHER($city), "Custom city: " + OTHER($city), "Selected city: " + CHOICELABEL($city))
+
+// Show different content based on other option in multi choice
+IF(HASOTHER($colors), "Custom color: " + OTHER($colors), "Selected colors: " + CHOICELABELS($colors).join(", "))
+```
+
+### Validation
+
+```javascript
+// Require additional validation when other is selected
+IF(HASOTHER($category), OTHER($category).length > 0, true)
+```
+
+### Form Behavior
+
+```javascript
+// Show additional fields when other is selected
+IF(HASOTHER($reason), "Please specify: " + OTHER($reason), "")
+```
+
+## Use Cases
+
+- **Conditional display**: Show additional fields or content when other options are selected
+- **Validation**: Apply different validation rules when other options are present
+- **Data processing**: Handle other options differently in calculations or logic
+- **User experience**: Provide context-aware feedback based on other selections
+- **Multi-choice support**: Works seamlessly with both single and multiple choice fields
+
+## Best Practices
+
+1. **Combine with OTHER**: Use together with `OTHER()` function to get the actual other value
+2. **Validation**: Always validate other inputs when `HASOTHER` returns true
+3. **User feedback**: Provide clear feedback when other options are selected
+4. **Field dependencies**: Use to show/hide related fields
+5. **Multi-choice compatibility**: Works with both SingleChoiceField and MultiChoiceField
+
+## Related Functions
+
+- [`OTHER`](./other.mdx) - Get the other option value
+- [`CHOICEVALUE`](./choicevalue.mdx) - Get the selected choice value (SingleChoiceField)
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label (SingleChoiceField)
+- [`CHOICEVALUES`](./choicevalues.mdx) - Get all selected choice values (MultiChoiceField)
+- [`CHOICELABELS`](./choicelabels.mdx) - Get all selected choice labels (MultiChoiceField)
+
+## Examples by Use Case
+
+### Dynamic Field Display
+
+```javascript
+// Show additional input field when other is selected
+IF(HASOTHER($industry), "Specify industry: " + OTHER($industry), "")
+```
+
+### Validation Rules
+
+```javascript
+// Require other field to be non-empty when selected
+AND(HASOTHER($reason), OTHER($reason).length > 3)
+```
+
+### Conditional Processing - SingleChoiceField
+
+```javascript
+// Different processing based on other selection
+IF(HASOTHER($payment_method), "Custom payment: " + OTHER($payment_method), "Standard payment")
+```
+
+### Conditional Processing - MultiChoiceField
+
+```javascript
+// Different processing based on other selection in multi-choice
+IF(HASOTHER($skills), "Custom skill: " + OTHER($skills), "Standard skills: " + CHOICELABELS($skills).join(", "))
+```
+
+### Form Completion
+
+```javascript
+// Check if form is complete including other fields
+AND(CHOICEVALUE($category) !== null, IF(HASOTHER($category), OTHER($category).length > 0, true))
+```
+
+## Field Type Compatibility
+
+- **SingleChoiceField**: Single selection with optional other input
+- **MultiChoiceField**: Multiple selections with optional other input
+- **Note**: User can only add 1 other option regardless of field type 

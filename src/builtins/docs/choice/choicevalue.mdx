@@ -1,0 +1,109 @@
+---
+title: "CHOICEVALUE Builtin"
+description: "Retrieve the selected choice field value with type preservation"
+category: "choice"
+tags: ["choice", "value", "selection"]
+---
+
+# CHOICEVALUE Function
+
+The `CHOICEVALUE` builtin retrieves the currently selected choice field value, preserving the original data type. If the value is a number, it preserves the number type; otherwise, it returns a string.
+
+## Syntax
+
+```javascript
+CHOICEVALUE(choiceField)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `choiceField` | `Object` | The choice field object with choice and other arrays |
+
+## Return Value
+
+Returns the selected choice value with preserved type, or `null` if no selection is made.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Get the selected city value
+CHOICEVALUE($city)
+```
+
+### Conditional Logic
+
+```javascript
+// Use in conditional expressions
+IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogotá!", "Welcome!")
+```
+
+### Calculations
+
+```javascript
+// Use numeric choice values in calculations
+CHOICEVALUE($priority) * 10
+```
+
+### Comparison Operations
+
+```javascript
+// Compare with other values
+CHOICEVALUE($status) === "active"
+```
+
+## Type Preservation
+
+The function preserves the original data type of the choice value:
+
+```javascript
+// If choice value is "42" (string), returns 42 (number)
+// If choice value is "hello" (string), returns "hello" (string)
+// If choice value is 3.14 (number), returns 3.14 (number)
+```
+
+
+
+## Common Use Cases
+
+- **Conditional logic**: Make decisions based on selected values
+- **Calculations**: Use numeric choice values in mathematical operations
+- **Data processing**: Extract choice values for further processing
+- **Validation**: Check if specific values are selected
+
+## Best Practices
+
+1. **Handle null values**: Always check for null when no selection is made
+2. **Type awareness**: Be aware of type preservation when using in calculations
+
+## Related Functions
+
+- [`CHOICELABEL`](./choicelabel.mdx) - Get the selected choice label
+- [`HASOTHER`](./hasother.mdx) - Check if other option is selected
+- [`OTHER`](./other.mdx) - Get the other option value
+
+## Examples by Use Case
+
+### E-commerce Priority
+
+```javascript
+// Calculate priority score based on selected priority level
+CHOICEVALUE($priority) * 100
+```
+
+### Status-Based Logic
+
+```javascript
+// Show different messages based on status
+IF(CHOICEVALUE($status) === "premium", "Premium features enabled", "Standard features")
+```
+
+### Numeric Calculations
+
+```javascript
+// Use numeric choice values in calculations
+CHOICEVALUE($quantity) * CHOICEVALUE($price)
+``` 

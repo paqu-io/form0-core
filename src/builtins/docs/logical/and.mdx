@@ -1,0 +1,141 @@
+---
+title: "AND Builtin"
+description: "Logical AND operation for form0 expressions"
+category: "logical"
+tags: ["logical", "boolean", "validation"]
+---
+
+# AND Function
+
+The `AND` builtin performs logical AND operations, returning `true` only when all provided arguments are truthy.
+
+## Syntax
+
+```javascript
+AND(...args)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `...args` | `any` | Any number of arguments to evaluate |
+
+## Return Value
+
+Returns `true` if all arguments are truthy, `false` otherwise.
+
+## Examples
+
+### Basic Usage
+
+```javascript
+// Check if user meets multiple criteria
+AND(user.age >= 18, user.hasEmail, user.agreedToTerms)
+```
+
+### Form Validation
+
+```javascript
+// Validate required fields
+AND(name.length > 0, email.includes("@"), phone.length >= 10)
+```
+
+### Complex Conditions
+
+```javascript
+// Check multiple business rules
+AND(
+  order.amount > 0,
+  inventory.stock >= order.quantity,
+  customer.creditScore > 600,
+  customer.accountStatus === "active"
+)
+```
+
+### Field Dependencies
+
+```javascript
+// Show field only when multiple conditions are met
+AND(showAdvanced, user.role === "admin", feature.enabled)
+```
+
+### Nested with Other Functions
+
+```javascript
+// Combine with IF for complex logic
+IF(AND(user.isPremium, order.value > 100), "Free shipping", "Standard shipping")
+```
+
+## Truthiness Rules
+
+The `AND` function uses JavaScript's standard truthiness evaluation:
+
+**Falsy values:**
+- `false`
+- `0`
+- `""` (empty string)
+- `null`
+- `undefined`
+- `NaN`
+
+**Truthy values:**
+- `true`
+- Any non-zero number
+- Any non-empty string
+- Objects and arrays
+- Functions
+
+## Common Use Cases
+
+- **Form validation**: Ensure multiple fields are properly filled
+- **User permissions**: Check if user has multiple required permissions
+- **Business rules**: Validate complex business logic conditions
+- **Feature flags**: Enable features when multiple conditions are met
+- **Data integrity**: Ensure data meets multiple criteria
+
+## Best Practices
+
+1. **Order by likelihood**: Put most likely-to-fail conditions first for better performance
+2. **Use descriptive expressions**: Make conditions self-documenting
+3. **Limit complexity**: Too many conditions can be hard to debug
+4. **Consider short-circuiting**: `AND` stops evaluating once it finds a falsy value
+
+## Performance Notes
+
+- **Short-circuit evaluation**: Stops checking as soon as a falsy value is found
+- **Evaluation order**: Arguments are evaluated left to right
+- **Lazy evaluation**: Later arguments won't be evaluated if earlier ones are falsy
+
+## Related Functions
+
+- [`OR`](./or.mdx) - Logical OR operations
+- [`IF`](./if.mdx) - Conditional logic
+
+## Examples by Use Case
+
+### User Authentication
+
+```javascript
+// Check if user is authenticated and authorized
+AND(user.isLoggedIn, user.permissions.includes("read"), user.sessionValid)
+```
+
+### E-commerce Validation
+
+```javascript
+// Validate order can be processed
+AND(
+  product.inStock,
+  customer.paymentMethodValid,
+  shippingAddress.isComplete,
+  order.total > 0
+)
+```
+
+### Feature Gating
+
+```javascript
+// Enable beta feature
+AND(user.betaOptIn, feature.betaEnabled, environment === "production")
+``` 

@@ -1,0 +1,234 @@
+---
+title: "form0 Builtins Documentation"
+description: "Complete reference for all form0 builtin functions"
+category: "index"
+tags: ["documentation", "reference", "builtins"]
+---
+
+# form0 Builtins Documentation
+
+Welcome to the complete reference for form0 builtin functions. This documentation covers all available functions, their usage, and practical examples.
+
+## Getting Started
+
+- **[Overview](./overview.mdx)** - Introduction to the builtins system
+- **[Quick Reference](#quick-reference)** - Function summary table
+- **[Common Patterns](#common-patterns)** - Frequently used combinations
+
+## Logical Functions
+
+Essential functions for conditional logic and boolean operations:
+
+| Function | Description | Use Cases |
+|----------|-------------|-----------|
+| **[IF](../logical/if.mdx)** | Conditional logic and branching | Field visibility, dynamic values, validation messages |
+| **[AND](../logical/and.mdx)** | Logical AND operations | Multi-condition validation, permission checks |
+| **[OR](../logical/or.mdx)** | Logical OR operations | Alternative requirements, fallback logic |
+
+## Control Functions
+
+Functions for managing calculation flow and results:
+
+| Function | Description | Use Cases |
+|----------|-------------|-----------|
+| **[SETRESULT](../control/setresult.mdx)** | Set calculation results | Price calculations, score computations, field aggregations |
+
+## Quick Reference
+
+### IF Function
+
+```javascript
+IF(condition, trueValue, falseValue)
+```
+
+**Common Usage:**
+- Field visibility: `IF(user.isPremium, true, false)`
+- Dynamic pricing: `IF(quantity > 10, price * 0.9, price)`
+- Validation messages: `IF(age < 18, "Must be 18+", "")`
+
+### AND Function
+
+```javascript
+AND(...conditions)
+```
+
+**Common Usage:**
+- Form validation: `AND(email.isValid, phone.isValid, name.length > 0)`
+- Permission checks: `AND(user.isLoggedIn, user.hasPermission)`
+- Business rules: `AND(inStock, paymentValid, addressComplete)`
+
+### OR Function
+
+```javascript
+OR(...conditions)
+```
+
+**Common Usage:**
+- Alternative requirements: `OR(email.length > 0, phone.length > 0)`
+- Feature detection: `OR(user.isPremium, user.isVip, user.hasSubscription)`
+- Fallback logic: `OR(user.preferredName, user.firstName, "Guest")`
+
+### SETRESULT Function
+
+```javascript
+SETRESULT(value)
+```
+
+**Common Usage:**
+- Price calculations: `SETRESULT(price * quantity * (1 + taxRate))`
+- Score computations: `SETRESULT((score1 + score2 + score3) / 3)`
+- Conditional results: `SETRESULT(IF(eligible, amount, 0))`
+
+## Common Patterns
+
+### Complex Conditional Logic
+
+```javascript
+// Multi-level pricing
+IF(user.type === "premium",
+  IF(order.value > 100, "free-shipping", "discounted-shipping"),
+  IF(order.value > 50, "reduced-shipping", "standard-shipping")
+)
+```
+
+### Validation Chains
+
+```javascript
+// Comprehensive form validation
+AND(
+  email.includes("@"),
+  phone.length >= 10,
+  age >= 18,
+  OR(hasLicense, hasAlternateId),
+  agreedToTerms === true
+)
+```
+
+### Calculation Pipelines
+
+```javascript
+// Complex business calculation
+SETRESULT(
+  (basePrice * quantity) * 
+  IF(user.isPremium, 0.9, 1.0) * 
+  IF(location === "remote", 1.1, 1.0) + 
+  IF(AND(urgent, businessHours), 25, 0)
+)
+```
+
+### Dynamic Field Behavior
+
+```javascript
+// Show field based on multiple conditions
+IF(AND(user.role === "admin", feature.enabled, environment === "production"),
+  "visible",
+  "hidden"
+)
+```
+
+## Function Combinations
+
+### IF + AND
+
+```javascript
+// Show premium features only when all conditions are met
+IF(AND(user.isPremium, feature.enabled, user.region === "US"),
+  premiumContent,
+  standardContent
+)
+```
+
+### IF + OR
+
+```javascript
+// Apply discount if user has any qualifying status
+IF(OR(user.isStudent, user.isSenior, user.isMilitary),
+  discountedPrice,
+  regularPrice
+)
+```
+
+### AND + OR
+
+```javascript
+// Complex eligibility check
+AND(
+  age >= 18,
+  OR(hasDriversLicense, hasStateId, hasPassport),
+  OR(hasProofOfIncome, hasGuarantor)
+)
+```
+
+### Nested Functions
+
+```javascript
+// Sophisticated business logic
+SETRESULT(
+  IF(AND(user.isVip, order.value > 500),
+    IF(OR(user.country === "US", user.country === "CA"),
+      0,  // Free shipping for VIP in North America
+      10  // Reduced shipping for VIP elsewhere
+    ),
+    IF(order.value > 100,
+      5,  // Standard reduced shipping
+      15  // Regular shipping
+    )
+  )
+)
+```
+
+## Best Practices
+
+1. **Keep expressions readable** - Break complex logic into smaller parts
+2. **Use descriptive field names** - Make your conditions self-documenting
+3. **Handle edge cases** - Consider null/undefined values
+4. **Test thoroughly** - Verify all code paths work as expected
+5. **Document complex logic** - Add comments for maintainability
+
+## Performance Tips
+
+- **Order conditions by likelihood** - Put most likely conditions first
+- **Use short-circuit evaluation** - `AND` and `OR` stop early when possible
+- **Avoid deeply nested expressions** - Consider splitting complex logic
+- **Cache expensive operations** - Don't repeat the same calculations
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Undefined values** - Use `OR` for fallbacks: `OR(user.name, "Unknown")`
+2. **Type mismatches** - Ensure consistent data types in comparisons
+3. **Logic errors** - Test all branches of conditional statements
+4. **Performance** - Avoid excessive nesting and complex expressions
+
+### Debugging Tips
+
+- Use simple test cases to verify function behavior
+- Break complex expressions into smaller parts
+- Check that all required fields are available
+- Verify data types match expectations
+
+## Examples by Domain
+
+### E-commerce
+- [Product pricing](../examples/ecommerce.mdx#pricing)
+- [Shipping calculations](../examples/ecommerce.mdx#shipping)
+- [Discount logic](../examples/ecommerce.mdx#discounts)
+
+### User Management
+- [Registration validation](../examples/user-management.mdx#registration)
+- [Permission checks](../examples/user-management.mdx#permissions)
+- [Profile completion](../examples/user-management.mdx#profiles)
+
+### Financial Services
+- [Loan eligibility](../examples/financial.mdx#loans)
+- [Risk assessment](../examples/financial.mdx#risk)
+- [Fee calculations](../examples/financial.mdx#fees)
+
+## Support
+
+For questions or issues:
+- Check the [form0 documentation](https://form0.dev/docs)
+- Review [common patterns](#common-patterns) above
+- See [troubleshooting](#troubleshooting) section
+- Visit the [form0 GitHub repository](https://github.com/form0-dev/form0-core) 

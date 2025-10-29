@@ -8,7 +8,9 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "node test/form0-core.test.js"
+    "test": "node tests/form0-core.test.js && node tests/security-test.js",
+    "format": "prettier --write \"**/*.{js,jsx,json,ts,tsx,md}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,json,ts,tsx,md}\""
   },
   "exports": {
     ".": {
@@ -33,13 +35,16 @@
       "name": "aragornii"
     }
   ],
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/paqu-io/form0-core/issues"
   },
   "homepage": "https://github.com/paqu-io/form0-core#readme",
-  "peerDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
-    "ignore": "^7.0.5"
+    "ignore": "^7.0.5",
+    "prettier": "^3.5.3"
   }
 }
