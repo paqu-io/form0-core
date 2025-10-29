@@ -5,6 +5,11 @@ import {
   validateFormLinkRecordConditions,
 } from './form-link-validators.js';
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
+const AI_ATTRIBUTE_DEFINITION = {
+  type: 'object',
+  required: false,
+  nullable: true,
+};
 
 /**
  * Central field specification registry
@@ -1526,3 +1531,7 @@ export const FIELD_SPECS = {
     },
   },
 };
+
+for (const spec of Object.values(FIELD_SPECS)) {
+  spec.attributes.ai = AI_ATTRIBUTE_DEFINITION;
+}

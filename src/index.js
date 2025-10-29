@@ -30,3 +30,19 @@ export {
 } from './utilities/form-link-helpers.js';
 export { expandBuildingPlanSchema } from './schema/building-plan-expander.js';
 export { FIELD_SPECS } from './schema/field-specs.js';
+export {
+  getFormAIMetadata,
+  getFormAIContext,
+  getFormAIInstructions,
+  getFormAITasks,
+  getFormAINamingPolicy,
+  getFieldAIMetadata,
+  getFieldAIContext,
+  getFieldAIInstructions,
+  getFieldAIExamples,
+  getFieldAISynonyms,
+  getFieldAITasks,
+  isFieldAIInferrable,
+  getFieldAIChoicePolicy,
+  getFieldAIProviderHints,
+} from './utilities/ai-metadata.js';
