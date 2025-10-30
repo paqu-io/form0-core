@@ -102,6 +102,7 @@ export function evaluateVisibility(schema, values, visible) {
   const allFields = {};
   fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
+    if (field.data_name) allFields[field.data_name] = field;
   });
 
   // Use recursive approach for single-pass visibility evaluation
@@ -116,6 +117,7 @@ export function evaluateRequirement(schema, values, required) {
   const allFields = {};
   fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
+    if (field.data_name) allFields[field.data_name] = field;
   });
   fields.forEach((field) => {
     if (field.requirement_conditions) {
@@ -135,6 +137,7 @@ export function evaluateReadOnly(schema, values, read_only) {
   const allFields = {};
   fields.forEach((field) => {
     if (field.key) allFields[field.key] = field;
+    if (field.data_name) allFields[field.data_name] = field;
   });
   fields.forEach((field) => {
     if (field.read_only_conditions) {
