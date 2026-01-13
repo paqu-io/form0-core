@@ -120,8 +120,8 @@ export function evaluateRequirement(schema, values, required) {
     if (field.data_name) allFields[field.data_name] = field;
   });
   fields.forEach((field) => {
-    if (field.requirement_conditions) {
-      const isRequired = evaluateConditions(field.requirement_conditions, values, allFields);
+    if (field.required_conditions) {
+      const isRequired = evaluateConditions(field.required_conditions, values, allFields);
       required[field.data_name] = isRequired;
     } else {
       required[field.data_name] = field.required === true;
