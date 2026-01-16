@@ -134,13 +134,23 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
 
   const now = new Date().toISOString();
 
+  // Allow state-provided timestamp overrides if options are missing
+  const stateCreatedAtClient =
+    state?.values?.created_at_client || state?.created_at_client || undefined;
+  const stateUpdatedAtClient =
+    state?.values?.updated_at_client || state?.updated_at_client || undefined;
+  const stateCreatedAtServer =
+    state?.values?.created_at_server || state?.created_at_server || undefined;
+  const stateUpdatedAtServer =
+    state?.values?.updated_at_server || state?.updated_at_server || undefined;
+
   // Determine client timestamps (only set if not already provided)
-  const clientCreatedAt = options.created_at_client || now;
-  const clientUpdatedAt = now; // Always updated on each submission
+  const clientCreatedAt = options.created_at_client || stateCreatedAtClient || now;
+  const clientUpdatedAt = options.updated_at_client || stateUpdatedAtClient || now; // Updated at submission time
 
   // Server timestamps (null for now, will be set by actual server/database)
-  const serverCreatedAt = options.created_at_server || null;
-  const serverUpdatedAt = options.updated_at_server || null;
+  const serverCreatedAt = options.created_at_server || stateCreatedAtServer || null;
+  const serverUpdatedAt = options.updated_at_server || stateUpdatedAtServer || null;
 
   // Transform values from data_name keys to field keys (with fallback to data_name)
   const form_values = {};
@@ -510,10 +520,6 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     '@title': options['@title'] || null,
     version: finalVersion,
     draft: false,
-    id: options.mainRecordId || id || null, // Use new options structure, fallback to old id param
-    changeset_id: options.changeset_id || null, // Changeset for grouping related changes
-    created_at: clientCreatedAt, // User's creation time is canonical
-    updated_at: serverUpdatedAt, // Server's update time is canonical
     created_at_client: clientCreatedAt,
     updated_at_client: clientUpdatedAt,
     created_at_server: serverCreatedAt,
@@ -527,7 +533,6 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     main_org_id: null,
     sub_org_id: null,
     project_id: null,
-    changeset_id: null,
 
     // Location metadata (null by default)
     created_location: null,
@@ -546,9 +551,6 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     // Form identification
     form_id: null, // To be set by the application
 
-    // Form values
-    form_values,
-
     // Override any defaults with provided options (excluding our internal processing keys)
     ...Object.fromEntries(
       Object.entries(options).filter(
@@ -565,7 +567,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       )
     ),
 
-    // Ensure our specific handling isn't overridden
+    // Ensure our specific handling isn't overridden (always set last)
     id: options.mainRecordId || id || null,
     changeset_id: options.changeset_id || null, // Ensure changeset_id isn't overridden
     created_at: clientCreatedAt, // Ensure canonical created_at isn't overridden

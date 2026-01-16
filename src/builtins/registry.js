@@ -2,6 +2,10 @@
 import { IF } from './logical/if.js';
 import { AND } from './logical/and.js';
 import { OR } from './logical/or.js';
+import { COUNT } from './logical/count.js';
+import { COUNTA } from './logical/counta.js';
+import { COUNTBLANK } from './logical/countblank.js';
+import { ARRAY } from './logical/array.js';
 import { SETRESULT, __consumeResult } from './control/setresult.js';
 import { EVAL } from './control/eval.js';
 import { CHOICEVALUE } from './choice/choicevalue.js';
@@ -11,6 +15,7 @@ import { OTHER } from './choice/other.js';
 import { CHOICEVALUES } from './choice/choicevalues.js';
 import { CHOICELABELS } from './choice/choicelabels.js';
 import { FORM } from './schema/form.js';
+import { DATANAMES } from './schema/datanames.js';
 import { ABS } from './math/abs.js';
 import { CEILING } from './math/ceiling.js';
 import { COS } from './math/cos.js';
@@ -29,6 +34,10 @@ import { __consumeEventOperations } from './event/event-operations-collector.js'
 export { IF } from './logical/if.js';
 export { AND } from './logical/and.js';
 export { OR } from './logical/or.js';
+export { COUNT } from './logical/count.js';
+export { COUNTA } from './logical/counta.js';
+export { COUNTBLANK } from './logical/countblank.js';
+export { ARRAY } from './logical/array.js';
 export { SETRESULT, __consumeResult } from './control/setresult.js';
 export { EVAL, __setEvalContext, __clearEvalContext } from './control/eval.js';
 export { CHOICEVALUE } from './choice/choicevalue.js';
@@ -38,6 +47,7 @@ export { OTHER } from './choice/other.js';
 export { CHOICEVALUES } from './choice/choicevalues.js';
 export { CHOICELABELS } from './choice/choicelabels.js';
 export { FORM } from './schema/form.js';
+export { DATANAMES, __setDataNamesContext, __clearDataNamesContext } from './schema/datanames.js';
 export { ABS } from './math/abs.js';
 export { CEILING } from './math/ceiling.js';
 export { COS } from './math/cos.js';
@@ -57,6 +67,10 @@ export const builtins = {
   IF,
   AND,
   OR,
+  COUNT,
+  COUNTA,
+  COUNTBLANK,
+  ARRAY,
   SETRESULT,
   EVAL,
   CHOICEVALUE,
@@ -66,6 +80,7 @@ export const builtins = {
   CHOICEVALUES,
   CHOICELABELS,
   FORM, // Available in both calculations and events
+  DATANAMES,
   ABS,
   CEILING,
   COS,

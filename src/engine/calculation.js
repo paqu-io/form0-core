@@ -35,7 +35,13 @@ export function evaluateCalculatedFields(
           warnings,
           field.calculate
         );
-        values[field.data_name] = runExpression(field.calculate, context, securityConfig);
+        values[field.data_name] = runExpression(
+          field.calculate,
+          context,
+          securityConfig,
+          false,
+          schema
+        );
       } catch (e) {
         console.warn(`Calculation failed for ${field.data_name}:`, e.message);
       }

@@ -86,8 +86,8 @@ export function validateSchema(form) {
       }
     }
 
-    if (field.requirement_conditions) {
-      const validation = validateFieldConditions(field, field.requirement_conditions, allFields);
+    if (field.required_conditions) {
+      const validation = validateFieldConditions(field, field.required_conditions, allFields);
       if (!validation.isValid) {
         errors.push(...validation.errors);
       }
