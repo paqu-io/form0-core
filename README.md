@@ -12,13 +12,13 @@
 
 form0-core is the schema-driven engine that powers form0 ecosystem. It is framework-agnostic and runs in any JavaScript runtime (Node.js, browsers, React Native, etc.)
 
-## Start with the CLI (recommended)
+## 🚀 Start with the CLI (recommended)
 
 The entry point for most users is form0-cli. Follow the quickstart to create a project and preview
 your schema:
 - https://docs.form0.dev/getting-started/quickstart
 
-## Documentation
+## 🗂️ Documentation
 
 - Docs home: https://docs.form0.dev
 - form0-core overview: https://docs.form0.dev/core/overview
