@@ -1,5 +1,6 @@
 import { __consumeResult } from '../builtins/registry.js';
 import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.js';
+import { __setDataNamesContext, __clearDataNamesContext } from '../builtins/schema/datanames.js';
 import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 
@@ -7,7 +8,8 @@ export function runExpression(
   expr,
   context = {},
   securityConfig = DEFAULT_SECURITY_CONFIG,
-  includeEventBuiltins = false
+  includeEventBuiltins = false,
+  schema = null
 ) {
   try {
     // Validate expression based on security mode
@@ -26,6 +28,9 @@ export function runExpression(
     const executeExpression = () => {
       // Set context for EVAL() before execution
       __setEvalContext(secureContext);
+      if (schema) {
+        __setDataNamesContext(schema);
+      }
 
       try {
         // Handle both expressions and multi-line code (Windows-safe)
@@ -49,6 +54,9 @@ export function runExpression(
       } finally {
         // Always clear EVAL context after execution
         __clearEvalContext();
+        if (schema) {
+          __clearDataNamesContext();
+        }
       }
     };
 

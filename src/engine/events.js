@@ -44,7 +44,7 @@ export class EventManager {
   executeEventCode(code, context) {
     // Execute the code to register event listeners (same security as calculated fields)
     // ON() and OFF() are now available as regular event builtins
-    runExpression(code, context, this.securityConfig, true);
+    runExpression(code, context, this.securityConfig, true, this.schema);
 
     // Process any ON/OFF operations that were collected during initialization
     const initOperations = __consumeEventOperations();
@@ -206,7 +206,7 @@ export class EventManager {
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
     const functionCall = `(${callbackCode})(event)`;
-    return runExpression(functionCall, contextWithEvent, this.securityConfig, true);
+    return runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema);
   }
 
   /**
