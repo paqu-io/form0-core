@@ -9,6 +9,6 @@
 AGENTS.md
 CLAUDE.md
 GEMINI.md
-SAFE_MODE_SECURITY_ANALYSIS.md
+analyses/
 tests/
 package-lock.json

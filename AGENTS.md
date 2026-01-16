@@ -110,7 +110,7 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 
 - Review `SECURITY.md` and prefer `SAFE_SECURITY_CONFIG`/`SECURITY_MODES` from `src/security/config.js`.
 - Modes: **TRUSTED** (default), **SAFE** (restricted context), **CUSTOM** (user-defined rules).
-- SAFE mode analysis: see `SAFE_MODE_SECURITY_ANALYSIS.md`.
+- SAFE mode analysis: see `analyses/SAFE_MODE_SECURITY_ANALYSIS.md`.
 - Never introduce unvetted dynamic code execution or imports in core paths.
 - Validate any untrusted schema input via existing validators.
 - Do not commit secrets; keep test data non-sensitive. Validate untrusted input through schema validators.
