@@ -45,8 +45,8 @@ jobs:
       - name: Modify package.json for GitHub Packages
         run: |
           if [[ "${{ env.STABLE }}" == "true" ]]; then
-            # For stable versions - set public access
-            jq '.name = "@paqu-io/form0-core" | .publishConfig = {"access": "public"}' package.json > temp.json && mv temp.json package.json
+            # For stable versions - set public access (temporary change to 'restricted' to avoid publishing during development)
+            jq '.name = "@paqu-io/form0-core" | .publishConfig = {"access": "restricted"}' package.json > temp.json && mv temp.json package.json
           else
             # For non-stable versions - set restricted access
             jq '.name = "@paqu-io/form0-core" | .publishConfig = {"access": "restricted"}' package.json > temp.json && mv temp.json package.json

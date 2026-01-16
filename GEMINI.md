@@ -31,6 +31,53 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 - `tests/`: Node-run test scripts and security examples. Open `tests/security-browser-test.html` in a browser for manual checks.
 - `.github/`: Workflows for automation and triage. See `GEMINI.md` for bot usage.
 
+## Architecture Overview
+
+### Core Engine (`src/engine/`)
+- **form-engine.js**: Main entry point for creating engine instances with state management
+- **calculation.js**: Calculated field evaluation
+- **conditions.js**: Visibility, required, and read-only conditions
+- **field-validation.js**: Field-level validation
+- **events.js**: Event system for form interactions
+- **context-resolver.js**: Field context resolution for calculations
+- **warning-system.js**: Warnings and diagnostics
+
+### Schema System (`src/schema/`)
+- **schema-validator.js**: Form schema validation
+- **field-specs.js**: Field type specifications
+- **operators.js**: Logical and comparison operators
+- **attribute-validator.js**: Field attribute validation
+- **field-schema-registry.js**: Registry for field type schemas
+- **field-value-registry.js**: Registry for field value handlers
+
+### Built-in Functions (`src/builtins/`)
+- **registry.js**: Central registry for built-in functions
+- **choice/**: Choice field operations (labels, values, other handling)
+- **control/**: Form control operations (eval, setresult)
+- **event/**: Event handling operations
+- **logical/**: Logical operations (and, or, if)
+- **math/**: Mathematical operations (ROUND)
+- **string/**: Text manipulation functions (UPPER)
+
+### Security (`src/security/`)
+- **config.js**: Security configurations (TRUSTED, SAFE, CUSTOM modes)
+- **validation.js**: Security validation logic
+
+### Utilities (`src/utilities/`)
+- **field-helpers.js**: Common field operations and transformations
+- **hash.js**: Key generation utilities
+- **record-transformer.js**: Data transformation utilities
+- **version-utils.js**: Version management utilities
+
+## Key Concepts
+
+### Form Engine Creation
+- Use `createFormEngine({ schema, initialValues, helpers, security })` to create a form instance.
+- Engine API: `eval()` (calculations/conditions/validation), `trigger()` (events), `getState()` (values, errors, visible, required, read_only).
+
+### Field Types
+- Core types: TextField, NumericField, SingleChoiceField, MultiChoiceField, BooleanField, DateField, TimeField, CalculatedField, Section, RepeatableSection, LabelField.
+
 ## Build, Test, and Development Commands
 
 - Install: `npm ci` (Node 18+; uses `package-lock.json`).
@@ -45,6 +92,7 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 - Modules: ES Modules only (`type: module`). File names use `kebab-case.js`.
 - Identifiers: functions `camelCase`, classes/types `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - Public API: export via `src/index.js`; prefer factories like `createFormEngine`, utilities under `utilities/`.
+- Built-in functions: follow JSDoc pattern with `@builtin`, `@description`, `@param`, `@returns`, `@example` tags.
 
 ## Testing Guidelines
 
@@ -61,6 +109,8 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 ## Security & Configuration Tips
 
 - Review `SECURITY.md` and prefer `SAFE_SECURITY_CONFIG`/`SECURITY_MODES` from `src/security/config.js`.
+- Modes: **TRUSTED** (default), **SAFE** (restricted context), **CUSTOM** (user-defined rules).
+- SAFE mode analysis: see `SAFE_MODE_SECURITY_ANALYSIS.md`.
 - Never introduce unvetted dynamic code execution or imports in core paths.
 - Validate any untrusted schema input via existing validators.
 - Do not commit secrets; keep test data non-sensitive. Validate untrusted input through schema validators.

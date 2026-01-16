@@ -1,10 +1,10 @@
 {
   "name": "form0-core",
-  "version": "0.0.1-alpha.1",
+  "version": "0.1.0-beta.1",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "This is a placeholder for the package description.",
+  "description": "Schema-driven engine that powers form0 ecosystem.",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -29,7 +29,7 @@
     "react-native",
     "dynamic-forms"
   ],
-  "author": "paqu.io <hello@paqu.io>",
+  "author": "paqu.io <hello@paqu.io> (https://paqu.io/)",
   "contributors": [
     {
       "name": "aragornii"
@@ -39,7 +39,7 @@
   "bugs": {
     "url": "https://github.com/paqu-io/form0-core/issues"
   },
-  "homepage": "https://github.com/paqu-io/form0-core#readme",
+  "homepage": "https://form0.dev/",
   "engines": {
     "node": ">=18.0.0"
   },

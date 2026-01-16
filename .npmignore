@@ -1,0 +1,14 @@
+.github/
+.claude/
+.cursor/
+.cursorignore
+.git/
+.gitignore
+.prettierignore
+.prettierrc
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+SAFE_MODE_SECURITY_ANALYSIS.md
+tests/
+package-lock.json

@@ -1,28 +1,8 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Development Commands
-
-### Testing
-- `npm test` - Runs all tests (form0-core.test.js and security-test.js)
-- `node tests/form0-core.test.js` - Run core functionality tests
-- `node tests/security-test.js` - Run security validation tests
-- Open `tests/security-browser-test.html` in browser for manual security validation
-
-### Code Quality
-- `npm run format` - Format code with Prettier
-- `npm run format:check` - Check code formatting without writing changes
-
-### Installation
-- `npm ci` - Install dependencies (requires Node 18+)
-
-### Manual Testing
-- `node -e "import('./src/index.js').then(m=>console.log(Object.keys(m)))"` - Quick import test
-
-## form0 Ecosystem
+# Repository Guidelines
 
 This project, `form0-core`, is the foundational JavaScript library that powers the entire form0 ecosystem. It provides a form engine that handles calculations, visibility, requirements, and validation based on a JSON schema. The library is designed to be used in both Node.js and browser environments.
+
+## Role in the form0 Ecosystem
 
 `form0-core` serves as the core engine for:
 
@@ -31,31 +11,47 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 - **form0-react-native**: React Native components that leverage the core engine for mobile form experiences
 
 ### Role in reform SaaS
+
 `form0-core` is the underlying engine that powers **reform**, a commercial SaaS product. While form0 is open-source and framework-agnostic, reform builds upon this foundation to provide a complete form management solution with additional enterprise features, hosting, and support.
+
+## Key Features
+
+- **Schema-driven forms:** Define form structure, logic, and behavior using a JSON schema.
+- **Form Engine:** A core engine that processes the form schema and manages the form state.
+- **Calculated Fields:** Define fields whose values are calculated based on other fields.
+- **Conditional Logic:** Control field visibility, requirements, and read-only status based on conditions.
+- **Event System:** Trigger custom actions based on form events (e.g., `load-record`, `change`).
+- **Built-in Functions:** A set of built-in functions for performing logical operations, calculations, and more.
+- **Extensible:** The engine can be extended with custom helper functions.
+- **Security:** The library includes a security model to control the execution of code.
+
+## Project Structure & Module Organization
+
+- `src/`: Library source (ESM). Key areas: `engine/` (form engine, warnings), `schema/` (validators, field specs, operators), `utilities/` (helpers, hashing, versioning), `security/` (config), `builtins/` (field implementations), `index.js` (public exports).
+- `tests/`: Node-run test scripts and security examples. Open `tests/security-browser-test.html` in a browser for manual checks.
+- `.github/`: Workflows for automation and triage. See `GEMINI.md` for bot usage.
 
 ## Architecture Overview
 
-form0-core's architecture is organized into several key modules:
-
 ### Core Engine (`src/engine/`)
-- **form-engine.js**: Main entry point - creates form engine instances with state management
-- **calculation.js**: Handles calculated field evaluation 
-- **conditions.js**: Manages visibility, requirement, and read-only conditions
-- **field-validation.js**: Validates field values against constraints
+- **form-engine.js**: Main entry point for creating engine instances with state management
+- **calculation.js**: Calculated field evaluation
+- **conditions.js**: Visibility, required, and read-only conditions
+- **field-validation.js**: Field-level validation
 - **events.js**: Event system for form interactions
-- **context-resolver.js**: Resolves field contexts for calculations
-- **warning-system.js**: Manages warnings and diagnostics
+- **context-resolver.js**: Field context resolution for calculations
+- **warning-system.js**: Warnings and diagnostics
 
 ### Schema System (`src/schema/`)
-- **schema-validator.js**: Validates form schemas
-- **field-specs.js**: Defines field type specifications
-- **operators.js**: Logical and comparison operators for conditions
-- **attribute-validator.js**: Validates field attributes
+- **schema-validator.js**: Form schema validation
+- **field-specs.js**: Field type specifications
+- **operators.js**: Logical and comparison operators
+- **attribute-validator.js**: Field attribute validation
 - **field-schema-registry.js**: Registry for field type schemas
 - **field-value-registry.js**: Registry for field value handlers
 
 ### Built-in Functions (`src/builtins/`)
-- **registry.js**: Central registry for all built-in functions
+- **registry.js**: Central registry for built-in functions
 - **choice/**: Choice field operations (labels, values, other handling)
 - **control/**: Form control operations (eval, setresult)
 - **event/**: Event handling operations
@@ -76,53 +72,50 @@ form0-core's architecture is organized into several key modules:
 ## Key Concepts
 
 ### Form Engine Creation
-Use `createFormEngine({ schema, initialValues, helpers, security })` to create a form instance. The engine provides:
-- `eval()`: Evaluates all form logic (calculations, conditions, validation)
-- `trigger()`: Triggers form events
-- `getState()`: Returns current form state (values, errors, visible, required, read_only)
-
-### Security Configuration
-- **TRUSTED** (default): Full JavaScript access
-- **SAFE**: Restricted context with blocked dangerous patterns
-- **CUSTOM**: User-defined security rules
-Import security configs from `src/security/config.js`
-
-### Security Analysis
-- **TRUSTED** (default): N/A
-- **SAFE**: @SAFE_MODE_SECURITY_ANALYSIS.md
-- **CUSTOM**: N/A
+- Use `createFormEngine({ schema, initialValues, helpers, security })` to create a form instance.
+- Engine API: `eval()` (calculations/conditions/validation), `trigger()` (events), `getState()` (values, errors, visible, required, read_only).
 
 ### Field Types
-Core field types include TextField, NumericField, SingleChoiceField, MultiChoiceField, BooleanField, DateField, TimeField, CalculatedField, Section, RepeatableSection, LabelField.
+- Core types: TextField, NumericField, SingleChoiceField, MultiChoiceField, BooleanField, DateField, TimeField, CalculatedField, Section, RepeatableSection, LabelField.
 
-## Code Conventions
+## Build, Test, and Development Commands
 
-### Style Guidelines
-- ES Modules only (`type: module`)
-- Prettier: 2 spaces, single quotes, semicolons, trailing commas (ES5), max width 100
-- File names: `kebab-case.js`
-- Functions: `camelCase`
-- Classes/Types: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
-- Builtin functions: Follow JSDoc pattern with @builtin, @description, @param, @returns, @example tags
+- Install: `npm ci` (Node 18+; uses `package-lock.json`).
+- Format (write): `npm run format`.
+- Format (check): `npm run format:check`.
+- Run tests: `node tests/form0-core.test.js` and `node tests/security-test.js`.
+- Import locally: `node -e "import('./src/index.js').then(m=>console.log(Object.keys(m)))"`.
 
-### Export Strategy
-- All public API exports go through `src/index.js`
-- Prefer factory functions like `createFormEngine`
-- Group utilities under `utilities/` module
+## Coding Style & Naming Conventions
 
-### Testing Strategy
-- Plain Node.js scripts in `tests/` directory
-- No testing framework - tests log/throw on failure
-- Name test files with `*.test.js` suffix
-- Keep tests deterministic (no network, minimal timers)
+- Prettier: 2 spaces, single quotes, semicolons, trailing commas (ES5), max width 100.
+- Modules: ES Modules only (`type: module`). File names use `kebab-case.js`.
+- Identifiers: functions `camelCase`, classes/types `PascalCase`, constants `UPPER_SNAKE_CASE`.
+- Public API: export via `src/index.js`; prefer factories like `createFormEngine`, utilities under `utilities/`.
+- Built-in functions: follow JSDoc pattern with `@builtin`, `@description`, `@param`, `@returns`, `@example` tags.
 
-### Security Best Practices
-- Never introduce unvetted dynamic code execution
-- Validate untrusted schema input via existing validators
-- Prefer `SAFE_SECURITY_CONFIG` for user-generated content
-- Review `SECURITY.md` for detailed security guidelines
+## Testing Guidelines
 
-## Language Policy
-- JavaScript only - no TypeScript source files
-- Optional JSDoc types for better DX (@typedef, @param, @returns)
+- Framework: none; tests are plain Node scripts in `tests/` and may log/throw on failure.
+- Naming: prefer `*.test.js` next to other test files in `tests/`.
+- Scope: add focused tests for schema validation, operators, and engine behaviors. Keep tests deterministic (no network, no timers where possible).
+- Manual: security HTML can be opened in a browser to verify CSP-related behavior.
+
+## Commit & Pull Request Guidelines
+
+- Commits: follow Conventional Commits (`feat:`, `fix:`, `chore:` …) with clear scope (e.g., `feat(schema): add version utils`).
+- PRs: include purpose, brief technical notes, and linked issues. Add usage notes when public exports change. Ensure format check passes and tests run locally.
+
+## Security & Configuration Tips
+
+- Review `SECURITY.md` and prefer `SAFE_SECURITY_CONFIG`/`SECURITY_MODES` from `src/security/config.js`.
+- Modes: **TRUSTED** (default), **SAFE** (restricted context), **CUSTOM** (user-defined rules).
+- SAFE mode analysis: see `SAFE_MODE_SECURITY_ANALYSIS.md`.
+- Never introduce unvetted dynamic code execution or imports in core paths.
+- Validate any untrusted schema input via existing validators.
+- Do not commit secrets; keep test data non-sensitive. Validate untrusted input through schema validators.
+
+## Language policy
+
+- JavaScript only in this repo. No TypeScript source files.
+- Optional types via JSDoc (@typedef, @param, @returns) to improve DX without adding a TS build step.
