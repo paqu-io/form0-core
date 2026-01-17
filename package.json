@@ -1,6 +1,6 @@
 {
   "name": "form0-core",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -43,7 +43,7 @@
   "bugs": {
     "url": "https://github.com/paqu-io/form0-core/issues"
   },
-  "homepage": "https://form0.dev/",
+  "homepage": "https://form0.dev",
   "engines": {
     "node": ">=18.0.0"
   },
