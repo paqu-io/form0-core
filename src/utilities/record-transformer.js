@@ -199,6 +199,12 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     sectionFields,
   } = buildRepeatableMetadata(elementsSource);
 
+  const hasStructuredRepeatableState =
+    state &&
+    Object.prototype.hasOwnProperty.call(state, 'repeatable') &&
+    state.repeatable &&
+    typeof state.repeatable === 'object';
+
   // Transform the values object using the preferred keys
   for (const [dataName, value] of Object.entries(state.values)) {
     // Skip flattened choice fields (created by form renderer for allow_other fields)
@@ -292,7 +298,9 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     const childIds = getNestedChildIds([...currentPath, pathKey]);
 
     // Structured RepeatableSection state supplied (new format)
-    if (Array.isArray(structuredInstances) && structuredInstances.length > 0) {
+    // Empty arrays are treated as explicit "no instances" and must not fall back
+    // to legacy flattened behavior, which can emit phantom records.
+    if (Array.isArray(structuredInstances)) {
       const recordCount = Math.max(structuredInstances.length, childIds.length);
       const childRecords = [];
 
@@ -360,16 +368,20 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         }
 
         for (const [, childRepInfo] of repInfo.children) {
-          const nestedInstances = instanceRepeatable[childRepInfo.preferredKey] || [];
+          const rawNestedInstances = Object.prototype.hasOwnProperty.call(
+            instanceRepeatable,
+            childRepInfo.preferredKey
+          )
+            ? instanceRepeatable[childRepInfo.preferredKey]
+            : [];
+          const nestedInstances = Array.isArray(rawNestedInstances) ? rawNestedInstances : [];
           const childRepeatableArray = processRepeatableSection(
             childRepInfo,
             [...currentPath, pathKey],
             nestedInstances
           );
-          if (childRepeatableArray.length > 0) {
-            const childOutputKey = resolveRepeatableOutputKey(childRepInfo);
-            childRecord.form_values[childOutputKey] = childRepeatableArray;
-          }
+          const childOutputKey = resolveRepeatableOutputKey(childRepInfo);
+          childRecord.form_values[childOutputKey] = childRepeatableArray;
         }
 
         if (hasMeaningfulRecord(childRecord)) {
@@ -501,14 +513,23 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   for (const [, repInfo] of repeatableSectionTree) {
     if (repInfo.parentPath.length === 0) {
       // This is a top-level RepeatableSection
-      const structuredInstances =
-        state.repeatable && state.repeatable[repInfo.preferredKey]
+      const rawStructuredInstances = hasStructuredRepeatableState
+        ? Object.prototype.hasOwnProperty.call(state.repeatable, repInfo.preferredKey)
           ? state.repeatable[repInfo.preferredKey]
-          : null;
+          : []
+        : null;
+      const structuredInstances = hasStructuredRepeatableState
+        ? Array.isArray(rawStructuredInstances)
+          ? rawStructuredInstances
+          : []
+        : null;
 
       const childRecords = processRepeatableSection(repInfo, [], structuredInstances);
-      if (childRecords.length > 0) {
-        const repeatableOutputKey = resolveRepeatableOutputKey(repInfo);
+      const repeatableOutputKey = resolveRepeatableOutputKey(repInfo);
+      if (hasStructuredRepeatableState) {
+        // In structured mode keep explicit repeatable keys, even when empty.
+        form_values[repeatableOutputKey] = childRecords;
+      } else if (childRecords.length > 0) {
         form_values[repeatableOutputKey] = childRecords;
       }
     }
