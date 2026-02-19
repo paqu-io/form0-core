@@ -35,3 +35,17 @@ npm install form0-core
 ## Security
 
 See `SECURITY.md` for security modes and configuration.
+
+## Requirements
+
+- Node.js 18+
+
+## Related repositories
+
+- [form0-cli](https://github.com/paqu-io/form0-cli) - Command-line interface
+- [form0-react](https://github.com/paqu-io/form0-react) - React components
+- [form0-react-native](https://github.com/paqu-io/form0-react-native) - React Native components
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit [issues](https://github.com/paqu-io/form0-core/issues) and [pull requests](https://github.com/paqu-io/form0-core/pulls).

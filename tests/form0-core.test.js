@@ -1287,7 +1287,6 @@ console.log('Load operations:', operations);
       top_text_data: 'Legacy Top',
       child_text_data: 'Legacy Child',
     },
-    repeatable: {},
   };
 
   const legacyRecord = createStructuredRecord(legacyState, flattened, {
@@ -1569,6 +1568,24 @@ assert.ok(
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');
 console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));
 
+const emptyBuildingPlanRecord = createStructuredRecord(
+  { values: {}, repeatable: {} },
+  flattenFields(expandedBuildingPlanSchema.form.elements),
+  {
+    originalElements: expandedBuildingPlanSchema.form.elements,
+    fieldKeyMode: 'data-name',
+  }
+);
+assert.ok(
+  Object.prototype.hasOwnProperty.call(emptyBuildingPlanRecord.form_values, floorRepeatable.data_name),
+  'BuildingPlanSection top-level repeatable should be present in structured output even when empty'
+);
+assert.ok(
+  Array.isArray(emptyBuildingPlanRecord.form_values[floorRepeatable.data_name]) &&
+    emptyBuildingPlanRecord.form_values[floorRepeatable.data_name].length === 0,
+  'BuildingPlanSection top-level repeatable should serialize to an empty array when no instances exist'
+);
+
 // -----------------------------------------------------------------------------
 // Structured record repeatable filtering
 // -----------------------------------------------------------------------------
@@ -1659,8 +1676,32 @@ console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) 
       column_label: '',
       column_height: null,
     },
-    repeatable: {},
   };
+
+  const structuredEmptyRecord = createStructuredRecord(
+    {
+      values: {
+        room_label: '',
+        column_label: '',
+        column_height: null,
+      },
+      repeatable: {},
+    },
+    flattened,
+    {
+      originalElements: elements,
+    }
+  );
+
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(structuredEmptyRecord.form_values, 'rooms'),
+    'Structured repeatables should keep top-level key when there are no instances'
+  );
+  assert.ok(
+    Array.isArray(structuredEmptyRecord.form_values.rooms) &&
+      structuredEmptyRecord.form_values.rooms.length === 0,
+    'Structured repeatables with no instances should serialize as empty arrays'
+  );
 
   const legacyRecord = createStructuredRecord(legacyState, flattened, {
     originalElements: elements,
@@ -1669,5 +1710,93 @@ console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) 
   assert.ok(
     !Object.prototype.hasOwnProperty.call(legacyRecord.form_values, 'rooms'),
     'Legacy flattened repeatables with no values should be omitted'
+  );
+})();
+
+(() => {
+  const schemaWithCalculatedRepeatable = {
+    form: {
+      name: 'Repeatable calculated regression',
+      description: 'Regression: empty structured repeatables must not emit records',
+      id: 'repeatable-calculated-regression',
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'RepeatableSection',
+          key: 'rep',
+          data_name: 'rep',
+          label: 'Rep',
+          display: 'drilldown',
+          description: null,
+          description_mode: null,
+          visible: true,
+          visible_conditions: null,
+          location_enabled: false,
+          location_required: false,
+          elements: [
+            {
+              type: 'CalculatedField',
+              key: 'half_age',
+              data_name: 'half_age',
+              label: 'Half Age',
+              display: { style: 'numeric' },
+              description: null,
+              description_mode: null,
+              required: false,
+              visible: true,
+              visible_conditions: null,
+              read_only: true,
+              calculate: '$age / 2',
+              supporting_image: false,
+              supporting_image_path: null,
+              supporting_image_display: null,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const engine = createFormEngine({ schema: schemaWithCalculatedRepeatable });
+  engine.eval();
+
+  const preparedElements = engine.getPreparedSchema().form.elements;
+  const fields = flattenFields(preparedElements);
+
+  const structuredNoInstancesRecord = createStructuredRecord(
+    { values: engine.getState().values, repeatable: {} },
+    fields,
+    { originalElements: preparedElements }
+  );
+
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(structuredNoInstancesRecord.form_values, 'rep'),
+    'Structured repeatable state should keep repeatable key even when no instances exist'
+  );
+  assert.ok(
+    Array.isArray(structuredNoInstancesRecord.form_values.rep) &&
+      structuredNoInstancesRecord.form_values.rep.length === 0,
+    'Structured repeatable state with no instances should serialize as empty array even when calculated fields are present'
   );
 })();
