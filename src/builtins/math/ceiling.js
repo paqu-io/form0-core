@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin CEILING
  * @description Rounds a value up to the nearest integer multiple of factor
@@ -14,6 +16,15 @@
  * // Returns 15
  * CEILING(12.3, 5)
  */
+export const CEILING_METADATA = defineBuiltinMetadata({
+  name: 'CEILING',
+  category: 'math',
+  signature: 'CEILING(value, factor)',
+  description: 'Round a number up to the nearest multiple.',
+  examples: ['CEILING($amount, 5)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const CEILING = (value, factor = 1) => {
   if (factor === 0) {
     throw new Error('CEILING factor cannot be zero');

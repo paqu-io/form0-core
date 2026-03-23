@@ -30,6 +30,12 @@ export {
 } from './utilities/form-link-helpers.js';
 export { expandBuildingPlanSchema } from './schema/building-plan-expander.js';
 export { FIELD_SPECS } from './schema/field-specs.js';
+export { getBuiltinDefinitions } from './builtins/registry.js';
+export {
+  getCalculationBuiltinCatalog,
+  getCalculationReferenceCatalog,
+  analyzeCalculationExpression,
+} from './utilities/calculation-editor.js';
 export {
   getFormAIMetadata,
   getFormAIContext,

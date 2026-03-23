@@ -1,5 +1,6 @@
 import { validateExpression } from '../../security/validation.js';
 import { SAFE_SECURITY_CONFIG } from '../../security/config.js';
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
 
 /**
  * @builtin EVAL
@@ -16,6 +17,15 @@ import { SAFE_SECURITY_CONFIG } from '../../security/config.js';
  * // Computed field references
  * EVAL('$city' + '_suffix')
  */
+export const EVAL_METADATA = defineBuiltinMetadata({
+  name: 'EVAL',
+  category: 'control',
+  signature: 'EVAL(expression)',
+  description: 'Evaluate a dynamically built expression string in a restricted context.',
+  examples: ['EVAL("$" + dynamicFieldName)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 // Global context for EVAL() - set during expression evaluation
 let _evalContext = null;
 

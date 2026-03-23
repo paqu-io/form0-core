@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin CHOICEVALUES
  * @description Retrieves an array of all selected choice field values from a MultiChoiceField, preserving the type of each value. Returns an empty array if no selections.
@@ -10,6 +12,15 @@
  * // Check if "red" is selected
  * CHOICEVALUES($colors).includes("red")
  */
+export const CHOICEVALUES_METADATA = defineBuiltinMetadata({
+  name: 'CHOICEVALUES',
+  category: 'choice',
+  signature: 'CHOICEVALUES(fieldValue)',
+  description: 'Return all selected values from a MultiChoiceField.',
+  examples: ['CHOICEVALUES($colors)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const CHOICEVALUES = (multiChoiceField) => {
   // Handle null/undefined input
   if (!multiChoiceField || typeof multiChoiceField !== 'object') {
