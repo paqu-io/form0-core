@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin COUNTA
  * @description Returns a count of values in a dataset
@@ -13,6 +15,15 @@
  * // Returns 4 (counts all items including null)
  * COUNTA([1, 'a', null, true])
  */
+export const COUNTA_METADATA = defineBuiltinMetadata({
+  name: 'COUNTA',
+  category: 'logical',
+  signature: 'COUNTA(values)',
+  description: 'Count non-empty values.',
+  examples: ['COUNTA(ARRAY($first_name, $last_name, $email))'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const COUNTA = (values) => {
   // Handle null/undefined input
   if (!Array.isArray(values)) {

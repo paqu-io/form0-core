@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin CHOICELABEL
  * @description Retrieves the currently selected choice field label, preserving the type (if the label is a number preserves the number type, otherwise string). If no selection it returns null.
@@ -10,6 +12,15 @@
  * // Use in display logic
  * "You selected: " + CHOICELABEL($city)
  */
+export const CHOICELABEL_METADATA = defineBuiltinMetadata({
+  name: 'CHOICELABEL',
+  category: 'choice',
+  signature: 'CHOICELABEL(fieldValue)',
+  description: 'Return the selected choice label from a choice field.',
+  examples: ['CHOICELABEL($city)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const CHOICELABEL = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

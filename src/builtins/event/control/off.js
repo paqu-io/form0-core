@@ -1,4 +1,5 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
 
 /**
  * OFF builtin for form events
@@ -26,6 +27,15 @@ import { __collectEventOperation } from '../event-operations-collector.js';
  * // Remove all field event handlers
  * OFF('change', 'city');
  */
+export const OFF_METADATA = defineBuiltinMetadata({
+  name: 'OFF',
+  category: 'event',
+  signature: 'OFF(eventType, fieldKeyOrCallback, callback)',
+  description: 'Remove event handlers within form event code.',
+  examples: ["OFF('change', 'city', specificCallback)"],
+  contexts: [BUILTIN_CONTEXTS.EVENT],
+});
+
 export function OFF(eventType, fieldKeyOrCallback, callback) {
   let fieldKey = '*';
   let actualCallback = undefined;

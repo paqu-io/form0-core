@@ -1,4 +1,5 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
 
 /**
  * ON builtin for form events
@@ -18,6 +19,15 @@ import { __collectEventOperation } from '../event-operations-collector.js';
  * // Register field-specific event handler
  * ON('change', 'city', function(event) { ALERT('City changed!'); });
  */
+export const ON_METADATA = defineBuiltinMetadata({
+  name: 'ON',
+  category: 'event',
+  signature: 'ON(eventType, fieldKeyOrCallback, callback)',
+  description: 'Register an event handler within form event code.',
+  examples: ["ON('change', 'city', function(event) { ALERT('City changed!'); })"],
+  contexts: [BUILTIN_CONTEXTS.EVENT],
+});
+
 export function ON(eventType, fieldKeyOrCallback, callback) {
   let fieldKey = '*';
   let actualCallback = fieldKeyOrCallback;

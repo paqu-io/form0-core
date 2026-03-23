@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin ARRAY
  * @description Returns an array from its arguments. Can parse string representations of arrays (with single or double quotes) and comma-separated values.
@@ -28,6 +30,15 @@
  * // For complex parsing, JSON.parse() can be used:
  * // EVAL('JSON.parse("[1,2,3]")')
  */
+export const ARRAY_METADATA = defineBuiltinMetadata({
+  name: 'ARRAY',
+  category: 'logical',
+  signature: 'ARRAY(...values)',
+  description: 'Build an array from individual arguments.',
+  examples: ['ARRAY($city, $country)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const ARRAY = (...args) => {
   // Handle empty arguments
   if (args.length === 0) {

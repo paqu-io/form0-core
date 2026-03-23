@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin DATANAMES
  * @description Returns the data names of form fields, optionally filtered by field type
@@ -13,6 +15,14 @@
  * // Get only TextField data names
  * DATANAMES('TextField')
  */
+export const DATANAMES_METADATA = defineBuiltinMetadata({
+  name: 'DATANAMES',
+  category: 'schema',
+  signature: "DATANAMES(type = 'any')",
+  description: 'Return form field data names, optionally filtered by field type.',
+  examples: ["DATANAMES('NumericField')"],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
 
 // Global schema context for DATANAMES() - set during expression evaluation
 let _dataNamesSchema = null;

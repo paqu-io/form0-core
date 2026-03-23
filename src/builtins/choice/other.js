@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin OTHER
  * @description Retrieves the other label if user entered the other option, otherwise null. Works with both SingleChoiceField and MultiChoiceField.
@@ -13,6 +15,15 @@
  * // Use in conditional logic
  * IF(HASOTHER($city), "Custom city: " + OTHER($city), "No custom city entered")
  */
+export const OTHER_METADATA = defineBuiltinMetadata({
+  name: 'OTHER',
+  category: 'choice',
+  signature: 'OTHER(fieldValue)',
+  description: 'Return the "other" label from a choice field.',
+  examples: ['OTHER($city)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const OTHER = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

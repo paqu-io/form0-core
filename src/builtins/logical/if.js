@@ -1,3 +1,5 @@
+import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+
 /**
  * @builtin IF
  * @description Conditional logic function that returns one of two values based on a condition
@@ -12,4 +14,13 @@
  * // Nested conditions for shipping cost
  * IF(country === "US", IF(state === "CA", 8.99, 5.99), 15.99)
  */
+export const IF_METADATA = defineBuiltinMetadata({
+  name: 'IF',
+  category: 'logical',
+  signature: 'IF(condition, trueValue, falseValue)',
+  description: 'Return one of two values based on a condition.',
+  examples: ['IF($age >= 18, "adult", "minor")'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const IF = (cond, a, b) => (cond ? a : b);
