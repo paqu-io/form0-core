@@ -9,7 +9,8 @@ export function evaluateCalculatedFields(
   helpers,
   securityConfig,
   contextResolver = null,
-  warningSystem = null
+  warningSystem = null,
+  runtimeDiagnostics = null
 ) {
   const fields = flattenFields(schema.elements);
 
@@ -40,10 +41,37 @@ export function evaluateCalculatedFields(
           context,
           securityConfig,
           false,
-          schema
+          schema,
+          {
+            suppressConsoleWarning: Array.isArray(runtimeDiagnostics),
+            onError: (error) => {
+              if (!Array.isArray(runtimeDiagnostics)) {
+                return;
+              }
+
+              runtimeDiagnostics.push({
+                fieldName: field.data_name,
+                message:
+                  error instanceof Error && error.message
+                    ? error.message
+                    : 'Unknown calculation runtime error.',
+              });
+            },
+          }
         );
       } catch (e) {
-        console.warn(`Calculation failed for ${field.data_name}:`, e.message);
+        if (Array.isArray(runtimeDiagnostics)) {
+          runtimeDiagnostics.push({
+            fieldName: field.data_name,
+            message:
+              e instanceof Error && e.message
+                ? e.message
+                : 'Unknown calculation runtime error.',
+          });
+        }
+        if (!Array.isArray(runtimeDiagnostics)) {
+          console.warn(`Calculation failed for ${field.data_name}:`, e.message);
+        }
       }
     }
   });
