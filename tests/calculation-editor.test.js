@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   analyzeCalculationExpression,
+  createFormEngine,
   getCalculationBuiltinCatalog,
   getCalculationReferenceCatalog,
 } from '../src/index.js';
@@ -431,8 +432,7 @@ const schema = {
                   visible: true,
                   visible_conditions: null,
                   read_only: true,
-                  calculate:
-                    'SETRESULT($room_area * $building_multiplier * $base_rate)',
+                  calculate: 'SETRESULT($room_area * $building_multiplier * $base_rate)',
                   supporting_image: false,
                   supporting_image_path: null,
                   supporting_image_display: null,
@@ -502,6 +502,95 @@ const schema = {
   assert.equal(baseRateReference?.access.code, 'main_form');
   assert.equal(taskHoursReference?.access.level, 'restricted');
   assert.equal(taskHoursReference?.access.code, 'different_repeatable_section');
+})();
+
+(() => {
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT($age);',
+  });
+
+  assert.equal(analysis.valid, true);
+  assert.deepEqual(analysis.issues, []);
+})();
+
+(() => {
+  const inlineSemicolonSchema = {
+    form: {
+      name: 'Inline Semicolon Test Form',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'age_copy',
+          data_name: 'age_copy',
+          label: 'Age Copy',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($age);',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const engine = createFormEngine({
+    schema: inlineSemicolonSchema,
+    initialValues: {
+      age: 21,
+    },
+  });
+
+  engine.eval();
+
+  assert.equal(engine.getState().values.age_copy, 21);
+})();
+
+(() => {
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: `
+      SETRESULT($room_name);
+      SETRESULT($age);
+    `,
+  });
+
+  assert.equal(analysis.valid, false);
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'multiple_setresult_calls'),
+    true
+  );
 })();
 
 (() => {

@@ -6,6 +6,10 @@ import {
 import { ContextResolver } from '../engine/context-resolver.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import { validateExpression } from '../security/validation.js';
+import {
+  isMultilineCalculationExpression,
+  normalizeInlineCalculationExpression,
+} from './calculation-expression-utils.js';
 import { flattenFields } from './field-helpers.js';
 
 const COMMON_GLOBAL_FUNCTIONS = new Set([
@@ -181,9 +185,7 @@ function toCalculationReferenceDefinition(field, resolver, executionContext) {
     type: typeof field.type === 'string' ? field.type : 'UnknownField',
     description: typeof field.description === 'string' ? field.description : null,
     displayStyle:
-      field.display &&
-      typeof field.display === 'object' &&
-      typeof field.display.style === 'string'
+      field.display && typeof field.display === 'object' && typeof field.display.style === 'string'
         ? field.display.style
         : typeof field.display === 'string'
           ? field.display
@@ -214,15 +216,15 @@ function addIssue(issues, issueKeys, issue) {
 }
 
 function validateSyntax(expression) {
-  const isMultiLine =
-    expression.includes('\r\n') || expression.includes('\n') || expression.includes('function');
+  const isMultiLine = isMultilineCalculationExpression(expression);
 
   if (isMultiLine) {
     new Function(expression);
     return;
   }
 
-  new Function(`return (${expression});`);
+  const inlineExpression = normalizeInlineCalculationExpression(expression);
+  new Function(`return (${inlineExpression});`);
 }
 
 function createSchemaFilteredSecurityConfig(securityConfig) {
@@ -341,6 +343,7 @@ export function analyzeCalculationExpression({
   const usedBuiltinNames = new Set();
   const referencedFields = [];
   const referencedFieldNames = new Set();
+  const setResultCalls = [];
 
   const normalizedExpression = typeof expression === 'string' ? expression : '';
   const form = normalizeFormSchema(schema);
@@ -437,6 +440,10 @@ export function analyzeCalculationExpression({
         usedBuiltins.push(call.name);
       }
 
+      if (call.name === 'SETRESULT') {
+        setResultCalls.push(call);
+      }
+
       if (builtinMetadata.status === 'unavailable') {
         addIssue(
           issues,
@@ -478,6 +485,22 @@ export function analyzeCalculationExpression({
         symbol: call.name,
         index: call.index,
         length: call.length,
+      })
+    );
+  }
+
+  if (setResultCalls.length > 1) {
+    const duplicateSetResultCall = setResultCalls[1];
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'multiple_setresult_calls',
+        severity: 'error',
+        message: 'SETRESULT() can only be used once in a CalculatedField expression.',
+        symbol: duplicateSetResultCall.name,
+        index: duplicateSetResultCall.index,
+        length: duplicateSetResultCall.length,
       })
     );
   }
