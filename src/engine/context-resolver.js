@@ -93,7 +93,13 @@ export class ContextResolver {
 
     // Main form fields (no parent RepeatableSection) are always accessible
     if (fieldInfo.parentPath.length === 0) {
-      return this.buildAccessInfo('accessible', 'main_form', fieldName, fieldInfo, executionContext);
+      return this.buildAccessInfo(
+        'accessible',
+        'main_form',
+        fieldName,
+        fieldInfo,
+        executionContext
+      );
     }
 
     // RepeatableSection field access depends on execution context
@@ -246,7 +252,10 @@ export class ContextResolver {
    * @returns {boolean} True if they share the same RepeatableSection context
    */
   haveSameRepeatableSectionContext(parentPath1, parentPath2) {
-    return this.resolveRepeatableSectionAccessCode(parentPath1, parentPath2) !== 'different_repeatable_section';
+    return (
+      this.resolveRepeatableSectionAccessCode(parentPath1, parentPath2) !==
+      'different_repeatable_section'
+    );
   }
 
   resolveRepeatableSectionRelationship(
@@ -271,7 +280,10 @@ export class ContextResolver {
       return contextPath.length === 0 ? 'main_form' : 'same_repeatable_section';
     }
 
-    if (targetPath.length < contextPath.length && ContextResolver.isPrefix(targetPath, contextPath)) {
+    if (
+      targetPath.length < contextPath.length &&
+      ContextResolver.isPrefix(targetPath, contextPath)
+    ) {
       return targetPath.length === 0 ? 'main_form' : 'ancestor_repeatable_context';
     }
 
@@ -293,7 +305,12 @@ export class ContextResolver {
       level,
       code,
       message: `Field '${fieldName}' is not accessible from current context`,
-      suggestion: this.buildRestrictedAccessSuggestion(executionContext, fieldName, fieldInfo, code),
+      suggestion: this.buildRestrictedAccessSuggestion(
+        executionContext,
+        fieldName,
+        fieldInfo,
+        code
+      ),
       fieldInfo,
     };
   }
@@ -303,7 +320,7 @@ export class ContextResolver {
 
     if (contextType === 'calculation') {
       if (code === 'different_repeatable_section') {
-        return `CalculatedField can only access fields in the same RepeatableSection or ancestor contexts. Field '${fieldName}' is in RepeatableSection: ${fieldInfo.parentPath.join(' -> ')}`;
+        return `CalculatedField can only access fields in the same RepeatableSection or ancestor contexts. Field '${fieldName}' is in RepeatableSection: ${this.formatRepeatableSectionPath(fieldInfo.parentPath)}`;
       }
     }
 
@@ -320,6 +337,33 @@ export class ContextResolver {
     }
 
     return 'Check the field access rules for your current context';
+  }
+
+  formatRepeatableSectionPath(parentPath) {
+    if (!Array.isArray(parentPath) || parentPath.length === 0) {
+      return 'main form';
+    }
+
+    return parentPath
+      .map((_, index) => this.formatRepeatableSectionSegment(parentPath.slice(0, index + 1)))
+      .join(' -> ');
+  }
+
+  formatRepeatableSectionSegment(currentPath) {
+    for (const treeInfo of this.repeatableSectionTree.values()) {
+      if (!ContextResolver.pathsEqual(treeInfo.currentPath, currentPath)) {
+        continue;
+      }
+
+      const dataName = treeInfo.field?.data_name || treeInfo.preferredKey;
+      if (dataName === treeInfo.preferredKey) {
+        return dataName;
+      }
+
+      return `${dataName} (${treeInfo.preferredKey})`;
+    }
+
+    return currentPath[currentPath.length - 1];
   }
 
   static isPrefix(prefix, fullPath) {
@@ -381,7 +425,8 @@ export class ContextResolver {
           ? `Field '${fieldName}' does not exist in the form schema`
           : `Field '${fieldName}' is not accessible from current context`),
       suggestion:
-        accessInfo.suggestion || this.generateAccessSuggestion(executionContext, fieldName, fieldInfo),
+        accessInfo.suggestion ||
+        this.generateAccessSuggestion(executionContext, fieldName, fieldInfo),
       fieldContext: fieldInfo
         ? {
             parentPath: fieldInfo.parentPath,

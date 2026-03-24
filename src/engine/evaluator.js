@@ -3,6 +3,10 @@ import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.j
 import { __setDataNamesContext, __clearDataNamesContext } from '../builtins/schema/datanames.js';
 import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
+import {
+  isMultilineCalculationExpression,
+  normalizeInlineCalculationExpression,
+} from '../utilities/calculation-expression-utils.js';
 
 export function runExpression(
   expr,
@@ -34,8 +38,7 @@ export function runExpression(
 
       try {
         // Handle both expressions and multi-line code (Windows-safe)
-        const isMultiLine =
-          expr.includes('\r\n') || expr.includes('\n') || expr.includes('function');
+        const isMultiLine = isMultilineCalculationExpression(expr);
 
         if (isMultiLine) {
           // Execute as code block (recompile each time for now)
@@ -46,7 +49,8 @@ export function runExpression(
           return consumed.called ? consumed.value : result;
         } else {
           // Execute as expression (existing behavior)
-          const fn = new Function(...keys, `return (${expr});`);
+          const inlineExpression = normalizeInlineCalculationExpression(expr);
+          const fn = new Function(...keys, `return (${inlineExpression});`);
           const result = fn(...values);
           const consumed = __consumeResult();
           return consumed.called ? consumed.value : result;
