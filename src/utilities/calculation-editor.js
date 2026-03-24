@@ -157,6 +157,42 @@ function cloneCatalogDefinition(definition) {
   };
 }
 
+function toCalculationReferenceAccess(accessInfo) {
+  return {
+    level: accessInfo.level,
+    code: accessInfo.code,
+    message: accessInfo.message,
+    suggestion: accessInfo.suggestion,
+  };
+}
+
+function toCalculationReferenceDefinition(field, resolver, executionContext) {
+  const accessInfo = resolver.resolveFieldAccessInfo(executionContext, field.data_name);
+
+  if (accessInfo.level === 'not_found') {
+    return null;
+  }
+
+  return {
+    key: typeof field.key === 'string' ? field.key : field.data_name,
+    reference: `$${field.data_name}`,
+    dataName: field.data_name,
+    label: typeof field.label === 'string' ? field.label : field.data_name,
+    type: typeof field.type === 'string' ? field.type : 'UnknownField',
+    description: typeof field.description === 'string' ? field.description : null,
+    displayStyle:
+      field.display &&
+      typeof field.display === 'object' &&
+      typeof field.display.style === 'string'
+        ? field.display.style
+        : typeof field.display === 'string'
+          ? field.display
+          : null,
+    parentPath: resolver.getFieldInfo(field.data_name)?.parentPath || [],
+    access: toCalculationReferenceAccess(accessInfo),
+  };
+}
+
 function createIssue({ code, severity, message, symbol = null, index = null, length = null }) {
   return {
     code,
@@ -220,6 +256,12 @@ function createSchemaFilteredSecurityConfig(securityConfig) {
  * @property {string | null} description
  * @property {string | null} displayStyle
  * @property {string[]} parentPath
+ * @property {{
+ *   level: 'accessible' | 'restricted',
+ *   code: 'main_form' | 'same_repeatable_section' | 'ancestor_repeatable_context' | 'different_repeatable_section',
+ *   message: string | null,
+ *   suggestion: string | null,
+ * }} access
  *
  * @typedef {Object} CalculationExpressionIssue
  * @property {string} code
@@ -246,9 +288,14 @@ export function getCalculationBuiltinCatalog() {
  * @param {Object} options
  * @param {Object} options.schema
  * @param {string} options.fieldDataName
+ * @param {boolean} [options.includeRestricted=false]
  * @returns {CalculationReferenceDefinition[]}
  */
-export function getCalculationReferenceCatalog({ schema, fieldDataName }) {
+export function getCalculationReferenceCatalog({
+  schema,
+  fieldDataName,
+  includeRestricted = false,
+}) {
   const form = normalizeFormSchema(schema);
   const resolver = new ContextResolver(form);
   const executionContext = buildExecutionContext(form, fieldDataName, resolver);
@@ -262,26 +309,9 @@ export function getCalculationReferenceCatalog({ schema, fieldDataName }) {
         field.type !== 'RepeatableSection' &&
         field.type !== 'BuildingPlanSection'
     )
-    .filter(
-      (field) => resolver.resolveFieldAccess(executionContext, field.data_name) === 'accessible'
-    )
-    .map((field) => ({
-      key: typeof field.key === 'string' ? field.key : field.data_name,
-      reference: `$${field.data_name}`,
-      dataName: field.data_name,
-      label: typeof field.label === 'string' ? field.label : field.data_name,
-      type: typeof field.type === 'string' ? field.type : 'UnknownField',
-      description: typeof field.description === 'string' ? field.description : null,
-      displayStyle:
-        field.display &&
-        typeof field.display === 'object' &&
-        typeof field.display.style === 'string'
-          ? field.display.style
-          : typeof field.display === 'string'
-            ? field.display
-            : null,
-      parentPath: resolver.getFieldInfo(field.data_name)?.parentPath || [],
-    }));
+    .map((field) => toCalculationReferenceDefinition(field, resolver, executionContext))
+    .filter((reference) => reference !== null)
+    .filter((reference) => includeRestricted || reference.access.level === 'accessible');
 }
 
 /**
@@ -458,25 +488,28 @@ export function analyzeCalculationExpression({
       referencedFields.push(reference.fieldName);
     }
 
-    const accessLevel = resolver.resolveFieldAccess(executionContext, reference.fieldName);
-    if (accessLevel === 'restricted') {
+    const accessInfo = resolver.resolveFieldAccessInfo(executionContext, reference.fieldName);
+    if (accessInfo.level === 'restricted') {
       addIssue(
         issues,
         issueKeys,
         createIssue({
           code: 'restricted_field_reference',
           severity: 'error',
-          message: resolver.generateAccessSuggestion(
-            executionContext,
-            reference.fieldName,
-            resolver.getFieldInfo(reference.fieldName)
-          ),
+          message:
+            accessInfo.suggestion ||
+            accessInfo.message ||
+            resolver.generateAccessSuggestion(
+              executionContext,
+              reference.fieldName,
+              resolver.getFieldInfo(reference.fieldName)
+            ),
           symbol: reference.reference,
           index: reference.index,
           length: reference.length,
         })
       );
-    } else if (accessLevel === 'not_found') {
+    } else if (accessInfo.level === 'not_found') {
       addIssue(
         issues,
         issueKeys,

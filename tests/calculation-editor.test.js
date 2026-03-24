@@ -146,11 +146,362 @@ const schema = {
     fieldDataName: 'room_summary',
   });
   const referenceNames = references.map((reference) => reference.dataName);
+  const roomNameReference = references.find((reference) => reference.dataName === 'room_name');
+  const ageReference = references.find((reference) => reference.dataName === 'age');
 
   assert.equal(referenceNames.includes('room_summary'), false);
   assert.equal(referenceNames.includes('room_name'), true);
   assert.equal(referenceNames.includes('age'), true);
   assert.equal(referenceNames.includes('task_duration'), false);
+  assert.equal(roomNameReference?.access.level, 'accessible');
+  assert.equal(roomNameReference?.access.code, 'same_repeatable_section');
+  assert.equal(ageReference?.access.level, 'accessible');
+  assert.equal(ageReference?.access.code, 'main_form');
+})();
+
+(() => {
+  const references = getCalculationReferenceCatalog({
+    schema,
+    fieldDataName: 'room_summary',
+    includeRestricted: true,
+  });
+  const referenceNames = references.map((reference) => reference.dataName);
+  const taskDurationReference = references.find(
+    (reference) => reference.dataName === 'task_duration'
+  );
+
+  assert.equal(referenceNames.includes('room_summary'), false);
+  assert.equal(referenceNames.includes('room_name'), true);
+  assert.equal(referenceNames.includes('age'), true);
+  assert.equal(referenceNames.includes('task_duration'), true);
+  assert.equal(taskDurationReference?.access.level, 'restricted');
+  assert.equal(taskDurationReference?.access.code, 'different_repeatable_section');
+  assert.match(
+    taskDurationReference?.access.suggestion || '',
+    /same RepeatableSection or ancestor contexts/
+  );
+})();
+
+(() => {
+  const sectionScopedSchema = {
+    form: {
+      name: 'Section Scoped Calculation Test',
+      description: null,
+      elements: [
+        {
+          type: 'TextField',
+          key: 'full_name',
+          data_name: 'full_name',
+          label: 'Full Name',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          pattern: null,
+          pattern_description: null,
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'Section',
+          key: 'contact_section',
+          data_name: 'contact_section',
+          label: 'Contact',
+          display: 'inline',
+          description: null,
+          description_mode: null,
+          visible: true,
+          visible_conditions: null,
+          elements: [
+            {
+              type: 'TextField',
+              key: 'city_name',
+              data_name: 'city_name',
+              label: 'City',
+              display: 'default',
+              description: null,
+              description_mode: null,
+              required: false,
+              required_conditions: null,
+              visible: true,
+              visible_conditions: null,
+              read_only: false,
+              read_only_conditions: null,
+              default_value: null,
+              pattern: null,
+              pattern_description: null,
+              supporting_image: false,
+              supporting_image_path: null,
+              supporting_image_display: null,
+            },
+            {
+              type: 'Section',
+              key: 'nested_section',
+              data_name: 'nested_section',
+              label: 'Nested',
+              display: 'inline',
+              description: null,
+              description_mode: null,
+              visible: true,
+              visible_conditions: null,
+              elements: [
+                {
+                  type: 'CalculatedField',
+                  key: 'contact_summary',
+                  data_name: 'contact_summary',
+                  label: 'Contact Summary',
+                  display: { style: 'text' },
+                  description: null,
+                  description_mode: null,
+                  required: false,
+                  visible: true,
+                  visible_conditions: null,
+                  read_only: true,
+                  calculate: 'SETRESULT($full_name + " / " + $city_name)',
+                  supporting_image: false,
+                  supporting_image_path: null,
+                  supporting_image_display: null,
+                },
+                {
+                  type: 'BooleanField',
+                  key: 'is_primary_contact',
+                  data_name: 'is_primary_contact',
+                  label: 'Primary',
+                  display: 'default',
+                  description: null,
+                  description_mode: null,
+                  required: false,
+                  required_conditions: null,
+                  visible: true,
+                  visible_conditions: null,
+                  read_only: false,
+                  read_only_conditions: null,
+                  default_value: null,
+                  choices: [
+                    {
+                      label: 'Yes',
+                      value: 'yes',
+                    },
+                    {
+                      label: 'No',
+                      value: 'no',
+                    },
+                  ],
+                  third_option_enabled: false,
+                  supporting_image: false,
+                  supporting_image_path: null,
+                  supporting_image_display: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const references = getCalculationReferenceCatalog({
+    schema: sectionScopedSchema,
+    fieldDataName: 'contact_summary',
+  });
+  const referenceNames = references.map((reference) => reference.dataName);
+  const cityReference = references.find((reference) => reference.dataName === 'city_name');
+
+  assert.equal(referenceNames.includes('full_name'), true);
+  assert.equal(referenceNames.includes('city_name'), true);
+  assert.equal(referenceNames.includes('is_primary_contact'), true);
+  assert.equal(cityReference?.access.level, 'accessible');
+  assert.equal(cityReference?.access.code, 'main_form');
+})();
+
+(() => {
+  const nestedRepeatableSchema = {
+    form: {
+      name: 'Nested Repeatable Calculation Test',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'base_rate',
+          data_name: 'base_rate',
+          label: 'Base Rate',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'RepeatableSection',
+          key: 'buildings',
+          data_name: 'buildings',
+          label: 'Buildings',
+          display: 'drilldown',
+          description: null,
+          description_mode: null,
+          visible: true,
+          visible_conditions: null,
+          location_enabled: false,
+          location_required: false,
+          elements: [
+            {
+              type: 'NumericField',
+              key: 'building_multiplier',
+              data_name: 'building_multiplier',
+              label: 'Building Multiplier',
+              display: 'default',
+              description: null,
+              description_mode: null,
+              required: false,
+              required_conditions: null,
+              visible: true,
+              visible_conditions: null,
+              read_only: false,
+              read_only_conditions: null,
+              default_value: null,
+              min: null,
+              max: null,
+              format: 'integer',
+              supporting_image: false,
+              supporting_image_path: null,
+              supporting_image_display: null,
+            },
+            {
+              type: 'RepeatableSection',
+              key: 'rooms',
+              data_name: 'rooms',
+              label: 'Rooms',
+              display: 'drilldown',
+              description: null,
+              description_mode: null,
+              visible: true,
+              visible_conditions: null,
+              location_enabled: false,
+              location_required: false,
+              elements: [
+                {
+                  type: 'NumericField',
+                  key: 'room_area',
+                  data_name: 'room_area',
+                  label: 'Room Area',
+                  display: 'default',
+                  description: null,
+                  description_mode: null,
+                  required: false,
+                  required_conditions: null,
+                  visible: true,
+                  visible_conditions: null,
+                  read_only: false,
+                  read_only_conditions: null,
+                  default_value: null,
+                  min: null,
+                  max: null,
+                  format: 'integer',
+                  supporting_image: false,
+                  supporting_image_path: null,
+                  supporting_image_display: null,
+                },
+                {
+                  type: 'CalculatedField',
+                  key: 'room_total',
+                  data_name: 'room_total',
+                  label: 'Room Total',
+                  display: { style: 'numeric' },
+                  description: null,
+                  description_mode: null,
+                  required: false,
+                  visible: true,
+                  visible_conditions: null,
+                  read_only: true,
+                  calculate:
+                    'SETRESULT($room_area * $building_multiplier * $base_rate)',
+                  supporting_image: false,
+                  supporting_image_path: null,
+                  supporting_image_display: null,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'RepeatableSection',
+          key: 'tasks',
+          data_name: 'tasks',
+          label: 'Tasks',
+          display: 'drilldown',
+          description: null,
+          description_mode: null,
+          visible: true,
+          visible_conditions: null,
+          location_enabled: false,
+          location_required: false,
+          elements: [
+            {
+              type: 'NumericField',
+              key: 'task_hours',
+              data_name: 'task_hours',
+              label: 'Task Hours',
+              display: 'default',
+              description: null,
+              description_mode: null,
+              required: false,
+              required_conditions: null,
+              visible: true,
+              visible_conditions: null,
+              read_only: false,
+              read_only_conditions: null,
+              default_value: null,
+              min: null,
+              max: null,
+              format: 'integer',
+              supporting_image: false,
+              supporting_image_path: null,
+              supporting_image_display: null,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const references = getCalculationReferenceCatalog({
+    schema: nestedRepeatableSchema,
+    fieldDataName: 'room_total',
+    includeRestricted: true,
+  });
+  const roomAreaReference = references.find((reference) => reference.dataName === 'room_area');
+  const buildingMultiplierReference = references.find(
+    (reference) => reference.dataName === 'building_multiplier'
+  );
+  const baseRateReference = references.find((reference) => reference.dataName === 'base_rate');
+  const taskHoursReference = references.find((reference) => reference.dataName === 'task_hours');
+
+  assert.equal(roomAreaReference?.access.level, 'accessible');
+  assert.equal(roomAreaReference?.access.code, 'same_repeatable_section');
+  assert.equal(buildingMultiplierReference?.access.level, 'accessible');
+  assert.equal(buildingMultiplierReference?.access.code, 'ancestor_repeatable_context');
+  assert.equal(baseRateReference?.access.level, 'accessible');
+  assert.equal(baseRateReference?.access.code, 'main_form');
+  assert.equal(taskHoursReference?.access.level, 'restricted');
+  assert.equal(taskHoursReference?.access.code, 'different_repeatable_section');
 })();
 
 (() => {
