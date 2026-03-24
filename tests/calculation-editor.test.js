@@ -5,6 +5,7 @@ import {
   createFormEngine,
   getCalculationBuiltinCatalog,
   getCalculationReferenceCatalog,
+  simulateCalculationExpression,
 } from '../src/index.js';
 
 const schema = {
@@ -642,4 +643,281 @@ const schema = {
     analysis.issues.some((issue) => issue.code === 'unknown_field_reference'),
     true
   );
+})();
+
+(() => {
+  const previewSchema = {
+    form: {
+      name: 'Calculation Preview Form',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'age_double',
+          data_name: 'age_double',
+          label: 'Age Double',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($age * 2)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const simulation = simulateCalculationExpression({
+    schema: previewSchema,
+    fieldDataName: 'age_double',
+    expression: 'SETRESULT($age * 3)',
+    values: {
+      age: 7,
+    },
+  });
+
+  assert.equal(simulation.result, 21);
+  assert.equal(simulation.runtimeError, null);
+  assert.deepEqual(simulation.warnings, []);
+})();
+
+(() => {
+  const defaultsSchema = {
+    form: {
+      name: 'Calculation Preview Defaults',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'base_rate',
+          data_name: 'base_rate',
+          label: 'Base Rate',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: 5,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'rate_copy',
+          data_name: 'rate_copy',
+          label: 'Rate Copy',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($base_rate)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const simulation = simulateCalculationExpression({
+    schema: defaultsSchema,
+    fieldDataName: 'rate_copy',
+    expression: 'SETRESULT($base_rate)',
+  });
+
+  assert.equal(simulation.result, 5);
+  assert.equal(simulation.runtimeError, null);
+})();
+
+(() => {
+  const simulation = simulateCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT($task_duration)',
+  });
+
+  assert.equal(simulation.result, null);
+  assert.equal(simulation.runtimeError, null);
+  assert.equal(simulation.warnings.length > 0, true);
+  assert.match(simulation.warnings[0]?.message || '', /not accessible/);
+  assert.match(simulation.warnings[0]?.suggestion || '', /same RepeatableSection/);
+})();
+
+(() => {
+  const chainedSchema = {
+    form: {
+      name: 'Chained Calculation Preview',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'base_value',
+          data_name: 'base_value',
+          label: 'Base Value',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'double_value',
+          data_name: 'double_value',
+          label: 'Double Value',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($base_value * 2)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'total_value',
+          data_name: 'total_value',
+          label: 'Total Value',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($double_value + 1)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const simulation = simulateCalculationExpression({
+    schema: chainedSchema,
+    fieldDataName: 'total_value',
+    expression: 'SETRESULT($double_value + 5)',
+    values: {
+      base_value: 8,
+    },
+  });
+
+  assert.equal(simulation.result, 21);
+  assert.equal(simulation.runtimeError, null);
+})();
+
+(() => {
+  const runtimeErrorSchema = {
+    form: {
+      name: 'Runtime Error Preview',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'age_label',
+          data_name: 'age_label',
+          label: 'Age Label',
+          display: { style: 'text' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($age)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const simulation = simulateCalculationExpression({
+    schema: runtimeErrorSchema,
+    fieldDataName: 'age_label',
+    expression: 'SETRESULT($age.toUpperCase())',
+    values: {
+      age: 12,
+    },
+  });
+
+  assert.equal(simulation.result, null);
+  assert.match(simulation.runtimeError || '', /toUpperCase/);
 })();

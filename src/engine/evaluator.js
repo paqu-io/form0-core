@@ -13,13 +13,16 @@ export function runExpression(
   context = {},
   securityConfig = DEFAULT_SECURITY_CONFIG,
   includeEventBuiltins = false,
-  schema = null
+  schema = null,
+  options = {}
 ) {
   try {
     // Validate expression based on security mode
     const validation = validateExpression(expr, securityConfig, includeEventBuiltins);
     if (!validation.valid) {
-      console.warn('[form0] Expression validation failed:', validation.reason);
+      if (!options.suppressConsoleWarning) {
+        console.warn('[form0] Expression validation failed:', validation.reason);
+      }
       return null;
     }
 
@@ -73,7 +76,12 @@ export function runExpression(
 
     return executeExpression();
   } catch (e) {
-    console.warn('[form0] Expression evaluation failed:', e.message);
+    if (typeof options.onError === 'function') {
+      options.onError(e);
+    }
+    if (!options.suppressConsoleWarning) {
+      console.warn('[form0] Expression evaluation failed:', e.message);
+    }
     return null;
   }
 }

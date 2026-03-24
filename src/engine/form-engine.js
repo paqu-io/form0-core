@@ -19,6 +19,7 @@ export function createFormEngine({
   helpers = {},
   security = DEFAULT_SECURITY_CONFIG,
   warningSystem = null,
+  runtimeDiagnostics = null,
 }) {
   const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
@@ -126,7 +127,8 @@ export function createFormEngine({
       allHelpers,
       security,
       contextResolver,
-      sharedWarningSystem
+      sharedWarningSystem,
+      runtimeDiagnostics
     );
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);

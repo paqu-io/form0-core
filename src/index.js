@@ -35,6 +35,7 @@ export {
   getCalculationBuiltinCatalog,
   getCalculationReferenceCatalog,
   analyzeCalculationExpression,
+  simulateCalculationExpression,
 } from './utilities/calculation-editor.js';
 export {
   getFormAIMetadata,
