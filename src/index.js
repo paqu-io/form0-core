@@ -35,6 +35,7 @@ export {
   getCalculationBuiltinCatalog,
   getCalculationReferenceCatalog,
   analyzeCalculationExpression,
+  createCalculationPreviewSession,
   simulateCalculationExpression,
 } from './utilities/calculation-editor.js';
 export {
