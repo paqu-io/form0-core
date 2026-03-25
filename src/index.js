@@ -39,6 +39,11 @@ export {
   simulateCalculationExpression,
 } from './utilities/calculation-editor.js';
 export {
+  getFormEventBuiltinCatalog,
+  getFormEventReferenceCatalog,
+  analyzeFormEventCode,
+} from './utilities/form-event-editor.js';
+export {
   getFormAIMetadata,
   getFormAIContext,
   getFormAIInstructions,

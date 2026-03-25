@@ -3,7 +3,7 @@ import { evaluateVisibility } from './conditions.js';
 import { evaluateRequirement } from './conditions.js';
 import { evaluateReadOnly } from './conditions.js';
 import { validateFields } from './field-validation.js';
-import { builtins, eventBuiltins } from '../builtins/registry.js';
+import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
 import { validateSchema } from '../schema/schema-validator.js';
 import { flattenFields } from '../utilities/field-helpers.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
@@ -90,7 +90,7 @@ export function createFormEngine({
   const required = {};
   const read_only = {};
 
-  const allHelpers = { ...builtins, ...helpers };
+  const allHelpers = { ...calculationBuiltins, ...helpers };
 
   // Initialize context resolution system
   const contextResolver = new ContextResolver(form);
@@ -99,7 +99,7 @@ export function createFormEngine({
   // Initialize event system with context resolution
   const eventManager = new EventManager(form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
-  const eventHelpers = { ...builtins, ...eventBuiltins, ...helpers };
+  const eventHelpers = { ...eventBuiltins, ...helpers };
 
   // Initialize event code if present
   if (form.events && form.events.code) {

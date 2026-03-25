@@ -11,6 +11,7 @@ import { getBuiltinDefinitions } from '../src/index.js';
   assert.equal(definitionsByName.get('IF')?.category, 'logical');
   assert.deepEqual(definitionsByName.get('IF')?.contexts, ['calculation', 'event']);
   assert.deepEqual(definitionsByName.get('ALERT')?.contexts, ['event']);
+  assert.deepEqual(definitionsByName.get('SETRESULT')?.contexts, ['calculation']);
   assert.equal(definitionsByName.get('COUNT')?.signature, 'COUNT(values)');
   assert.equal(definitionsByName.get('FORM')?.signature, 'FORM()');
 })();

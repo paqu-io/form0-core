@@ -65,7 +65,7 @@ export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
 export { __consumeEventOperations } from './event/event-operations-collector.js';
 
-const CALCULATION_AND_EVENT_ENTRIES = Object.freeze([
+const COMMON_RUNTIME_ENTRIES = Object.freeze([
   { implementation: IF, definition: IF_METADATA },
   { implementation: AND, definition: AND_METADATA },
   { implementation: OR, definition: OR_METADATA },
@@ -73,7 +73,6 @@ const CALCULATION_AND_EVENT_ENTRIES = Object.freeze([
   { implementation: COUNTA, definition: COUNTA_METADATA },
   { implementation: COUNTBLANK, definition: COUNTBLANK_METADATA },
   { implementation: ARRAY, definition: ARRAY_METADATA },
-  { implementation: SETRESULT, definition: SETRESULT_METADATA },
   { implementation: EVAL, definition: EVAL_METADATA },
   { implementation: CHOICEVALUE, definition: CHOICEVALUE_METADATA },
   { implementation: CHOICELABEL, definition: CHOICELABEL_METADATA },
@@ -89,6 +88,10 @@ const CALCULATION_AND_EVENT_ENTRIES = Object.freeze([
   { implementation: SIN, definition: SIN_METADATA },
   { implementation: ROUND, definition: ROUND_METADATA },
   { implementation: UPPER, definition: UPPER_METADATA },
+]);
+
+const CALCULATION_ONLY_ENTRIES = Object.freeze([
+  { implementation: SETRESULT, definition: SETRESULT_METADATA },
 ]);
 
 const EVENT_ONLY_ENTRIES = Object.freeze([
@@ -110,12 +113,23 @@ function filterDefinitionsByContext(definitions, context) {
   return Object.freeze(definitions.filter((definition) => definition.contexts.includes(context)));
 }
 
-export const builtins = buildBuiltinObject(CALCULATION_AND_EVENT_ENTRIES);
+export const calculationBuiltins = buildBuiltinObject([
+  ...COMMON_RUNTIME_ENTRIES,
+  ...CALCULATION_ONLY_ENTRIES,
+]);
 
-export const eventBuiltins = buildBuiltinObject(EVENT_ONLY_ENTRIES);
+export const eventBuiltins = buildBuiltinObject([
+  ...COMMON_RUNTIME_ENTRIES,
+  ...EVENT_ONLY_ENTRIES,
+]);
+
+// Backward-compatible alias for calculation runtime helpers.
+export const builtins = calculationBuiltins;
 
 export const BUILTIN_DEFINITIONS = Object.freeze(
-  [...CALCULATION_AND_EVENT_ENTRIES, ...EVENT_ONLY_ENTRIES].map(({ definition }) => definition)
+  [...COMMON_RUNTIME_ENTRIES, ...CALCULATION_ONLY_ENTRIES, ...EVENT_ONLY_ENTRIES].map(
+    ({ definition }) => definition
+  )
 );
 
 export const CALCULATION_BUILTIN_DEFINITIONS = filterDefinitionsByContext(
