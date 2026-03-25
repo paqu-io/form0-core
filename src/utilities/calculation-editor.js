@@ -296,6 +296,33 @@ function sanitizeCollectedWarnings(warnings) {
   }));
 }
 
+function clearRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return;
+  }
+
+  Object.keys(record).forEach((key) => {
+    delete record[key];
+  });
+}
+
+function resetEngineValues(targetValues, sourceValues) {
+  clearRecord(targetValues);
+  Object.assign(targetValues, deepClone(sourceValues));
+}
+
+function normalizeSimulationValues(values) {
+  return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+}
+
+function createSimulationErrorResult(runtimeError, warnings = []) {
+  return {
+    result: null,
+    runtimeError,
+    warnings,
+  };
+}
+
 /**
  * @typedef {'stable' | 'advanced' | 'unavailable'} CalculationBuiltinStatus
  *
@@ -615,6 +642,132 @@ export function analyzeCalculationExpression({
 }
 
 /**
+ * Create a reusable preview session for CalculatedField authoring.
+ *
+ * @param {Object} options
+ * @param {Object} options.schema
+ * @param {string} options.fieldDataName
+ * @param {string} options.expression
+ * @param {Object} [options.security]
+ * @returns {{
+ *   run: (options?: {
+ *     expression?: string,
+ *     values?: Object,
+ *   }) => {
+ *     result: unknown,
+ *     runtimeError: string | null,
+ *     warnings: Array<{
+ *       message: string,
+ *       suggestion: string | null,
+ *       context: Object | null,
+ *       fieldContext: Object | null,
+ *     }>,
+ *   },
+ *   dispose: () => void,
+ * }}
+ */
+export function createCalculationPreviewSession({
+  schema,
+  fieldDataName,
+  expression,
+  security = DEFAULT_SECURITY_CONFIG,
+}) {
+  const simulationSchema = cloneSimulationSchema(schema);
+  const form = normalizeFormSchema(simulationSchema);
+  const targetField = findFieldByDataName(form.elements, fieldDataName);
+
+  if (!targetField) {
+    return {
+      run: () =>
+        createSimulationErrorResult(
+          `Field '${fieldDataName}' does not exist in the form schema.`
+        ),
+      dispose: () => {},
+    };
+  }
+
+  if (targetField.type !== 'CalculatedField') {
+    return {
+      run: () =>
+        createSimulationErrorResult(`Field '${fieldDataName}' is not a CalculatedField.`),
+      dispose: () => {},
+    };
+  }
+
+  targetField.calculate = typeof expression === 'string' ? expression : '';
+
+  const warningSystem = new WarningSystem({
+    enableCollection: true,
+    enableConsoleWarnings: false,
+    throttleMs: 0,
+  });
+  const runtimeDiagnostics = [];
+  const engine = createFormEngine({
+    schema: simulationSchema,
+    initialValues: {},
+    security,
+    warningSystem,
+    runtimeDiagnostics,
+  });
+
+  engine.eval();
+
+  const engineState = engine.getState();
+  const baselineValues = deepClone(engineState.values);
+  let currentExpression = targetField.calculate;
+  let disposed = false;
+
+  return {
+    run: ({ expression: nextExpression, values = {} } = {}) => {
+      if (disposed) {
+        return createSimulationErrorResult('Calculation preview session has been disposed.');
+      }
+
+      warningSystem.clearCollectedWarnings();
+      runtimeDiagnostics.length = 0;
+
+      if (typeof nextExpression === 'string' && nextExpression !== currentExpression) {
+        targetField.calculate = nextExpression;
+        currentExpression = nextExpression;
+      }
+
+      resetEngineValues(engineState.values, baselineValues);
+      Object.assign(engineState.values, normalizeSimulationValues(values));
+
+      try {
+        engine.eval();
+
+        const simulatedResult = engineState.values[fieldDataName];
+        const runtimeError =
+          runtimeDiagnostics.find((diagnostic) => diagnostic.fieldName === fieldDataName)
+            ?.message ||
+          runtimeDiagnostics[0]?.message ||
+          null;
+
+        return {
+          result: simulatedResult === undefined ? null : simulatedResult,
+          runtimeError,
+          warnings: sanitizeCollectedWarnings(warningSystem.getCollectedWarnings()),
+        };
+      } catch (error) {
+        return createSimulationErrorResult(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Unknown calculation simulation error.',
+          sanitizeCollectedWarnings(warningSystem.getCollectedWarnings())
+        );
+      }
+    },
+    dispose: () => {
+      disposed = true;
+      warningSystem.clearCollectedWarnings();
+      runtimeDiagnostics.length = 0;
+      clearRecord(engineState.values);
+    },
+  };
+}
+
+/**
  * Simulate a CalculatedField expression against form0-core's real evaluation engine.
  *
  * @param {Object} options
@@ -641,66 +794,18 @@ export function simulateCalculationExpression({
   values = {},
   security = DEFAULT_SECURITY_CONFIG,
 }) {
-  const simulationSchema = cloneSimulationSchema(schema);
-  const form = normalizeFormSchema(simulationSchema);
-  const targetField = findFieldByDataName(form.elements, fieldDataName);
-
-  if (!targetField) {
-    return {
-      result: null,
-      runtimeError: `Field '${fieldDataName}' does not exist in the form schema.`,
-      warnings: [],
-    };
-  }
-
-  if (targetField.type !== 'CalculatedField') {
-    return {
-      result: null,
-      runtimeError: `Field '${fieldDataName}' is not a CalculatedField.`,
-      warnings: [],
-    };
-  }
-
-  targetField.calculate = typeof expression === 'string' ? expression : '';
-
-  const warningSystem = new WarningSystem({
-    enableCollection: true,
-    enableConsoleWarnings: false,
+  const session = createCalculationPreviewSession({
+    schema,
+    fieldDataName,
+    expression,
+    security,
   });
-  const runtimeDiagnostics = [];
-
   try {
-    const engine = createFormEngine({
-      schema: simulationSchema,
-      initialValues:
-        values && typeof values === 'object' && !Array.isArray(values) ? values : {},
-      security,
-      warningSystem,
-      runtimeDiagnostics,
+    return session.run({
+      expression,
+      values,
     });
-
-    engine.eval();
-
-    const engineState = engine.getState();
-    const simulatedResult = engineState.values[fieldDataName];
-    const runtimeError =
-      runtimeDiagnostics.find((diagnostic) => diagnostic.fieldName === fieldDataName)?.message ||
-      runtimeDiagnostics[0]?.message ||
-      null;
-
-    return {
-      result: simulatedResult === undefined ? null : simulatedResult,
-      runtimeError,
-      warnings: sanitizeCollectedWarnings(warningSystem.getCollectedWarnings()),
-    };
-  } catch (error) {
-    return {
-      result: null,
-      runtimeError:
-        error instanceof Error && error.message
-          ? error.message
-          : 'Unknown calculation simulation error.',
-      warnings: sanitizeCollectedWarnings(warningSystem.getCollectedWarnings()),
-    };
+  } finally {
+    session.dispose();
   }
 }

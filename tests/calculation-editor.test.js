@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   analyzeCalculationExpression,
+  createCalculationPreviewSession,
   createFormEngine,
   getCalculationBuiltinCatalog,
   getCalculationReferenceCatalog,
@@ -920,4 +921,174 @@ const schema = {
 
   assert.equal(simulation.result, null);
   assert.match(simulation.runtimeError || '', /toUpperCase/);
+})();
+
+(() => {
+  const previewSchema = {
+    form: {
+      name: 'Reusable Preview Session',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: 2,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'age_result',
+          data_name: 'age_result',
+          label: 'Age Result',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($age * 2)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const session = createCalculationPreviewSession({
+    schema: previewSchema,
+    fieldDataName: 'age_result',
+    expression: 'SETRESULT($age * 3)',
+  });
+
+  const firstRun = session.run({
+    values: {
+      age: 4,
+    },
+  });
+  const secondRun = session.run({
+    expression: 'SETRESULT($age * 4)',
+    values: {
+      age: 5,
+    },
+  });
+  const defaultRun = session.run();
+
+  assert.equal(firstRun.result, 12);
+  assert.equal(firstRun.runtimeError, null);
+  assert.equal(secondRun.result, 20);
+  assert.equal(secondRun.runtimeError, null);
+  assert.equal(defaultRun.result, 8);
+  assert.equal(defaultRun.runtimeError, null);
+
+  session.dispose();
+})();
+
+(() => {
+  const session = createCalculationPreviewSession({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT($task_duration)',
+  });
+
+  const warnedRun = session.run();
+  const safeRun = session.run({
+    expression: 'SETRESULT($room_name)',
+  });
+
+  assert.equal(warnedRun.warnings.length > 0, true);
+  assert.deepEqual(safeRun.warnings, []);
+
+  session.dispose();
+})();
+
+(() => {
+  const runtimeErrorSchema = {
+    form: {
+      name: 'Reusable Runtime Error Preview',
+      description: null,
+      elements: [
+        {
+          type: 'NumericField',
+          key: 'age',
+          data_name: 'age',
+          label: 'Age',
+          display: 'default',
+          description: null,
+          description_mode: null,
+          required: false,
+          required_conditions: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          default_value: null,
+          min: null,
+          max: null,
+          format: 'integer',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'age_label',
+          data_name: 'age_label',
+          label: 'Age Label',
+          display: { style: 'text' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT($age)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const session = createCalculationPreviewSession({
+    schema: runtimeErrorSchema,
+    fieldDataName: 'age_label',
+    expression: 'SETRESULT($age.toUpperCase())',
+  });
+
+  const failingRun = session.run({
+    values: {
+      age: 12,
+    },
+  });
+  const recoveredRun = session.run({
+    expression: 'SETRESULT(String($age))',
+    values: {
+      age: 12,
+    },
+  });
+
+  assert.match(failingRun.runtimeError || '', /toUpperCase/);
+  assert.equal(recoveredRun.runtimeError, null);
+  assert.equal(recoveredRun.result, '12');
+
+  session.dispose();
 })();
