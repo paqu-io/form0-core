@@ -22,7 +22,7 @@ export const SETRESULT_METADATA = defineBuiltinMetadata({
   signature: 'SETRESULT(value)',
   description: 'Set the final return value for multiline calculations.',
   examples: ['SETRESULT($price * $quantity)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION],
 });
 
 export const SETRESULT = (value) => {

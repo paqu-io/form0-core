@@ -1,5 +1,6 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
 import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
+import { isValidEventType } from '../../../engine/event-registry.js';
 
 /**
  * ON builtin for form events
@@ -29,6 +30,16 @@ export const ON_METADATA = defineBuiltinMetadata({
 });
 
 export function ON(eventType, fieldKeyOrCallback, callback) {
+  if (typeof eventType !== 'string' || eventType.trim().length === 0) {
+    console.warn('[form0] ON() requires a non-empty event type string');
+    return null;
+  }
+
+  if (!isValidEventType(eventType)) {
+    console.warn(`[form0] ON() received an unknown event type: ${eventType}`);
+    return null;
+  }
+
   let fieldKey = '*';
   let actualCallback = fieldKeyOrCallback;
 
@@ -36,6 +47,11 @@ export function ON(eventType, fieldKeyOrCallback, callback) {
   if (typeof fieldKeyOrCallback === 'string') {
     fieldKey = fieldKeyOrCallback;
     actualCallback = callback;
+  }
+
+  if (typeof actualCallback !== 'function') {
+    console.warn('[form0] ON() requires a callback function');
+    return null;
   }
 
   // Create operation descriptor

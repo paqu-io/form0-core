@@ -1,16 +1,15 @@
-import { builtins, eventBuiltins } from '../builtins/registry.js';
+import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
 import { DEFAULT_SECURITY_CONFIG, SAFE_SECURITY_CONFIG, SECURITY_MODES } from './config.js';
 
 // Helper function to validate builtin function names in expressions
 function validateBuiltinNames(expr, includeEventBuiltins = false) {
   // Always use fresh builtin sets (no caching) to support dynamic builtin registration
-  const validBuiltinsSet = new Set(Object.keys(builtins));
+  const validCalculationBuiltinsSet = new Set(Object.keys(calculationBuiltins));
   const validEventBuiltinsSet = new Set(Object.keys(eventBuiltins));
 
-  // Combine regular and event builtins if in event context
   const allowedBuiltins = includeEventBuiltins
-    ? new Set([...validBuiltinsSet, ...validEventBuiltinsSet])
-    : validBuiltinsSet;
+    ? validEventBuiltinsSet
+    : validCalculationBuiltinsSet;
 
   // Extract function calls from the expression
   // This regex matches function calls like FUNCTIONNAME( allowing for whitespace
@@ -46,8 +45,8 @@ function validateBuiltinNames(expr, includeEventBuiltins = false) {
     }
 
     // Check for potential typos by finding similar builtin names
-    const validBuiltins = [...allowedBuiltins]; // Convert back to array for filtering
-    const similarBuiltins = validBuiltins.filter((builtin) => {
+    const validBuiltinNames = [...allowedBuiltins];
+    const similarBuiltins = validBuiltinNames.filter((builtin) => {
       // Simple similarity check - same length or very close
       const lengthDiff = Math.abs(builtin.length - functionName.length);
       return lengthDiff <= 2 && builtin.startsWith(functionName.substring(0, 3));
