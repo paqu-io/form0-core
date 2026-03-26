@@ -219,7 +219,7 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
   const runtimeDiagnostics = [];
   const schema = {
     form: {
-      name: 'Non Converging Cycle',
+      name: 'Static Cycle',
       description: null,
       elements: [
         createCalculatedField({
@@ -231,6 +231,62 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
           key: 'calc_b',
           data_name: 'calc_b',
           calculate: 'SETRESULT(($calc_a ?? 0) + 1)',
+        }),
+      ],
+    },
+  };
+
+  const engine = createFormEngine({
+    schema,
+    warningSystem,
+    runtimeDiagnostics,
+  });
+
+  engine.eval();
+
+  assert.equal(engine.getState().values.calc_a, null);
+  assert.equal(engine.getState().values.calc_b, null);
+  assert.equal(
+    warningSystem
+      .getCollectedWarnings()
+      .some((warning) => /dependency cycle detected/.test(warning.message)),
+    true
+  );
+  assert.equal(
+    runtimeDiagnostics.some(
+      (diagnostic) =>
+        /dependency cycle detected/.test(diagnostic.message) &&
+        (diagnostic.severity || 'error') === 'error'
+    ),
+    true
+  );
+  assert.equal(
+    runtimeDiagnostics.some((diagnostic) => /did not stabilize/.test(diagnostic.message)),
+    false
+  );
+})();
+
+(() => {
+  const warningSystem = new WarningSystem({
+    enableCollection: true,
+    enableConsoleWarnings: false,
+    throttleMs: 0,
+  });
+  const runtimeDiagnostics = [];
+  const schema = {
+    form: {
+      name: 'Dynamic Non Converging Cycle',
+      description: null,
+      elements: [
+        createCalculatedField({
+          key: 'calc_a',
+          data_name: 'calc_a',
+          calculate: `SETRESULT((EVAL("'$calc_b'") || 0) + 1)`,
+        }),
+        createCalculatedField({
+          key: 'calc_b',
+          data_name: 'calc_b',
+          calculate: `SETRESULT((EVAL("'$calc_a'") || 0) + 1)`,
         }),
       ],
     },

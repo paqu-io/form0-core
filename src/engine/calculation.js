@@ -28,9 +28,18 @@ export function evaluateCalculatedFields(
     return;
   }
 
+  const blockedFieldNames = blockCyclicCalculatedFields(plan, values);
+  const evaluableFieldNames = plan.orderedFieldNames.filter(
+    (fieldName) => !blockedFieldNames.has(fieldName)
+  );
+
+  if (evaluableFieldNames.length === 0) {
+    return;
+  }
+
   if (plan.hasDynamicDependencies) {
     evaluateFieldSequenceUntilStable(
-      plan.orderedFieldNames,
+      evaluableFieldNames,
       plan,
       schema,
       values,
@@ -50,17 +59,6 @@ export function evaluateCalculatedFields(
     }
 
     if (component.isCyclic) {
-      evaluateFieldSequenceUntilStable(
-        component.fieldNames,
-        plan,
-        schema,
-        values,
-        helpers,
-        securityConfig,
-        resolver,
-        warnings,
-        runtimeDiagnostics
-      );
       return;
     }
 
@@ -79,6 +77,24 @@ export function evaluateCalculatedFields(
       );
     }
   });
+}
+
+function blockCyclicCalculatedFields(plan, values) {
+  const blockedFieldNames = new Set();
+
+  plan.cyclicComponentIds.forEach((componentId) => {
+    const component = plan.componentsById.get(componentId);
+    if (!component?.isCyclic) {
+      return;
+    }
+
+    component.fieldNames.forEach((fieldName) => {
+      blockedFieldNames.add(fieldName);
+      values[fieldName] = null;
+    });
+  });
+
+  return blockedFieldNames;
 }
 
 function buildScopedContext(
@@ -198,10 +214,11 @@ function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics) {
     }
 
     const fieldNames = component.fieldNames;
-    const message = `CalculatedField dependency cycle detected: ${fieldNames.join(' -> ')}. Runtime evaluation will use bounded stabilization.`;
+    const message = `CalculatedField dependency cycle detected: ${fieldNames.join(' -> ')}. Runtime evaluation is disabled for the involved fields until the cycle is removed.`;
     warningSystem.emitWarning({
       type: 'calculation_dependency',
       reason: 'cyclic_dependencies',
+      severity: 'error',
       message,
       suggestion:
         'Remove the cycle or break it with a source field so calculated values can be evaluated deterministically.',
@@ -220,7 +237,7 @@ function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics) {
         runtimeDiagnostics,
         fieldName,
         message,
-        'warning',
+        'error',
         `cycle:${componentId}`
       );
     });
@@ -296,7 +313,7 @@ function evaluateFieldSequenceUntilStable(
   warnings,
   runtimeDiagnostics
 ) {
-  const maxPasses = Math.max(2, plan.totalCalculatedFieldCount);
+  const maxPasses = Math.max(2, fieldNames.length);
   let stillChangingFieldNames = [];
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
