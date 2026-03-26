@@ -27,6 +27,30 @@ function createNumericField({ key, data_name, label = data_name, default_value =
   };
 }
 
+function createTextField({ key, data_name, label = data_name, default_value = null }) {
+  return {
+    type: 'TextField',
+    key,
+    data_name,
+    label,
+    display: 'default',
+    description: null,
+    description_mode: null,
+    required: false,
+    required_conditions: null,
+    visible: true,
+    visible_conditions: null,
+    read_only: false,
+    read_only_conditions: null,
+    default_value,
+    pattern: null,
+    pattern_description: null,
+    supporting_image: false,
+    supporting_image_path: null,
+    supporting_image_display: null,
+  };
+}
+
 function createCalculatedField({ key, data_name, label = data_name, calculate }) {
   return {
     type: 'CalculatedField',
@@ -177,13 +201,13 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
   });
   const schema = {
     form: {
-      name: 'Dynamic Calculation Dependencies',
+      name: 'Statically Resolvable EVAL Dependency',
       description: null,
       elements: [
         createCalculatedField({
           key: 'calc_target',
           data_name: 'calc_target',
-          calculate: 'SETRESULT(EVAL("\'$calc_source\'"))',
+          calculate: `SETRESULT(EVAL("'$' + 'calc_source'"))`,
         }),
         createCalculatedField({
           key: 'calc_source',
@@ -198,6 +222,54 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
     schema,
     warningSystem,
     runtimeDiagnostics: [],
+  });
+
+  engine.eval();
+
+  const warnings = warningSystem.getCollectedWarnings();
+  assert.equal(engine.getState().values.calc_target, 23);
+  assert.equal(
+    warnings.some((warning) => /dynamic field access/.test(warning.message)),
+    false
+  );
+})();
+
+(() => {
+  const warningSystem = new WarningSystem({
+    enableCollection: true,
+    enableConsoleWarnings: false,
+    throttleMs: 0,
+  });
+  const schema = {
+    form: {
+      name: 'Dynamic Calculation Dependencies',
+      description: null,
+      elements: [
+        createTextField({
+          key: 'selected_calculation',
+          data_name: 'selected_calculation',
+        }),
+        createCalculatedField({
+          key: 'calc_target',
+          data_name: 'calc_target',
+          calculate: `SETRESULT(EVAL("'$' + $selected_calculation"))`,
+        }),
+        createCalculatedField({
+          key: 'calc_source',
+          data_name: 'calc_source',
+          calculate: 'SETRESULT(23)',
+        }),
+      ],
+    },
+  };
+
+  const engine = createFormEngine({
+    schema,
+    warningSystem,
+    runtimeDiagnostics: [],
+    initialValues: {
+      selected_calculation: 'calc_source',
+    },
   });
 
   engine.eval();
@@ -275,18 +347,18 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
   const runtimeDiagnostics = [];
   const schema = {
     form: {
-      name: 'Dynamic Non Converging Cycle',
+      name: 'Static Cycle Through Resolved EVAL',
       description: null,
       elements: [
         createCalculatedField({
           key: 'calc_a',
           data_name: 'calc_a',
-          calculate: `SETRESULT((EVAL("'$calc_b'") || 0) + 1)`,
+          calculate: `SETRESULT((EVAL("'$' + 'calc_b'") || 0) + 1)`,
         }),
         createCalculatedField({
           key: 'calc_b',
           data_name: 'calc_b',
-          calculate: `SETRESULT((EVAL("'$calc_a'") || 0) + 1)`,
+          calculate: `SETRESULT((EVAL("'$' + 'calc_a'") || 0) + 1)`,
         }),
       ],
     },
@@ -296,6 +368,70 @@ function createCalculatedField({ key, data_name, label = data_name, calculate })
     schema,
     warningSystem,
     runtimeDiagnostics,
+  });
+
+  engine.eval();
+
+  assert.equal(engine.getState().values.calc_a, null);
+  assert.equal(engine.getState().values.calc_b, null);
+  assert.equal(
+    warningSystem
+      .getCollectedWarnings()
+      .some((warning) => /dependency cycle detected/.test(warning.message)),
+    true
+  );
+  assert.equal(
+    runtimeDiagnostics.some(
+      (diagnostic) =>
+        /dependency cycle detected/.test(diagnostic.message) &&
+        (diagnostic.severity || 'error') === 'error'
+    ),
+    true
+  );
+})();
+
+(() => {
+  const warningSystem = new WarningSystem({
+    enableCollection: true,
+    enableConsoleWarnings: false,
+    throttleMs: 0,
+  });
+  const runtimeDiagnostics = [];
+  const schema = {
+    form: {
+      name: 'Dynamic Non Converging Cycle',
+      description: null,
+      elements: [
+        createTextField({
+          key: 'next_a',
+          data_name: 'next_a',
+        }),
+        createTextField({
+          key: 'next_b',
+          data_name: 'next_b',
+        }),
+        createCalculatedField({
+          key: 'calc_a',
+          data_name: 'calc_a',
+          calculate: `SETRESULT((EVAL("'$' + $next_a") || 0) + 1)`,
+        }),
+        createCalculatedField({
+          key: 'calc_b',
+          data_name: 'calc_b',
+          calculate: `SETRESULT((EVAL("'$' + $next_b") || 0) + 1)`,
+        }),
+      ],
+    },
+  };
+
+  const engine = createFormEngine({
+    schema,
+    warningSystem,
+    runtimeDiagnostics,
+    initialValues: {
+      next_a: 'calc_b',
+      next_b: 'calc_a',
+    },
   });
 
   engine.eval();
