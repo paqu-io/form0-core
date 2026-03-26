@@ -9,6 +9,13 @@ import { WarningSystem } from '../engine/warning-system.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import { validateExpression } from '../security/validation.js';
 import {
+  buildCalculationDependencyPlan,
+  buildCalculationExecutionContext,
+  extractStaticFieldReferenceMatches,
+  hasDynamicCalculationDependencies,
+  normalizeCalculationFormSchema,
+} from './calculation-dependencies.js';
+import {
   isMultilineCalculationExpression,
   normalizeInlineCalculationExpression,
 } from './calculation-expression-utils.js';
@@ -53,65 +60,8 @@ const CALCULATION_BUILTIN_METADATA_BY_NAME = new Map(
   CALCULATION_BUILTIN_CATALOG.map((definition) => [definition.name, definition])
 );
 
-function normalizeFormSchema(schema) {
-  if (schema && Array.isArray(schema.elements)) {
-    return schema;
-  }
-
-  if (schema && schema.form && Array.isArray(schema.form.elements)) {
-    return schema.form;
-  }
-
-  throw new Error('Expected a form schema or a root schema containing form.elements');
-}
-
 function isBuiltinCallMatchAllowed(functionName) {
   return COMMON_GLOBAL_FUNCTIONS.has(functionName);
-}
-
-function removeEvalContents(code) {
-  let result = '';
-  let i = 0;
-
-  while (i < code.length) {
-    const evalMatch = code.substring(i).match(/^EVAL\s*\(/);
-    if (evalMatch) {
-      result += 'EVAL()';
-      i += evalMatch[0].length;
-
-      let parenCount = 1;
-      let inSingleQuote = false;
-      let inDoubleQuote = false;
-      let inBacktick = false;
-
-      while (i < code.length && parenCount > 0) {
-        const char = code[i];
-
-        if (char === "'" && !inDoubleQuote && !inBacktick) {
-          inSingleQuote = !inSingleQuote;
-        } else if (char === '"' && !inSingleQuote && !inBacktick) {
-          inDoubleQuote = !inDoubleQuote;
-        } else if (char === '`' && !inSingleQuote && !inDoubleQuote) {
-          inBacktick = !inBacktick;
-        }
-
-        if (!inSingleQuote && !inDoubleQuote && !inBacktick) {
-          if (char === '(') {
-            parenCount++;
-          } else if (char === ')') {
-            parenCount--;
-          }
-        }
-
-        i++;
-      }
-    } else {
-      result += code[i];
-      i++;
-    }
-  }
-
-  return result;
 }
 
 function extractFunctionCalls(code) {
@@ -128,32 +78,6 @@ function extractFunctionCalls(code) {
   }
 
   return matches;
-}
-
-function extractFieldReferenceMatches(code) {
-  const cleanedCode = removeEvalContents(code);
-  const fieldRegex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
-  const matches = [];
-  let match;
-
-  while ((match = fieldRegex.exec(cleanedCode)) !== null) {
-    matches.push({
-      fieldName: match[1],
-      reference: `$${match[1]}`,
-      index: match.index,
-      length: match[0].length,
-    });
-  }
-
-  return matches;
-}
-
-function buildExecutionContext(form, fieldDataName, resolver) {
-  return {
-    type: 'calculation',
-    fieldName: fieldDataName,
-    parentPath: resolver.getFieldInfo(fieldDataName)?.parentPath || [],
-  };
 }
 
 function cloneCatalogDefinition(definition) {
@@ -254,7 +178,7 @@ function cloneSimulationSchema(schema) {
   }
 
   return {
-    form: deepClone(normalizeFormSchema(schema)),
+    form: deepClone(normalizeCalculationFormSchema(schema)),
   };
 }
 
@@ -383,9 +307,9 @@ export function getCalculationReferenceCatalog({
   fieldDataName,
   includeRestricted = false,
 }) {
-  const form = normalizeFormSchema(schema);
+  const form = normalizeCalculationFormSchema(schema);
   const resolver = new ContextResolver(form);
-  const executionContext = buildExecutionContext(form, fieldDataName, resolver);
+  const executionContext = buildCalculationExecutionContext(form, fieldDataName, resolver);
 
   return flattenFields(form.elements)
     .filter((field) => field && typeof field === 'object')
@@ -431,9 +355,14 @@ export function analyzeCalculationExpression({
   const setResultCalls = [];
 
   const normalizedExpression = typeof expression === 'string' ? expression : '';
-  const form = normalizeFormSchema(schema);
+  const baseForm = normalizeCalculationFormSchema(schema);
+  const form = deepClone(baseForm);
+  const targetField = findFieldByDataName(form.elements, fieldDataName);
+  if (targetField && targetField.type === 'CalculatedField') {
+    targetField.calculate = normalizedExpression;
+  }
   const resolver = new ContextResolver(form);
-  const executionContext = buildExecutionContext(form, fieldDataName, resolver);
+  const executionContext = buildCalculationExecutionContext(form, fieldDataName, resolver);
 
   if (normalizedExpression.trim().length === 0) {
     addIssue(
@@ -590,7 +519,7 @@ export function analyzeCalculationExpression({
     );
   }
 
-  for (const reference of extractFieldReferenceMatches(normalizedExpression)) {
+  for (const reference of extractStaticFieldReferenceMatches(normalizedExpression)) {
     if (!referencedFieldNames.has(reference.fieldName)) {
       referencedFieldNames.add(reference.fieldName);
       referencedFields.push(reference.fieldName);
@@ -628,6 +557,39 @@ export function analyzeCalculationExpression({
           symbol: reference.reference,
           index: reference.index,
           length: reference.length,
+        })
+      );
+    }
+  }
+
+  if (hasDynamicCalculationDependencies(normalizedExpression)) {
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'dynamic_calculation_dependency',
+        severity: 'warning',
+        message:
+          'This expression uses dynamic field access through EVAL(). Runtime evaluation will fall back to bounded stabilization.',
+      })
+    );
+  }
+
+  if (targetField?.type === 'CalculatedField') {
+    const dependencyPlan = buildCalculationDependencyPlan(form, resolver);
+    const targetNode = dependencyPlan.nodesByDataName.get(fieldDataName);
+    const targetComponent = targetNode?.componentId
+      ? dependencyPlan.componentsById.get(targetNode.componentId)
+      : null;
+
+    if (targetComponent?.isCyclic) {
+      addIssue(
+        issues,
+        issueKeys,
+        createIssue({
+          code: 'calculated_field_cycle',
+          severity: 'error',
+          message: `CalculatedField dependency cycle detected: ${targetComponent.fieldNames.join(' -> ')}.`,
         })
       );
     }
@@ -673,23 +635,20 @@ export function createCalculationPreviewSession({
   security = DEFAULT_SECURITY_CONFIG,
 }) {
   const simulationSchema = cloneSimulationSchema(schema);
-  const form = normalizeFormSchema(simulationSchema);
+  const form = normalizeCalculationFormSchema(simulationSchema);
   const targetField = findFieldByDataName(form.elements, fieldDataName);
 
   if (!targetField) {
     return {
       run: () =>
-        createSimulationErrorResult(
-          `Field '${fieldDataName}' does not exist in the form schema.`
-        ),
+        createSimulationErrorResult(`Field '${fieldDataName}' does not exist in the form schema.`),
       dispose: () => {},
     };
   }
 
   if (targetField.type !== 'CalculatedField') {
     return {
-      run: () =>
-        createSimulationErrorResult(`Field '${fieldDataName}' is not a CalculatedField.`),
+      run: () => createSimulationErrorResult(`Field '${fieldDataName}' is not a CalculatedField.`),
       dispose: () => {},
     };
   }
@@ -739,9 +698,13 @@ export function createCalculationPreviewSession({
 
         const simulatedResult = engineState.values[fieldDataName];
         const runtimeError =
-          runtimeDiagnostics.find((diagnostic) => diagnostic.fieldName === fieldDataName)
+          runtimeDiagnostics.find(
+            (diagnostic) =>
+              diagnostic.fieldName === fieldDataName &&
+              (diagnostic.severity || 'error') !== 'warning'
+          )?.message ||
+          runtimeDiagnostics.find((diagnostic) => (diagnostic.severity || 'error') !== 'warning')
             ?.message ||
-          runtimeDiagnostics[0]?.message ||
           null;
 
         return {

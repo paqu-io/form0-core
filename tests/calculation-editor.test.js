@@ -1002,6 +1002,116 @@ const schema = {
 })();
 
 (() => {
+  const dynamicAnalysis = analyzeCalculationExpression({
+    schema: {
+      form: {
+        name: 'Dynamic Dependency Analysis',
+        description: null,
+        elements: [
+          {
+            type: 'CalculatedField',
+            key: 'calc_target',
+            data_name: 'calc_target',
+            label: 'Calc Target',
+            display: { style: 'numeric' },
+            description: null,
+            description_mode: null,
+            required: false,
+            visible: true,
+            visible_conditions: null,
+            read_only: true,
+            calculate: 'SETRESULT(null)',
+            supporting_image: false,
+            supporting_image_path: null,
+            supporting_image_display: null,
+          },
+          {
+            type: 'CalculatedField',
+            key: 'calc_source',
+            data_name: 'calc_source',
+            label: 'Calc Source',
+            display: { style: 'numeric' },
+            description: null,
+            description_mode: null,
+            required: false,
+            visible: true,
+            visible_conditions: null,
+            read_only: true,
+            calculate: 'SETRESULT(23)',
+            supporting_image: false,
+            supporting_image_path: null,
+            supporting_image_display: null,
+          },
+        ],
+      },
+    },
+    fieldDataName: 'calc_target',
+    expression: 'SETRESULT(EVAL("\'$calc_source\'"))',
+  });
+
+  assert.equal(
+    dynamicAnalysis.issues.some((issue) => issue.code === 'dynamic_calculation_dependency'),
+    true
+  );
+})();
+
+(() => {
+  const cycleSchema = {
+    form: {
+      name: 'Cycle Analysis',
+      description: null,
+      elements: [
+        {
+          type: 'CalculatedField',
+          key: 'calc_a',
+          data_name: 'calc_a',
+          label: 'Calc A',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT(($calc_b ?? 0) + 1)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'calc_b',
+          data_name: 'calc_b',
+          label: 'Calc B',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT(($calc_a ?? 0) + 1)',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+
+  const cycleAnalysis = analyzeCalculationExpression({
+    schema: cycleSchema,
+    fieldDataName: 'calc_a',
+    expression: 'SETRESULT(($calc_b ?? 0) + 1)',
+  });
+
+  assert.equal(
+    cycleAnalysis.issues.some((issue) => issue.code === 'calculated_field_cycle'),
+    true
+  );
+})();
+
+(() => {
   const session = createCalculationPreviewSession({
     schema,
     fieldDataName: 'room_summary',

@@ -12,6 +12,7 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
+import { buildCalculationDependencyPlan } from '../utilities/calculation-dependencies.js';
 
 export function createFormEngine({
   schema,
@@ -94,6 +95,7 @@ export function createFormEngine({
 
   // Initialize context resolution system
   const contextResolver = new ContextResolver(form);
+  const calculationPlan = buildCalculationDependencyPlan(form, contextResolver);
   const sharedWarningSystem = warningSystem || new WarningSystem();
 
   // Initialize event system with context resolution
@@ -128,7 +130,8 @@ export function createFormEngine({
       security,
       contextResolver,
       sharedWarningSystem,
-      runtimeDiagnostics
+      runtimeDiagnostics,
+      calculationPlan
     );
     evaluateRequirement(form, values, required);
     evaluateVisibility(form, values, visible);
