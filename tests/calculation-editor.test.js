@@ -1002,10 +1002,10 @@ const schema = {
 })();
 
 (() => {
-  const dynamicAnalysis = analyzeCalculationExpression({
+  const staticEvalAnalysis = analyzeCalculationExpression({
     schema: {
       form: {
-        name: 'Dynamic Dependency Analysis',
+        name: 'Resolvable EVAL Analysis',
         description: null,
         elements: [
           {
@@ -1046,7 +1046,82 @@ const schema = {
       },
     },
     fieldDataName: 'calc_target',
-    expression: 'SETRESULT(EVAL("\'$calc_source\'"))',
+    expression: `SETRESULT(EVAL("'$' + 'calc_source'"))`,
+  });
+
+  assert.equal(
+    staticEvalAnalysis.issues.some((issue) => issue.code === 'dynamic_calculation_dependency'),
+    false
+  );
+})();
+
+(() => {
+  const dynamicAnalysis = analyzeCalculationExpression({
+    schema: {
+      form: {
+        name: 'Dynamic Dependency Analysis',
+        description: null,
+        elements: [
+          {
+            type: 'TextField',
+            key: 'selected_calc',
+            data_name: 'selected_calc',
+            label: 'Selected Calc',
+            display: 'default',
+            description: null,
+            description_mode: null,
+            required: false,
+            required_conditions: null,
+            visible: true,
+            visible_conditions: null,
+            read_only: false,
+            read_only_conditions: null,
+            default_value: null,
+            pattern: null,
+            pattern_description: null,
+            supporting_image: false,
+            supporting_image_path: null,
+            supporting_image_display: null,
+          },
+          {
+            type: 'CalculatedField',
+            key: 'calc_target',
+            data_name: 'calc_target',
+            label: 'Calc Target',
+            display: { style: 'numeric' },
+            description: null,
+            description_mode: null,
+            required: false,
+            visible: true,
+            visible_conditions: null,
+            read_only: true,
+            calculate: 'SETRESULT(null)',
+            supporting_image: false,
+            supporting_image_path: null,
+            supporting_image_display: null,
+          },
+          {
+            type: 'CalculatedField',
+            key: 'calc_source',
+            data_name: 'calc_source',
+            label: 'Calc Source',
+            display: { style: 'numeric' },
+            description: null,
+            description_mode: null,
+            required: false,
+            visible: true,
+            visible_conditions: null,
+            read_only: true,
+            calculate: 'SETRESULT(23)',
+            supporting_image: false,
+            supporting_image_path: null,
+            supporting_image_display: null,
+          },
+        ],
+      },
+    },
+    fieldDataName: 'calc_target',
+    expression: `SETRESULT(EVAL("'$' + $selected_calc"))`,
   });
 
   assert.equal(

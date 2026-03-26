@@ -105,8 +105,235 @@ export function normalizeCalculationFormSchema(schema) {
   throw new Error('Expected a form schema or a root schema containing form.elements');
 }
 
+function isEscapedCharacter(source, index) {
+  let backslashCount = 0;
+  let cursor = index - 1;
+
+  while (cursor >= 0 && source[cursor] === '\\') {
+    backslashCount += 1;
+    cursor -= 1;
+  }
+
+  return backslashCount % 2 === 1;
+}
+
+function skipWhitespace(source, state) {
+  while (state.index < source.length && /\s/.test(source[state.index])) {
+    state.index += 1;
+  }
+}
+
+function parseStaticStringLiteral(source, state) {
+  const quote = source[state.index];
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null;
+  }
+
+  state.index += 1;
+  let value = '';
+
+  while (state.index < source.length) {
+    const char = source[state.index];
+
+    if (char === quote && !isEscapedCharacter(source, state.index)) {
+      state.index += 1;
+      return value;
+    }
+
+    if (quote === '`' && char === '$' && source[state.index + 1] === '{') {
+      return null;
+    }
+
+    if (char === '\\' && state.index + 1 < source.length) {
+      const escapedChar = source[state.index + 1];
+      const escapeMap = {
+        n: '\n',
+        r: '\r',
+        t: '\t',
+        "'": "'",
+        '"': '"',
+        '`': '`',
+        '\\': '\\',
+      };
+
+      value += escapeMap[escapedChar] ?? escapedChar;
+      state.index += 2;
+      continue;
+    }
+
+    value += char;
+    state.index += 1;
+  }
+
+  return null;
+}
+
+function parseStaticStringTerm(source, state) {
+  skipWhitespace(source, state);
+
+  if (source[state.index] === '(') {
+    state.index += 1;
+    const nestedValue = parseStaticStringConcatenation(source, state);
+    if (nestedValue === null) {
+      return null;
+    }
+
+    skipWhitespace(source, state);
+    if (source[state.index] !== ')') {
+      return null;
+    }
+
+    state.index += 1;
+    return nestedValue;
+  }
+
+  return parseStaticStringLiteral(source, state);
+}
+
+function parseStaticStringConcatenation(source, state) {
+  const firstValue = parseStaticStringTerm(source, state);
+  if (firstValue === null) {
+    return null;
+  }
+
+  let result = firstValue;
+
+  while (true) {
+    skipWhitespace(source, state);
+    if (source[state.index] !== '+') {
+      return result;
+    }
+
+    state.index += 1;
+    const nextValue = parseStaticStringTerm(source, state);
+    if (nextValue === null) {
+      return null;
+    }
+
+    result += nextValue;
+  }
+}
+
+function resolveStaticStringExpression(source) {
+  if (typeof source !== 'string') {
+    return null;
+  }
+
+  const state = { index: 0 };
+  skipWhitespace(source, state);
+
+  if (state.index >= source.length) {
+    return null;
+  }
+
+  const result = parseStaticStringConcatenation(source, state);
+  if (result === null) {
+    return null;
+  }
+
+  skipWhitespace(source, state);
+  return state.index === source.length ? result : null;
+}
+
+function extractEvalCallArguments(code) {
+  const source = typeof code === 'string' ? code : '';
+  const argumentsList = [];
+  let i = 0;
+
+  while (i < source.length) {
+    const evalMatch = source.substring(i).match(/^EVAL\s*\(/);
+    if (!evalMatch) {
+      i += 1;
+      continue;
+    }
+
+    i += evalMatch[0].length;
+    const startIndex = i;
+
+    let parenCount = 1;
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let inBacktick = false;
+
+    while (i < source.length && parenCount > 0) {
+      const char = source[i];
+
+      if (char === "'" && !inDoubleQuote && !inBacktick && !isEscapedCharacter(source, i)) {
+        inSingleQuote = !inSingleQuote;
+      } else if (
+        char === '"' &&
+        !inSingleQuote &&
+        !inBacktick &&
+        !isEscapedCharacter(source, i)
+      ) {
+        inDoubleQuote = !inDoubleQuote;
+      } else if (
+        char === '`' &&
+        !inSingleQuote &&
+        !inDoubleQuote &&
+        !isEscapedCharacter(source, i)
+      ) {
+        inBacktick = !inBacktick;
+      }
+
+      if (!inSingleQuote && !inDoubleQuote && !inBacktick) {
+        if (char === '(') {
+          parenCount += 1;
+        } else if (char === ')') {
+          parenCount -= 1;
+          if (parenCount === 0) {
+            argumentsList.push(source.slice(startIndex, i));
+          }
+        }
+      }
+
+      i += 1;
+    }
+  }
+
+  return argumentsList;
+}
+
+function resolveStaticEvalFieldReference(expression) {
+  let currentExpression = typeof expression === 'string' ? expression : null;
+
+  for (let depth = 0; depth < 2 && currentExpression; depth += 1) {
+    const resolvedString = resolveStaticStringExpression(currentExpression);
+    if (resolvedString === null) {
+      return null;
+    }
+
+    const fieldReferenceMatch = resolvedString.match(/^\$([a-zA-Z_][a-zA-Z0-9_]*)$/);
+    if (fieldReferenceMatch) {
+      return fieldReferenceMatch[1];
+    }
+
+    currentExpression = resolvedString;
+  }
+
+  return null;
+}
+
+function extractStaticEvalFieldReferences(code) {
+  const fieldReferences = new Set();
+
+  extractEvalCallArguments(code).forEach((argumentSource) => {
+    const fieldName = resolveStaticEvalFieldReference(argumentSource);
+    if (fieldName) {
+      fieldReferences.add(fieldName);
+    }
+  });
+
+  return fieldReferences;
+}
+
 export function hasDynamicCalculationDependencies(code) {
-  return /\bEVAL\s*\(/.test(typeof code === 'string' ? code : '');
+  const evalArguments = extractEvalCallArguments(code);
+  if (evalArguments.length === 0) {
+    return false;
+  }
+
+  return evalArguments.some((argumentSource) => !resolveStaticEvalFieldReference(argumentSource));
 }
 
 export function removeEvalContents(code) {
@@ -174,7 +401,15 @@ export function extractStaticFieldReferenceMatches(code) {
 }
 
 export function extractStaticFieldReferences(code) {
-  return new Set(extractStaticFieldReferenceMatches(code).map((match) => match.fieldName));
+  const fieldReferences = new Set(
+    extractStaticFieldReferenceMatches(code).map((match) => match.fieldName)
+  );
+
+  extractStaticEvalFieldReferences(code).forEach((fieldName) => {
+    fieldReferences.add(fieldName);
+  });
+
+  return fieldReferences;
 }
 
 export function buildCalculationExecutionContext(form, fieldDataName, resolver) {
