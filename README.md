@@ -32,6 +32,14 @@ If you are integrating the engine directly:
 npm install form0-core
 ```
 
+`form0-core` owns behavioral schema concerns such as fields, conditions, calculations,
+events, and AI metadata. Applications may still attach optional top-level metadata such as
+`id` (unique form identifier), `status` (publication state), `version` (schema version),
+scope fields like `main_org_id`, and media or location settings. Operational counters like
+`record_count` and `record_last_change_at` should stay platform-owned and be injected at
+application or API boundaries, not treated as engine-authored schema. A top-level
+`form.version` may still exist, but the engine does not bump or consume it.
+
 ## Security
 
 See `SECURITY.md` for security modes and configuration.
