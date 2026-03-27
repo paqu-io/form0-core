@@ -28,21 +28,19 @@ const schema = {
   form: {
     name: 'MyForm',
     description: 'This is a test description',
-    id: null, //This should be the unique identifier of the form (UUIDv4 or UUIDv7 - TBD).
-    record_count: 0, //This should count the number of records in the form. Available in reform.
-    record_last_change_at: null, //This should be the date and time of the last record change in ISO 8601 format. Available in reform.
-    form_created_at: null, //This should be the date and time of the form creation in ISO 8601 format. Available in reform.
-    form_updated_at: null, //This should be the date and time of the form update in ISO 8601 format. Available in reform.
-    form_created_by: null, //This should be the user who created the form. Available in reform. Available in reform.
-    form_updated_by: null, //This should be the user who updated the form. Available in reform. Available in reform.
-    status: 'active', //status can be active or inactive. Available in reform.
-    version: 1, //This should be the version of the form and it's updated every time the form is saved. Available in reform.
-    main_org_id: 'personal', //This should be the unique identifier of the main organization of the form (it can be 'personal' or one of the main organizations in the account). Available in reform.
-    main_org_metadata: null, //This should be the metadata of the main organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
-    sub_org_id: null, //This should be the unique identifier of the sub-organization of the form (it can be null or one of the sub-organizations in the account). Available in reform.
-    sub_org_metadata: null, //This should be the metadata of the sub-organization of the form (it can be null or an array of fields to be included in each form). Available in reform.
-    project_id: null, //This should be the unique identifier of the project of the form (it can be null or one of the projects in the account). Available in reform.
-    project_metadata: null, //This should be the metadata of the project of the form (it can be null or an array of fields to be included in each form). Available in reform.
+    id: null, // Optional platform-owned form identifier. Unique form identifier.
+    form_created_at: null, // Optional platform-owned audit timestamp. Form creation date/time.
+    form_updated_at: null, // Optional platform-owned audit timestamp. Form last update date/time.
+    form_created_by: null, // Optional platform-owned audit metadata. User who created the form.
+    form_updated_by: null, // Optional platform-owned audit metadata. User who last updated the form.
+    status: 'active', // Optional platform-owned publication status. Usually active or inactive.
+    version: '1', // Optional platform-owned schema version. form0-core does not increment it.
+    main_org_id: 'personal', // Optional platform-owned scope metadata. Main organization identifier.
+    main_org_metadata: null, // Optional platform-owned scope metadata. Main organization metadata fields.
+    sub_org_id: null, // Optional platform-owned scope metadata. Sub-organization identifier.
+    sub_org_metadata: null, // Optional platform-owned scope metadata. Sub-organization metadata fields.
+    project_id: null, // Optional platform-owned scope metadata. Project identifier.
+    project_metadata: null, // Optional platform-owned scope metadata. Project metadata fields.
     ai: {
       context: ['safety_inspections', 'incident_reporting'],
       instructions: ['Keep data identifiers in English', 'Avoid personal identifiers in suggestions'],
@@ -96,13 +94,13 @@ const schema = {
         '0180f', //If a key/data_name refers to a SingleChoiceField, MultiChoiceField or BooleanField, we should always show the choice label.
       ],
     },
-    bounding_box: [0, 0, 0, 0], //Bounding box containing all the form's records. Format is [min_lat, min_long, max_lat, max_long]. Available in reform.
-    location_enabled: true, //location_enabled can be true or false
-    location_required: true, //location_required can be true or false
-    image: null, //The URL to the original image which was uploaded as this app's icon. Available in reform.
-    image_thumbnail: null, //The URL to the thumbnail-sized image which was uploaded as this app's icon. 160x160 px. Available in reform.
-    image_small: null, //The URL to the small-sized image which was uploaded as this app's icon. 320x320 px. Available in reform.
-    image_large: null, //The URL to the medium-sized image which was uploaded as this app's icon. 640x640 px. Available in reform.
+    bounding_box: [0, 0, 0, 0], // Optional platform-owned geospatial metadata. Bounding box containing all records.
+    location_enabled: true, // Optional platform-owned form capability flag. Enables location capture.
+    location_required: true, // Optional platform-owned form capability flag. Requires location data when enabled.
+    image: null, // Optional platform-owned media metadata. URL for the original form image.
+    image_thumbnail: null, // Optional platform-owned media metadata. URL for the thumbnail image (160x160 px).
+    image_small: null, // Optional platform-owned media metadata. URL for the small image (320x320 px).
+    image_large: null, // Optional platform-owned media metadata. URL for the large image (640x640 px).
     events: {
       code: `
         function alertTest(event) {
