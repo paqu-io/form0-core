@@ -23,6 +23,13 @@ export { getValidOperators, isValidOperator, validateFieldConditions } from './s
 
 export { recordVersion, formVersion } from './utilities/version-utils.js';
 export { buildRepeatableMetadata } from './utilities/repeatable-helpers.js';
+export {
+  buildDatasetDescriptors,
+  buildFieldIdentityMap,
+  getFieldQuerySemantics,
+  projectDatasetRowValues,
+  resolveDatasetDescriptorById,
+} from './utilities/dataset-descriptors.js';
 export { generateUuidV7 } from './utilities/uuid.js';
 export {
   FORM_LINK_VALUE_DELIMITER,
