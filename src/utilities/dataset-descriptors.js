@@ -87,8 +87,11 @@ const QUERY_SEMANTICS_BY_FIELD_TYPE = {
     default_operator: 'contains',
     allowed_operators: [
       'contains',
+      'not_contains',
       'eq',
       'neq',
+      'in',
+      'not_in',
       'starts_with',
       'ends_with',
       'is_blank',
@@ -109,6 +112,8 @@ const QUERY_SEMANTICS_BY_FIELD_TYPE = {
       'neq',
       'gt',
       'lt',
+      'in',
+      'not_in',
       'is_blank',
       'is_not_blank',
     ],
@@ -127,6 +132,8 @@ const QUERY_SEMANTICS_BY_FIELD_TYPE = {
       'neq',
       'gt',
       'lt',
+      'in',
+      'not_in',
       'is_blank',
       'is_not_blank',
     ],
@@ -145,6 +152,8 @@ const QUERY_SEMANTICS_BY_FIELD_TYPE = {
       'neq',
       'gt',
       'lt',
+      'in',
+      'not_in',
       'is_blank',
       'is_not_blank',
     ],
@@ -202,6 +211,8 @@ const getCalculatedFieldSemantics = (field) => {
         'neq',
         'gt',
         'lt',
+        'in',
+        'not_in',
         'is_blank',
         'is_not_blank',
       ],
@@ -223,6 +234,8 @@ const getCalculatedFieldSemantics = (field) => {
         'neq',
         'gt',
         'lt',
+        'in',
+        'not_in',
         'is_blank',
         'is_not_blank',
       ],
@@ -244,6 +257,8 @@ const getCalculatedFieldSemantics = (field) => {
         'neq',
         'gt',
         'lt',
+        'in',
+        'not_in',
         'is_blank',
         'is_not_blank',
       ],
@@ -258,8 +273,11 @@ const getCalculatedFieldSemantics = (field) => {
     default_operator: 'contains',
     allowed_operators: [
       'contains',
+      'not_contains',
       'eq',
       'neq',
+      'in',
+      'not_in',
       'starts_with',
       'ends_with',
       'is_blank',
@@ -293,33 +311,179 @@ const toChoiceValueList = (field) => {
   return field.choices.filter((choice) => isRecord(choice));
 };
 
-const toSingleChoiceLabel = (field, rawValue) => {
-  const choices = toChoiceValueList(field);
-  if (choices.length === 0) {
-    return rawValue;
+const isChoicePrimitive = (value) =>
+  typeof value === 'string' ||
+  typeof value === 'number' ||
+  typeof value === 'boolean';
+
+const normalizeChoiceEntryValue = (entry) => {
+  if (isChoicePrimitive(entry)) {
+    return entry;
   }
 
-  const matched = choices.find(
-    (choice) => Object.prototype.hasOwnProperty.call(choice, 'value') && choice.value === rawValue,
+  if (!isRecord(entry)) {
+    return undefined;
+  }
+
+  if (isChoicePrimitive(entry.value)) {
+    return entry.value;
+  }
+
+  if (isChoicePrimitive(entry.label)) {
+    return entry.label;
+  }
+
+  return undefined;
+};
+
+const normalizeChoiceEntryDisplayValue = (entry) => {
+  if (isChoicePrimitive(entry)) {
+    return entry;
+  }
+
+  if (!isRecord(entry)) {
+    return undefined;
+  }
+
+  if (isChoicePrimitive(entry.label)) {
+    return entry.label;
+  }
+
+  if (isChoicePrimitive(entry.value)) {
+    return entry.value;
+  }
+
+  return undefined;
+};
+
+const normalizeChoiceEntryLabel = (field, entry) => {
+  const normalizedValue = normalizeChoiceEntryValue(entry);
+  if (typeof normalizedValue === 'undefined') {
+    return undefined;
+  }
+
+  const matched = toChoiceValueList(field).find(
+    (choice) =>
+      Object.prototype.hasOwnProperty.call(choice, 'value') &&
+      choice.value === normalizedValue,
   );
-  if (!matched) {
+  if (matched) {
+    return toTrimmedString(matched.label) ?? normalizedValue;
+  }
+
+  if (isRecord(entry) && isChoicePrimitive(entry.label)) {
+    return entry.label;
+  }
+
+  return normalizedValue;
+};
+
+const toSingleChoiceSelectionValues = (rawValue) => {
+  if (isRecord(rawValue)) {
+    const choiceValues = Array.isArray(rawValue.choice)
+      ? rawValue.choice
+          .map((entry) => normalizeChoiceEntryValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+    const otherValues = Array.isArray(rawValue.other)
+      ? rawValue.other
+          .map((entry) => normalizeChoiceEntryValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+
+    return [...choiceValues, ...otherValues];
+  }
+
+  const normalized = normalizeChoiceEntryValue(rawValue);
+  return typeof normalized === 'undefined' ? [] : [normalized];
+};
+
+const toSingleChoiceDisplayValues = (field, rawValue) => {
+  if (isRecord(rawValue)) {
+    const choiceLabels = Array.isArray(rawValue.choice)
+      ? rawValue.choice
+          .map((entry) => normalizeChoiceEntryLabel(field, entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+    const otherLabels = Array.isArray(rawValue.other)
+      ? rawValue.other
+          .map((entry) => normalizeChoiceEntryDisplayValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+
+    return [...choiceLabels, ...otherLabels];
+  }
+
+  const normalized = normalizeChoiceEntryLabel(field, rawValue);
+  return typeof normalized === 'undefined' ? [] : [normalized];
+};
+
+const toMultiChoiceSelectionValues = (rawValue) => {
+  if (isRecord(rawValue)) {
+    const selectedValues = Array.isArray(rawValue.choices)
+      ? rawValue.choices
+          .map((entry) => normalizeChoiceEntryValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+    const otherValues = Array.isArray(rawValue.other)
+      ? rawValue.other
+          .map((entry) => normalizeChoiceEntryValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+
+    return [...selectedValues, ...otherValues];
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .map((entry) => normalizeChoiceEntryValue(entry))
+      .filter((entry) => typeof entry !== 'undefined');
+  }
+
+  return [];
+};
+
+const toMultiChoiceDisplayValues = (field, rawValue) => {
+  if (isRecord(rawValue)) {
+    const selectedLabels = Array.isArray(rawValue.choices)
+      ? rawValue.choices
+          .map((entry) => normalizeChoiceEntryLabel(field, entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+    const otherLabels = Array.isArray(rawValue.other)
+      ? rawValue.other
+          .map((entry) => normalizeChoiceEntryDisplayValue(entry))
+          .filter((entry) => typeof entry !== 'undefined')
+      : [];
+
+    return [...selectedLabels, ...otherLabels];
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .map((entry) => normalizeChoiceEntryLabel(field, entry))
+      .filter((entry) => typeof entry !== 'undefined');
+  }
+
+  return [];
+};
+
+const toSingleChoiceLabel = (field, rawValue) => {
+  const labels = toSingleChoiceDisplayValues(field, rawValue);
+  if (labels.length === 0) {
     return rawValue;
   }
 
-  return toTrimmedString(matched.label) ?? rawValue;
+  return labels.length === 1 ? labels[0] : labels;
 };
 
 const toMultiChoiceLabels = (field, rawValue) => {
-  if (!Array.isArray(rawValue)) {
+  const labels = toMultiChoiceDisplayValues(field, rawValue);
+  if (labels.length === 0) {
     return rawValue;
   }
 
-  const choices = toChoiceValueList(field);
-  if (choices.length === 0) {
-    return rawValue;
-  }
-
-  return rawValue.map((entry) => toSingleChoiceLabel(field, entry));
+  return labels;
 };
 
 const toDisplayValue = (field, rawValue) => {
@@ -497,7 +661,14 @@ const readFirstAliasValue = (value, aliases) => {
   return undefined;
 };
 
-const normalizeScalarValue = (value) => {
+const normalizeScalarValue = (field, value) => {
+  if (
+    field?.field_type === 'SingleChoiceField' ||
+    field?.field_type === 'BooleanField'
+  ) {
+    return toSingleChoiceSelectionValues(value)[0];
+  }
+
   if (Array.isArray(value)) {
     return undefined;
   }
@@ -505,7 +676,11 @@ const normalizeScalarValue = (value) => {
   return value;
 };
 
-const normalizeTermValues = (value) => {
+const normalizeTermValues = (field, value) => {
+  if (field?.field_type === 'MultiChoiceField') {
+    return toMultiChoiceSelectionValues(value);
+  }
+
   if (!Array.isArray(value)) {
     return [];
   }
@@ -539,7 +714,7 @@ export function projectDatasetRowValues(descriptor, rowValues) {
     displayValues[field.field_id] = toDisplayValue(field, rawValue);
 
     if (field.query_kind === 'scalar') {
-      const scalarValue = normalizeScalarValue(rawValue);
+      const scalarValue = normalizeScalarValue(field, rawValue);
       if (typeof scalarValue !== 'undefined') {
         scalarValues[field.field_id] = scalarValue;
       }
@@ -547,7 +722,7 @@ export function projectDatasetRowValues(descriptor, rowValues) {
     }
 
     if (field.query_kind === 'terms') {
-      const terms = normalizeTermValues(rawValue);
+      const terms = normalizeTermValues(field, rawValue);
       if (terms.length > 0) {
         termValues[field.field_id] = terms;
       }
