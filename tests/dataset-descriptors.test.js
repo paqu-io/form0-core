@@ -144,10 +144,39 @@ assert.deepEqual(textSemantics, {
   default_operator: 'contains',
   allowed_operators: [
     'contains',
+    'not_contains',
     'eq',
     'neq',
+    'in',
+    'not_in',
     'starts_with',
     'ends_with',
+    'is_blank',
+    'is_not_blank',
+  ],
+});
+
+const numericSemantics = getFieldQuerySemantics({
+  type: 'NumericField',
+  key: 'numeric_key',
+  data_name: 'numeric_value',
+});
+assert.deepEqual(numericSemantics, {
+  query_kind: 'scalar',
+  display_kind: 'number',
+  sortable: true,
+  filterable: true,
+  default_operator: 'between',
+  allowed_operators: [
+    'between',
+    'gte',
+    'lte',
+    'eq',
+    'neq',
+    'gt',
+    'lt',
+    'in',
+    'not_in',
     'is_blank',
     'is_not_blank',
   ],
@@ -170,7 +199,10 @@ assert.deepEqual(multiChoiceSemantics, {
 const projectedRoot = projectDatasetRowValues(rootDataset, {
   title: 'Main record',
   age: 12,
-  city: 'bogota',
+  city: {
+    choice: [{ value: 'bogota', label: 'Bogota' }],
+    other: [],
+  },
 });
 
 assert.deepEqual(projectedRoot.displayValues, {
@@ -188,19 +220,25 @@ assert.deepEqual(projectedRoot.termValues, {});
 const projectedChild = projectDatasetRowValues(animalsDataset, {
   form_values: {
     animal_name: 'Falcon',
-    animal_tags: ['fast', 'calm'],
+    animal_tags: {
+      choices: [
+        { value: 'fast', label: 'Fast' },
+        { value: 'calm', label: 'Calm' },
+      ],
+      other: [{ value: 'custom-tag', label: 'Custom Tag' }],
+    },
   },
 });
 
 assert.deepEqual(projectedChild.displayValues, {
   animal_name_key: 'Falcon',
-  animal_tags_key: ['Fast', 'Calm'],
+  animal_tags_key: ['Fast', 'Calm', 'Custom Tag'],
 });
 assert.deepEqual(projectedChild.scalarValues, {
   animal_name_key: 'Falcon',
 });
 assert.deepEqual(projectedChild.termValues, {
-  animal_tags_key: ['fast', 'calm'],
+  animal_tags_key: ['fast', 'calm', 'custom-tag'],
 });
 
 const identityMap = buildFieldIdentityMap(schema);
