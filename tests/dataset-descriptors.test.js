@@ -198,7 +198,7 @@ assert.deepEqual(multiChoiceSemantics, {
 
 const projectedRoot = projectDatasetRowValues(rootDataset, {
   title: 'Main record',
-  age: 12,
+  age: '12',
   city: {
     choice: [{ value: 'bogota', label: 'Bogota' }],
     other: [],
@@ -207,7 +207,7 @@ const projectedRoot = projectDatasetRowValues(rootDataset, {
 
 assert.deepEqual(projectedRoot.displayValues, {
   title_key: 'Main record',
-  age_key: 12,
+  age_key: '12',
   city_key: 'Bogota',
 });
 assert.deepEqual(projectedRoot.scalarValues, {
@@ -228,6 +228,18 @@ const projectedChild = projectDatasetRowValues(animalsDataset, {
       other: [{ value: 'custom-tag', label: 'Custom Tag' }],
     },
   },
+});
+
+const projectedCalculatedNumeric = projectDatasetRowValues(vaccinationsDataset, {
+  form_values: {
+    shot_date: '2026-04-02',
+    dose_count: '44',
+  },
+});
+
+assert.deepEqual(projectedCalculatedNumeric.scalarValues, {
+  shot_date_key: '2026-04-02',
+  dose_count_key: 44,
 });
 
 assert.deepEqual(projectedChild.displayValues, {
