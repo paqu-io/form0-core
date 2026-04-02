@@ -15,6 +15,20 @@ const toTrimmedString = (value) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const toFiniteNumberOrNull = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const trimmed = toTrimmedString(value);
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const toSchemaFormNode = (schema) => {
   if (!isRecord(schema)) {
     return null;
@@ -671,6 +685,13 @@ const normalizeScalarValue = (field, value) => {
 
   if (Array.isArray(value)) {
     return undefined;
+  }
+
+  if (field?.display_kind === 'number') {
+    const parsedNumber = toFiniteNumberOrNull(value);
+    if (parsedNumber !== null) {
+      return parsedNumber;
+    }
   }
 
   return value;
