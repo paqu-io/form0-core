@@ -182,6 +182,33 @@ assert.deepEqual(numericSemantics, {
   ],
 });
 
+const calculatedNumericAliasSemantics = getFieldQuerySemantics({
+  type: 'CalculatedField',
+  key: 'calc_number_key',
+  data_name: 'calc_number',
+  display_mode: 'number',
+});
+assert.deepEqual(calculatedNumericAliasSemantics, {
+  query_kind: 'scalar',
+  display_kind: 'number',
+  sortable: true,
+  filterable: true,
+  default_operator: 'between',
+  allowed_operators: [
+    'between',
+    'gte',
+    'lte',
+    'eq',
+    'neq',
+    'gt',
+    'lt',
+    'in',
+    'not_in',
+    'is_blank',
+    'is_not_blank',
+  ],
+});
+
 const multiChoiceSemantics = getFieldQuerySemantics({
   type: 'MultiChoiceField',
   key: 'multi_key',
