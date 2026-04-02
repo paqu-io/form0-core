@@ -75,18 +75,44 @@ const toRepeatableLabel = (field) =>
   toTrimmedString(field?.key) ??
   'Repeatable section';
 
+const normalizeCalculatedDisplayStyle = (value) => {
+  const normalized = toTrimmedString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  switch (normalized.toLowerCase()) {
+    case 'number':
+      return 'numeric';
+    case 'datetime':
+      return 'date';
+    default:
+      return normalized.toLowerCase();
+  }
+};
+
 const getCalculatedDisplayStyle = (field) => {
   if (!isRecord(field)) {
     return null;
   }
 
+  const directStyle =
+    normalizeCalculatedDisplayStyle(field.display_mode) ??
+    normalizeCalculatedDisplayStyle(field.display_style);
+  if (directStyle) {
+    return directStyle;
+  }
+
   const display = field.display;
   if (typeof display === 'string') {
-    return toTrimmedString(display);
+    return normalizeCalculatedDisplayStyle(display);
   }
 
   if (isRecord(display)) {
-    return toTrimmedString(display.style);
+    return (
+      normalizeCalculatedDisplayStyle(display.style) ??
+      normalizeCalculatedDisplayStyle(display.type)
+    );
   }
 
   return null;
