@@ -40,6 +40,16 @@ const schema = {
               { label: 'Paris', value: 'paris' },
             ],
           },
+          {
+            type: 'BooleanField',
+            key: 'approved_key',
+            data_name: 'approved',
+            label: 'Approved',
+            choices: [
+              { label: 'Yes', value: 'yes' },
+              { label: 'No', value: 'no' },
+            ],
+          },
         ],
       },
       {
@@ -103,11 +113,11 @@ assert.equal(rootDataset.kind, 'root');
 assert.equal(rootDataset.label, 'Zoo Survey');
 assert.deepEqual(
   rootDataset.fields.map((field) => field.field_id),
-  ['title_key', 'age_key', 'city_key'],
+  ['title_key', 'age_key', 'city_key', 'approved_key']
 );
 assert.deepEqual(
   rootDataset.fields.map((field) => field.output_key),
-  ['title', 'age', 'city'],
+  ['title', 'age', 'city', 'approved']
 );
 
 const animalsDataset = resolveDatasetDescriptorById(schema, 'animals_key');
@@ -119,7 +129,7 @@ assert.equal(animalsDataset.repeatable_output_key, 'animals');
 assert.equal(animalsDataset.label, 'Animals');
 assert.deepEqual(
   animalsDataset.fields.map((field) => field.field_id),
-  ['animal_name_key', 'animal_tags_key'],
+  ['animal_name_key', 'animal_tags_key']
 );
 
 const vaccinationsDataset = resolveDatasetDescriptorById(schema, 'animals_key.vaccinations_key');
@@ -128,7 +138,7 @@ assert.equal(vaccinationsDataset.parent_dataset_id, 'animals_key');
 assert.equal(vaccinationsDataset.label, 'Animals / Vaccinations');
 assert.deepEqual(
   vaccinationsDataset.fields.map((field) => field.field_id),
-  ['shot_date_key', 'dose_count_key'],
+  ['shot_date_key', 'dose_count_key']
 );
 
 const textSemantics = getFieldQuerySemantics({
@@ -227,8 +237,12 @@ const projectedRoot = projectDatasetRowValues(rootDataset, {
   title: 'Main record',
   age: '12',
   city: {
-    choice: [{ value: 'bogota', label: 'Bogota' }],
-    other: [],
+    choice_value: [{ value: 'bogota', label: 'Legacy Bogota' }],
+    other_value: [],
+  },
+  approved: {
+    choice_value: [{ value: 'yes', label: 'Legacy Yes' }],
+    other_value: [],
   },
 });
 
@@ -236,11 +250,13 @@ assert.deepEqual(projectedRoot.displayValues, {
   title_key: 'Main record',
   age_key: '12',
   city_key: 'Bogota',
+  approved_key: 'Yes',
 });
 assert.deepEqual(projectedRoot.scalarValues, {
   title_key: 'Main record',
   age_key: 12,
   city_key: 'bogota',
+  approved_key: 'yes',
 });
 assert.deepEqual(projectedRoot.termValues, {});
 
@@ -248,11 +264,11 @@ const projectedChild = projectDatasetRowValues(animalsDataset, {
   form_values: {
     animal_name: 'Falcon',
     animal_tags: {
-      choices: [
-        { value: 'fast', label: 'Fast' },
-        { value: 'calm', label: 'Calm' },
+      choices_value: [
+        { value: 'fast', label: 'Legacy Fast' },
+        { value: 'calm', label: 'Legacy Calm' },
       ],
-      other: [{ value: 'custom-tag', label: 'Custom Tag' }],
+      other_value: [{ value: 'custom-tag', label: 'Custom Tag' }],
     },
   },
 });
@@ -280,6 +296,18 @@ assert.deepEqual(projectedChild.termValues, {
   animal_tags_key: ['fast', 'calm', 'custom-tag'],
 });
 
+assert.throws(
+  () =>
+    projectDatasetRowValues(rootDataset, {
+      city: {
+        choice: [{ value: 'bogota', label: 'Bogota' }],
+        other: [],
+      },
+    }),
+  /must not use renderer keys/,
+  'dataset projection should reject renderer choice aliases'
+);
+
 const identityMap = buildFieldIdentityMap(schema);
 assert.deepEqual(identityMap.city_key, {
   field_id: 'city_key',
@@ -297,3 +325,5 @@ assert.deepEqual(identityMap.shot_date_key, {
   label: 'Shot Date',
   field_type: 'DateField',
 });
+
+console.log('dataset-descriptors tests passed');

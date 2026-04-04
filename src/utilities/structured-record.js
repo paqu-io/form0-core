@@ -4,6 +4,11 @@ import {
   buildFieldIdentityMap,
   projectDatasetRowValues,
 } from './dataset-descriptors.js';
+import {
+  isChoiceFieldLike,
+  normalizeStoredChoiceValue,
+  toRendererChoiceValue,
+} from './choice-value-shapes.js';
 
 const CONTAINER_TYPES = new Set(['Section', 'BuildingPlanSection']);
 const TIMESTAMP_KEYS = [
@@ -131,102 +136,6 @@ const buildScopeFromElements = (elements) => {
   return scope;
 };
 
-const resolveChoiceLabel = (field, rawValue, fallbackLabel) => {
-  const normalizedValue = trimString(rawValue);
-  if (!normalizedValue) {
-    return fallbackLabel ?? null;
-  }
-
-  if (Array.isArray(field?.choices)) {
-    const matched = field.choices.find(
-      (choice) =>
-        isRecordObject(choice) &&
-        Object.prototype.hasOwnProperty.call(choice, 'value') &&
-        choice.value === normalizedValue
-    );
-    if (matched) {
-      return trimString(matched.label) ?? normalizedValue;
-    }
-  }
-
-  return fallbackLabel ?? normalizedValue;
-};
-
-const normalizeChoiceEntry = (field, entry) => {
-  if (!isRecordObject(entry)) {
-    return entry;
-  }
-
-  const rawValue = trimString(entry.value) ?? trimString(entry.label) ?? trimString(entry.id);
-  if (!rawValue) {
-    return { ...entry };
-  }
-
-  return {
-    ...entry,
-    value: rawValue,
-    label: resolveChoiceLabel(field, rawValue, trimString(entry.label)),
-  };
-};
-
-const normalizeChoiceList = (field, entries) => {
-  if (!Array.isArray(entries)) {
-    return entries;
-  }
-
-  return entries.map((entry) => normalizeChoiceEntry(field, entry));
-};
-
-const normalizeChoiceStructuredValue = (field, rawValue) => {
-  if (!isRecordObject(rawValue)) {
-    return rawValue;
-  }
-
-  const normalized = { ...rawValue };
-
-  if (field?.type === 'SingleChoiceField' || field?.type === 'BooleanField') {
-    if (Array.isArray(rawValue.choice_value)) {
-      normalized.choice_value = normalizeChoiceList(field, rawValue.choice_value);
-    }
-    if (Array.isArray(rawValue.choice)) {
-      normalized.choice = normalizeChoiceList(field, rawValue.choice);
-    }
-    if (Array.isArray(rawValue.other_value)) {
-      normalized.other_value = rawValue.other_value.map((entry) =>
-        isRecordObject(entry) ? { ...entry } : entry
-      );
-    }
-    if (Array.isArray(rawValue.other)) {
-      normalized.other = rawValue.other.map((entry) =>
-        isRecordObject(entry) ? { ...entry } : entry
-      );
-    }
-    return normalized;
-  }
-
-  if (field?.type === 'MultiChoiceField') {
-    if (Array.isArray(rawValue.choices_value)) {
-      normalized.choices_value = normalizeChoiceList(field, rawValue.choices_value);
-    }
-    if (Array.isArray(rawValue.choices)) {
-      normalized.choices = normalizeChoiceList(field, rawValue.choices);
-    }
-    if (Array.isArray(rawValue.other_value)) {
-      normalized.other_value = rawValue.other_value.map((entry) =>
-        isRecordObject(entry) ? { ...entry } : entry
-      );
-    }
-    if (Array.isArray(rawValue.other)) {
-      normalized.other = rawValue.other.map((entry) =>
-        isRecordObject(entry) ? { ...entry } : entry
-      );
-    }
-    return normalized;
-  }
-
-  return normalized;
-};
-
 const buildFieldReferenceMap = (schema) => {
   const identityMap = buildFieldIdentityMap(schema);
   const references = new Map();
@@ -323,12 +232,10 @@ const normalizeRecordScope = (record, scope) => {
       return;
     }
 
-    if (
-      field.field?.type === 'SingleChoiceField' ||
-      field.field?.type === 'BooleanField' ||
-      field.field?.type === 'MultiChoiceField'
-    ) {
-      formValues[entry.key] = normalizeChoiceStructuredValue(field.field, entry.value);
+    if (isChoiceFieldLike(field.field)) {
+      formValues[entry.key] = normalizeStoredChoiceValue(field.field, entry.value, {
+        context: 'normalizeStructuredRecord',
+      });
     }
   });
 
@@ -363,7 +270,11 @@ const buildSnapshotState = (formValues, scope) => {
       return;
     }
 
-    rawValues[field.dataName] = cloneJson(entry.value);
+    rawValues[field.dataName] = isChoiceFieldLike(field.field)
+      ? toRendererChoiceValue(field.field, entry.value, {
+          context: 'buildFormRecordSnapshot',
+        })
+      : cloneJson(entry.value);
   });
 
   scope.repeatables.forEach((repeatableField) => {
@@ -436,6 +347,10 @@ const extractSnapshotTimestamps = (record) => ({
   updated_at_server: toNullableString(record?.updated_at_server) ?? null,
 });
 
+/**
+ * Normalize a canonical stored record for downstream record-side consumers.
+ * Renderer/live aliases are rejected; known choice labels are refreshed from the supplied schema.
+ */
 export function normalizeStructuredRecord(schema, record, options = {}) {
   const normalized = isRecordObject(record) ? cloneJson(record) : {};
   const mode = trimString(options.mode) ?? 'derived';
@@ -456,6 +371,10 @@ export function normalizeStructuredRecord(schema, record, options = {}) {
   return normalized;
 }
 
+/**
+ * Build a renderer snapshot from a canonical stored record.
+ * Choice fields are converted back to renderer/live shape while record metadata stays top-level.
+ */
 export function buildFormRecordSnapshot(schema, record, options = {}) {
   const normalizedRecord = normalizeStructuredRecord(schema, record, {
     mode: 'derived',
