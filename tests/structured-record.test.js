@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { buildFormRecordSnapshot, normalizeStructuredRecord } from '../src/index.js';
+import {
+  buildFormRecordSnapshot,
+  createStructuredRecord,
+  flattenFields,
+  normalizeStructuredRecord,
+} from '../src/index.js';
 
 function createNumericField({ key, data_name, label = data_name, default_value = null }) {
   return {
@@ -27,7 +32,13 @@ function createNumericField({ key, data_name, label = data_name, default_value =
   };
 }
 
-function createSingleChoiceField({ key, data_name, label = data_name, choices }) {
+function createSingleChoiceField({
+  key,
+  data_name,
+  label = data_name,
+  choices,
+  allow_other = false,
+}) {
   return {
     type: 'SingleChoiceField',
     key,
@@ -43,12 +54,68 @@ function createSingleChoiceField({ key, data_name, label = data_name, choices })
     read_only: false,
     read_only_conditions: null,
     default_value: null,
-    allow_other: false,
+    allow_other,
     supporting_image: false,
     supporting_image_path: null,
     supporting_image_display: null,
     is_searchable: true,
     is_searchable_mode: 'default',
+    choices,
+  };
+}
+
+function createMultiChoiceField({
+  key,
+  data_name,
+  label = data_name,
+  choices,
+  allow_other = false,
+}) {
+  return {
+    type: 'MultiChoiceField',
+    key,
+    data_name,
+    label,
+    display: 'default',
+    description: null,
+    description_mode: null,
+    required: false,
+    required_conditions: null,
+    visible: true,
+    visible_conditions: null,
+    read_only: false,
+    read_only_conditions: null,
+    default_value: null,
+    allow_other,
+    supporting_image: false,
+    supporting_image_path: null,
+    supporting_image_display: null,
+    is_searchable: true,
+    is_searchable_mode: 'default',
+    choices,
+  };
+}
+
+function createBooleanField({ key, data_name, label = data_name, choices }) {
+  return {
+    type: 'BooleanField',
+    key,
+    data_name,
+    label,
+    display: 'default',
+    description: null,
+    description_mode: null,
+    required: false,
+    required_conditions: null,
+    visible: true,
+    visible_conditions: null,
+    read_only: false,
+    read_only_conditions: null,
+    default_value: null,
+    third_option_enabled: false,
+    supporting_image: false,
+    supporting_image_path: null,
+    supporting_image_display: null,
     choices,
   };
 }
@@ -132,6 +199,23 @@ const schema = {
           { label: 'Milano', value: 'milan' },
         ],
       }),
+      createMultiChoiceField({
+        key: 'amenities',
+        data_name: 'amenities',
+        allow_other: true,
+        choices: [
+          { label: 'Wi-Fi', value: 'wifi' },
+          { label: 'Parking', value: 'parking' },
+        ],
+      }),
+      createBooleanField({
+        key: 'confirmed',
+        data_name: 'confirmed',
+        choices: [
+          { label: 'Yes', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ],
+      }),
       createNumericField({
         key: 'base_amount',
         data_name: 'base_amount',
@@ -160,23 +244,31 @@ const schema = {
   },
 };
 
-const legacyRecord = {
+const canonicalRecord = {
   '@status': 'pending',
   '@title': 'Old Rome',
   created_at_client: '2026-04-02T09:00:00.000Z',
   updated_at_client: '2026-04-02T09:05:00.000Z',
   form_values: {
     city: {
-      choice: [{ value: 'rome', label: 'Old Rome' }],
-      other: [],
+      choice_value: [{ value: 'rome', label: 'Old Rome' }],
+      other_value: [],
+    },
+    amenities: {
+      choices_value: [{ value: 'wifi', label: 'Legacy WiFi' }],
+      other_value: [{ label: 'Balcony' }],
+    },
+    confirmed: {
+      choice_value: [{ value: 'yes', label: 'Legacy Yes' }],
+      other_value: [],
     },
     rooms: [
       {
         id: 'room-1',
         form_values: {
           room_type: {
-            choice: [{ value: 'kitchen', label: 'Legacy Kitchen' }],
-            other: [],
+            choice_value: [{ value: 'kitchen', label: 'Legacy Kitchen' }],
+            other_value: [],
           },
         },
       },
@@ -184,20 +276,50 @@ const legacyRecord = {
   },
 };
 
+const rendererAliasRecord = {
+  '@status': 'pending',
+  form_values: {
+    city: {
+      choice: [{ value: 'rome', label: 'Roma' }],
+      other: [],
+    },
+  },
+};
+
 (() => {
-  const normalized = normalizeStructuredRecord(schema, legacyRecord, {
+  const normalized = normalizeStructuredRecord(schema, canonicalRecord, {
     mode: 'derived',
   });
 
   assert.equal(
-    normalized.form_values.city.choice[0].value,
+    normalized.form_values.city.choice_value[0].value,
     'rome',
-    'normalization should keep canonical choice values stable'
+    'normalization should keep canonical single-choice values stable'
   );
   assert.equal(
-    normalized.form_values.city.choice[0].label,
+    normalized.form_values.city.choice_value[0].label,
     'Roma',
-    'normalization should refresh root choice labels from the current schema'
+    'normalization should refresh root single-choice labels from the current schema'
+  );
+  assert.equal(
+    normalized.form_values.amenities.choices_value[0].label,
+    'Wi-Fi',
+    'normalization should refresh multi-choice labels from the current schema'
+  );
+  assert.equal(
+    normalized.form_values.amenities.other_value[0].label,
+    'Balcony',
+    'normalization should preserve record-provided other labels'
+  );
+  assert.equal(
+    normalized.form_values.confirmed.choice_value[0].label,
+    'Yes',
+    'normalization should refresh boolean labels from the current schema'
+  );
+  assert.equal(
+    normalized.form_values.rooms[0].form_values.room_type.choice_value[0].label,
+    'Kitchen',
+    'normalization should refresh nested repeatable choice labels'
   );
   assert.equal(
     normalized['@title'],
@@ -205,29 +327,40 @@ const legacyRecord = {
     'normalization should recompute the record title from current schema display values'
   );
   assert.equal(
-    legacyRecord['@title'],
+    canonicalRecord['@title'],
     'Old Rome',
     'normalization must not mutate the source record'
   );
 })();
 
 (() => {
-  const normalized = normalizeStructuredRecord(schema, legacyRecord, {
-    mode: 'derived',
-  });
-
-  assert.equal(
-    normalized.form_values.rooms[0].form_values.room_type.choice[0].label,
-    'Kitchen',
-    'normalization should refresh nested repeatable choice labels'
+  assert.throws(
+    () =>
+      normalizeStructuredRecord(schema, rendererAliasRecord, {
+        mode: 'derived',
+      }),
+    /must not use renderer keys/,
+    'normalization should reject renderer choice aliases in record inputs'
   );
 })();
 
 (() => {
-  const snapshot = buildFormRecordSnapshot(schema, legacyRecord, {
+  const snapshot = buildFormRecordSnapshot(schema, canonicalRecord, {
     mode: 'editor',
   });
 
+  assert.deepEqual(snapshot.raw_values.city, {
+    choice: [{ value: 'rome', label: 'Roma' }],
+    other: [],
+  });
+  assert.deepEqual(snapshot.raw_values.amenities, {
+    choices: [{ value: 'wifi', label: 'Wi-Fi' }],
+    other: [{ label: 'Balcony' }],
+  });
+  assert.deepEqual(snapshot.raw_values.confirmed, {
+    choice: [{ value: 'yes', label: 'Yes' }],
+    other: [],
+  });
   assert.equal(
     snapshot.raw_values.status,
     'pending',
@@ -243,16 +376,63 @@ const legacyRecord = {
     40,
     'editor snapshots should evaluate calculated fields against hydrated defaults'
   );
-  assert.equal(
-    snapshot.repeatable.rooms[0].values.room_type.choice[0].label,
-    'Kitchen',
-    'editor snapshots should keep normalized nested repeatable values'
-  );
+  assert.deepEqual(snapshot.repeatable.rooms[0].values.room_type, {
+    choice: [{ value: 'kitchen', label: 'Kitchen' }],
+    other: [],
+  });
   assert.deepEqual(
-    legacyRecord.form_values.base_amount,
+    canonicalRecord.form_values.base_amount,
     undefined,
     'editor hydration must not persist hydrated defaults back into the source record'
   );
+})();
+
+(() => {
+  assert.throws(
+    () => buildFormRecordSnapshot(schema, rendererAliasRecord, { mode: 'editor' }),
+    /must not use renderer keys/,
+    'snapshots should reject renderer choice aliases in canonical record inputs'
+  );
+})();
+
+(() => {
+  const flattenedFields = flattenFields(schema.form.elements);
+  const record = createStructuredRecord(
+    {
+      values: {
+        city: {
+          choice: [{ value: 'rome', label: 'Roma' }],
+          other: [],
+        },
+        amenities: {
+          choices: [{ value: 'wifi', label: 'Wi-Fi' }],
+          other: [{ label: 'Balcony' }],
+        },
+        confirmed: {
+          choice: [{ value: 'yes', label: 'Yes' }],
+          other: [],
+        },
+      },
+      repeatable: {},
+    },
+    flattenedFields,
+    {
+      originalElements: schema.form.elements,
+    }
+  );
+
+  assert.deepEqual(record.form_values.city, {
+    choice_value: [{ value: 'rome', label: 'Roma' }],
+    other_value: [],
+  });
+  assert.deepEqual(record.form_values.amenities, {
+    choices_value: [{ value: 'wifi', label: 'Wi-Fi' }],
+    other_value: [{ label: 'Balcony' }],
+  });
+  assert.deepEqual(record.form_values.confirmed, {
+    choice_value: [{ value: 'yes', label: 'Yes' }],
+    other_value: [],
+  });
 })();
 
 console.log('structured-record tests passed');

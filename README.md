@@ -40,6 +40,26 @@ scope fields like `main_org_id`, and media or location settings. Operational cou
 application or API boundaries, not treated as engine-authored schema. A top-level
 `form.version` may still exist, but the engine does not bump or consume it.
 
+### Record-side contract
+
+`form0-core` intentionally uses two different choice-value shapes:
+
+- Live engine / renderer values use renderer shape:
+  - single / boolean: `{ choice, other }`
+  - multi: `{ choices, other }`
+- Structured records use canonical stored shape:
+  - single / boolean: `{ choice_value, other_value }`
+  - multi: `{ choices_value, other_value }`
+
+Record-side utilities follow this contract:
+
+- `createStructuredRecord()` outputs canonical stored records
+- `normalizeStructuredRecord()` consumes and returns canonical stored records
+- `buildFormRecordSnapshot()` consumes canonical stored records and returns renderer snapshot values
+- `projectDatasetRowValues()` consumes canonical stored rows
+
+Record status remains top-level as `@status`; it is not stored inside `form_values`.
+
 ## Security
 
 See `SECURITY.md` for security modes and configuration.

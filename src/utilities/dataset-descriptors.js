@@ -1,10 +1,13 @@
 import { flattenFields } from './field-helpers.js';
+import {
+  readStoredChoiceDisplayValues,
+  readStoredChoiceSelectionValues,
+} from './choice-value-shapes.js';
 
 const ROOT_DATASET_ID = '__root__';
 const CONTAINER_TYPES = new Set(['Section', 'BuildingPlanSection']);
 
-const isRecord = (value) =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const toTrimmedString = (value) => {
   if (typeof value !== 'string') {
@@ -57,11 +60,9 @@ const uniqueAliases = (...values) => {
   return aliases;
 };
 
-const toFieldId = (field) =>
-  toTrimmedString(field?.key) ?? toTrimmedString(field?.data_name);
+const toFieldId = (field) => toTrimmedString(field?.key) ?? toTrimmedString(field?.data_name);
 
-const toOutputKey = (field) =>
-  toTrimmedString(field?.data_name) ?? toTrimmedString(field?.key);
+const toOutputKey = (field) => toTrimmedString(field?.data_name) ?? toTrimmedString(field?.key);
 
 const toFieldLabel = (field) =>
   toTrimmedString(field?.label) ??
@@ -343,173 +344,10 @@ export function getFieldQuerySemantics(field) {
   return { ...semantics };
 }
 
-const toChoiceValueList = (field) => {
-  if (!Array.isArray(field?.choices)) {
-    return [];
-  }
-
-  return field.choices.filter((choice) => isRecord(choice));
-};
-
-const isChoicePrimitive = (value) =>
-  typeof value === 'string' ||
-  typeof value === 'number' ||
-  typeof value === 'boolean';
-
-const normalizeChoiceEntryValue = (entry) => {
-  if (isChoicePrimitive(entry)) {
-    return entry;
-  }
-
-  if (!isRecord(entry)) {
-    return undefined;
-  }
-
-  if (isChoicePrimitive(entry.value)) {
-    return entry.value;
-  }
-
-  if (isChoicePrimitive(entry.label)) {
-    return entry.label;
-  }
-
-  return undefined;
-};
-
-const normalizeChoiceEntryDisplayValue = (entry) => {
-  if (isChoicePrimitive(entry)) {
-    return entry;
-  }
-
-  if (!isRecord(entry)) {
-    return undefined;
-  }
-
-  if (isChoicePrimitive(entry.label)) {
-    return entry.label;
-  }
-
-  if (isChoicePrimitive(entry.value)) {
-    return entry.value;
-  }
-
-  return undefined;
-};
-
-const normalizeChoiceEntryLabel = (field, entry) => {
-  const normalizedValue = normalizeChoiceEntryValue(entry);
-  if (typeof normalizedValue === 'undefined') {
-    return undefined;
-  }
-
-  const matched = toChoiceValueList(field).find(
-    (choice) =>
-      Object.prototype.hasOwnProperty.call(choice, 'value') &&
-      choice.value === normalizedValue,
-  );
-  if (matched) {
-    return toTrimmedString(matched.label) ?? normalizedValue;
-  }
-
-  if (isRecord(entry) && isChoicePrimitive(entry.label)) {
-    return entry.label;
-  }
-
-  return normalizedValue;
-};
-
-const toSingleChoiceSelectionValues = (rawValue) => {
-  if (isRecord(rawValue)) {
-    const choiceValues = Array.isArray(rawValue.choice)
-      ? rawValue.choice
-          .map((entry) => normalizeChoiceEntryValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-    const otherValues = Array.isArray(rawValue.other)
-      ? rawValue.other
-          .map((entry) => normalizeChoiceEntryValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-
-    return [...choiceValues, ...otherValues];
-  }
-
-  const normalized = normalizeChoiceEntryValue(rawValue);
-  return typeof normalized === 'undefined' ? [] : [normalized];
-};
-
-const toSingleChoiceDisplayValues = (field, rawValue) => {
-  if (isRecord(rawValue)) {
-    const choiceLabels = Array.isArray(rawValue.choice)
-      ? rawValue.choice
-          .map((entry) => normalizeChoiceEntryLabel(field, entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-    const otherLabels = Array.isArray(rawValue.other)
-      ? rawValue.other
-          .map((entry) => normalizeChoiceEntryDisplayValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-
-    return [...choiceLabels, ...otherLabels];
-  }
-
-  const normalized = normalizeChoiceEntryLabel(field, rawValue);
-  return typeof normalized === 'undefined' ? [] : [normalized];
-};
-
-const toMultiChoiceSelectionValues = (rawValue) => {
-  if (isRecord(rawValue)) {
-    const selectedValues = Array.isArray(rawValue.choices)
-      ? rawValue.choices
-          .map((entry) => normalizeChoiceEntryValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-    const otherValues = Array.isArray(rawValue.other)
-      ? rawValue.other
-          .map((entry) => normalizeChoiceEntryValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-
-    return [...selectedValues, ...otherValues];
-  }
-
-  if (Array.isArray(rawValue)) {
-    return rawValue
-      .map((entry) => normalizeChoiceEntryValue(entry))
-      .filter((entry) => typeof entry !== 'undefined');
-  }
-
-  return [];
-};
-
-const toMultiChoiceDisplayValues = (field, rawValue) => {
-  if (isRecord(rawValue)) {
-    const selectedLabels = Array.isArray(rawValue.choices)
-      ? rawValue.choices
-          .map((entry) => normalizeChoiceEntryLabel(field, entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-    const otherLabels = Array.isArray(rawValue.other)
-      ? rawValue.other
-          .map((entry) => normalizeChoiceEntryDisplayValue(entry))
-          .filter((entry) => typeof entry !== 'undefined')
-      : [];
-
-    return [...selectedLabels, ...otherLabels];
-  }
-
-  if (Array.isArray(rawValue)) {
-    return rawValue
-      .map((entry) => normalizeChoiceEntryLabel(field, entry))
-      .filter((entry) => typeof entry !== 'undefined');
-  }
-
-  return [];
-};
-
 const toSingleChoiceLabel = (field, rawValue) => {
-  const labels = toSingleChoiceDisplayValues(field, rawValue);
+  const labels = readStoredChoiceDisplayValues(field, rawValue, {
+    context: 'projectDatasetRowValues',
+  });
   if (labels.length === 0) {
     return rawValue;
   }
@@ -518,7 +356,9 @@ const toSingleChoiceLabel = (field, rawValue) => {
 };
 
 const toMultiChoiceLabels = (field, rawValue) => {
-  const labels = toMultiChoiceDisplayValues(field, rawValue);
+  const labels = readStoredChoiceDisplayValues(field, rawValue, {
+    context: 'projectDatasetRowValues',
+  });
   if (labels.length === 0) {
     return rawValue;
   }
@@ -645,7 +485,7 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
         repeatable_output_path: descriptor.repeatable_output_path,
         parent_dataset_id: descriptor.id,
       },
-      datasets,
+      datasets
     );
   });
 };
@@ -681,7 +521,7 @@ export function buildDatasetDescriptors(schema) {
       repeatable_output_path: [],
       parent_dataset_id: ROOT_DATASET_ID,
     },
-    datasets,
+    datasets
   );
 
   return datasets;
@@ -702,11 +542,10 @@ const readFirstAliasValue = (value, aliases) => {
 };
 
 const normalizeScalarValue = (field, value) => {
-  if (
-    field?.field_type === 'SingleChoiceField' ||
-    field?.field_type === 'BooleanField'
-  ) {
-    return toSingleChoiceSelectionValues(value)[0];
+  if (field?.field_type === 'SingleChoiceField' || field?.field_type === 'BooleanField') {
+    return readStoredChoiceSelectionValues(field, value, {
+      context: 'projectDatasetRowValues',
+    })[0];
   }
 
   if (Array.isArray(value)) {
@@ -725,7 +564,9 @@ const normalizeScalarValue = (field, value) => {
 
 const normalizeTermValues = (field, value) => {
   if (field?.field_type === 'MultiChoiceField') {
-    return toMultiChoiceSelectionValues(value);
+    return readStoredChoiceSelectionValues(field, value, {
+      context: 'projectDatasetRowValues',
+    });
   }
 
   if (!Array.isArray(value)) {
@@ -733,13 +574,14 @@ const normalizeTermValues = (field, value) => {
   }
 
   return value.filter(
-    (entry) =>
-      typeof entry === 'string' ||
-      typeof entry === 'number' ||
-      typeof entry === 'boolean',
+    (entry) => typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean'
   );
 };
 
+/**
+ * Project a canonical stored row into dataset display/scalar/term values.
+ * Choice fields must already use the stored `*_value` record shape.
+ */
 export function projectDatasetRowValues(descriptor, rowValues) {
   const sourceRecord = isRecord(rowValues) ? rowValues : {};
   const source =
