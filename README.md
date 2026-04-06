@@ -57,6 +57,9 @@ Record-side utilities follow this contract:
 - `normalizeStructuredRecord()` consumes and returns canonical stored records
 - `buildFormRecordSnapshot()` consumes canonical stored records and returns renderer snapshot values
 - `projectDatasetRowValues()` consumes canonical stored rows
+- Choice `FIELD_SPECS` keep separate validators by context:
+  - `valueValidator` validates live engine / renderer values
+  - `recordValueValidator` validates canonical stored record values
 
 Record status remains top-level as `@status`; it is not stored inside `form_values`.
 

@@ -1,4 +1,5 @@
 import { validateChoiceFieldChoices } from '../utilities/field-helpers.js';
+import { validateStoredChoiceValue } from '../utilities/choice-value-shapes.js';
 import {
   isNonEmptyString,
   validateFormLinkRecordDefaults,
@@ -316,6 +317,10 @@ export const FIELD_SPECS = {
       }
       return null;
     },
+    recordValueValidator: (field, value) =>
+      validateStoredChoiceValue(field, value, {
+        context: 'FIELD_SPECS.recordValueValidator',
+      }),
     defaultProducer: (field) => {
       if (field.default_value) {
         const choice = field.choices.find((c) => c.value === field.default_value);
@@ -466,6 +471,10 @@ export const FIELD_SPECS = {
       }
       return null;
     },
+    recordValueValidator: (field, value) =>
+      validateStoredChoiceValue(field, value, {
+        context: 'FIELD_SPECS.recordValueValidator',
+      }),
     defaultProducer: (field) => {
       if (field.default_value) {
         const selectedChoices = field.choices
@@ -596,6 +605,10 @@ export const FIELD_SPECS = {
       }
       return null;
     },
+    recordValueValidator: (field, value) =>
+      validateStoredChoiceValue(field, value, {
+        context: 'FIELD_SPECS.recordValueValidator',
+      }),
     defaultProducer: (field) => {
       if (field.default_value) {
         const choice = field.choices.find((c) => c.value === field.default_value);
