@@ -296,6 +296,48 @@ assert.deepEqual(projectedChild.termValues, {
   animal_tags_key: ['fast', 'calm', 'custom-tag'],
 });
 
+const projectedBlankRootChoices = projectDatasetRowValues(rootDataset, {
+  city: {
+    choice_value: [],
+    other_value: [],
+  },
+  approved: {
+    choice_value: [],
+    other_value: [],
+  },
+});
+
+assert.deepEqual(
+  projectedBlankRootChoices.displayValues,
+  {},
+  'blank canonical single choice and boolean values should not leak raw objects into display values'
+);
+assert.deepEqual(
+  projectedBlankRootChoices.scalarValues,
+  {},
+  'blank canonical single choice and boolean values should not project scalar values'
+);
+
+const projectedBlankMultiChoice = projectDatasetRowValues(animalsDataset, {
+  form_values: {
+    animal_tags: {
+      choices_value: [],
+      other_value: [],
+    },
+  },
+});
+
+assert.deepEqual(
+  projectedBlankMultiChoice.displayValues,
+  {},
+  'blank canonical multi choice values should not leak raw objects into display values'
+);
+assert.deepEqual(
+  projectedBlankMultiChoice.termValues,
+  {},
+  'blank canonical multi choice values should not project term values'
+);
+
 assert.throws(
   () =>
     projectDatasetRowValues(rootDataset, {
