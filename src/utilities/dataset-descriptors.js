@@ -349,7 +349,7 @@ const toSingleChoiceLabel = (field, rawValue) => {
     context: 'projectDatasetRowValues',
   });
   if (labels.length === 0) {
-    return rawValue;
+    return undefined;
   }
 
   return labels.length === 1 ? labels[0] : labels;
@@ -360,7 +360,7 @@ const toMultiChoiceLabels = (field, rawValue) => {
     context: 'projectDatasetRowValues',
   });
   if (labels.length === 0) {
-    return rawValue;
+    return undefined;
   }
 
   return labels;
@@ -600,7 +600,10 @@ export function projectDatasetRowValues(descriptor, rowValues) {
       return;
     }
 
-    displayValues[field.field_id] = toDisplayValue(field, rawValue);
+    const displayValue = toDisplayValue(field, rawValue);
+    if (typeof displayValue !== 'undefined') {
+      displayValues[field.field_id] = displayValue;
+    }
 
     if (field.query_kind === 'scalar') {
       const scalarValue = normalizeScalarValue(field, rawValue);
