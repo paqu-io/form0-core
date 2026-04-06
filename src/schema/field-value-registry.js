@@ -20,6 +20,29 @@ export function validateFieldValue(field, value) {
 }
 
 /**
+ * Validates a structured-record field value against its specification
+ * @param {object} field - The field definition
+ * @param {any} value - The stored record value to validate
+ * @returns {string|null} - Error message if validation fails, or null if valid
+ */
+export function validateRecordFieldValue(field, value) {
+  const spec = FIELD_SPECS[field.type];
+  if (!spec) {
+    return `Unsupported field type: ${field.type}`;
+  }
+
+  if (typeof spec.recordValueValidator === 'function') {
+    return spec.recordValueValidator(field, value);
+  }
+
+  if (typeof spec.valueValidator === 'function') {
+    return spec.valueValidator(field, value);
+  }
+
+  return null;
+}
+
+/**
  * Returns the value validator function for a field type
  * @param {string} fieldType - The field type
  * @returns {function|null} - The value validator function or null if not found
@@ -27,6 +50,25 @@ export function validateFieldValue(field, value) {
 export function getFieldValueValidator(fieldType) {
   const spec = FIELD_SPECS[fieldType];
   return spec ? spec.valueValidator : null;
+}
+
+/**
+ * Returns the structured-record value validator function for a field type
+ * Falls back to the live value validator when no record-specific validator exists.
+ * @param {string} fieldType - The field type
+ * @returns {function|null} - The record value validator function or null if not found
+ */
+export function getRecordFieldValueValidator(fieldType) {
+  const spec = FIELD_SPECS[fieldType];
+  if (!spec) {
+    return null;
+  }
+
+  if (typeof spec.recordValueValidator === 'function') {
+    return spec.recordValueValidator;
+  }
+
+  return typeof spec.valueValidator === 'function' ? spec.valueValidator : null;
 }
 
 /**

@@ -213,6 +213,34 @@ export function normalizeStoredChoiceValue(field, rawValue, options = {}) {
   return normalized;
 }
 
+export function validateStoredChoiceValue(field, rawValue, options = {}) {
+  try {
+    const normalized = normalizeStoredChoiceValue(field, rawValue, options);
+    const kind = getChoiceKind(field);
+    const fieldIdentifier = toFieldIdentifier(field);
+
+    if (normalized && kind === 'single' && toFieldType(field) === 'BooleanField') {
+      if (normalized.other_value.length > 0) {
+        return `${fieldIdentifier} does not support 'other_value' values`;
+      }
+    }
+
+    if (normalized && kind !== null && toFieldType(field) !== 'BooleanField') {
+      if (field.allow_other !== true && normalized.other_value.length > 0) {
+        return `${fieldIdentifier} does not allow 'other_value' values`;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    if (error instanceof Error) {
+      return error.message.replace(/^\[form0\] [^:]+: /, '');
+    }
+
+    return 'stored choice value is invalid';
+  }
+}
+
 export function toRendererChoiceValue(field, rawValue, options = {}) {
   const kind = getChoiceKind(field);
   if (!kind || rawValue === null || typeof rawValue === 'undefined') {

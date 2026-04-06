@@ -4,12 +4,11 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Schema-driven engine that powers form0 ecosystem.",
+  "description": "Schema-driven engine that powers form0 ecosystem. Looking for the full form0 ecosystem? Install the CLI: `npm install -g form0-cli`",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "test": "node tests/form0-core.test.js && node tests/dataset-descriptors.test.js && node tests/structured-record.test.js && node tests/builtin-metadata.test.js && node tests/calculation-editor.test.js && node tests/form-event-editor.test.js && node tests/security-test.js",
-    "postinstall": "node scripts/postinstall.cjs",
     "format": "prettier --write \"**/*.{js,jsx,json,ts,tsx,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,json,ts,tsx,md}\""
   },

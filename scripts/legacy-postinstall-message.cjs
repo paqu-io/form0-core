@@ -1,3 +1,7 @@
+// Legacy reference only.
+// This script is intentionally not wired into package.json lifecycle hooks.
+// It is retained as a reference for the previous install-time guidance message.
+
 const PACKAGE_NAME = 'form0-core';
 
 const npmUserAgent = process.env.npm_config_user_agent || '';

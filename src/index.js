@@ -6,6 +6,12 @@ export {
   buildFormRecordSnapshot,
 } from './utilities/structured-record.js';
 export { validateSchema } from './schema/schema-validator.js';
+export {
+  validateFieldValue,
+  validateRecordFieldValue,
+  getFieldValueValidator,
+  getRecordFieldValueValidator,
+} from './schema/field-value-registry.js';
 //export { validateSchema, resolveSupportingImagePath } from './schema/schema-validator.js';
 export { generateKey } from './utilities/hash.js';
 export {
