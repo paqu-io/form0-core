@@ -11,6 +11,8 @@ import {
 const schema = {
   form: {
     name: 'Zoo Survey',
+    location_enabled: true,
+    location_required: false,
     elements: [
       {
         type: 'TextField',
@@ -57,6 +59,8 @@ const schema = {
         key: 'animals_key',
         data_name: 'animals',
         label: 'Animals',
+        location_enabled: true,
+        location_required: true,
         elements: [
           {
             type: 'TextField',
@@ -111,6 +115,8 @@ const rootDataset = resolveDatasetDescriptorById(schema, '__root__');
 assert.ok(rootDataset);
 assert.equal(rootDataset.kind, 'root');
 assert.equal(rootDataset.label, 'Zoo Survey');
+assert.equal(rootDataset.location_enabled, true);
+assert.equal(rootDataset.location_required, false);
 assert.deepEqual(
   rootDataset.fields.map((field) => field.field_id),
   ['title_key', 'age_key', 'city_key', 'approved_key']
@@ -127,6 +133,8 @@ assert.equal(animalsDataset.parent_dataset_id, '__root__');
 assert.equal(animalsDataset.repeatable_field_id, 'animals_key');
 assert.equal(animalsDataset.repeatable_output_key, 'animals');
 assert.equal(animalsDataset.label, 'Animals');
+assert.equal(animalsDataset.location_enabled, true);
+assert.equal(animalsDataset.location_required, true);
 assert.deepEqual(
   animalsDataset.fields.map((field) => field.field_id),
   ['animal_name_key', 'animal_tags_key']
@@ -136,6 +144,8 @@ const vaccinationsDataset = resolveDatasetDescriptorById(schema, 'animals_key.va
 assert.ok(vaccinationsDataset);
 assert.equal(vaccinationsDataset.parent_dataset_id, 'animals_key');
 assert.equal(vaccinationsDataset.label, 'Animals / Vaccinations');
+assert.equal(vaccinationsDataset.location_enabled, false);
+assert.equal(vaccinationsDataset.location_required, false);
 assert.deepEqual(
   vaccinationsDataset.fields.map((field) => field.field_id),
   ['shot_date_key', 'dose_count_key']

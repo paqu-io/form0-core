@@ -32,6 +32,9 @@ const toFiniteNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const toBooleanOrDefault = (value, fallback = false) =>
+  typeof value === 'boolean' ? value : fallback;
+
 const toSchemaFormNode = (schema) => {
   if (!isRecord(schema)) {
     return null;
@@ -471,6 +474,8 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
       repeatable_field_id: repeatableFieldId,
       repeatable_output_key: repeatableOutputKey,
       root_dataset_id: ROOT_DATASET_ID,
+      location_enabled: toBooleanOrDefault(element.location_enabled),
+      location_required: toBooleanOrDefault(element.location_required),
       fields: [],
     };
 
@@ -507,6 +512,8 @@ export function buildDatasetDescriptors(schema) {
     repeatable_field_id: null,
     repeatable_output_key: null,
     root_dataset_id: ROOT_DATASET_ID,
+    location_enabled: toBooleanOrDefault(formNode.location_enabled),
+    location_required: toBooleanOrDefault(formNode.location_required),
     fields: [],
   };
 
