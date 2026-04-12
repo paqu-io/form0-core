@@ -12,6 +12,44 @@ const AI_ATTRIBUTE_DEFINITION = {
   nullable: true,
 };
 
+const MEDIA_REFERENCE_FIELDS = [
+  'asset_id',
+  'upload_id',
+  'upload_status',
+  'mime_type',
+  'size',
+  'size_bytes',
+  'checksum_sha256',
+  'original_filename',
+  'thumbnail_url',
+  'preview_url',
+  'url',
+  'public_url',
+  'field_key',
+  'field_data_name',
+  'attached_at_client',
+  'captured_at_client',
+  'signed_at_client',
+  'uploaded_at_server',
+  'ready_at_server',
+  'error',
+];
+
+const isObjectRecord = (value) =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const copyPresentMediaFields = (source, target) => {
+  MEDIA_REFERENCE_FIELDS.forEach((fieldName) => {
+    if (Object.prototype.hasOwnProperty.call(source, fieldName)) {
+      target[fieldName] = source[fieldName];
+    }
+  });
+  return target;
+};
+
+const normalizeMediaId = (value, primaryKey) =>
+  value[primaryKey] || value.media_id || value.asset_id || null;
+
 /**
  * Central field specification registry
  * Each field type defines its attributes, validation rules, and behavior
@@ -1104,17 +1142,19 @@ export const FIELD_SPECS = {
       return field.default_value || null;
     },
     outputProducer: (field, value) => {
-      // SignatureField output structure: {signature_id: null, data: base64String}
-      if (value && typeof value === 'object' && value.data) {
-        // Value is already in the correct structure from form-renderer.js
-        return {
-          signature_id: value.signature_id || null,
-          data: value.data,
-        };
+      // SignatureField preserves storage-agnostic upload metadata.
+      if (isObjectRecord(value)) {
+        const output = copyPresentMediaFields(value, {
+          signature_id: normalizeMediaId(value, 'signature_id'),
+          media_id: value.media_id || value.signature_id || value.asset_id || null,
+          data: value.data || null,
+        });
+        return output.data || output.asset_id || output.upload_id || output.media_id ? output : null;
       } else if (value && typeof value === 'string') {
         // Fallback: if value is just the base64 string
         return {
           signature_id: null,
+          media_id: null,
           data: value,
         };
       }
@@ -1200,13 +1240,18 @@ export const FIELD_SPECS = {
       return null; // PhotoField default_value must be null
     },
     outputProducer: (field, value) => {
-      // PhotoField output structure: array of {photo_id: null|uuid, filename: string, caption: string|null}
+      // PhotoField output preserves stable client IDs and upload metadata.
       if (Array.isArray(value)) {
-        return value.map((photo) => ({
-          photo_id: photo.photo_id || null,
-          filename: photo.filename || photo.name || 'unknown',
-          caption: photo.caption || null,
-        }));
+        return value
+          .filter((photo) => isObjectRecord(photo))
+          .map((photo) =>
+            copyPresentMediaFields(photo, {
+              photo_id: normalizeMediaId(photo, 'photo_id'),
+              media_id: photo.media_id || photo.photo_id || photo.asset_id || null,
+              filename: photo.filename || photo.name || photo.original_filename || 'unknown',
+              caption: photo.caption || null,
+            })
+          );
       }
       return [];
     },
@@ -1296,14 +1341,19 @@ export const FIELD_SPECS = {
       return null; // VideoField default_value must be null
     },
     outputProducer: (field, value) => {
-      // VideoField output structure: array of {video_id: null|uuid, filename: string, duration: number, caption: string|null}
+      // VideoField output preserves stable client IDs and upload metadata.
       if (Array.isArray(value)) {
-        return value.map((video) => ({
-          video_id: video.video_id || null,
-          filename: video.filename || video.name || 'unknown',
-          duration: video.duration || 0,
-          caption: video.caption || null,
-        }));
+        return value
+          .filter((video) => isObjectRecord(video))
+          .map((video) =>
+            copyPresentMediaFields(video, {
+              video_id: normalizeMediaId(video, 'video_id'),
+              media_id: video.media_id || video.video_id || video.asset_id || null,
+              filename: video.filename || video.name || video.original_filename || 'unknown',
+              duration: video.duration || 0,
+              caption: video.caption || null,
+            })
+          );
       }
       return [];
     },
