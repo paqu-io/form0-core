@@ -111,6 +111,7 @@ export const FIELD_SPECS = {
       },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -190,6 +191,7 @@ export const FIELD_SPECS = {
       },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -275,6 +277,7 @@ export const FIELD_SPECS = {
       choices: { type: 'array', required: true, nullable: false },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -429,6 +432,7 @@ export const FIELD_SPECS = {
       choices: { type: 'array', required: true, nullable: false },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -578,6 +582,7 @@ export const FIELD_SPECS = {
       third_option_enabled: { type: 'boolean', required: true, nullable: false },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -812,6 +817,7 @@ export const FIELD_SPECS = {
       calculate: { type: 'string', required: true, nullable: false },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -1071,6 +1077,7 @@ export const FIELD_SPECS = {
       default_value: { type: 'string', required: true, nullable: true, value: null },
       supporting_image: { type: 'boolean', required: true, nullable: false },
       supporting_image_path: { type: 'string', required: true, nullable: true },
+      supporting_image_asset_id: { type: 'string', required: false, nullable: true },
       supporting_image_display: {
         type: 'string',
         required: true,
@@ -1149,7 +1156,9 @@ export const FIELD_SPECS = {
           media_id: value.media_id || value.signature_id || value.asset_id || null,
           data: value.data || null,
         });
-        return output.data || output.asset_id || output.upload_id || output.media_id ? output : null;
+        return output.data || output.asset_id || output.upload_id || output.media_id
+          ? output
+          : null;
       } else if (value && typeof value === 'string') {
         // Fallback: if value is just the base64 string
         return {
