@@ -212,7 +212,7 @@ const QUERY_SEMANTICS_BY_FIELD_TYPE = {
   },
   BooleanField: {
     query_kind: 'scalar',
-    display_kind: 'boolean',
+    display_kind: 'enum',
     sortable: true,
     filterable: true,
     default_operator: 'in',
