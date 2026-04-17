@@ -202,6 +202,20 @@ assert.deepEqual(numericSemantics, {
   ],
 });
 
+const booleanSemantics = getFieldQuerySemantics({
+  type: 'BooleanField',
+  key: 'boolean_key',
+  data_name: 'boolean_choice',
+});
+assert.deepEqual(booleanSemantics, {
+  query_kind: 'scalar',
+  display_kind: 'enum',
+  sortable: true,
+  filterable: true,
+  default_operator: 'in',
+  allowed_operators: ['in', 'eq', 'neq', 'not_in', 'is_blank', 'is_not_blank'],
+});
+
 const calculatedNumericAliasSemantics = getFieldQuerySemantics({
   type: 'CalculatedField',
   key: 'calc_number_key',
