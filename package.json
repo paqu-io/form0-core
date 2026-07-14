@@ -1,6 +1,6 @@
 {
   "name": "form0-core",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
