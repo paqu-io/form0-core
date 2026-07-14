@@ -1,5 +1,14 @@
 # Security Features
 
+> [!CAUTION] > `SAFE` and `CUSTOM` mode are validation aids, not security sandboxes. The
+> evaluator compiles customer expressions with `new Function`; blocked-pattern
+> checks can be bypassed through dynamic property access, and
+> `maxExecutionTime` is not currently enforced. Do not execute untrusted
+> schemas in a privileged server or browser context. See
+> `analyses/SAFE_MODE_SECURITY_ANALYSIS.md` for the accepted critical finding
+> and `analyses/UNTRUSTED_JAVASCRIPT_EXECUTION_ARCHITECTURE.md` for the selected
+> isolation architecture that preserves vanilla JavaScript and imperative event scripts.
+
 form0-core provides configurable security options for expression evaluation to balance flexibility and safety.
 
 ## Security Modes
@@ -23,11 +32,12 @@ const engine = createFormEngine({
 });
 ```
 
-### SAFE
+### SAFE (validation only; not a trust boundary)
 
 - **Restricted context** - Only whitelisted globals available
 - **Pattern blocking** - Dangerous patterns are blocked
-- **Use case**: User-generated expressions, safer environments
+- **Use case**: Diagnostics for trusted authors. It is not suitable for
+  adversarial or otherwise untrusted expressions.
 
 ```javascript
 import { createFormEngine, SECURITY_MODES, SAFE_SECURITY_CONFIG } from 'form0-core';
@@ -113,7 +123,7 @@ const engine = createFormEngine({ schema, initialValues });
 To add security, simply include the security parameter:
 
 ```javascript
-// Add safe mode
+// Add validation-oriented safe mode. This is not a sandbox.
 const engine = createFormEngine({
   schema,
   initialValues,
