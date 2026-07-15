@@ -237,6 +237,39 @@ const DISPLAY_ONLY_SEMANTICS = {
   allowed_operators: [],
 };
 
+const MEDIA_FIELD_TYPES = new Set([
+  'PhotoField',
+  'VideoField',
+  'SignatureField',
+  'Photo',
+  'Video',
+  'Signature',
+]);
+const NON_DATA_FIELD_TYPES = new Set([
+  'LabelField',
+  'Section',
+  'RepeatableSection',
+  'BuildingPlanSection',
+]);
+
+/**
+ * Exportability is intentionally independent from query semantics. Media fields are
+ * display-only in the query engine, but are first-class export columns whose values
+ * are resolved by an authorized media gateway.
+ */
+export function getFieldExportKind(field) {
+  const fieldType = toTrimmedString(field?.type ?? field?.field_type);
+  if (!fieldType || NON_DATA_FIELD_TYPES.has(fieldType)) {
+    return 'none';
+  }
+
+  if (MEDIA_FIELD_TYPES.has(fieldType)) {
+    return 'media';
+  }
+
+  return 'value';
+}
+
 const getCalculatedFieldSemantics = (field) => {
   const style = getCalculatedDisplayStyle(field);
 
@@ -402,6 +435,7 @@ const buildDatasetFieldDescriptor = (field, dataset) => {
     data_name: toTrimmedString(field.data_name),
     label: toFieldLabel(field),
     field_type: toTrimmedString(field.type) ?? 'UnknownField',
+    export_kind: getFieldExportKind(field),
     choices: Array.isArray(field.choices)
       ? field.choices.filter((choice) => isRecord(choice)).map((choice) => ({ ...choice }))
       : undefined,
