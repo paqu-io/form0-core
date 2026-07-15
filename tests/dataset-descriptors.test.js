@@ -4,9 +4,62 @@ import {
   buildDatasetDescriptors,
   buildFieldIdentityMap,
   getFieldQuerySemantics,
+  getFieldExportKind,
   projectDatasetRowValues,
   resolveDatasetDescriptorById,
 } from '../src/index.js';
+
+const exportKindExpectations = new Map([
+  ['TextField', 'value'],
+  ['NumericField', 'value'],
+  ['SingleChoiceField', 'value'],
+  ['MultiChoiceField', 'value'],
+  ['BooleanField', 'value'],
+  ['DateField', 'value'],
+  ['TimeField', 'value'],
+  ['CalculatedField', 'value'],
+  ['FormLinkField', 'value'],
+  ['StatusField', 'value'],
+  ['TitleField', 'value'],
+  ['PhotoField', 'media'],
+  ['VideoField', 'media'],
+  ['SignatureField', 'media'],
+  ['LabelField', 'none'],
+  ['Section', 'none'],
+  ['RepeatableSection', 'none'],
+  ['BuildingPlanSection', 'none'],
+]);
+
+for (const [fieldType, expected] of exportKindExpectations) {
+  assert.equal(
+    getFieldExportKind({ type: fieldType }),
+    expected,
+    `${fieldType} should use export kind ${expected}`
+  );
+}
+
+const exportProjectionDataset = buildDatasetDescriptors({
+  form: {
+    elements: [
+      { type: 'PhotoField', key: 'photo_key', data_name: 'photo', label: 'Photo' },
+      {
+        type: 'CalculatedField',
+        key: 'metric_key',
+        data_name: 'metric',
+        label: 'Metric',
+        display: { style: 'currency' },
+      },
+    ],
+  },
+})[0];
+const exportedProjection = projectDatasetRowValues(exportProjectionDataset, {
+  photo: [{ asset_id: 'asset-1' }],
+  metric: 123.45,
+});
+assert.equal(exportProjectionDataset.fields[0].export_kind, 'media');
+assert.equal(exportProjectionDataset.fields[1].export_kind, 'value');
+assert.deepEqual(exportedProjection.displayValues.photo_key, [{ asset_id: 'asset-1' }]);
+assert.equal(exportedProjection.scalarValues.metric_key, 123.45);
 
 const schema = {
   form: {

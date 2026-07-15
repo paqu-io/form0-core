@@ -36,6 +36,7 @@ export { buildRepeatableMetadata } from './utilities/repeatable-helpers.js';
 export {
   buildDatasetDescriptors,
   buildFieldIdentityMap,
+  getFieldExportKind,
   getFieldQuerySemantics,
   projectDatasetRowValues,
   resolveDatasetDescriptorById,
