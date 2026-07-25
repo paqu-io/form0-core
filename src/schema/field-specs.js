@@ -202,7 +202,10 @@ export const FIELD_SPECS = {
     schemaValidators: [
       // Validate min/max relationship (cross-attribute validation)
       (field) => {
-        if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+        const hasMin = field.min !== null && field.min !== undefined;
+        const hasMax = field.max !== null && field.max !== undefined;
+
+        if (hasMin && hasMax && field.min > field.max) {
           return { isValid: false, error: `NumericField "${field.data_name}" has min > max` };
         }
         return { isValid: true };
