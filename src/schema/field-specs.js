@@ -932,6 +932,7 @@ export const FIELD_SPECS = {
       visible_conditions: { type: 'object', required: true, nullable: true },
       location_enabled: { type: 'boolean', required: true, nullable: false },
       location_required: { type: 'boolean', required: true, nullable: false },
+      title_field: { type: 'object', required: false, nullable: true },
       elements: { type: 'array', required: true, nullable: false },
     },
     schemaValidators: [

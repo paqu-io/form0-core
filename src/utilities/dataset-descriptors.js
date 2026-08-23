@@ -6,6 +6,16 @@ import {
 
 const ROOT_DATASET_ID = '__root__';
 const CONTAINER_TYPES = new Set(['Section', 'BuildingPlanSection']);
+const TITLE_ELIGIBLE_FIELD_TYPES = new Set([
+  'TextField',
+  'NumericField',
+  'DateField',
+  'TimeField',
+  'SingleChoiceField',
+  'MultiChoiceField',
+  'BooleanField',
+  'CalculatedField',
+]);
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -78,6 +88,8 @@ const toRepeatableLabel = (field) =>
   toTrimmedString(field?.data_name) ??
   toTrimmedString(field?.key) ??
   'Repeatable section';
+
+const cloneTitleField = (value) => (isRecord(value) ? { ...value } : null);
 
 const normalizeCalculatedDisplayStyle = (value) => {
   const normalized = toTrimmedString(value);
@@ -435,6 +447,7 @@ const buildDatasetFieldDescriptor = (field, dataset) => {
     data_name: toTrimmedString(field.data_name),
     label: toFieldLabel(field),
     field_type: toTrimmedString(field.type) ?? 'UnknownField',
+    title_eligible: TITLE_ELIGIBLE_FIELD_TYPES.has(field.type),
     export_kind: getFieldExportKind(field),
     choices: Array.isArray(field.choices)
       ? field.choices.filter((choice) => isRecord(choice)).map((choice) => ({ ...choice }))
@@ -510,6 +523,7 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
       root_dataset_id: ROOT_DATASET_ID,
       location_enabled: toBooleanOrDefault(element.location_enabled),
       location_required: toBooleanOrDefault(element.location_required),
+      title_field: cloneTitleField(element.title_field),
       fields: [],
     };
 
@@ -548,6 +562,7 @@ export function buildDatasetDescriptors(schema) {
     root_dataset_id: ROOT_DATASET_ID,
     location_enabled: toBooleanOrDefault(formNode.location_enabled),
     location_required: toBooleanOrDefault(formNode.location_required),
+    title_field: cloneTitleField(formNode.title_field),
     fields: [],
   };
 
@@ -667,6 +682,138 @@ export function projectDatasetRowValues(descriptor, rowValues) {
     scalarValues,
     termValues,
   };
+}
+
+const toLiveChoiceDisplayValues = (field, rawValue) => {
+  if (rawValue === null || typeof rawValue === 'undefined') {
+    return [];
+  }
+
+  if (typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+    const matched = Array.isArray(field?.choices)
+      ? field.choices.find((choice) => choice?.value === rawValue)
+      : null;
+    return [matched?.label ?? rawValue];
+  }
+
+  const selectionKey = field?.field_type === 'MultiChoiceField' ? 'choices' : 'choice';
+  const selected = Array.isArray(rawValue[selectionKey]) ? rawValue[selectionKey] : [];
+  const other = Array.isArray(rawValue.other) ? rawValue.other : [];
+  const labels = selected.map((entry) => {
+    const value = isRecord(entry) ? entry.value : entry;
+    const matched = Array.isArray(field?.choices)
+      ? field.choices.find((choice) => choice?.value === value)
+      : null;
+    return matched?.label ?? (isRecord(entry) ? (entry.label ?? entry.value) : entry);
+  });
+
+  other.forEach((entry) => {
+    labels.push(isRecord(entry) ? (entry.label ?? entry.value) : entry);
+  });
+
+  return labels.filter((entry) => entry !== null && typeof entry !== 'undefined');
+};
+
+const toTitleDisplayValue = (field, rawValue) => {
+  if (
+    isRecord(rawValue) &&
+    ['choice', 'choices', 'other'].some((key) =>
+      Object.prototype.hasOwnProperty.call(rawValue, key)
+    )
+  ) {
+    return toLiveChoiceDisplayValues(field, rawValue);
+  }
+
+  if (
+    field?.field_type === 'SingleChoiceField' ||
+    field?.field_type === 'MultiChoiceField' ||
+    field?.field_type === 'BooleanField'
+  ) {
+    if (!isRecord(rawValue)) {
+      return toLiveChoiceDisplayValues(field, rawValue);
+    }
+    return readStoredChoiceDisplayValues(field, rawValue, {
+      context: 'resolveDatasetRowTitle',
+    });
+  }
+
+  return rawValue;
+};
+
+const toTitlePart = (value) => {
+  if (Array.isArray(value)) {
+    const parts = value.map(toTitlePart).filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : null;
+  }
+
+  if (typeof value === 'string') {
+    return toTrimmedString(value);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (isRecord(value) && Object.prototype.hasOwnProperty.call(value, 'value')) {
+    return toTitlePart(value.value);
+  }
+
+  return null;
+};
+
+/**
+ * Resolve a derived title for one root or repeatable dataset row.
+ * Supports renderer/live values and canonical stored record values.
+ */
+export function resolveDatasetRowTitle(descriptor, rowValues) {
+  const titleField = isRecord(descriptor?.title_field) ? descriptor.title_field : null;
+  const references = Array.isArray(titleField?.elements) ? titleField.elements : [];
+  if (!titleField || titleField.enabled === false || references.length === 0) {
+    return null;
+  }
+
+  const sourceRecord = isRecord(rowValues) ? rowValues : {};
+  const source = isRecord(sourceRecord.form_values) ? sourceRecord.form_values : sourceRecord;
+  const fields = Array.isArray(descriptor?.fields) ? descriptor.fields : [];
+  const fieldByReference = new Map();
+
+  fields.forEach((field) => {
+    if (field?.title_eligible !== true) {
+      return;
+    }
+    [
+      field.field_id,
+      field.output_key,
+      field.key,
+      field.data_name,
+      ...(field.aliases ?? []),
+    ].forEach((reference) => {
+      const normalized = toTrimmedString(reference);
+      if (normalized && !fieldByReference.has(normalized)) {
+        fieldByReference.set(normalized, field);
+      }
+    });
+  });
+
+  const parts = [];
+  references.forEach((reference) => {
+    const normalizedReference = toTrimmedString(reference);
+    const field = normalizedReference ? fieldByReference.get(normalizedReference) : null;
+    if (!field) {
+      return;
+    }
+    const rawValue = readFirstAliasValue(source, field.aliases ?? []);
+    const part = toTitlePart(toTitleDisplayValue(field, rawValue));
+    if (part) {
+      parts.push(part);
+    }
+  });
+
+  return parts.length > 0 ? parts.join(', ') : null;
 }
 
 export function resolveDatasetDescriptorById(schema, datasetId) {

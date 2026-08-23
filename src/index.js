@@ -39,6 +39,7 @@ export {
   getFieldExportKind,
   getFieldQuerySemantics,
   projectDatasetRowValues,
+  resolveDatasetRowTitle,
   resolveDatasetDescriptorById,
 } from './utilities/dataset-descriptors.js';
 export { generateUuidV7 } from './utilities/uuid.js';
