@@ -1,9 +1,5 @@
 import { createFormEngine } from '../engine/form-engine.js';
-import {
-  buildDatasetDescriptors,
-  buildFieldIdentityMap,
-  projectDatasetRowValues,
-} from './dataset-descriptors.js';
+import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
 import {
   isChoiceFieldLike,
   normalizeStoredChoiceValue,
@@ -81,10 +77,11 @@ const findFirstAliasEntry = (value, aliases) => {
   return null;
 };
 
-const buildScopeFromElements = (elements) => {
+const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) => {
   const scope = {
     valueFields: [],
     repeatables: [],
+    datasetDescriptor: null,
   };
 
   if (!Array.isArray(elements)) {
@@ -98,7 +95,8 @@ const buildScopeFromElements = (elements) => {
 
     if (CONTAINER_TYPES.has(element.type)) {
       const childScope = buildScopeFromElements(
-        Array.isArray(element.elements) ? element.elements : []
+        Array.isArray(element.elements) ? element.elements : [],
+        descriptorByRepeatable
       );
       scope.valueFields.push(...childScope.valueFields);
       scope.repeatables.push(...childScope.repeatables);
@@ -115,8 +113,15 @@ const buildScopeFromElements = (elements) => {
         aliases: toAliasList(element),
         outputKey,
         repeatableKey: trimString(element.key) ?? trimString(element.data_name) ?? outputKey,
-        childScope: buildScopeFromElements(Array.isArray(element.elements) ? element.elements : []),
+        childScope: buildScopeFromElements(
+          Array.isArray(element.elements) ? element.elements : [],
+          descriptorByRepeatable
+        ),
       });
+      scope.repeatables[scope.repeatables.length - 1].childScope.datasetDescriptor =
+        descriptorByRepeatable.get(trimString(element.key)) ||
+        descriptorByRepeatable.get(trimString(element.data_name)) ||
+        null;
       continue;
     }
 
@@ -134,86 +139,6 @@ const buildScopeFromElements = (elements) => {
   }
 
   return scope;
-};
-
-const buildFieldReferenceMap = (schema) => {
-  const identityMap = buildFieldIdentityMap(schema);
-  const references = new Map();
-
-  Object.values(identityMap).forEach((field) => {
-    if (!isRecordObject(field)) {
-      return;
-    }
-
-    [field.field_id, field.output_key, field.key, field.data_name].forEach((ref) => {
-      const normalizedRef = trimString(ref);
-      if (normalizedRef && !references.has(normalizedRef)) {
-        references.set(normalizedRef, field.field_id);
-      }
-    });
-  });
-
-  return references;
-};
-
-const toTitlePart = (value) => {
-  if (Array.isArray(value)) {
-    const parts = value
-      .map((entry) => toTitlePart(entry))
-      .filter((entry) => typeof entry === 'string' && entry.length > 0);
-    return parts.length > 0 ? parts.join(', ') : null;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
-  }
-
-  return null;
-};
-
-const computeStructuredRecordTitle = (schema, record) => {
-  const formNode = isRecordObject(schema?.form) ? schema.form : null;
-  const titleField = isRecordObject(formNode?.title_field) ? formNode.title_field : null;
-  const titleElements = Array.isArray(titleField?.elements) ? titleField.elements : [];
-
-  if (!titleField || titleField.enabled === false || titleElements.length === 0) {
-    return null;
-  }
-
-  const descriptors = buildDatasetDescriptors(schema);
-  const rootDescriptor =
-    descriptors.find((descriptor) => descriptor.id === ROOT_DATASET_ID) ?? descriptors[0] ?? null;
-  if (!rootDescriptor) {
-    return null;
-  }
-
-  const projected = projectDatasetRowValues(rootDescriptor, record);
-  const references = buildFieldReferenceMap(schema);
-  const parts = [];
-
-  titleElements.forEach((entry) => {
-    const normalizedEntry = trimString(entry);
-    if (!normalizedEntry) {
-      return;
-    }
-
-    const fieldId = references.get(normalizedEntry);
-    if (!fieldId) {
-      return;
-    }
-
-    const part = toTitlePart(projected.displayValues[fieldId]);
-    if (part) {
-      parts.push(part);
-    }
-  });
-
-  return parts.length > 0 ? parts.join(', ') : null;
 };
 
 const normalizeRecordScope = (record, scope) => {
@@ -256,7 +181,41 @@ const normalizeRecordScope = (record, scope) => {
     });
   });
 
+  if (scope.datasetDescriptor) {
+    record['@title'] = resolveDatasetRowTitle(scope.datasetDescriptor, record);
+  }
+
   return record;
+};
+
+const findRepeatableElement = (elements, descriptor) => {
+  if (!Array.isArray(elements)) {
+    return null;
+  }
+
+  for (const element of elements) {
+    if (!isRecordObject(element)) {
+      continue;
+    }
+    if (
+      element.type === 'RepeatableSection' &&
+      [element.key, element.data_name].some(
+        (reference) =>
+          reference === descriptor.repeatable_field_id ||
+          reference === descriptor.repeatable_output_key
+      )
+    ) {
+      return element;
+    }
+    if (CONTAINER_TYPES.has(element.type) || element.type === 'RepeatableSection') {
+      const match = findRepeatableElement(element.elements, descriptor);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return null;
 };
 
 const buildSnapshotState = (formValues, scope) => {
@@ -360,13 +319,41 @@ export function normalizeStructuredRecord(schema, record, options = {}) {
   }
 
   const formNode = isRecordObject(schema?.form) ? schema.form : null;
-  const scope = buildScopeFromElements(Array.isArray(formNode?.elements) ? formNode.elements : []);
+  const descriptors = buildDatasetDescriptors(schema);
+  const descriptorByRepeatable = new Map();
+  descriptors.forEach((descriptor) => {
+    if (descriptor.kind !== 'repeatable') {
+      return;
+    }
+    [descriptor.repeatable_field_id, descriptor.repeatable_output_key].forEach((reference) => {
+      if (reference) {
+        descriptorByRepeatable.set(reference, descriptor);
+      }
+    });
+  });
+
+  const requestedDatasetId = trimString(options.datasetId) ?? ROOT_DATASET_ID;
+  const datasetDescriptor = descriptors.find((descriptor) => descriptor.id === requestedDatasetId);
+  if (!datasetDescriptor) {
+    throw new Error(`[form0] normalizeStructuredRecord: unknown dataset "${requestedDatasetId}"`);
+  }
+
+  const datasetElement =
+    datasetDescriptor.kind === 'repeatable'
+      ? findRepeatableElement(formNode?.elements, datasetDescriptor)
+      : null;
+  const scopeElements =
+    datasetDescriptor.kind === 'root'
+      ? Array.isArray(formNode?.elements)
+        ? formNode.elements
+        : []
+      : Array.isArray(datasetElement?.elements)
+        ? datasetElement.elements
+        : [];
+  const scope = buildScopeFromElements(scopeElements, descriptorByRepeatable);
+  scope.datasetDescriptor = datasetDescriptor;
 
   normalizeRecordScope(normalized, scope);
-
-  if (formNode) {
-    normalized['@title'] = computeStructuredRecordTitle(schema, normalized);
-  }
 
   return normalized;
 }

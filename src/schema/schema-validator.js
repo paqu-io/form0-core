@@ -3,6 +3,73 @@ import { validateFieldSchema, validateDefaultValue } from './field-schema-regist
 import { isSupportedFieldType } from '../utilities/field-types.js';
 import { validateFieldConditions } from './operators.js';
 import { validateFormAIMetadata } from './ai-metadata-validator.js';
+import { buildDatasetDescriptors } from '../utilities/dataset-descriptors.js';
+
+const toNonEmptyString = (value) =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+
+const getDescriptorFieldReferences = (field) =>
+  new Set(
+    [field?.field_id, field?.output_key, field?.key, field?.data_name, ...(field?.aliases || [])]
+      .map(toNonEmptyString)
+      .filter(Boolean)
+  );
+
+const validateScopedTitleFields = (form, errors) => {
+  const descriptors = buildDatasetDescriptors({ form });
+  const allReferenceDatasets = new Map();
+
+  descriptors.forEach((descriptor) => {
+    (descriptor.fields || []).forEach((field) => {
+      getDescriptorFieldReferences(field).forEach((reference) => {
+        if (!allReferenceDatasets.has(reference)) {
+          allReferenceDatasets.set(reference, new Set());
+        }
+        allReferenceDatasets.get(reference).add(descriptor.id);
+      });
+    });
+  });
+
+  descriptors.forEach((descriptor) => {
+    const titleField = descriptor.title_field;
+    if (!titleField) {
+      return;
+    }
+
+    const scopeLabel = descriptor.kind === 'root' ? 'title_field' : `RepeatableSection title_field`;
+    const titleValidation = validateFieldSchema(titleField);
+    if (!titleValidation.isValid) {
+      errors.push(...titleValidation.errors.map((error) => `${scopeLabel}: ${error}`));
+      return;
+    }
+
+    const scopedFields = descriptor.fields || [];
+    titleField.elements.forEach((entry) => {
+      const reference = toNonEmptyString(entry);
+      if (!reference) {
+        return;
+      }
+
+      const matchedField = scopedFields.find((field) =>
+        getDescriptorFieldReferences(field).has(reference)
+      );
+      if (!matchedField) {
+        if (allReferenceDatasets.has(reference)) {
+          errors.push(`${scopeLabel} reference "${reference}" is outside its record scope`);
+        } else {
+          errors.push(`${scopeLabel} reference "${reference}" does not match any field`);
+        }
+        return;
+      }
+
+      if (matchedField.title_eligible !== true) {
+        errors.push(
+          `${scopeLabel} reference "${reference}" uses unsupported field type ${matchedField.field_type}`
+        );
+      }
+    });
+  });
+};
 
 export function validateSchema(form) {
   const fields = flattenFields(form.elements);
@@ -180,12 +247,7 @@ export function validateSchema(form) {
       }
     }
   }
-  if (form.title_field) {
-    const titleValidation = validateFieldSchema(form.title_field);
-    if (!titleValidation.isValid) {
-      errors.push(...titleValidation.errors.map((e) => `title_field: ${e}`));
-    }
-  }
+  validateScopedTitleFields(form, errors);
 
   // Add duplicate errors to the main errors array
   if (duplicateDataNames.size > 0) {
@@ -225,7 +287,11 @@ export function validateSchema(form) {
               }
             }
 
-            if (!entry.form_id || typeof entry.form_id !== 'string' || entry.form_id.trim() === '') {
+            if (
+              !entry.form_id ||
+              typeof entry.form_id !== 'string' ||
+              entry.form_id.trim() === ''
+            ) {
               errors.push(`form_links.to[${index}].form_id must be a non-empty string`);
             }
           });
@@ -242,7 +308,11 @@ export function validateSchema(form) {
               return;
             }
 
-            if (!entry.form_id || typeof entry.form_id !== 'string' || entry.form_id.trim() === '') {
+            if (
+              !entry.form_id ||
+              typeof entry.form_id !== 'string' ||
+              entry.form_id.trim() === ''
+            ) {
               errors.push(`form_links.from[${index}].form_id must be a non-empty string`);
             }
 

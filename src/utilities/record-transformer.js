@@ -6,6 +6,7 @@
 import { FIELD_SPECS } from '../schema/field-specs.js';
 import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
+import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
 
 const hasMeaningfulValue = (value) => {
   if (value === null || value === undefined) {
@@ -178,26 +179,44 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
       dataNameToFieldMap.set(field.data_name, field);
     });
   }
-  // Create mapping from key to field for title resolution
-  const keyToFieldMap = new Map();
-  if (Array.isArray(fields)) {
-    fields.forEach((field) => {
-      if (field.key) keyToFieldMap.set(field.key, field);
-    });
-  }
-
   // Build a comprehensive tree structure for nested RepeatableSections
   const elementsSource = Array.isArray(options.originalElements)
     ? options.originalElements
     : Array.isArray(fields)
-    ? fields
-    : [];
+      ? fields
+      : [];
 
-  const {
-    repeatableSectionTree,
-    fieldOwnership,
-    sectionFields,
-  } = buildRepeatableMetadata(elementsSource);
+  const { repeatableSectionTree, fieldOwnership, sectionFields } =
+    buildRepeatableMetadata(elementsSource);
+
+  const titleDatasetDescriptors = buildDatasetDescriptors({
+    form: {
+      elements: elementsSource,
+      title_field: options.title_field || null,
+    },
+  });
+  const rootTitleDescriptor = titleDatasetDescriptors.find(
+    (descriptor) => descriptor.kind === 'root'
+  );
+  const repeatableTitleDescriptors = new Map();
+  titleDatasetDescriptors.forEach((descriptor) => {
+    if (descriptor.kind !== 'repeatable') {
+      return;
+    }
+    [descriptor.repeatable_field_id, descriptor.repeatable_output_key].forEach((reference) => {
+      if (reference) {
+        repeatableTitleDescriptors.set(reference, descriptor);
+      }
+    });
+  });
+
+  const resolveRepeatableTitle = (repInfo, rowValues) => {
+    const descriptor =
+      repeatableTitleDescriptors.get(repInfo?.preferredKey) ||
+      repeatableTitleDescriptors.get(repInfo?.field?.key) ||
+      repeatableTitleDescriptors.get(repInfo?.field?.data_name);
+    return descriptor ? resolveDatasetRowTitle(descriptor, rowValues) : null;
+  };
 
   const hasStructuredRepeatableState =
     state &&
@@ -237,12 +256,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
 
     // Apply output formatting if field spec exists
     let processedValue = value;
-    if (
-      field &&
-      field.type &&
-      FIELD_SPECS[field.type] &&
-      FIELD_SPECS[field.type].outputProducer
-    ) {
+    if (field && field.type && FIELD_SPECS[field.type] && FIELD_SPECS[field.type].outputProducer) {
       try {
         processedValue = FIELD_SPECS[field.type].outputProducer(field, value);
       } catch (err) {
@@ -384,6 +398,10 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           childRecord.form_values[childOutputKey] = childRepeatableArray;
         }
 
+        if (repInfo.field?.title_field) {
+          childRecord['@title'] = resolveRepeatableTitle(repInfo, instanceValues);
+        }
+
         if (hasMeaningfulRecord(childRecord)) {
           childRecords.push(childRecord);
         }
@@ -498,6 +516,13 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           }
         }
 
+        if (repInfo.field?.title_field) {
+          childRecord['@title'] = resolveRepeatableTitle(
+            repInfo,
+            i === 0 ? state.values : childRecord.form_values
+          );
+        }
+
         if (hasMeaningfulRecord(childRecord)) {
           childRecords.push(childRecord);
         }
@@ -600,70 +625,8 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   // Add top-level @title and @status
   // ==============================
   try {
-    // Compute @title from TitleField elements if provided in options
-    const titleField = options.title_field;
-    if (titleField && Array.isArray(titleField.elements)) {
-      const parts = [];
-      for (const ref of titleField.elements) {
-        let fieldDef = null;
-        // Prefer key lookup
-        if (keyToFieldMap.has(ref)) {
-          fieldDef = keyToFieldMap.get(ref);
-        } else if (dataNameToFieldMap.has(ref)) {
-          fieldDef = dataNameToFieldMap.get(ref);
-        }
-        if (!fieldDef) continue;
-        const value = state.values[fieldDef.data_name];
-        if (value == null) continue;
-        // Extract display text by field type
-        if (fieldDef.type === 'SingleChoiceField') {
-          let labels = [];
-          if (value.choice && Array.isArray(value.choice) && value.choice.length > 0) {
-            const v = value.choice[0].value;
-            const found = (fieldDef.choices || []).find((c) => c.value === v);
-            labels.push(found?.label || value.choice[0].label || v);
-          }
-          if (value.other && Array.isArray(value.other)) {
-            for (const o of value.other) {
-              if (o && (o.label || o.value)) labels.push(o.label || o.value);
-            }
-          }
-          const text = labels.filter(Boolean).join(', ');
-          if (text) parts.push(text);
-        } else if (fieldDef.type === 'MultiChoiceField') {
-          let labels = [];
-          if (value.choices && Array.isArray(value.choices)) {
-            for (const c of value.choices) {
-              const found = (fieldDef.choices || []).find((cc) => cc.value === c.value);
-              labels.push(found?.label || c.label || c.value);
-            }
-          }
-          if (value.other && Array.isArray(value.other)) {
-            for (const o of value.other) {
-              if (o && (o.label || o.value)) labels.push(o.label || o.value);
-            }
-          }
-          const text = labels.filter(Boolean).join(', ');
-          if (text) parts.push(text);
-        } else if (fieldDef.type === 'BooleanField') {
-          let label = '';
-          if (value.choice && Array.isArray(value.choice) && value.choice.length > 0) {
-            const v = value.choice[0].value;
-            const found = (fieldDef.choices || []).find((c) => c.value === v);
-            label = found?.label || value.choice[0].label || v;
-          }
-          if (label) parts.push(label);
-        } else {
-          const text = typeof value === 'object' ? null : String(value);
-          if (text && text.trim() !== '') parts.push(text);
-        }
-      }
-      const titleText = parts.join(', ');
-      if (titleText) {
-        record['@title'] = titleText;
-      } else {
-        record['@title'] = null;
-      }
+    if (options.title_field && rootTitleDescriptor) {
+      record['@title'] = resolveDatasetRowTitle(rootTitleDescriptor, state.values);
     }
   } catch (err) {
     console.warn('[form0] createStructuredRecord: failed to compute @title:', err);
