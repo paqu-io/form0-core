@@ -6,7 +6,8 @@
 
 function getRandomBytes(length) {
   const array = new Uint8Array(length);
-  const cryptoObj = (typeof globalThis !== 'undefined' && (globalThis.crypto || globalThis.msCrypto)) || null;
+  const cryptoObj =
+    (typeof globalThis !== 'undefined' && (globalThis.crypto || globalThis.msCrypto)) || null;
 
   if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
     cryptoObj.getRandomValues(array);

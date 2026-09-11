@@ -11,21 +11,21 @@ const testContext = {
   String: String,
   Number: Number,
   Array: Array,
-  Object: Object
+  Object: Object,
 };
 
 function testBypass(description, expression) {
   console.log(`\n--- ${description} ---`);
   console.log(`Expression: ${expression}`);
-  
+
   try {
     const result = runExpression(expression, testContext, SAFE_SECURITY_CONFIG);
-    
+
     if (result === null || result === undefined) {
       console.log('✓ BLOCKED: Expression returned null/undefined');
     } else {
       console.log(`✗ BYPASS SUCCESS: Result = ${JSON.stringify(result)}`);
-      
+
       // Additional analysis
       if (typeof result === 'function') {
         console.log('  WARNING: Got function object - potential code execution');
@@ -70,7 +70,10 @@ testBypass('Function.prototype.call', 'Math.max.constructor("return 42")()');
 console.log('\n7. Global Object Access');
 testBypass('Global this binding', '(function(){return this})()');
 testBypass('Indirect global', '(0,eval)("this")');
-testBypass('Global through error', 'try{null.f()}catch(e){e.constructor.constructor("return this")()}');
+testBypass(
+  'Global through error',
+  'try{null.f()}catch(e){e.constructor.constructor("return this")()}'
+);
 
 console.log('\n8. Prototype Chain Exploitation');
 testBypass('toString constructor', '(42).toString.constructor("return 42")()');

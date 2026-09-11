@@ -19,11 +19,12 @@ export function buildRepeatableSectionTree(
   fieldOwnership = new Map(),
   sectionFields = new Set()
 ) {
-  if (!Array.isArray(elements)) return {
-    repeatableSectionTree,
-    fieldOwnership,
-    sectionFields,
-  };
+  if (!Array.isArray(elements))
+    return {
+      repeatableSectionTree,
+      fieldOwnership,
+      sectionFields,
+    };
 
   elements.forEach((element) => {
     if (element.type === 'Section' || element.type === 'BuildingPlanSection') {

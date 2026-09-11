@@ -6,22 +6,14 @@ import {
   getRecordFieldValueValidator,
 } from '../src/index.js';
 
-const createSingleChoiceField = ({
-  data_name,
-  allow_other = false,
-  choices = [],
-}) => ({
+const createSingleChoiceField = ({ data_name, allow_other = false, choices = [] }) => ({
   type: 'SingleChoiceField',
   data_name,
   allow_other,
   choices,
 });
 
-const createMultiChoiceField = ({
-  data_name,
-  allow_other = false,
-  choices = [],
-}) => ({
+const createMultiChoiceField = ({ data_name, allow_other = false, choices = [] }) => ({
   type: 'MultiChoiceField',
   data_name,
   allow_other,

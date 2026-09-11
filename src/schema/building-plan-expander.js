@@ -19,7 +19,8 @@ function appendSuffix(base, suffix, maxLength = null) {
 }
 
 function createScopedKey(baseKey, suffix) {
-  const cleanBase = typeof baseKey === 'string' ? baseKey.replace(/^~+/, '').replace(/_+$/, '') : '';
+  const cleanBase =
+    typeof baseKey === 'string' ? baseKey.replace(/^~+/, '').replace(/_+$/, '') : '';
   const scopedBase = appendSuffix(cleanBase, suffix);
   return `~${scopedBase}`;
 }

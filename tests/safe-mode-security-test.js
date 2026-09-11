@@ -10,40 +10,40 @@ const testSchema = {
       name: 'test_field',
       type: 'TextField',
       calculated: true,
-      expression: 'placeholder' // Will be replaced by tests
+      expression: 'placeholder', // Will be replaced by tests
     },
     {
       name: 'normal_field',
-      type: 'TextField'
-    }
-  ]
+      type: 'TextField',
+    },
+  ],
 };
 
 function testExpression(description, expression, shouldSucceed = false) {
   console.log(`\n--- ${description} ---`);
   console.log(`Expression: ${expression}`);
-  
+
   try {
     const schema = {
       ...testSchema,
       fields: [
         {
           ...testSchema.fields[0],
-          expression: expression
+          expression: expression,
         },
-        testSchema.fields[1]
-      ]
+        testSchema.fields[1],
+      ],
     };
-    
+
     const engine = createFormEngine({
       schema,
       initialValues: { normal_field: 'test' },
-      security: SAFE_SECURITY_CONFIG
+      security: SAFE_SECURITY_CONFIG,
     });
-    
+
     const result = engine.eval();
     const testFieldValue = result.values.test_field;
-    
+
     if (shouldSucceed) {
       console.log(`✓ PASS: Result = ${JSON.stringify(testFieldValue)}`);
     } else {

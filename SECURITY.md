@@ -1,189 +1,53 @@
-# Security Features
+# Security Policy
 
-> [!CAUTION] > `SAFE` and `CUSTOM` mode are validation aids, not security sandboxes. The
-> evaluator compiles customer expressions with `new Function`; blocked-pattern
-> checks can be bypassed through dynamic property access, and
-> `maxExecutionTime` is not currently enforced. Do not execute untrusted
-> schemas in a privileged server or browser context. See
-> `analyses/SAFE_MODE_SECURITY_ANALYSIS.md` for the accepted critical finding
-> and `analyses/UNTRUSTED_JAVASCRIPT_EXECUTION_ARCHITECTURE.md` for the selected
-> isolation architecture that preserves vanilla JavaScript and imperative event scripts.
+Security reports are taken seriously. Please report vulnerabilities privately so they can be
+investigated and fixed before public disclosure.
 
-form0-core provides configurable security options for expression evaluation to balance flexibility and safety.
+## Reporting a vulnerability
 
-## Security Modes
+Use the
+[form0-core private vulnerability report](https://github.com/paqu-io/form0-core/security/advisories/new).
+Do not open a public issue for a suspected vulnerability.
 
-### TRUSTED (Default)
+Include:
 
-- **Full JavaScript access** - Current behavior maintained
-- **No restrictions** - All expressions execute as-is
-- **Use case**: Internal tools, trusted developers, client-side only
+- the affected version and runtime;
+- a minimal reproduction or proof of concept;
+- the impact you believe is possible;
+- any mitigations you have already identified; and
+- whether the issue has been disclosed anywhere else.
 
-```javascript
-import { createFormEngine } from 'form0-core';
+Reports affecting any version are welcome. When possible, reproduce the issue with the latest
+release. Security fixes are normally released for the latest version; older versions are assessed
+case by case.
 
-// Default behavior - no security parameter needed
-const engine = createFormEngine({ schema });
+Maintainers will review the report, may ask for more information, and will coordinate disclosure
+after a fix or mitigation is available. Please keep the report private during that process.
 
-// Or explicitly set trusted mode
-const engine = createFormEngine({
-  schema,
-  security: { mode: 'trusted' },
-});
-```
+## Trust model
 
-### SAFE (validation only; not a trust boundary)
+form0-core supports JavaScript expressions and imperative event scripts. These expressions and
+scripts are executable code, so schemas that contain them must come from authors you trust.
 
-- **Restricted context** - Only whitelisted globals available
-- **Pattern blocking** - Dangerous patterns are blocked
-- **Use case**: Diagnostics for trusted authors. It is not suitable for
-  adversarial or otherwise untrusted expressions.
+**SAFE** and **CUSTOM** modes provide validation and configuration controls. They are not security
+sandboxes, and pattern-based restrictions must not be used as a boundary for executing adversarial
+schemas in a privileged browser, server, CLI, or mobile context.
 
-```javascript
-import { createFormEngine, SECURITY_MODES, SAFE_SECURITY_CONFIG } from 'form0-core';
+Giving an untrusted user control over executable schema expressions and then observing that the
+expressions can execute JavaScript is outside this project's security boundary. Reports remain in
+scope when behavior crosses a documented boundary—for example, when data that is not intended to
+be executable becomes code, or when an attacker can affect a schema or runtime context they were
+not authorized to control.
 
-// Simple safe mode
-const engine = createFormEngine({
-  schema,
-  security: { mode: SECURITY_MODES.SAFE },
-});
+Applications are responsible for authenticating schema authors, authorizing schema changes, and
+isolating execution when schemas cannot be trusted.
 
-// Or use predefined safe config
-const engine = createFormEngine({
-  schema,
-  security: SAFE_SECURITY_CONFIG,
-});
-```
+## Maintainer security documents
 
-### CUSTOM
+The public documents in
+[analyses](https://github.com/paqu-io/form0-core/tree/main/analyses) record the current threat model,
+known limitations, and the planned isolation architecture. They are maintainer-oriented
+engineering documents, not claims that the current validation modes provide isolation.
 
-- **User-defined rules** - Configure your own security settings
-- **Flexible restrictions** - Mix and match security features
-- **Use case**: Specific security requirements
-
-```javascript
-const engine = createFormEngine({
-  schema,
-  security: {
-    mode: SECURITY_MODES.CUSTOM,
-    maxExecutionTime: 1000,
-    allowedGlobals: ['Math', 'Date', 'Number'],
-    blockedPatterns: [/\bwindow\b/, /\bdocument\b/, /\bfetch\b/],
-  },
-});
-```
-
-## Security Configuration Options
-
-```javascript
-// TRUSTED mode (default) - no additional config needed
-const trustedConfig = {
-  mode: 'trusted', // Full JavaScript access
-};
-
-// SAFE mode - uses predefined safe settings
-const safeConfig = {
-  mode: 'safe', // Automatically applies safe defaults
-};
-
-// CUSTOM mode - define your own rules
-const customConfig = {
-  mode: 'custom',
-  maxExecutionTime: 1000, // Milliseconds (future feature)
-  maxCallStackDepth: 100, // Maximum recursion depth (future feature)
-  allowedGlobals: ['Math', 'Date', 'JSON'], // Whitelisted global objects
-  blockedPatterns: [/\beval\b/, /\bwindow\b/], // Regex patterns to block
-};
-```
-
-## Default Blocked Patterns (Safe Mode)
-
-The following patterns are blocked by default in safe mode:
-
-- `eval`, `Function` - Code execution
-- `window`, `document` - Browser globals
-- `process`, `require` - Node.js globals
-- `fetch`, `XMLHttpRequest` - Network requests
-- `localStorage`, `sessionStorage` - Storage APIs
-- `__proto__`, `constructor`, `prototype` - Prototype pollution
-
-## Migration Guide
-
-### No Changes Needed
-
-Existing code continues to work unchanged:
-
-```javascript
-// This still works exactly as before
-const engine = createFormEngine({ schema, initialValues });
-```
-
-### Adding Security
-
-To add security, simply include the security parameter:
-
-```javascript
-// Add validation-oriented safe mode. This is not a sandbox.
-const engine = createFormEngine({
-  schema,
-  initialValues,
-  security: { mode: 'safe' },
-});
-```
-
-## Examples
-
-### Safe Mathematical Calculations
-
-```javascript
-const schema = {
-  form: {
-    elements: [
-      {
-        type: 'CalculatedField',
-        data_name: 'result',
-        calculate: 'Math.max($value1, $value2) * 1.1', // ✅ Works in safe mode
-      },
-    ],
-  },
-};
-```
-
-### Blocked Dangerous Expressions
-
-```javascript
-const schema = {
-  form: {
-    elements: [
-      {
-        type: 'CalculatedField',
-        data_name: 'result',
-        calculate: 'window.alert("hello")', // ❌ Blocked in safe mode
-      },
-    ],
-  },
-};
-```
-
-### Custom Security Rules
-
-```javascript
-const engine = createFormEngine({
-  schema,
-  security: {
-    mode: 'custom',
-    allowedGlobals: ['Math'], // Only Math allowed
-    blockedPatterns: [/\bDate\b/], // Block Date usage
-  },
-});
-```
-
-## Testing Security
-
-Use the included test file to verify security behavior:
-
-```bash
-node test/security-test.js
-```
-
-This will show how different expressions behave under different security modes.
+For ordinary usage questions, see
+[SUPPORT.md](https://github.com/paqu-io/form0-core/blob/main/SUPPORT.md).

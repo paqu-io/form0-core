@@ -2,81 +2,144 @@
 
 [![NPM Version](https://img.shields.io/npm/v/form0-core)](https://www.npmjs.com/package/form0-core)
 [![NPM Downloads](https://img.shields.io/npm/dt/form0-core)](https://www.npmjs.com/package/form0-core)
+[![CI](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml/badge.svg)](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml)
 ![NPM License](https://img.shields.io/npm/l/form0-core)
 [![Docs](https://img.shields.io/badge/docs-docs.form0.dev-2563eb)](https://docs.form0.dev)
 [![Website](https://img.shields.io/badge/site-form0.dev-0f172a)](https://form0.dev)
 ![NPM Last Update](https://img.shields.io/npm/last-update/form0-core)
+[![Socket](https://socket.dev/api/badge/npm/package/form0-core)](https://socket.dev/npm/package/form0-core)
 
-> [!WARNING]
-> form0 is in active, very early development. Do not use in production. Expect breaking
-> changes and unstable behavior.
+> [!NOTE]
+> form0 is in active development and is available to use today. Its schema format and core
+> concepts are stable in practice, but releases before 1.0 may include breaking changes. Pin your
+> versions and review the release notes when upgrading. A formally stable release is coming.
 
-form0-core is the schema-driven engine that powers [form0 open-source ecosystem](https://form0.dev). It is framework-agnostic and runs in any JavaScript runtime (Node.js, browsers, React Native, etc.)
+`form0-core` is the framework-agnostic, schema-driven engine behind the
+[form0 open-source ecosystem](https://form0.dev). It evaluates calculations, conditional
+visibility, requirements, read-only rules, validation, and form events in Node.js, browsers, and
+React Native.
 
-## 🚀 Start with the CLI (recommended)
+## 🚀 Start with the CLI
 
-The entry point for most users is [form0-cli](https://github.com/paqu-io/form0-cli). Follow the [quickstart](https://docs.form0.dev/getting-started/quickstart) to create a project and preview
-your schema.
+Most users should begin with [`form0-cli`](https://github.com/paqu-io/form0-cli) rather than install
+the engine directly. Follow the [quickstart](https://docs.form0.dev/getting-started/quickstart) to
+create a project, edit a schema, and preview a form.
 
-## 🗂️ Documentation
+Use `form0-core` directly when you are building a renderer, integration, developer tool, or other
+custom form runtime.
 
-- Overview: https://docs.form0.dev/core/overview
-- Concepts: https://docs.form0.dev/core/concepts
-- Full docs: https://docs.form0.dev
-
-## Direct usage (advanced)
-
-If you are integrating the engine directly:
+## 📦 Installation
 
 ```bash
 npm install form0-core
 ```
 
-`form0-core` owns behavioral schema concerns such as fields, conditions, calculations,
-events, and AI metadata. Applications may still attach optional top-level metadata such as
-`id` (unique form identifier), `status` (publication state), `version` (schema version),
-scope fields like `main_org_id`, and media or location settings. Operational counters like
-`record_count` and `record_last_change_at` should stay platform-owned and be injected at
-application or API boundaries, not treated as engine-authored schema. A top-level
-`form.version` may still exist, but the engine does not bump or consume it.
+## ⚡ Quick example
+
+```javascript
+import { createFormEngine } from 'form0-core';
+
+const schema = {
+  form: {
+    name: 'Contact form',
+    status_field: null,
+    elements: [
+      {
+        type: 'TextField',
+        key: 'name',
+        data_name: 'name',
+        label: 'Name',
+        display: 'default',
+        description: null,
+        description_mode: null,
+        required: true,
+        required_conditions: null,
+        visible: true,
+        visible_conditions: null,
+        read_only: false,
+        read_only_conditions: null,
+        default_value: null,
+        pattern: null,
+        pattern_description: null,
+        supporting_image: false,
+        supporting_image_path: null,
+        supporting_image_display: null,
+      },
+    ],
+  },
+};
+
+const engine = createFormEngine({
+  schema,
+  initialValues: { name: 'Ada' },
+});
+
+engine.eval();
+console.log(engine.getState());
+```
+
+The engine API exposes `eval()` for calculations, conditions, and validation; `trigger()` for form
+events; and `getState()` for current values and evaluated field state.
+
+## 🔒 Security
+
+> [!CAUTION]
+> Schema expressions and event scripts execute JavaScript. Only evaluate schemas from authors you
+> trust. `SAFE` and `CUSTOM` modes provide validation controls; they are not security sandboxes.
+
+Read the [security policy](./SECURITY.md) before evaluating schemas outside a fully trusted
+authoring workflow.
+
+## Schema and record ownership
+
+`form0-core` owns behavioral schema concerns such as fields, conditions, calculations, events, and
+AI metadata. Applications may attach optional top-level metadata such as form identifiers,
+publication state, schema version, organization scope, and media or location settings.
+Operational counters should remain platform-owned and be injected at application or API
+boundaries.
 
 ### Record-side contract
 
-`form0-core` intentionally uses two different choice-value shapes:
+`form0-core` intentionally uses two choice-value shapes:
 
-- Live engine / renderer values use renderer shape:
-  - single / boolean: `{ choice, other }`
-  - multi: `{ choices, other }`
-- Structured records use canonical stored shape:
-  - single / boolean: `{ choice_value, other_value }`
-  - multi: `{ choices_value, other_value }`
+- Live engine and renderer values:
+  - single choice and boolean: `{ choice, other }`
+  - multiple choice: `{ choices, other }`
+- Canonical structured records:
+  - single choice and boolean: `{ choice_value, other_value }`
+  - multiple choice: `{ choices_value, other_value }`
 
-Record-side utilities follow this contract:
+Record utilities follow this contract:
 
-- `createStructuredRecord()` outputs canonical stored records
-- `normalizeStructuredRecord()` consumes and returns canonical stored records
-- `buildFormRecordSnapshot()` consumes canonical stored records and returns renderer snapshot values
-- `projectDatasetRowValues()` consumes canonical stored rows
-- Choice `FIELD_SPECS` keep separate validators by context:
-  - `valueValidator` validates live engine / renderer values
-  - `recordValueValidator` validates canonical stored record values
+- `createStructuredRecord()` produces canonical stored records.
+- `normalizeStructuredRecord()` consumes and returns canonical stored records.
+- `buildFormRecordSnapshot()` converts canonical records into renderer snapshot values.
+- `projectDatasetRowValues()` consumes canonical stored rows.
 
 Record status remains top-level as `@status`; it is not stored inside `form_values`.
 
-## Security
+## ✅ Requirements
 
-See `SECURITY.md` for security modes and configuration.
+- Node.js 22 or newer
+- An ESM-capable runtime or bundler
 
-## Requirements
+## 📚 Documentation
 
-- Node.js 18+
+- [Core overview](https://docs.form0.dev/core/overview)
+- [Core concepts](https://docs.form0.dev/core/concepts)
+- [Full documentation](https://docs.form0.dev)
 
-## Related repositories
+## 🔗 Related repositories
 
-- [form0-cli](https://github.com/paqu-io/form0-cli) - Command-line interface
-- [form0-react](https://github.com/paqu-io/form0-react) - React components
-- [form0-react-native](https://github.com/paqu-io/form0-react-native) - React Native components
+- [form0-cli](https://github.com/paqu-io/form0-cli) — recommended project entry point
+- [form0-react](https://github.com/paqu-io/form0-react) — React bindings and renderers
+- [form0-react-native](https://github.com/paqu-io/form0-react-native) — React Native bindings and renderers
 
-## Contributing
+## 🤝 Support and contributing
 
-Contributions are welcome! Please feel free to submit [issues](https://github.com/paqu-io/form0-core/issues) and [pull requests](https://github.com/paqu-io/form0-core/pulls).
+See [SUPPORT.md](https://github.com/paqu-io/form0-core/blob/main/SUPPORT.md) for help and
+[CONTRIBUTING.md](https://github.com/paqu-io/form0-core/blob/main/CONTRIBUTING.md) to contribute.
+
+## 📄 License
+
+[MIT](./LICENSE)

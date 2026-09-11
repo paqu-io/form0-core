@@ -22,35 +22,35 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           PREV_TAG=$(git describe --tags --abbrev=0 $TAG^ 2>/dev/null || echo "")
-          
+
           echo "CURRENT_TAG=$TAG" >> $GITHUB_ENV
           echo "PREV_TAG=$PREV_TAG" >> $GITHUB_ENV
-          
+
           if [ -z "$PREV_TAG" ]; then
             RANGE="$TAG"
           else
             RANGE="$PREV_TAG..$TAG"
           fi
-          
+
           echo "COMMIT_RANGE=$RANGE" >> $GITHUB_ENV
 
       - name: Create issue for Claude
         id: create-issue
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.CLAUDE_RELEASE_ACCESS_TOKEN }}  # ← Use CLAUDE_RELEASE_ACCESS_TOKEN instead of GITHUB_TOKEN
+          github-token: ${{ secrets.CLAUDE_RELEASE_ACCESS_TOKEN }} # ← Use CLAUDE_RELEASE_ACCESS_TOKEN instead of GITHUB_TOKEN
           script: |
             const { execSync } = require('child_process');
-            
+
             // Get commit data
             const range = process.env.COMMIT_RANGE;
             const currentTag = process.env.CURRENT_TAG;
             const prevTag = process.env.PREV_TAG || 'initial commit';
-            
+
             let commits = [];
             let filesChanged = [];
             let truncatedDiff = ''; // Declare outside try block
-            
+
             try {
               const commitOutput = execSync(`git log ${range} --pretty=format:"- %s (%h) by %an" --reverse`).toString().trim();
               commits = commitOutput.split('\n').filter(line => line.trim());
@@ -74,7 +74,7 @@ jobs:
               filesChanged = [];
               truncatedDiff = 'Unable to generate diff - please check commits manually';
             }
-            
+
             const issueBody = `@claude Please generate professional release notes for version **${currentTag}**.
 
             ## Release Information
@@ -95,14 +95,14 @@ jobs:
 
             ## Actual Code Changes
             **IMPORTANT: Base your descriptions on the actual changes shown below, not assumptions.**
-            
+
             \`\`\`diff
             ${truncatedDiff || 'No diff available - check individual commits'}
             \`\`\`
 
             ## Instructions for Release Notes
             **CRITICAL: Only describe what actually changed based on the diff above. Do not invent or assume details.**
-            
+
             1. **Review the actual diff content** before writing descriptions
             2. **Transform technical commit messages into user-friendly descriptions** 
             3. **Base descriptions on ACTUAL changes shown in the diff**, not commit message assumptions
@@ -146,7 +146,7 @@ jobs:
             14. **For small changes, use simple language like Minor documentation update rather than elaborate descriptions**
             15. **Technical terms:** Use user-friendly language but keep key technical terms in backticks when needed
             16. **Please DO NOT add a summary at the end of the release notes.**
-            
+
             Please generate the release notes in your response. Thanks! 🚀`;
 
             const { data: issue } = await github.rest.issues.create({
@@ -164,13 +164,13 @@ jobs:
       - name: Create draft release
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}  # Can use GITHUB_TOKEN for release creation
+          github-token: ${{ secrets.GITHUB_TOKEN }} # Can use GITHUB_TOKEN for release creation
           script: |
             const tag = process.env.CURRENT_TAG;
             const prevTag = process.env.PREV_TAG || 'initial';
             const isPrerelease = tag.includes('-');
             const issueUrl = '${{ steps.create-issue.outputs.issue-url }}';
-            
+
             const placeholderBody = `## 🤖 AI-Generated Release Notes
 
             **Status:** ⏳ Claude should automatically respond in the issue below.
@@ -191,7 +191,7 @@ jobs:
             **Full Changelog:** https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${prevTag}...${tag}
 
             ---
-            
+
             *🔄 Replace this placeholder text with Claude's response from the issue above.*`;
 
             const { data: release } = await github.rest.repos.createRelease({

@@ -235,16 +235,22 @@ export function applyLinkedRecordSelection({
   }
 
   if (!values || typeof values !== 'object') {
-    throw new Error('applyLinkedRecordSelection requires a values object from the form engine state');
+    throw new Error(
+      'applyLinkedRecordSelection requires a values object from the form engine state'
+    );
   }
 
   const field = resolveFormField(form, fieldIdentifier);
   if (!field) {
-    throw new Error(`applyLinkedRecordSelection could not find field "${fieldIdentifier}" in the provided form`);
+    throw new Error(
+      `applyLinkedRecordSelection could not find field "${fieldIdentifier}" in the provided form`
+    );
   }
 
   if (field.type !== 'FormLinkField') {
-    throw new Error(`applyLinkedRecordSelection can only target FormLinkField fields (received ${field.type})`);
+    throw new Error(
+      `applyLinkedRecordSelection can only target FormLinkField fields (received ${field.type})`
+    );
   }
 
   const normalizedRecords = normalizeLinkedRecords(records);
@@ -255,7 +261,8 @@ export function applyLinkedRecordSelection({
     );
   }
 
-  const selectedRecords = field.allow_multiple_records === true ? normalizedRecords : normalizedRecords.slice(0, 1);
+  const selectedRecords =
+    field.allow_multiple_records === true ? normalizedRecords : normalizedRecords.slice(0, 1);
 
   values[field.data_name] = selectedRecords.map((record) => ({
     record_id: record.record_id,
@@ -275,7 +282,11 @@ export function applyLinkedRecordSelection({
       }
 
       if (field.allow_multiple_records === true) {
-        const aggregated = aggregateDefaultValues(selectedRecords, mapping.source_field_id, delimiter);
+        const aggregated = aggregateDefaultValues(
+          selectedRecords,
+          mapping.source_field_id,
+          delimiter
+        );
         values[destinationField.data_name] = aggregated;
         return;
       }

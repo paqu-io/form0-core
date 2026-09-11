@@ -124,10 +124,7 @@ const schema = {
   assert.equal(builtinNames.includes('EVAL'), true);
   assert.equal(builtinNames.includes('SETRESULT'), false);
   assert.equal(builtinCatalog.find((builtin) => builtin.name === 'EVAL')?.status, 'advanced');
-  assert.equal(
-    builtinCatalog.find((builtin) => builtin.name === 'FORM')?.status,
-    'unavailable'
-  );
+  assert.equal(builtinCatalog.find((builtin) => builtin.name === 'FORM')?.status, 'unavailable');
 })();
 
 (() => {

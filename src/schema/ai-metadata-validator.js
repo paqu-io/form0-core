@@ -211,9 +211,7 @@ function validateFillStrategy(strategy, errors, prefix) {
   }
 
   if (!FILL_STRATEGIES.has(strategy)) {
-    errors.push(
-      `${prefix}fillStrategy must be one of: ${Array.from(FILL_STRATEGIES).join(', ')}`
-    );
+    errors.push(`${prefix}fillStrategy must be one of: ${Array.from(FILL_STRATEGIES).join(', ')}`);
   }
 }
 

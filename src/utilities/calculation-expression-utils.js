@@ -10,6 +10,16 @@ export function isMultilineCalculationExpression(expression) {
 
 export function normalizeInlineCalculationExpression(expression) {
   const normalizedExpression = typeof expression === 'string' ? expression : '';
+  const expressionWithoutTrailingWhitespace = normalizedExpression.trimEnd();
 
-  return normalizedExpression.replace(/;+\s*$/u, '');
+  if (!expressionWithoutTrailingWhitespace.endsWith(';')) {
+    return normalizedExpression;
+  }
+
+  let expressionEnd = expressionWithoutTrailingWhitespace.length;
+  while (expressionEnd > 0 && expressionWithoutTrailingWhitespace[expressionEnd - 1] === ';') {
+    expressionEnd -= 1;
+  }
+
+  return expressionWithoutTrailingWhitespace.slice(0, expressionEnd);
 }
