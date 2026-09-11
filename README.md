@@ -81,15 +81,6 @@ console.log(engine.getState());
 The engine API exposes `eval()` for calculations, conditions, and validation; `trigger()` for form
 events; and `getState()` for current values and evaluated field state.
 
-## 🔒 Security
-
-> [!CAUTION]
-> Schema expressions and event scripts execute JavaScript. Only evaluate schemas from authors you
-> trust. `SAFE` and `CUSTOM` modes provide validation controls; they are not security sandboxes.
-
-Read the [security policy](./SECURITY.md) before evaluating schemas outside a fully trusted
-authoring workflow.
-
 ## Schema and record ownership
 
 `form0-core` owns behavioral schema concerns such as fields, conditions, calculations, events, and
@@ -128,6 +119,15 @@ Record status remains top-level as `@status`; it is not stored inside `form_valu
 - [Core overview](https://docs.form0.dev/core/overview)
 - [Core concepts](https://docs.form0.dev/core/concepts)
 - [Full documentation](https://docs.form0.dev)
+
+## 🔒 Security
+
+> [!CAUTION]
+> Schema expressions and event scripts execute JavaScript. Only evaluate schemas from authors you
+> trust. `SAFE` and `CUSTOM` modes provide validation controls; they are not security sandboxes.
+
+Read the [security policy](./SECURITY.md) before evaluating schemas outside a fully trusted
+authoring workflow.
 
 ## 🔗 Related repositories
 
