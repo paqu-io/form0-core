@@ -38,7 +38,11 @@ export function getFormAITasks(form) {
 
 export function getFormAINamingPolicy(form) {
   const metadata = getFormAIMetadata(form);
-  if (!metadata || typeof metadata.namingPolicy !== 'object' || Array.isArray(metadata.namingPolicy)) {
+  if (
+    !metadata ||
+    typeof metadata.namingPolicy !== 'object' ||
+    Array.isArray(metadata.namingPolicy)
+  ) {
     return null;
   }
   return metadata.namingPolicy;
@@ -78,7 +82,11 @@ export function isFieldAIInferrable(field) {
 
 export function getFieldAIChoicePolicy(field) {
   const metadata = getFieldAIMetadata(field);
-  if (!metadata || typeof metadata.choicePolicy !== 'object' || Array.isArray(metadata.choicePolicy)) {
+  if (
+    !metadata ||
+    typeof metadata.choicePolicy !== 'object' ||
+    Array.isArray(metadata.choicePolicy)
+  ) {
     return null;
   }
   return metadata.choicePolicy;
@@ -86,7 +94,11 @@ export function getFieldAIChoicePolicy(field) {
 
 export function getFieldAIProviderHints(field) {
   const metadata = getFieldAIMetadata(field);
-  if (!metadata || typeof metadata.providerHints !== 'object' || Array.isArray(metadata.providerHints)) {
+  if (
+    !metadata ||
+    typeof metadata.providerHints !== 'object' ||
+    Array.isArray(metadata.providerHints)
+  ) {
     return null;
   }
   return metadata.providerHints;

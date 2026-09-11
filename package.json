@@ -7,10 +7,19 @@
   "description": "The schema-driven form engine behind form0, the open-source form ecosystem by paqu.io. Framework-agnostic: conditional visibility, validation and calculations from a JSON schema, in Node.js, browsers and React Native.",
   "main": "src/index.js",
   "type": "module",
+  "files": [
+    "src",
+    "SECURITY.md"
+  ],
   "scripts": {
-    "test": "node tests/form0-core.test.js && node tests/numeric-field-schema.test.js && node tests/dataset-descriptors.test.js && node tests/structured-record.test.js && node tests/title-fields.test.js && node tests/builtin-metadata.test.js && node tests/calculation-editor.test.js && node tests/form-event-editor.test.js && node tests/security-test.js",
-    "format": "prettier --write \"**/*.{js,jsx,json,ts,tsx,md}\"",
-    "format:check": "prettier --check \"**/*.{js,jsx,json,ts,tsx,md}\""
+    "test": "node tests/form0-core.test.js && node tests/numeric-field-schema.test.js && node tests/dataset-descriptors.test.js && node tests/structured-record.test.js && node tests/title-fields.test.js && node tests/builtin-metadata.test.js && node tests/calculation-expression-utils.test.js && node tests/calculation-editor.test.js && node tests/form-event-editor.test.js && node tests/security-test.js",
+    "format": "prettier --write \"src/**/*.{js,jsx}\" \"tests/**/*.{js,jsx}\" \"scripts/**/*.{js,mjs}\" package.json README.md SECURITY.md SUPPORT.md CONTRIBUTING.md eslint.config.js .github/workflows/ci.yml .github/workflows/publish.yml",
+    "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"tests/**/*.{js,jsx}\" \"scripts/**/*.{js,mjs}\" package.json README.md SECURITY.md SUPPORT.md CONTRIBUTING.md eslint.config.js .github/workflows/ci.yml .github/workflows/publish.yml",
+    "lint:check": "eslint src tests",
+    "package:check": "node scripts/check-package-contents.mjs",
+    "security:audit:prod": "npm audit --omit=dev --omit=peer --audit-level=high",
+    "check": "npm run format:check && npm run lint:check && npm test",
+    "release:check": "npm run check && npm run security:audit:prod && npm run package:check"
   },
   "exports": {
     ".": {
@@ -46,9 +55,12 @@
   },
   "homepage": "https://form0.dev",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.12.0",
     "ignore": "^7.0.5",
     "prettier": "^3.5.3"
   }

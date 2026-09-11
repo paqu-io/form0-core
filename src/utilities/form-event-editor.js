@@ -17,11 +17,7 @@ const COMMON_GLOBAL_FUNCTIONS = new Set([
   'Boolean',
 ]);
 
-const STRUCTURAL_FIELD_TYPES = new Set([
-  'Section',
-  'RepeatableSection',
-  'BuildingPlanSection',
-]);
+const STRUCTURAL_FIELD_TYPES = new Set(['Section', 'RepeatableSection', 'BuildingPlanSection']);
 
 const FORM_EVENT_BUILTIN_STATUS_BY_NAME = Object.freeze({
   EVAL: 'advanced',
@@ -296,11 +292,7 @@ export function getFormEventReferenceCatalog({ schema }) {
  *   referencedFields: string[],
  * }}
  */
-export function analyzeFormEventCode({
-  code,
-  schema,
-  securityConfig = DEFAULT_SECURITY_CONFIG,
-}) {
+export function analyzeFormEventCode({ code, schema, securityConfig = DEFAULT_SECURITY_CONFIG }) {
   const issues = [];
   const issueKeys = new Set();
   const usedBuiltins = [];

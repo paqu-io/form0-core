@@ -43,7 +43,10 @@ const schema = {
     project_metadata: null, // Optional platform-owned scope metadata. Project metadata fields.
     ai: {
       context: ['safety_inspections', 'incident_reporting'],
-      instructions: ['Keep data identifiers in English', 'Avoid personal identifiers in suggestions'],
+      instructions: [
+        'Keep data identifiers in English',
+        'Avoid personal identifiers in suggestions',
+      ],
       namingPolicy: { language: 'en', case: 'snake', asciiOnly: true, maxLength: 32 },
       tasks: ['suggestFieldNames', 'suggestFieldValues'],
     },
@@ -133,10 +136,12 @@ const schema = {
         ON('change', 'colors', colorsF);
       `,
     },
-    form_links: { //Used in conjuncture with a FormLinkField, this object stores form_link_field_key and form_id to or from which the form is linked. To evaluate if this attribute is needed (for AI agent to answer this).
-      to: [{
+    form_links: {
+      //Used in conjuncture with a FormLinkField, this object stores form_link_field_key and form_id to or from which the form is linked. To evaluate if this attribute is needed (for AI agent to answer this).
+      to: [
+        {
           form_link_field_key: '1f92ff', //form_link_field_key can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
-          form_id: '01936b8e-7f2a-7c3d-9e4f-123456789abc' //form_id cannot be null. form_id specify the id of the form that will be linked to the FormLinkField.
+          form_id: '01936b8e-7f2a-7c3d-9e4f-123456789abc', //form_id cannot be null. form_id specify the id of the form that will be linked to the FormLinkField.
         },
       ],
       from: [],
@@ -169,7 +174,8 @@ const schema = {
             read_only_conditions: null,
             default_value: null,
             pattern: '^[a-zA-Z]+$',
-            pattern_description: 'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
+            pattern_description:
+              'One or more letters (uppercase or lowercase), with no spaces, numbers, or symbols',
             supporting_image: true, //supporting_image can be true or false
             supporting_image_path: 'first_name.jpg', //supporting_image_path can be null or a string
             supporting_image_display: 'default', //supporting_image_display can be 'default', 'dialog' or null
@@ -582,7 +588,8 @@ const schema = {
         allow_updating_records: false, //allow_updating_records can be true or false. It specifies if the user is allowed to update existing records in the linked form specificed by form_id.
         allow_multiple_records: false, //allow_multiple_records can be true or false. It specifies if the user is allowed to select multiple records in the linked form specificed by form_id.
         form_id: '01936b8e-7f2a-7c3d-9e4f-123456789abc', //form_id cannot be null. form_id specify the id of the form that will be linked to the FormLinkField.
-        record_conditions: { // operator can be any of the ones defined in src/engine/conditions.js. record_conditions specify the conditions that will be applied to filter the linked records.
+        record_conditions: {
+          // operator can be any of the ones defined in src/engine/conditions.js. record_conditions specify the conditions that will be applied to filter the linked records.
           and: [
             { linked_form_field_id: 'sample123', operator: 'equal_to', value: 'test_value_1' }, // linked_form_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
             {
@@ -593,15 +600,16 @@ const schema = {
             },
           ],
         },
-        record_defaults: [ //record_defaults specify the fields of the current form that will be populated by the fields of the linked form. source_field_id is the field of the linked form and destination_field_id is the field of the current form to populate.
+        record_defaults: [
+          //record_defaults specify the fields of the current form that will be populated by the fields of the linked form. source_field_id is the field of the linked form and destination_field_id is the field of the current form to populate.
           {
             source_field_id: 'sample567', //source_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
-            destination_field_id: 'ee748' //source_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
+            destination_field_id: 'ee748', //source_field_id can be the field key or the field data_name as it happens in visible_conditions for example (to check feasibility - for AI agent to answer this).
           },
           {
             source_field_id: 'sample234',
-            destination_field_id: 'ee749'
-          }
+            destination_field_id: 'ee749',
+          },
         ],
       },
       {
@@ -1011,10 +1019,13 @@ try {
     form: schema.form,
     values: engineState.values,
     fieldIdentifier: '1f92ff',
-    records: [...linkedRecordsSample, {
-      record_id: 'a9c51b21-1234-4567-89ab-ffffffffffff',
-      defaults: {},
-    }],
+    records: [
+      ...linkedRecordsSample,
+      {
+        record_id: 'a9c51b21-1234-4567-89ab-ffffffffffff',
+        defaults: {},
+      },
+    ],
   });
   throw new Error('FormLinkField allow_multiple_records constraint was not enforced');
 } catch (error) {
@@ -1056,7 +1067,10 @@ const expectedSecondImportChoice = {
   other: [],
 };
 
-if (JSON.stringify(postSelectionState.values.second_import) !== JSON.stringify(expectedSecondImportChoice)) {
+if (
+  JSON.stringify(postSelectionState.values.second_import) !==
+  JSON.stringify(expectedSecondImportChoice)
+) {
   throw new Error('record_defaults did not populate second_import correctly');
 }
 
@@ -1391,9 +1405,7 @@ console.log('Load operations:', operations);
   assert.equal(getFormAINamingPolicy(aiForm), aiForm.ai.namingPolicy);
 
   assert.equal(getFieldAIMetadata(textField), textField.ai);
-  assert.deepEqual(getFieldAIContext(textField), [
-    'Short incident summary from responder',
-  ]);
+  assert.deepEqual(getFieldAIContext(textField), ['Short incident summary from responder']);
   assert.deepEqual(getFieldAIInstructions(textField), ['Prefer concise statements']);
   assert.deepEqual(getFieldAIExamples(textField), [
     'Slip on wet floor',
@@ -1469,13 +1481,15 @@ const buildingPlanTestSchema = {
   },
 };
 
-const { schema: expandedBuildingPlanSchema, buildingPlanMeta } = expandBuildingPlanSchema(
-  buildingPlanTestSchema
-);
+const { schema: expandedBuildingPlanSchema, buildingPlanMeta } =
+  expandBuildingPlanSchema(buildingPlanTestSchema);
 
 const expandedBuildingPlan = expandedBuildingPlanSchema.form.elements[0];
 assert.equal(expandedBuildingPlan.type, 'BuildingPlanSection');
-assert.ok(Array.isArray(expandedBuildingPlan.elements), 'BuildingPlanSection should expose elements');
+assert.ok(
+  Array.isArray(expandedBuildingPlan.elements),
+  'BuildingPlanSection should expose elements'
+);
 
 const floorRepeatable = expandedBuildingPlan.elements[0];
 assert.equal(floorRepeatable.type, 'RepeatableSection');
@@ -1564,7 +1578,10 @@ assert.ok(
 );
 
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');
-console.log('   Generated nodes:', buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', '));
+console.log(
+  '   Generated nodes:',
+  buildingPlanMeta[0]?.repeatables?.map((node) => node.nodeKey).join(', ')
+);
 
 const emptyBuildingPlanRecord = createStructuredRecord(
   { values: {}, repeatable: {} },
@@ -1575,7 +1592,10 @@ const emptyBuildingPlanRecord = createStructuredRecord(
   }
 );
 assert.ok(
-  Object.prototype.hasOwnProperty.call(emptyBuildingPlanRecord.form_values, floorRepeatable.data_name),
+  Object.prototype.hasOwnProperty.call(
+    emptyBuildingPlanRecord.form_values,
+    floorRepeatable.data_name
+  ),
   'BuildingPlanSection top-level repeatable should be present in structured output even when empty'
 );
 assert.ok(
@@ -1662,7 +1682,10 @@ assert.ok(
   });
 
   const roomRecords = structuredRecord.form_values.rooms;
-  assert.ok(Array.isArray(roomRecords) && roomRecords.length === 1, 'Expected a single room record');
+  assert.ok(
+    Array.isArray(roomRecords) && roomRecords.length === 1,
+    'Expected a single room record'
+  );
   const columnsOutput = roomRecords[0].form_values.columns;
   assert.ok(Array.isArray(columnsOutput), 'Columns repeatable should be present');
   assert.equal(columnsOutput.length, 1, 'Only non-empty column records should be retained');

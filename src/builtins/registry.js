@@ -118,10 +118,7 @@ export const calculationBuiltins = buildBuiltinObject([
   ...CALCULATION_ONLY_ENTRIES,
 ]);
 
-export const eventBuiltins = buildBuiltinObject([
-  ...COMMON_RUNTIME_ENTRIES,
-  ...EVENT_ONLY_ENTRIES,
-]);
+export const eventBuiltins = buildBuiltinObject([...COMMON_RUNTIME_ENTRIES, ...EVENT_ONLY_ENTRIES]);
 
 // Backward-compatible alias for calculation runtime helpers.
 export const builtins = calculationBuiltins;

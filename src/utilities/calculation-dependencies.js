@@ -260,12 +260,7 @@ function extractEvalCallArguments(code) {
 
       if (char === "'" && !inDoubleQuote && !inBacktick && !isEscapedCharacter(source, i)) {
         inSingleQuote = !inSingleQuote;
-      } else if (
-        char === '"' &&
-        !inSingleQuote &&
-        !inBacktick &&
-        !isEscapedCharacter(source, i)
-      ) {
+      } else if (char === '"' && !inSingleQuote && !inBacktick && !isEscapedCharacter(source, i)) {
         inDoubleQuote = !inDoubleQuote;
       } else if (
         char === '`' &&

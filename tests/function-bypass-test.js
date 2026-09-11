@@ -15,7 +15,7 @@ console.log(`Is it actually Function?: ${globalFunction === Function}`);
 
 if (typeof globalFunction === 'function') {
   console.log('CRITICAL: Function constructor is accessible!');
-  
+
   // Test if we can use it to execute code
   console.log('\n2. Testing code execution:');
   try {
@@ -25,25 +25,29 @@ if (typeof globalFunction === 'function') {
   } catch (e) {
     console.log(`Function execution failed: ${e.message}`);
   }
-  
+
   // Test accessing require through Function
   console.log('\n3. Testing require access through Function:');
   try {
-    const requireAccess = globalFunction('try { return require; } catch(e) { return "no require"; }')();
+    const requireAccess = globalFunction(
+      'try { return require; } catch(e) { return "no require"; }'
+    )();
     console.log(`Require access: ${typeof requireAccess} - ${requireAccess}`);
   } catch (e) {
     console.log(`Require access failed: ${e.message}`);
   }
-  
+
   // Test process access
   console.log('\n4. Testing process access through Function:');
   try {
-    const processAccess = globalFunction('try { return process; } catch(e) { return "no process"; }')();
+    const processAccess = globalFunction(
+      'try { return process; } catch(e) { return "no process"; }'
+    )();
     console.log(`Process access: ${typeof processAccess}`);
   } catch (e) {
     console.log(`Process access failed: ${e.message}`);
   }
-  
+
   // Test file system access
   console.log('\n5. Testing file system access:');
   try {
@@ -59,12 +63,12 @@ const altMethods = [
   'this.global["Function"]',
   'this["global"]["Function"]',
   'Object.getPrototypeOf(this.global).constructor',
-  'this.global.constructor'
+  'this.global.constructor',
 ];
 
 altMethods.forEach((method, i) => {
   const result = runExpression(method, testContext, SAFE_SECURITY_CONFIG);
-  console.log(`Method ${i+1} (${method}): ${typeof result}`);
+  console.log(`Method ${i + 1} (${method}): ${typeof result}`);
 });
 
 console.log('\n=== FUNCTION BYPASS TEST COMPLETE ===');

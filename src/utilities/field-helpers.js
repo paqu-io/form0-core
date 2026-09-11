@@ -10,7 +10,11 @@ export function flattenFields(elements) {
   }
 
   return elements.flatMap((el) => {
-    if (el.type === 'Section' || el.type === 'RepeatableSection' || el.type === 'BuildingPlanSection') {
+    if (
+      el.type === 'Section' ||
+      el.type === 'RepeatableSection' ||
+      el.type === 'BuildingPlanSection'
+    ) {
       return [el, ...flattenFields(el.elements)];
     }
 
