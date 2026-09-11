@@ -1,7 +1,7 @@
 # form0-core
 
 [![NPM Version](https://img.shields.io/npm/v/form0-core)](https://www.npmjs.com/package/form0-core)
-[![NPM Downloads](https://img.shields.io/npm/dt/form0-core)](https://www.npmjs.com/package/form0-core)
+[![NPM Downloads](https://img.shields.io/npm/dm/form0-core)](https://www.npmjs.com/package/form0-core)
 [![CI](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml/badge.svg)](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml)
 ![NPM License](https://img.shields.io/npm/l/form0-core)
 [![Docs](https://img.shields.io/badge/docs-docs.form0.dev-2563eb)](https://docs.form0.dev)
