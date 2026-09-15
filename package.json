@@ -12,7 +12,7 @@
     "SECURITY.md"
   ],
   "scripts": {
-    "test": "node tests/form0-core.test.js && node tests/numeric-field-schema.test.js && node tests/dataset-descriptors.test.js && node tests/structured-record.test.js && node tests/title-fields.test.js && node tests/builtin-metadata.test.js && node tests/calculation-expression-utils.test.js && node tests/calculation-editor.test.js && node tests/form-event-editor.test.js && node tests/security-test.js",
+    "test": "node tests/form0-core.test.js && node tests/numeric-field-schema.test.js && node tests/dataset-descriptors.test.js && node tests/structured-record.test.js && node tests/title-fields.test.js && node tests/builtin-metadata.test.js && node tests/calculation-expression-utils.test.js && node tests/calculation-editor.test.js && node tests/form-event-editor.test.js && node tests/form-authoring.test.js && node tests/security-test.js",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"tests/**/*.{js,jsx}\" \"scripts/**/*.{js,mjs}\" package.json README.md SECURITY.md SUPPORT.md CONTRIBUTING.md eslint.config.js .github/workflows/ci.yml .github/workflows/publish.yml",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"tests/**/*.{js,jsx}\" \"scripts/**/*.{js,mjs}\" package.json README.md SECURITY.md SUPPORT.md CONTRIBUTING.md eslint.config.js .github/workflows/ci.yml .github/workflows/publish.yml",
     "lint:check": "eslint src tests",

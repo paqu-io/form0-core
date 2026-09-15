@@ -78,3 +78,9 @@ export {
   getFieldAIChoicePolicy,
   getFieldAIProviderHints,
 } from './utilities/ai-metadata.js';
+export {
+  getFormSchemaRevision,
+  getFormAuthoringContext,
+  getFormAICloudPolicy,
+  applyFormMutationBatch,
+} from './authoring/form-authoring.js';
