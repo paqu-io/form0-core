@@ -656,6 +656,22 @@ const schema = {
 })();
 
 (() => {
+  const nestingDepth = 10_000;
+  const expression = `SETRESULT(${'('.repeat(nestingDepth)}$age${')'.repeat(nestingDepth)});\nconst ignored = 1;`;
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression,
+  });
+
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
+    true,
+    'Deeply nested uncontrolled input must be checked without regex backtracking'
+  );
+})();
+
+(() => {
   const missingResult = analyzeCalculationExpression({
     schema,
     fieldDataName: 'room_summary',
@@ -676,6 +692,21 @@ const schema = {
   assert.equal(
     misplacedResult.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
     true
+  );
+})();
+
+(() => {
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT(() => $age);\nROUND($age, 0);',
+  });
+
+  assert.equal(analysis.valid, true, 'Style guidance must remain permissive');
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
+    true,
+    'A later parenthesized statement must not make SETRESULT appear final'
   );
 })();
 
