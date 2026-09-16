@@ -5,6 +5,7 @@ import {
   getFormAICloudPolicy,
   getFormAuthoringContext,
   getFormSchemaRevision,
+  validateFormAuthoringSchema,
 } from '../src/index.js';
 
 function textField(dataName, extra = {}) {
@@ -148,6 +149,10 @@ assert.deepEqual(getFormAICloudPolicy(source), {
   consentReasons: [{ scope: 'form' }],
 });
 
+const sourceValidation = validateFormAuthoringSchema({ schema: source });
+assert.equal(sourceValidation.valid, true, JSON.stringify(sourceValidation.diagnostics));
+assert.equal(sourceValidation.revision, revision);
+
 const renamed = applyFormMutationBatch({
   schema: source,
   baseRevision: revision,
@@ -209,6 +214,25 @@ assert.equal(invalidChoiceComparison.valid, false);
 assert.ok(
   invalidChoiceComparison.diagnostics.some(
     (issue) => issue.code === 'choice_value_accessor_required' && issue.source === 'form-events'
+  )
+);
+const invalidChoiceValidation = validateFormAuthoringSchema({
+  schema: {
+    ...choiceSource,
+    form: {
+      ...choiceSource.form,
+      events: {
+        code: `ON('change', 'birth_town', function () {
+          SETVALUE('first_name', IF($birth_town === 'loreto', 'Hooola!', 'Ciaooo'));
+        });`,
+      },
+    },
+  },
+});
+assert.equal(invalidChoiceValidation.valid, false);
+assert.ok(
+  invalidChoiceValidation.diagnostics.some(
+    (issue) => issue.code === 'choice_value_accessor_required'
   )
 );
 

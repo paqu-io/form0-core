@@ -82,5 +82,6 @@ export {
   getFormSchemaRevision,
   getFormAuthoringContext,
   getFormAICloudPolicy,
+  validateFormAuthoringSchema,
   applyFormMutationBatch,
 } from './authoring/form-authoring.js';

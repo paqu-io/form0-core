@@ -505,6 +505,17 @@ export function getFormAICloudPolicy(schema) {
   };
 }
 
+/** Validate a complete authoring draft without creating or applying mutations. */
+export function validateFormAuthoringSchema({ schema, security }) {
+  const root = normalizeRootSchema(schema);
+  const diagnostics = validateDraft(root, security);
+  return {
+    valid: !diagnostics.some((diagnostic) => diagnostic.severity === 'error'),
+    revision: getFormSchemaRevision(root),
+    diagnostics,
+  };
+}
+
 /** Apply and fully validate a semantic mutation batch without mutating the input schema. */
 export function applyFormMutationBatch({ schema, baseRevision, operations, security }) {
   const root = normalizeRootSchema(schema);
