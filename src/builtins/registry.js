@@ -7,7 +7,12 @@ import { COUNT, COUNT_METADATA } from './logical/count.js';
 import { COUNTA, COUNTA_METADATA } from './logical/counta.js';
 import { COUNTBLANK, COUNTBLANK_METADATA } from './logical/countblank.js';
 import { ARRAY, ARRAY_METADATA } from './logical/array.js';
-import { SETRESULT, SETRESULT_METADATA, __consumeResult } from './control/setresult.js';
+import {
+  SETRESULT,
+  SETRESULT_METADATA,
+  __consumeResult,
+  __resetResult,
+} from './control/setresult.js';
 import { EVAL, EVAL_METADATA } from './control/eval.js';
 import { CHOICEVALUE, CHOICEVALUE_METADATA } from './choice/choicevalue.js';
 import { CHOICELABEL, CHOICELABEL_METADATA } from './choice/choicelabel.js';
@@ -37,7 +42,12 @@ export { COUNT, COUNT_METADATA } from './logical/count.js';
 export { COUNTA, COUNTA_METADATA } from './logical/counta.js';
 export { COUNTBLANK, COUNTBLANK_METADATA } from './logical/countblank.js';
 export { ARRAY, ARRAY_METADATA } from './logical/array.js';
-export { SETRESULT, SETRESULT_METADATA, __consumeResult } from './control/setresult.js';
+export {
+  SETRESULT,
+  SETRESULT_METADATA,
+  __consumeResult,
+  __resetResult,
+} from './control/setresult.js';
 export { EVAL, EVAL_METADATA, __setEvalContext, __clearEvalContext } from './control/eval.js';
 export { CHOICEVALUE, CHOICEVALUE_METADATA } from './choice/choicevalue.js';
 export { CHOICELABEL, CHOICELABEL_METADATA } from './choice/choicelabel.js';

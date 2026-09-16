@@ -519,6 +519,37 @@ export function analyzeCalculationExpression({
     );
   }
 
+  if (isMultilineCalculationExpression(normalizedExpression) && setResultCalls.length === 0) {
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'noncanonical_multiline_result',
+        severity: 'warning',
+        message: 'Multiline calculations should finish with exactly one SETRESULT() call.',
+        index: 0,
+        length: 1,
+      })
+    );
+  } else if (
+    isMultilineCalculationExpression(normalizedExpression) &&
+    setResultCalls.length === 1 &&
+    !/SETRESULT\s*\([\s\S]*\)\s*;?\s*$/.test(normalizedExpression)
+  ) {
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'noncanonical_setresult_placement',
+        severity: 'warning',
+        message: 'SETRESULT() should be the final statement in a multiline calculation.',
+        symbol: 'SETRESULT',
+        index: setResultCalls[0].index,
+        length: setResultCalls[0].length,
+      })
+    );
+  }
+
   for (const reference of extractStaticFieldReferenceMatches(normalizedExpression)) {
     if (!referencedFieldNames.has(reference.fieldName)) {
       referencedFieldNames.add(reference.fieldName);

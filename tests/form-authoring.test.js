@@ -52,6 +52,35 @@ function calculatedField(dataName, calculate) {
   };
 }
 
+function singleChoiceField(dataName) {
+  return {
+    type: 'SingleChoiceField',
+    key: dataName,
+    data_name: dataName,
+    label: dataName,
+    display: 'default',
+    description: null,
+    description_mode: null,
+    required: false,
+    required_conditions: null,
+    visible: true,
+    visible_conditions: null,
+    read_only: false,
+    read_only_conditions: null,
+    default_value: null,
+    allow_other: false,
+    choices: [
+      { value: 'loreto', label: 'Loreto' },
+      { value: 'recanati', label: 'Recanati' },
+    ],
+    supporting_image: false,
+    supporting_image_path: null,
+    supporting_image_display: null,
+    is_searchable: false,
+    is_searchable_mode: 'default',
+  };
+}
+
 const source = {
   form: {
     name: 'Authoring test',
@@ -84,11 +113,33 @@ const revision = getFormSchemaRevision(source);
 assert.equal(revision, getFormSchemaRevision(structuredClone(source)));
 
 const context = getFormAuthoringContext({ schema: source, coreVersion: 'test' });
+assert.equal(context.contractVersion, 3);
 assert.equal(context.schema.form.elements.length, 2);
 assert.equal(context.revision, revision);
 assert.ok(context.fieldSpecs.TextField);
 assert.ok(context.calculationBuiltins.some((builtin) => builtin.name === 'SETRESULT'));
+assert.deepEqual(context.calculationGuidance.preferenceOrder, [
+  'direct-expression',
+  'builtin-expression',
+  'multiline-javascript',
+]);
+assert.equal(context.calculationGuidance.multilineResult.builtin, 'SETRESULT');
+assert.equal(context.calculationGuidance.multilineResult.requiredCalls, 1);
+assert.equal(context.calculationGuidance.multilineResult.placement, 'final-statement');
+assert.deepEqual(context.calculationGuidance.nonPreferredPatterns, ['iife']);
+assert.equal(context.calculationGuidance.examples.builtin, 'IF($eligible, $amount, 0)');
+assert.match(context.calculationGuidance.examples.multiline, /SETRESULT\(age\);$/);
 assert.ok(context.eventTypes.includes('change'));
+assert.equal(context.eventGuidance.choiceValues.single.builtin, 'CHOICEVALUE');
+assert.deepEqual(context.eventGuidance.choiceValues.single.fieldTypes, [
+  'SingleChoiceField',
+  'BooleanField',
+]);
+assert.equal(context.eventGuidance.choiceValues.multiple.builtin, 'CHOICEVALUES');
+assert.equal(context.eventGuidance.conditionalMappings.explicitNamedCases, true);
+assert.equal(context.eventGuidance.conditionalMappings.explicitFallback, true);
+assert.match(context.eventGuidance.examples.conditionalChoiceMapping, /CHOICEVALUE/);
+assert.match(context.eventGuidance.examples.conditionalChoiceMapping, /recanati/);
 
 assert.deepEqual(getFormAICloudPolicy(source), {
   allowCloud: false,
@@ -139,6 +190,27 @@ const invalidCalculation = applyFormMutationBatch({
 });
 assert.equal(invalidCalculation.valid, false);
 assert.ok(invalidCalculation.diagnostics.some((issue) => issue.code === 'unknown_field_reference'));
+
+const choiceSource = structuredClone(source);
+choiceSource.form.elements.push(singleChoiceField('birth_town'));
+const invalidChoiceComparison = applyFormMutationBatch({
+  schema: choiceSource,
+  baseRevision: getFormSchemaRevision(choiceSource),
+  operations: [
+    {
+      op: 'setFormEventCode',
+      code: `ON('change', 'birth_town', function () {
+        SETVALUE('first_name', IF($birth_town === 'loreto', 'Hooola!', 'Ciaooo'));
+      });`,
+    },
+  ],
+});
+assert.equal(invalidChoiceComparison.valid, false);
+assert.ok(
+  invalidChoiceComparison.diagnostics.some(
+    (issue) => issue.code === 'choice_value_accessor_required' && issue.source === 'form-events'
+  )
+);
 
 const added = applyFormMutationBatch({
   schema: { form: { name: 'Empty', description: null, elements: [] } },

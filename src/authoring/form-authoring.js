@@ -28,6 +28,66 @@ const MUTATION_OPERATIONS = Object.freeze([
   'setFormEventCode',
 ]);
 
+const CALCULATION_GUIDANCE = Object.freeze({
+  version: 1,
+  preferenceOrder: Object.freeze([
+    'direct-expression',
+    'builtin-expression',
+    'multiline-javascript',
+  ]),
+  multilineResult: Object.freeze({
+    builtin: 'SETRESULT',
+    requiredCalls: 1,
+    placement: 'final-statement',
+  }),
+  nonPreferredPatterns: Object.freeze(['iife']),
+  examples: Object.freeze({
+    direct: '$quantity * $unit_price',
+    builtin: 'IF($eligible, $amount, 0)',
+    multiline: `let age = null;
+if ($birth_date) {
+  const birth = new Date($birth_date);
+  const today = new Date();
+  age = today.getFullYear() - birth.getFullYear();
+  const month = today.getMonth() - birth.getMonth();
+  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age--;
+}
+SETRESULT(age);`,
+  }),
+});
+
+const EVENT_GUIDANCE = Object.freeze({
+  version: 1,
+  choiceValues: Object.freeze({
+    single: Object.freeze({
+      fieldTypes: Object.freeze(['SingleChoiceField', 'BooleanField']),
+      builtin: 'CHOICEVALUE',
+    }),
+    multiple: Object.freeze({
+      fieldTypes: Object.freeze(['MultiChoiceField']),
+      builtin: 'CHOICEVALUES',
+    }),
+  }),
+  conditionalMappings: Object.freeze({
+    explicitNamedCases: true,
+    explicitFallback: true,
+  }),
+  examples: Object.freeze({
+    singleChoiceComparison: "CHOICEVALUE($birth_town) === 'loreto'",
+    multipleChoiceComparison: "CHOICEVALUES($interests).includes('music')",
+    conditionalChoiceMapping: `ON('change', 'birth_town', function () {
+  SETVALUE(
+    'comments',
+    IF(
+      CHOICEVALUE($birth_town) === 'loreto',
+      'Hooola!',
+      IF(CHOICEVALUE($birth_town) === 'recanati', 'Ciaooo', '')
+    )
+  );
+});`,
+  }),
+});
+
 function deepClone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -408,7 +468,7 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
       }),
     }));
   return {
-    contractVersion: 1,
+    contractVersion: 3,
     coreVersion,
     revision: getFormSchemaRevision(root),
     schema: deepClone(root),
@@ -416,7 +476,9 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
     fieldSpecs,
     operators,
     eventTypes: getAllEventTypes(),
+    eventGuidance: deepClone(EVENT_GUIDANCE),
     calculationBuiltins: getCalculationBuiltinCatalog(),
+    calculationGuidance: deepClone(CALCULATION_GUIDANCE),
     eventBuiltins: getFormEventBuiltinCatalog(),
     eventReferences: getFormEventReferenceCatalog({ schema: root }),
     calculations,
