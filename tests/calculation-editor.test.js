@@ -518,6 +518,66 @@ const schema = {
 })();
 
 (() => {
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: '(() => $age)()',
+  });
+
+  assert.equal(analysis.valid, true, 'IIFEs remain valid for existing schemas');
+})();
+
+(() => {
+  const leakSchema = {
+    form: {
+      name: 'SETRESULT cleanup',
+      description: null,
+      elements: [
+        {
+          type: 'CalculatedField',
+          key: 'fails_after_result',
+          data_name: 'fails_after_result',
+          label: 'Fails after result',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: 'SETRESULT(41);\nthrow new Error("boom");',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+        {
+          type: 'CalculatedField',
+          key: 'after_failure',
+          data_name: 'after_failure',
+          label: 'After failure',
+          display: { style: 'numeric' },
+          description: null,
+          description_mode: null,
+          required: false,
+          visible: true,
+          visible_conditions: null,
+          read_only: true,
+          calculate: '42',
+          supporting_image: false,
+          supporting_image_path: null,
+          supporting_image_display: null,
+        },
+      ],
+    },
+  };
+  const engine = createFormEngine({ schema: leakSchema });
+  engine.eval();
+
+  assert.equal(engine.getState().values.fails_after_result, null);
+  assert.equal(engine.getState().values.after_failure, 42);
+})();
+
+(() => {
   const inlineSemicolonSchema = {
     form: {
       name: 'Inline Semicolon Test Form',
@@ -592,6 +652,61 @@ const schema = {
   assert.equal(
     analysis.issues.some((issue) => issue.code === 'multiple_setresult_calls'),
     true
+  );
+})();
+
+(() => {
+  const nestingDepth = 10_000;
+  const expression = `SETRESULT(${'('.repeat(nestingDepth)}$age${')'.repeat(nestingDepth)});\nconst ignored = 1;`;
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression,
+  });
+
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
+    true,
+    'Deeply nested uncontrolled input must be checked without regex backtracking'
+  );
+})();
+
+(() => {
+  const missingResult = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'const age = $age;\nage + 1;',
+  });
+  const misplacedResult = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT($age);\nconst ignored = 1;',
+  });
+
+  assert.equal(missingResult.valid, true, 'Style guidance must not reject existing calculations');
+  assert.equal(
+    missingResult.issues.some((issue) => issue.code === 'noncanonical_multiline_result'),
+    true
+  );
+  assert.equal(misplacedResult.valid, true, 'Style guidance must remain permissive');
+  assert.equal(
+    misplacedResult.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
+    true
+  );
+})();
+
+(() => {
+  const analysis = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'SETRESULT(() => $age);\nROUND($age, 0);',
+  });
+
+  assert.equal(analysis.valid, true, 'Style guidance must remain permissive');
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
+    true,
+    'A later parenthesized statement must not make SETRESULT appear final'
   );
 })();
 

@@ -18,6 +18,10 @@ const COMMON_GLOBAL_FUNCTIONS = new Set([
 ]);
 
 const STRUCTURAL_FIELD_TYPES = new Set(['Section', 'RepeatableSection', 'BuildingPlanSection']);
+const SINGLE_CHOICE_FIELD_TYPES = new Set(['SingleChoiceField', 'BooleanField']);
+const MULTI_CHOICE_FIELD_TYPES = new Set(['MultiChoiceField']);
+
+const SCALAR_LITERAL_PATTERN = String.raw`(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|true|false|null|undefined)`;
 
 const FORM_EVENT_BUILTIN_STATUS_BY_NAME = Object.freeze({
   EVAL: 'advanced',
@@ -136,6 +140,84 @@ function extractFieldReferenceMatches(code) {
       reference: `$${match[1]}`,
       index: match.index,
       length: match[0].length,
+    });
+  }
+
+  return matches;
+}
+
+function getCodePositions(code) {
+  const positions = new Array(code.length).fill(false);
+  let state = 'code';
+
+  for (let index = 0; index < code.length; index++) {
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (state === 'line-comment') {
+      if (char === '\n') state = 'code';
+      continue;
+    }
+    if (state === 'block-comment') {
+      if (char === '*' && next === '/') {
+        index++;
+        state = 'code';
+      }
+      continue;
+    }
+    if (state !== 'code') {
+      if (char === '\\') {
+        index++;
+      } else if (
+        (state === 'single-quote' && char === "'") ||
+        (state === 'double-quote' && char === '"') ||
+        (state === 'template' && char === '`')
+      ) {
+        state = 'code';
+      }
+      continue;
+    }
+
+    positions[index] = true;
+    if (char === '/' && next === '/') {
+      positions[index] = false;
+      state = 'line-comment';
+      index++;
+    } else if (char === '/' && next === '*') {
+      positions[index] = false;
+      state = 'block-comment';
+      index++;
+    } else if (char === "'") {
+      state = 'single-quote';
+    } else if (char === '"') {
+      state = 'double-quote';
+    } else if (char === '`') {
+      state = 'template';
+    }
+  }
+
+  return positions;
+}
+
+function extractDirectScalarComparisonMatches(code) {
+  const comparisonPattern = new RegExp(
+    String.raw`(?:\$([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:===|!==|==|!=)\s*${SCALAR_LITERAL_PATTERN}|${SCALAR_LITERAL_PATTERN}\s*(?:===|!==|==|!=)\s*\$([a-zA-Z_][a-zA-Z0-9_]*))`,
+    'g'
+  );
+  const codePositions = getCodePositions(code);
+  const matches = [];
+  let match;
+
+  while ((match = comparisonPattern.exec(code)) !== null) {
+    if (!codePositions[match.index]) continue;
+    const fieldName = match[1] || match[2];
+    const reference = `$${fieldName}`;
+    const referenceOffset = match[0].indexOf(reference);
+    matches.push({
+      fieldName,
+      reference,
+      index: match.index + referenceOffset,
+      length: reference.length,
     });
   }
 
@@ -302,12 +384,11 @@ export function analyzeFormEventCode({ code, schema, securityConfig = DEFAULT_SE
   const validEventTypes = new Set(getAllEventTypes());
   const normalizedCode = typeof code === 'string' ? code : '';
   const form = normalizeFormSchema(schema);
-  const knownFieldNames = new Set(
-    flattenFields(form.elements)
-      .filter((field) => field && typeof field === 'object')
-      .map((field) => field.data_name)
-      .filter((fieldName) => typeof fieldName === 'string' && fieldName.length > 0)
+  const knownFields = flattenFields(form.elements).filter(
+    (field) => field && typeof field === 'object' && typeof field.data_name === 'string'
   );
+  const knownFieldNames = new Set(knownFields.map((field) => field.data_name));
+  const knownFieldByName = new Map(knownFields.map((field) => [field.data_name, field]));
 
   if (normalizedCode.trim().length > 0) {
     try {
@@ -450,6 +531,29 @@ export function analyzeFormEventCode({ code, schema, securityConfig = DEFAULT_SE
         })
       );
     }
+  }
+
+  for (const comparison of extractDirectScalarComparisonMatches(normalizedCode)) {
+    const fieldType = knownFieldByName.get(comparison.fieldName)?.type;
+    const accessor = SINGLE_CHOICE_FIELD_TYPES.has(fieldType)
+      ? 'CHOICEVALUE'
+      : MULTI_CHOICE_FIELD_TYPES.has(fieldType)
+        ? 'CHOICEVALUES'
+        : null;
+    if (!accessor) continue;
+
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'choice_value_accessor_required',
+        severity: 'error',
+        message: `${comparison.reference} is a ${fieldType} value object. Use ${accessor}(${comparison.reference}) when comparing its selected value.`,
+        symbol: comparison.reference,
+        index: comparison.index,
+        length: comparison.length,
+      })
+    );
   }
 
   for (const eventTypeReference of extractLiteralEventTypeMatches(normalizedCode)) {

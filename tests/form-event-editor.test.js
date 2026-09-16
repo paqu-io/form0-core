@@ -57,6 +57,32 @@ const schema = {
         supporting_image_display: null,
       },
       {
+        type: 'SingleChoiceField',
+        key: 'birth_town',
+        data_name: 'birth_town',
+        label: 'Birth town',
+        display: 'default',
+        description: null,
+        description_mode: null,
+        required: false,
+        required_conditions: null,
+        visible: true,
+        visible_conditions: null,
+        read_only: false,
+        read_only_conditions: null,
+        default_value: null,
+        allow_other: false,
+        choices: [
+          { value: 'loreto', label: 'Loreto' },
+          { value: 'recanati', label: 'Recanati' },
+        ],
+        supporting_image: false,
+        supporting_image_path: null,
+        supporting_image_display: null,
+        is_searchable: false,
+        is_searchable_mode: 'default',
+      },
+      {
         type: 'CalculatedField',
         key: 'full_name',
         data_name: 'full_name',
@@ -156,6 +182,65 @@ const schema = {
 
   assert.equal(analysis.valid, true);
   assert.deepEqual(analysis.issues, []);
+})();
+
+(() => {
+  const invalid = analyzeFormEventCode({
+    schema,
+    code: `
+      ON('change', 'birth_town', function () {
+        SETVALUE('status_message', IF($birth_town === 'loreto', 'Hooola!', 'Ciaooo'));
+      });
+    `,
+  });
+  const canonical = analyzeFormEventCode({
+    schema,
+    code: `
+      ON('change', 'birth_town', function () {
+        SETVALUE(
+          'status_message',
+          IF(
+            CHOICEVALUE($birth_town) === 'loreto',
+            'Hooola!',
+            IF(CHOICEVALUE($birth_town) === 'recanati', 'Ciaooo', '')
+          )
+        );
+      });
+    `,
+  });
+
+  assert.equal(invalid.valid, false);
+  assert.equal(
+    invalid.issues.some((issue) => issue.code === 'choice_value_accessor_required'),
+    true
+  );
+  assert.equal(canonical.valid, true, JSON.stringify(canonical.issues));
+})();
+
+(() => {
+  const reversed = analyzeFormEventCode({
+    schema,
+    code: `ON('change', 'birth_town', function () {
+      SETVALUE('status_message', 'loreto' === $birth_town ? 'Hooola!' : '');
+    });`,
+  });
+  const quotedAndCommented = analyzeFormEventCode({
+    schema,
+    code: `
+      // $birth_town === 'loreto'
+      const example = "$birth_town === 'recanati'";
+      ON('change', 'birth_town', function () {
+        SETVALUE('status_message', example);
+      });
+    `,
+  });
+
+  assert.equal(reversed.valid, false);
+  assert.equal(
+    reversed.issues.some((issue) => issue.code === 'choice_value_accessor_required'),
+    true
+  );
+  assert.equal(quotedAndCommented.valid, true, JSON.stringify(quotedAndCommented.issues));
 })();
 
 (() => {

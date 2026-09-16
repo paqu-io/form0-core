@@ -17,7 +17,10 @@ export const CHOICEVALUE_METADATA = defineBuiltinMetadata({
   category: 'choice',
   signature: 'CHOICEVALUE(fieldValue)',
   description: 'Return the selected choice value from a choice field.',
-  examples: ['CHOICEVALUE($city)'],
+  examples: [
+    'CHOICEVALUE($city)',
+    'IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogota!", "Welcome!")',
+  ],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
 

@@ -17,7 +17,7 @@ export const CHOICEVALUES_METADATA = defineBuiltinMetadata({
   category: 'choice',
   signature: 'CHOICEVALUES(fieldValue)',
   description: 'Return all selected values from a MultiChoiceField.',
-  examples: ['CHOICEVALUES($colors)'],
+  examples: ['CHOICEVALUES($colors)', 'CHOICEVALUES($colors).includes("red")'],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
 

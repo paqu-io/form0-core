@@ -1,4 +1,4 @@
-import { __consumeResult } from '../builtins/registry.js';
+import { __consumeResult, __resetResult } from '../builtins/registry.js';
 import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.js';
 import { __setDataNamesContext, __clearDataNamesContext } from '../builtins/schema/datanames.js';
 import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
@@ -16,6 +16,9 @@ export function runExpression(
   schema = null,
   options = {}
 ) {
+  // SETRESULT uses synchronous evaluation-scoped state. Clear it at both boundaries so a
+  // previously failed expression can never influence this evaluation.
+  __resetResult();
   try {
     // Validate expression based on security mode
     const validation = validateExpression(expr, securityConfig, includeEventBuiltins);
@@ -59,6 +62,7 @@ export function runExpression(
           return consumed.called ? consumed.value : result;
         }
       } finally {
+        __resetResult();
         // Always clear EVAL context after execution
         __clearEvalContext();
         if (schema) {

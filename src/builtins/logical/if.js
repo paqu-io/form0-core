@@ -19,7 +19,10 @@ export const IF_METADATA = defineBuiltinMetadata({
   category: 'logical',
   signature: 'IF(condition, trueValue, falseValue)',
   description: 'Return one of two values based on a condition.',
-  examples: ['IF($age >= 18, "adult", "minor")'],
+  examples: [
+    'IF($age >= 18, "adult", "minor")',
+    'IF($country === "US", IF($state === "CA", 8.99, 5.99), 15.99)',
+  ],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
 

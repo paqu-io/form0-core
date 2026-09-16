@@ -42,3 +42,9 @@ export function __consumeResult() {
   _resultValue = undefined;
   return { called, value };
 }
+
+/** Clear calculation result state without consuming it. */
+export function __resetResult() {
+  _resultSet = false;
+  _resultValue = undefined;
+}

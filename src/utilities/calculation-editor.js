@@ -80,6 +80,69 @@ function extractFunctionCalls(code) {
   return matches;
 }
 
+function isFinalFunctionCall(code, call) {
+  let index = call.index + call.length;
+  while (index < code.length && /\s/u.test(code[index])) index += 1;
+  if (code[index] !== '(') return false;
+
+  let depth = 0;
+  let state = 'code';
+  for (; index < code.length; index += 1) {
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (state === 'line-comment') {
+      if (char === '\n') state = 'code';
+      continue;
+    }
+    if (state === 'block-comment') {
+      if (char === '*' && next === '/') {
+        index += 1;
+        state = 'code';
+      }
+      continue;
+    }
+    if (state !== 'code') {
+      if (char === '\\') {
+        index += 1;
+      } else if (
+        (state === 'single-quote' && char === "'") ||
+        (state === 'double-quote' && char === '"') ||
+        (state === 'template' && char === '`')
+      ) {
+        state = 'code';
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') {
+      state = 'line-comment';
+      index += 1;
+    } else if (char === '/' && next === '*') {
+      state = 'block-comment';
+      index += 1;
+    } else if (char === "'") {
+      state = 'single-quote';
+    } else if (char === '"') {
+      state = 'double-quote';
+    } else if (char === '`') {
+      state = 'template';
+    } else if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+  }
+
+  if (depth !== 0) return false;
+  index += 1;
+  while (index < code.length && /\s/u.test(code[index])) index += 1;
+  if (code[index] === ';') index += 1;
+  while (index < code.length && /\s/u.test(code[index])) index += 1;
+  return index === code.length;
+}
+
 function cloneCatalogDefinition(definition) {
   return {
     ...definition,
@@ -515,6 +578,37 @@ export function analyzeCalculationExpression({
         symbol: duplicateSetResultCall.name,
         index: duplicateSetResultCall.index,
         length: duplicateSetResultCall.length,
+      })
+    );
+  }
+
+  if (isMultilineCalculationExpression(normalizedExpression) && setResultCalls.length === 0) {
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'noncanonical_multiline_result',
+        severity: 'warning',
+        message: 'Multiline calculations should finish with exactly one SETRESULT() call.',
+        index: 0,
+        length: 1,
+      })
+    );
+  } else if (
+    isMultilineCalculationExpression(normalizedExpression) &&
+    setResultCalls.length === 1 &&
+    !isFinalFunctionCall(normalizedExpression, setResultCalls[0])
+  ) {
+    addIssue(
+      issues,
+      issueKeys,
+      createIssue({
+        code: 'noncanonical_setresult_placement',
+        severity: 'warning',
+        message: 'SETRESULT() should be the final statement in a multiline calculation.',
+        symbol: 'SETRESULT',
+        index: setResultCalls[0].index,
+        length: setResultCalls[0].length,
       })
     );
   }
