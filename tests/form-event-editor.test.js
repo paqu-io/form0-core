@@ -354,3 +354,37 @@ const schema = {
 
   assert.deepEqual(engine.trigger('load-record'), []);
 })();
+
+(() => {
+  const engine = createFormEngine({
+    schema: {
+      form: {
+        ...schema.form,
+        events: {
+          code: `
+            ON('change', 'first_name', function () {
+              ON('change', 'status_message', function () {
+                ALERT('Nested handler should not run');
+              });
+              OFF('change', 'first_name');
+              SETVALUE('status_message', 'kept');
+            });
+          `,
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(engine.trigger('change', 'first_name'), [
+    {
+      type: 'FIELD_OPERATION',
+      operation: 'SETVALUE',
+      params: {
+        fieldDataName: 'status_message',
+        valueToSet: 'kept',
+      },
+    },
+  ]);
+  assert.deepEqual(engine.trigger('change', 'status_message'), []);
+  assert.equal(engine.trigger('change', 'first_name').length, 1);
+})();

@@ -1,8 +1,28 @@
 import { flattenFields } from '../utilities/field-helpers.js';
 
+const valuesEqual = (a, b) => {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    const unmatched = [...b];
+    return a.every((value) => {
+      const matchIndex = unmatched.findIndex((candidate) => candidate === value);
+      if (matchIndex === -1) {
+        return false;
+      }
+      unmatched.splice(matchIndex, 1);
+      return true;
+    });
+  }
+
+  return a === b;
+};
+
 const OPERATORS = {
-  equal_to: (a, b) => a === b,
-  not_equal_to: (a, b) => a !== b,
+  equal_to: valuesEqual,
+  not_equal_to: (a, b) => !valuesEqual(a, b),
   greater_than: (a, b) => a > b,
   less_than: (a, b) => a < b,
   greater_or_equal_than: (a, b) => a >= b,
@@ -14,6 +34,52 @@ const OPERATORS = {
   is_not_empty: (a) =>
     !(a === null || a === undefined || a === '' || (Array.isArray(a) && a.length === 0)),
 };
+
+const hasValue = (entry, property) =>
+  entry &&
+  typeof entry === 'object' &&
+  Object.prototype.hasOwnProperty.call(entry, property) &&
+  entry[property] !== null &&
+  entry[property] !== undefined &&
+  entry[property] !== '';
+
+const getOtherValue = (entry) => {
+  if (hasValue(entry, 'value')) {
+    return entry.value;
+  }
+  if (hasValue(entry, 'label')) {
+    return entry.label;
+  }
+  return null;
+};
+
+function normalizeConditionValue(field, value) {
+  if (!field || !value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  if (field.type === 'SingleChoiceField' || field.type === 'BooleanField') {
+    const selectedChoice = Array.isArray(value.choice) ? value.choice[0] : null;
+    if (hasValue(selectedChoice, 'value')) {
+      return selectedChoice.value;
+    }
+
+    const otherEntry = Array.isArray(value.other) ? value.other[0] : null;
+    return getOtherValue(otherEntry);
+  }
+
+  if (field.type === 'MultiChoiceField') {
+    const selectedValues = Array.isArray(value.choices)
+      ? value.choices.filter((choice) => hasValue(choice, 'value')).map((choice) => choice.value)
+      : [];
+    const otherValues = Array.isArray(value.other)
+      ? value.other.map(getOtherValue).filter((otherValue) => otherValue !== null)
+      : [];
+    return [...selectedValues, ...otherValues];
+  }
+
+  return value;
+}
 
 export function evaluateConditions(conditions, values, allFields) {
   if (Array.isArray(conditions)) {
@@ -31,7 +97,7 @@ export function evaluateConditions(conditions, values, allFields) {
   // Map field_id (key) to data_name for value lookup
   const field = allFields ? allFields[conditions.field_id] : undefined;
   const dataName = field ? field.data_name : undefined;
-  const val = dataName ? values[dataName] : undefined;
+  const val = normalizeConditionValue(field, dataName ? values[dataName] : undefined);
   // Debug log: show what is being checked
   //console.log('[evaluateConditions] field_id:', conditions.field_id, 'data_name:', dataName, 'value in values:', val, 'expected:', conditions.value, 'operator:', conditions.operator);
   const fn = OPERATORS[conditions.operator];

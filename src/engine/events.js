@@ -415,14 +415,16 @@ export class EventManager {
 
         // Consume any collected event operations
         const collectedOps = __consumeEventOperations();
+        const runtimeOps = collectedOps.filter(
+          (operation) => operation?.type !== 'EVENT_OPERATION'
+        );
 
         // Validate operations against context restrictions before adding them
-        const validOps = this.validateOperations(collectedOps, executionContext);
+        const validOps = this.validateOperations(runtimeOps, executionContext);
         operations.push(...validOps);
 
-        // Note: EVENT_OPERATION processing (ON/OFF) is handled only during initialization
-        // If event handlers contain ON/OFF calls, they will be in the operations array
-        // but won't be processed here to avoid duplicate registrations
+        // EVENT_OPERATION processing is initialization-only. ON/OFF calls inside a handler neither
+        // mutate the listener registry nor leak internal registration descriptors to the host.
 
         // For backward compatibility, still handle returned operations
         if (result && result.type === 'UI_OPERATION') {

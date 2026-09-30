@@ -181,11 +181,14 @@ IF(user.age >= 18, "Adult", "Minor")
 
 ## Security
 
-All builtins are designed to be safe for use in form contexts:
+Builtins provide defined interfaces for common form operations, and their arguments are validated
+where applicable. Event builtins such as `SETVALUE` and `ALERT` return operations for the host to
+apply instead of mutating application state directly.
 
-- **No side effects**: Builtins don't modify external state
-- **Sandboxed execution**: Cannot access system resources
-- **Input validation**: Arguments are validated before processing
+Using a builtin does not sandbox the JavaScript expression or event script that calls it. Schemas
+containing executable code must come from trusted authors. `SAFE` and `CUSTOM` modes provide
+validation and configuration controls, not isolation. See the project
+[security policy](../../../SECURITY.md) for the trust model and application responsibilities.
 
 ## Extending Builtins
 
@@ -252,4 +255,4 @@ SETRESULT(
 
 - Explore individual builtin documentation for detailed usage
 - Check out the [form0 examples](../examples.mdx) for real-world scenarios
-- Learn about [custom helpers](../custom-helpers.mdx) for extending functionality 
+- Learn about [custom helpers](../custom-helpers.mdx) for extending functionality
