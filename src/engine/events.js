@@ -1,8 +1,14 @@
 import { runExpression } from './evaluator.js';
-import { __consumeEventOperations } from '../builtins/registry.js';
+import { eventBuiltins } from '../builtins/registry.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 import { createEventSourceRegistry } from './event-source.js';
+import {
+  bindEventBuiltins,
+  closeEventOperationScope,
+  createEventOperationScope,
+  runInEventOperationScope,
+} from './event-operation-scope.js';
 
 // Global registry to track logged event handlers (development only)
 const _loggedHandlers = new Set();
@@ -44,16 +50,79 @@ export class EventManager {
    * @param {Object} context - The execution context
    */
   executeEventCode(code, context) {
-    // Execute the code to register event listeners (same security as calculated fields)
-    // ON() and OFF() are now available as regular event builtins
-    const prepared = this.callbackSources.prepare(code, context);
-    runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
-      sourceExpression: code,
-    });
+    const executionContext = {
+      type: 'event',
+      eventType: 'initialization',
+      fieldName: null,
+    };
+    const scope = this.createOperationScope(executionContext, 'form.events.code');
+    const scopedContext = bindEventBuiltins(context, eventBuiltins, scope);
 
-    // Process any ON/OFF operations that were collected during initialization
-    const initOperations = __consumeEventOperations();
-    this.processEventOperations(initOperations);
+    try {
+      // Execute the code to register event listeners (same security as calculated fields).
+      const prepared = this.callbackSources.prepare(code, scopedContext);
+      const result = runInEventOperationScope(scope, () =>
+        runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
+          sourceExpression: code,
+        })
+      );
+      this.reportAsyncHandlerResult(result, executionContext, 'form.events.code');
+    } finally {
+      this.processEventOperations(closeEventOperationScope(scope));
+    }
+  }
+
+  createOperationScope(executionContext, handlerName) {
+    return createEventOperationScope((operationName) => {
+      this.emitHandlerWarning(
+        'late_event_operation_discarded',
+        executionContext,
+        handlerName,
+        operationName
+      );
+    });
+  }
+
+  emitHandlerWarning(reason, executionContext, handlerName, operationName = null) {
+    const eventName = executionContext.eventType;
+    const messages = {
+      async_handler_unsupported: `Event handler '${handlerName}' for event '${eventName}' returned a Promise or thenable.`,
+      late_event_operation_discarded: `Event handler '${handlerName}' for event '${eventName}' attempted ${operationName || 'an event operation'} after its synchronous scope closed. The operation was discarded.`,
+      async_handler_rejected: `Event handler '${handlerName}' for event '${eventName}' rejected after its synchronous scope closed.`,
+    };
+
+    this.warningSystem.emitWarning({
+      type: 'EVENT_HANDLER_WARNING',
+      reason,
+      severity: reason === 'async_handler_rejected' ? 'error' : 'warning',
+      message: messages[reason],
+      suggestion:
+        'Keep event handlers synchronous and create every event operation before the handler returns.',
+      executionContext: { ...executionContext },
+      fieldContext: {
+        handlerName,
+        ...(operationName ? { operationName } : {}),
+      },
+    });
+  }
+
+  reportAsyncHandlerResult(result, executionContext, handlerName) {
+    if ((typeof result !== 'object' || result === null) && typeof result !== 'function') return;
+
+    let then;
+    try {
+      then = result.then;
+    } catch {
+      this.emitHandlerWarning('async_handler_rejected', executionContext, handlerName);
+      return;
+    }
+
+    if (typeof then !== 'function') return;
+
+    this.emitHandlerWarning('async_handler_unsupported', executionContext, handlerName);
+    Promise.resolve(result).catch(() => {
+      this.emitHandlerWarning('async_handler_rejected', executionContext, handlerName);
+    });
   }
 
   /**
@@ -180,7 +249,7 @@ export class EventManager {
    * @param {Object} event - The event object
    * @returns {*} The result of the event handler
    */
-  executeHandlerWithContext(callback, event) {
+  executeHandlerWithContext(callback, event, scope) {
     // Create execution context for this event
     const executionContext = {
       type: 'event',
@@ -208,10 +277,16 @@ export class EventManager {
       };
     }
 
+    contextWithEvent = bindEventBuiltins(contextWithEvent, eventBuiltins, scope);
+
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
     const functionCall = `(${callbackCode})(event)`;
-    return runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema);
+    return runInEventOperationScope(scope, () =>
+      runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema, {
+        evaluateAsExpression: true,
+      })
+    );
   }
 
   /**
@@ -413,13 +488,19 @@ export class EventManager {
     const wildcardListeners = eventMap.get('*') || [];
 
     [...fieldListeners, ...wildcardListeners].forEach((callback) => {
+      const handlerName = callback.name || '<anonymous>';
+      const scope = this.createOperationScope(executionContext, handlerName);
+      let result;
+      let collectedOps = [];
       try {
         // Execute the callback with current form context
         // This ensures EVAL() and other builtins have access to field values
-        const result = this.executeHandlerWithContext(callback, event);
-
-        // Consume any collected event operations
-        const collectedOps = __consumeEventOperations();
+        result = this.executeHandlerWithContext(callback, event, scope);
+      } catch (error) {
+        // Simple error message for now
+        console.warn(`[form0] Event listener failed: ${error.message}`);
+      } finally {
+        collectedOps = closeEventOperationScope(scope);
         const runtimeOps = collectedOps.filter(
           (operation) => operation?.type !== 'EVENT_OPERATION'
         );
@@ -430,16 +511,16 @@ export class EventManager {
 
         // EVENT_OPERATION processing is initialization-only. ON/OFF calls inside a handler neither
         // mutate the listener registry nor leak internal registration descriptors to the host.
+      }
 
+      try {
+        this.reportAsyncHandlerResult(result, executionContext, handlerName);
         // For backward compatibility, still handle returned operations
-        if (result && result.type === 'UI_OPERATION') {
+        if (result && result.type === 'UI_OPERATION' && !collectedOps.includes(result)) {
           operations.push(result);
         }
       } catch (error) {
-        // Simple error message for now
         console.warn(`[form0] Event listener failed: ${error.message}`);
-        // Make sure to consume operations even if callback fails
-        __consumeEventOperations();
       }
     });
 

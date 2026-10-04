@@ -112,7 +112,7 @@ The `SETVALUE` function supports different value formats for different field typ
 - **Platform execution**: The actual field value setting is handled by the platform
 - **Operation collection**: Operations are automatically collected and executed
 - **Type handling**: The platform handles value formatting for different field types
-- **Asynchronous execution**: Field updates may occur asynchronously after event completion
+- **Synchronous operation creation**: Call `SETVALUE` before the event handler returns. The host application may apply the returned operation asynchronously after event completion.
 
 ## Related Functions
 
@@ -236,4 +236,4 @@ SETVALUE('form_status',
     'incomplete'
   )
 )
-``` 
+```

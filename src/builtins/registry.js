@@ -33,7 +33,6 @@ import { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 import { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 import { ON, ON_METADATA } from './event/control/on.js';
 import { OFF, OFF_METADATA } from './event/control/off.js';
-import { __consumeEventOperations } from './event/event-operations-collector.js';
 
 export { IF, IF_METADATA } from './logical/if.js';
 export { AND, AND_METADATA } from './logical/and.js';
@@ -73,7 +72,6 @@ export { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 export { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
-export { __consumeEventOperations } from './event/event-operations-collector.js';
 
 const COMMON_RUNTIME_ENTRIES = Object.freeze([
   { implementation: IF, definition: IF_METADATA },
