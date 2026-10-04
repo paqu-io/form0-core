@@ -2,6 +2,7 @@ import { runExpression } from './evaluator.js';
 import { __consumeEventOperations } from '../builtins/registry.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
+import { createEventSourceRegistry } from './event-source.js';
 
 // Global registry to track logged event handlers (development only)
 const _loggedHandlers = new Set();
@@ -19,6 +20,7 @@ export class EventManager {
     this.contextResolver = contextResolver || (schema ? new ContextResolver(schema) : null);
     this.warningSystem = warningSystem || new WarningSystem();
     this.schema = schema;
+    this.callbackSources = createEventSourceRegistry();
   }
 
   /**
@@ -29,7 +31,7 @@ export class EventManager {
   initializeEventCode(eventCode, context) {
     this.eventContext = context;
     try {
-      // Execute the event code to register listeners (recompile each time)
+      // Execute initialization once; retain authored callback source for scoped dispatch.
       this.executeEventCode(eventCode, context);
     } catch (error) {
       console.warn('[form0] Event code initialization failed:', error.message);
@@ -44,7 +46,10 @@ export class EventManager {
   executeEventCode(code, context) {
     // Execute the code to register event listeners (same security as calculated fields)
     // ON() and OFF() are now available as regular event builtins
-    runExpression(code, context, this.securityConfig, true, this.schema);
+    const prepared = this.callbackSources.prepare(code, context);
+    runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
+      sourceExpression: code,
+    });
 
     // Process any ON/OFF operations that were collected during initialization
     const initOperations = __consumeEventOperations();
@@ -184,7 +189,7 @@ export class EventManager {
     };
 
     // Get the callback code for field reference analysis
-    const callbackCode = callback.toString();
+    const callbackCode = this.callbackSources.getSource(callback);
 
     // Build scoped context if context resolver is available
     let contextWithEvent;
