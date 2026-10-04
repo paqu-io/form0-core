@@ -28,13 +28,19 @@ export const EVAL_METADATA = defineBuiltinMetadata({
 
 // Global context for EVAL() - set during expression evaluation
 let _evalContext = null;
+let _evalReporting = null;
 
 /**
  * Set the context for EVAL() during expression evaluation
  * Called internally by the expression evaluator
  */
-export function __setEvalContext(context) {
+export function __setEvalContext(context, reporting = null) {
+  const previousReporting = _evalReporting;
   _evalContext = context;
+  _evalReporting = reporting;
+  return () => {
+    _evalReporting = previousReporting;
+  };
 }
 
 /**
@@ -43,24 +49,54 @@ export function __setEvalContext(context) {
  */
 export function __clearEvalContext() {
   _evalContext = null;
+  _evalReporting = null;
+}
+
+function reportFailure(code, phase, message, consoleArgs, context = {}) {
+  _evalReporting?.onDiagnostic?.({
+    code,
+    phase,
+    message,
+    context: { source: 'EVAL', ...context },
+  });
+  if (!_evalReporting?.suppressConsole) console.warn(...consoleArgs);
+}
+
+function logDebug(...args) {
+  if (!_evalReporting?.suppressConsole) console.log(...args);
+}
+
+function referenceContext(reference) {
+  // Legacy EVAL also treats strings starting with '$' as reference lookups.
+  // Do not copy a whole expression into diagnostic metadata in that case.
+  return /^\$[a-zA-Z_][a-zA-Z0-9_]*$/.test(reference)
+    ? { referencedFieldName: reference.slice(1) }
+    : {};
 }
 
 export const EVAL = (expression) => {
   // Step 1: Basic validation
   if (typeof expression !== 'string') {
-    console.warn('[form0] EVAL() requires a string expression');
+    reportFailure('eval_invalid_argument', 'validation', 'EVAL() requires a string expression', [
+      '[form0] EVAL() requires a string expression',
+    ]);
     return null;
   }
 
   if (!expression || expression.trim() === '') {
-    console.warn('[form0] EVAL() requires a non-empty expression');
+    reportFailure('eval_invalid_argument', 'validation', 'EVAL() requires a non-empty expression', [
+      '[form0] EVAL() requires a non-empty expression',
+    ]);
     return null;
   }
 
   // Step 2: Security validation for EVAL() expressions
   const securityValidation = validateEvalExpression(expression);
   if (!securityValidation.valid) {
-    console.warn('[form0] EVAL() security validation failed:', securityValidation.reason);
+    reportFailure('expression_validation_failed', 'validation', securityValidation.reason, [
+      '[form0] EVAL() security validation failed:',
+      securityValidation.reason,
+    ]);
     return null;
   }
 
@@ -147,12 +183,13 @@ function validateEvalExpression(expression) {
  * @returns {*} The evaluation result
  */
 function evaluateHybridExpression(expression, formContext) {
+  let phase = 'runtime';
   try {
     // Step 3a: Handle simple string literals and field references directly
     if (isSimpleStringLiteral(expression)) {
       // Simple string literal - return as is
       const result = expression;
-      console.log('[form0] EVAL() simple string:', expression, '→', result);
+      logDebug('[form0] EVAL() simple string:', expression, '→', result);
       return result;
     }
 
@@ -160,10 +197,16 @@ function evaluateHybridExpression(expression, formContext) {
       // Field reference - resolve from context
       const fieldValue = formContext?.[expression];
       if (fieldValue !== undefined) {
-        console.log('[form0] EVAL() resolved field reference:', expression, '→', fieldValue);
+        logDebug('[form0] EVAL() resolved field reference:', expression, '→', fieldValue);
         return fieldValue;
       } else {
-        console.warn('[form0] EVAL() field reference not found:', expression);
+        reportFailure(
+          'eval_reference_unavailable',
+          'scope',
+          'EVAL() field reference is unavailable.',
+          ['[form0] EVAL() field reference not found:', expression],
+          referenceContext(expression)
+        );
         return null;
       }
     }
@@ -183,7 +226,9 @@ function evaluateHybridExpression(expression, formContext) {
     const keys = Object.keys(basicContext);
     const values = Object.values(basicContext);
 
+    phase = 'syntax';
     const fn = new Function(...keys, `return (${expression});`);
+    phase = 'runtime';
     const result = fn(...values);
 
     // Step 3e: Check if result should be resolved as field reference
@@ -191,7 +236,7 @@ function evaluateHybridExpression(expression, formContext) {
       // This is a field reference - resolve it from context
       const fieldValue = formContext?.[result];
       if (fieldValue !== undefined) {
-        console.log(
+        logDebug(
           '[form0] EVAL() resolved field reference:',
           expression,
           '→',
@@ -201,16 +246,31 @@ function evaluateHybridExpression(expression, formContext) {
         );
         return fieldValue;
       } else {
-        console.warn('[form0] EVAL() field reference not found:', result);
+        reportFailure(
+          'eval_reference_unavailable',
+          'scope',
+          'EVAL() field reference is unavailable.',
+          ['[form0] EVAL() field reference not found:', result],
+          referenceContext(result)
+        );
         return null;
       }
     }
 
     // Step 3f: Return string result for dataname references
-    console.log('[form0] EVAL() built string:', expression, '→', result);
+    logDebug('[form0] EVAL() built string:', expression, '→', result);
     return result;
   } catch (error) {
-    console.warn('[form0] EVAL() execution failed:', error.message);
+    reportFailure(
+      phase === 'syntax'
+        ? error instanceof SyntaxError
+          ? 'invalid_syntax'
+          : 'compilation_error'
+        : 'runtime_exception',
+      phase,
+      error instanceof Error && error.message ? error.message : 'Unknown EVAL() runtime error.',
+      ['[form0] EVAL() execution failed:', error.message]
+    );
     return null;
   }
 }

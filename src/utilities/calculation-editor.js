@@ -754,13 +754,12 @@ export function createCalculationPreviewSession({
     enableConsoleWarnings: false,
     throttleMs: 0,
   });
-  const runtimeDiagnostics = [];
   const engine = createFormEngine({
     schema: simulationSchema,
     initialValues: {},
     security,
     warningSystem,
-    runtimeDiagnostics,
+    diagnostics: { console: false },
   });
 
   engine.eval();
@@ -777,7 +776,6 @@ export function createCalculationPreviewSession({
       }
 
       warningSystem.clearCollectedWarnings();
-      runtimeDiagnostics.length = 0;
 
       if (typeof nextExpression === 'string' && nextExpression !== currentExpression) {
         targetField.calculate = nextExpression;
@@ -790,6 +788,7 @@ export function createCalculationPreviewSession({
       try {
         engine.eval();
 
+        const runtimeDiagnostics = engine.getDiagnostics();
         const simulatedResult = engineState.values[fieldDataName];
         const runtimeError =
           runtimeDiagnostics.find(
@@ -818,7 +817,6 @@ export function createCalculationPreviewSession({
     dispose: () => {
       disposed = true;
       warningSystem.clearCollectedWarnings();
-      runtimeDiagnostics.length = 0;
       clearRecord(engineState.values);
     },
   };

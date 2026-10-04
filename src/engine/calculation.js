@@ -16,13 +16,14 @@ export function evaluateCalculatedFields(
   contextResolver = null,
   warningSystem = null,
   runtimeDiagnostics = null,
-  calculationPlan = null
+  calculationPlan = null,
+  diagnostics = null
 ) {
   const resolver = contextResolver || new ContextResolver(schema);
   const warnings = warningSystem || new WarningSystem();
   const plan = calculationPlan || buildCalculationDependencyPlan(schema, resolver);
 
-  emitDependencyPlanWarnings(plan, warnings, runtimeDiagnostics);
+  emitDependencyPlanWarnings(plan, warnings, runtimeDiagnostics, diagnostics);
 
   if (plan.totalCalculatedFieldCount === 0) {
     return;
@@ -47,7 +48,8 @@ export function evaluateCalculatedFields(
       securityConfig,
       resolver,
       warnings,
-      runtimeDiagnostics
+      runtimeDiagnostics,
+      diagnostics
     );
     return;
   }
@@ -73,7 +75,8 @@ export function evaluateCalculatedFields(
         securityConfig,
         resolver,
         warnings,
-        runtimeDiagnostics
+        runtimeDiagnostics,
+        diagnostics
       );
     }
   });
@@ -103,7 +106,8 @@ function buildScopedContext(
   executionContext,
   contextResolver,
   warningSystem,
-  expressionCode
+  expressionCode,
+  diagnostics
 ) {
   const ctx = { ...helpers };
 
@@ -139,12 +143,14 @@ function buildScopedContext(
       fieldName,
       'restricted'
     );
-    warningSystem.emitWarning(warning);
+    if (diagnostics) diagnostics.emitWarning(warning);
+    else warningSystem.emitWarning(warning);
   });
 
   notFoundAccessedFields.forEach((fieldName) => {
     const warning = contextResolver.generateAccessWarning(executionContext, fieldName, 'not_found');
-    warningSystem.emitWarning(warning);
+    if (diagnostics) diagnostics.emitWarning(warning);
+    else warningSystem.emitWarning(warning);
   });
 
   return ctx;
@@ -181,10 +187,12 @@ function pushRuntimeDiagnostic(
   });
 }
 
-function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics) {
+function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics, diagnostics) {
+  const emit = (warning, fieldNames) =>
+    diagnostics ? diagnostics.emitWarning(warning, fieldNames) : warningSystem.emitWarning(warning);
   plan.dynamicFieldNames.forEach((fieldName) => {
     const message = `CalculatedField '${fieldName}' uses dynamic field access. Runtime evaluation falls back to bounded stabilization.`;
-    warningSystem.emitWarning({
+    emit({
       type: 'calculation_dependency',
       reason: 'dynamic_dependencies',
       message,
@@ -215,22 +223,25 @@ function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics) {
 
     const fieldNames = component.fieldNames;
     const message = `CalculatedField dependency cycle detected: ${fieldNames.join(' -> ')}. Runtime evaluation is disabled for the involved fields until the cycle is removed.`;
-    warningSystem.emitWarning({
-      type: 'calculation_dependency',
-      reason: 'cyclic_dependencies',
-      severity: 'error',
-      message,
-      suggestion:
-        'Remove the cycle or break it with a source field so calculated values can be evaluated deterministically.',
-      executionContext: {
-        type: 'calculation',
-        fieldName: fieldNames[0] || null,
+    emit(
+      {
+        type: 'calculation_dependency',
+        reason: 'cyclic_dependencies',
+        severity: 'error',
+        message,
+        suggestion:
+          'Remove the cycle or break it with a source field so calculated values can be evaluated deterministically.',
+        executionContext: {
+          type: 'calculation',
+          fieldName: fieldNames[0] || null,
+        },
+        fieldContext: {
+          fieldNames: [...fieldNames],
+          cyclic: true,
+        },
       },
-      fieldContext: {
-        fieldNames: [...fieldNames],
-        cyclic: true,
-      },
-    });
+      fieldNames
+    );
 
     fieldNames.forEach((fieldName) => {
       pushRuntimeDiagnostic(
@@ -252,7 +263,8 @@ function evaluateCalculatedField(
   securityConfig,
   resolver,
   warnings,
-  runtimeDiagnostics
+  runtimeDiagnostics,
+  diagnostics
 ) {
   if (!field?.data_name || !field.calculate) {
     return { changed: false, hasError: false };
@@ -266,11 +278,18 @@ function evaluateCalculatedField(
       executionContext,
       resolver,
       warnings,
-      field.calculate
+      field.calculate,
+      diagnostics
     );
     const previousValue = values[field.data_name];
     const nextValue = runExpression(field.calculate, context, securityConfig, false, schema, {
-      suppressConsoleWarning: Array.isArray(runtimeDiagnostics),
+      suppressConsoleWarning:
+        diagnostics?.consoleOverride !== undefined || Array.isArray(runtimeDiagnostics),
+      onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),
+      evalReporting: {
+        suppressConsole: diagnostics?.consoleOverride !== undefined,
+        onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),
+      },
       onError: (error) => {
         pushRuntimeDiagnostic(
           runtimeDiagnostics,
@@ -288,13 +307,21 @@ function evaluateCalculatedField(
       hasError: false,
     };
   } catch (error) {
+    diagnostics?.record(field.data_name, {
+      code: 'runtime_exception',
+      phase: 'runtime',
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : 'Unknown calculation runtime error.',
+    });
     pushRuntimeDiagnostic(
       runtimeDiagnostics,
       field.data_name,
       error instanceof Error && error.message ? error.message : 'Unknown calculation runtime error.'
     );
 
-    if (!Array.isArray(runtimeDiagnostics)) {
+    if (diagnostics?.consoleOverride === undefined && !Array.isArray(runtimeDiagnostics)) {
       console.warn(`Calculation failed for ${field.data_name}:`, error?.message);
     }
 
@@ -311,7 +338,8 @@ function evaluateFieldSequenceUntilStable(
   securityConfig,
   resolver,
   warnings,
-  runtimeDiagnostics
+  runtimeDiagnostics,
+  diagnostics
 ) {
   const maxPasses = Math.max(2, fieldNames.length);
   let stillChangingFieldNames = [];
@@ -333,7 +361,8 @@ function evaluateFieldSequenceUntilStable(
         securityConfig,
         resolver,
         warnings,
-        runtimeDiagnostics
+        runtimeDiagnostics,
+        diagnostics
       );
 
       if (result.changed) {
@@ -347,7 +376,7 @@ function evaluateFieldSequenceUntilStable(
   }
 
   const message = `Calculated fields did not stabilize within ${maxPasses} evaluation passes: ${stillChangingFieldNames.join(', ')}.`;
-  warnings.emitWarning({
+  const warning = {
     type: 'calculation_dependency',
     reason: 'non_converging_runtime',
     message,
@@ -361,7 +390,9 @@ function evaluateFieldSequenceUntilStable(
       fieldNames: [...stillChangingFieldNames],
       maxPasses,
     },
-  });
+  };
+  if (diagnostics) diagnostics.emitWarning(warning, stillChangingFieldNames);
+  else warnings.emitWarning(warning);
 
   stillChangingFieldNames.forEach((fieldName) => {
     pushRuntimeDiagnostic(

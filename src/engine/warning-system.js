@@ -118,7 +118,7 @@ export class WarningSystem {
    * Emit warning to all registered handlers
    * @param {Object} warning - Warning object with structured information
    */
-  emitWarning(warning) {
+  emitWarning(warning, options = {}) {
     // Throttle warnings to prevent spam
     if (this.shouldThrottleWarning(warning)) {
       return;
@@ -136,12 +136,12 @@ export class WarningSystem {
     }
 
     // Console logging for development
-    if (this.enableConsoleWarnings) {
+    if (options.console ?? this.enableConsoleWarnings) {
       this.logWarningToConsole(warning);
     }
 
     // Custom handlers (for "reform" and other integrations)
-    this.notifyCustomHandlers(warning);
+    this.notifyCustomHandlers(warning, options);
   }
 
   /**
@@ -194,12 +194,14 @@ export class WarningSystem {
    * Notify all custom warning handlers
    * @param {Object} warning - Warning object
    */
-  notifyCustomHandlers(warning) {
+  notifyCustomHandlers(warning, options = {}) {
     for (const handler of this.warningHandlers) {
       try {
         handler(warning);
       } catch (err) {
-        console.error('[form0] Warning handler failed:', err);
+        if (options.console !== false) {
+          console.error('[form0] Warning handler failed:', err);
+        }
         // Don't remove the handler automatically - let the user decide
       }
     }

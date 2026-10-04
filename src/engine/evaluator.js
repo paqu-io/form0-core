@@ -19,10 +19,17 @@ export function runExpression(
   // SETRESULT uses synchronous evaluation-scoped state. Clear it at both boundaries so a
   // previously failed expression can never influence this evaluation.
   __resetResult();
+  let phase = 'runtime';
   try {
+    const sourceExpression = options.sourceExpression ?? expr;
     // Validate expression based on security mode
-    const validation = validateExpression(expr, securityConfig, includeEventBuiltins);
+    const validation = validateExpression(sourceExpression, securityConfig, includeEventBuiltins);
     if (!validation.valid) {
+      options.onDiagnostic?.({
+        code: 'expression_validation_failed',
+        phase: 'validation',
+        message: validation.reason,
+      });
       if (!options.suppressConsoleWarning) {
         console.warn('[form0] Expression validation failed:', validation.reason);
       }
@@ -37,18 +44,20 @@ export function runExpression(
     // Execute expression
     const executeExpression = () => {
       // Set context for EVAL() before execution
-      __setEvalContext(secureContext);
+      const restoreReporting = __setEvalContext(secureContext, options.evalReporting);
       if (schema) {
         __setDataNamesContext(schema);
       }
 
       try {
         // Handle both expressions and multi-line code (Windows-safe)
-        const isMultiLine = isMultilineCalculationExpression(expr);
+        const isMultiLine = isMultilineCalculationExpression(sourceExpression);
 
         if (isMultiLine) {
           // Execute as code block (recompile each time for now)
+          phase = 'syntax';
           const fn = new Function(...keys, expr);
+          phase = 'runtime';
           const result = fn(...values);
           // Check for consumed result from SETRESULT() calls in multiline code
           const consumed = __consumeResult();
@@ -56,7 +65,9 @@ export function runExpression(
         } else {
           // Execute as expression (existing behavior)
           const inlineExpression = normalizeInlineCalculationExpression(expr);
+          phase = 'syntax';
           const fn = new Function(...keys, `return (${inlineExpression});`);
+          phase = 'runtime';
           const result = fn(...values);
           const consumed = __consumeResult();
           return consumed.called ? consumed.value : result;
@@ -65,6 +76,7 @@ export function runExpression(
         __resetResult();
         // Always clear EVAL context after execution
         __clearEvalContext();
+        restoreReporting();
         if (schema) {
           __clearDataNamesContext();
         }
@@ -80,6 +92,16 @@ export function runExpression(
 
     return executeExpression();
   } catch (e) {
+    options.onDiagnostic?.({
+      code:
+        phase === 'syntax'
+          ? e instanceof SyntaxError
+            ? 'invalid_syntax'
+            : 'compilation_error'
+          : 'runtime_exception',
+      phase,
+      message: e instanceof Error && e.message ? e.message : 'Unknown calculation runtime error.',
+    });
     if (typeof options.onError === 'function') {
       options.onError(e);
     }
