@@ -131,7 +131,14 @@ Diagnostics stay separate from `state.errors` and do not change submission valid
 Omit `diagnostics.console` to preserve existing defaults and supplied `WarningSystem` settings.
 `false` silences calculation-owned reporting, including `EVAL()` warnings and debug logs; `true`
 prints diagnostic reporting in development and production. Event reporting retains its existing
-behavior. `WarningSystem` and the legacy append-only `runtimeDiagnostics` array remain compatible.
+behavior. `WarningSystem` remains compatible.
+
+The append-only `runtimeDiagnostics` option is deprecated but remains supported for compatibility.
+For new integrations, omit that option and use `engine.getDiagnostics()` for the latest evaluation,
+or `onDiagnostics(snapshot)` to receive every completed evaluation, including recovery (`[]`).
+This is not a drop-in replacement for the legacy array: snapshots use the structured diagnostic
+contract above and replace prior results rather than accumulating them. If you need a history,
+store snapshots in application code. No removal version is scheduled.
 
 See [calculation diagnostics](https://docs.form0.dev/core/engine/calculations-dependencies#seeing-errors-and-warnings)
 for stable codes and the reporting contract. CLI and renderer diagnostics adoption is separate
