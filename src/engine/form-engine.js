@@ -14,6 +14,7 @@ import { WarningSystem } from './warning-system.js';
 import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
 import { buildCalculationDependencyPlan } from '../utilities/calculation-dependencies.js';
 import { createCalculationDiagnostics } from './calculation-diagnostics.js';
+import { formatLocalDate } from '../utilities/date-utils.js';
 
 /**
  * @typedef {Object} CalculationDiagnostic
@@ -267,8 +268,7 @@ function getDefaultValueLegacy(field) {
 
     case 'DateField':
       if (field.default_value === 'now') {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        return formatLocalDate(); // YYYY-MM-DD, local calendar day
       }
       return null;
 
