@@ -198,6 +198,26 @@ export const ROUND_METADATA = defineBuiltinMetadata({
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
 
+export const DATEADD_METADATA = defineBuiltinMetadata({
+  name: 'DATEADD',
+  category: 'date',
+  signature: 'DATEADD(date, days)',
+  description:
+    'Add a whole number of days to a YYYY-MM-DD date. Returns null when an argument is blank.',
+  examples: ['DATEADD($start_date, 30)', 'DATEADD($due_date, -7)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
+export const DAYS_METADATA = defineBuiltinMetadata({
+  name: 'DAYS',
+  category: 'date',
+  signature: 'DAYS(endDate, startDate)',
+  description:
+    'Return the number of days between two YYYY-MM-DD dates. Returns null when an argument is blank.',
+  examples: ['DAYS($end_date, $start_date)'],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
+});
+
 export const UPPER_METADATA = defineBuiltinMetadata({
   name: 'UPPER',
   category: 'string',
@@ -274,6 +294,8 @@ export const BUILTIN_DEFINITIONS = Object.freeze([
   COS_METADATA,
   SIN_METADATA,
   ROUND_METADATA,
+  DATEADD_METADATA,
+  DAYS_METADATA,
   UPPER_METADATA,
   SETRESULT_METADATA,
   ALERT_METADATA,

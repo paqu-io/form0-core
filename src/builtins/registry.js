@@ -35,6 +35,8 @@ import { CEILING, CEILING_METADATA } from './math/ceiling.js';
 import { COS, COS_METADATA } from './math/cos.js';
 import { SIN, SIN_METADATA } from './math/sin.js';
 import { ROUND, ROUND_METADATA } from './math/round.js';
+import { DATEADD, DATEADD_METADATA } from './date/dateadd.js';
+import { DAYS, DAYS_METADATA } from './date/days.js';
 import { UPPER, UPPER_METADATA } from './string/upper.js';
 
 import { ALERT, ALERT_METADATA } from './event/ui/alert.js';
@@ -74,6 +76,8 @@ export { CEILING, CEILING_METADATA } from './math/ceiling.js';
 export { COS, COS_METADATA } from './math/cos.js';
 export { SIN, SIN_METADATA } from './math/sin.js';
 export { ROUND, ROUND_METADATA } from './math/round.js';
+export { DATEADD, DATEADD_METADATA } from './date/dateadd.js';
+export { DAYS, DAYS_METADATA } from './date/days.js';
 export { UPPER, UPPER_METADATA } from './string/upper.js';
 
 export { ALERT, ALERT_METADATA } from './event/ui/alert.js';
@@ -103,6 +107,8 @@ const RUNTIME_ENTRIES = Object.freeze([
   { implementation: COS, definition: COS_METADATA },
   { implementation: SIN, definition: SIN_METADATA },
   { implementation: ROUND, definition: ROUND_METADATA },
+  { implementation: DATEADD, definition: DATEADD_METADATA },
+  { implementation: DAYS, definition: DAYS_METADATA },
   { implementation: UPPER, definition: UPPER_METADATA },
   { implementation: SETRESULT, definition: SETRESULT_METADATA },
   { implementation: ALERT, definition: ALERT_METADATA },
