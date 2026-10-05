@@ -3,7 +3,8 @@ export { OFF_METADATA } from '../../builtin-definitions.js';
 import { isValidEventType } from '../../../engine/event-registry.js';
 
 /**
- * OFF builtin for form events
+ * @builtin OFF
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * Removes event handlers within event context
  * Automatically collects operation for platform execution
  *
@@ -11,22 +12,6 @@ import { isValidEventType } from '../../../engine/event-registry.js';
  * @param {string|Function} [fieldKeyOrCallback] - Field key for field events, or callback for global events
  * @param {Function} [callback] - Callback function for field events (when fieldKeyOrCallback is a field key)
  * @returns {Object} Operation descriptor for platform execution (for backward compatibility)
- *
- * @example
- * // Remove specific global event handler
- * OFF('load-record', specificCallback);
- *
- * @example
- * // Remove all global event handlers
- * OFF('load-record');
- *
- * @example
- * // Remove specific field event handler
- * OFF('change', 'city', specificCallback);
- *
- * @example
- * // Remove all field event handlers
- * OFF('change', 'city');
  */
 export function OFF(eventType, fieldKeyOrCallback, callback) {
   if (typeof eventType !== 'string' || eventType.trim().length === 0) {

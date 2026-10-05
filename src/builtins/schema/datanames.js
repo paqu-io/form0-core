@@ -2,18 +2,9 @@ export { DATANAMES_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin DATANAMES
- * @description Returns the data names of form fields, optionally filtered by field type
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {string} type - Optional field type to filter by (e.g., 'TextField', 'RepeatableSection', etc.). Defaults to 'any' (all fields)
  * @returns {Array<string>} Array of field data names
- * @example
- * // Get all field data names
- * DATANAMES()
- * @example
- * // Get only RepeatableSection data names
- * DATANAMES('RepeatableSection')
- * @example
- * // Get only TextField data names
- * DATANAMES('TextField')
  */
 // Global schema context for DATANAMES() - set during expression evaluation
 let _dataNamesSchema = null;

@@ -4,18 +4,9 @@ export { EVAL_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin EVAL
- * @description Evaluates a dynamic expression in a controlled, secure context
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {string} expression - The dynamic expression to evaluate
  * @returns {*} The result of the evaluated expression
- * @example
- * // Dynamic field access
- * EVAL('$' + dynamicFieldName)
- * @example
- * // Dynamic builtin calls
- * EVAL('CHOICEVALUE($' + fieldVar + ')')
- * @example
- * // Computed field references
- * EVAL('$city' + '_suffix')
  */
 // Global context for EVAL() - set during expression evaluation
 let _evalContext = null;

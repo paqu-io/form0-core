@@ -2,33 +2,9 @@ export { ARRAY_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin ARRAY
- * @description Returns an array from its arguments. Can parse string representations of arrays (with single or double quotes) and comma-separated values.
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {...*} args - Values to create an array from. Accepts multiple arguments or a single string to parse
  * @returns {Array} An array containing the arguments
- * @example
- * // Create array from multiple arguments
- * ARRAY(1, 2, 3) // returns [1, 2, 3]
- * @example
- * // Pass an existing array (no flattening)
- * ARRAY([1, 2, 3]) // returns [1, 2, 3]
- * @example
- * // Parse JSON array string (double quotes)
- * ARRAY("[1, 2, 3]") // returns [1, 2, 3]
- * @example
- * // Parse array string with single quotes
- * ARRAY("['a', 'b', 'c']") // returns ['a', 'b', 'c']
- * @example
- * // Parse simple comma-separated string (becomes array of strings)
- * ARRAY("one, two, three") // returns ["one", "two", "three"]
- * @example
- * // Nested arrays are preserved (no flattening)
- * ARRAY([1, [2, 3]]) // returns [1, [2, 3]]
- * @example
- * // Empty arguments
- * ARRAY() // returns []
- * @example
- * // For complex parsing, JSON.parse() can be used:
- * // EVAL('JSON.parse("[1,2,3]")')
  */
 export const ARRAY = (...args) => {
   // Handle empty arguments

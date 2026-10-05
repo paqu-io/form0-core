@@ -2,7 +2,8 @@ import { __collectEventOperation } from '../event-operations-collector.js';
 export { ALERT_METADATA } from '../../builtin-definitions.js';
 
 /**
- * ALERT builtin for form events
+ * @builtin ALERT
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * Automatically collects operation for platform execution
  * @param {string} title - The title to display in the alert
  * @param {string} message - The message to display in the alert (optional)

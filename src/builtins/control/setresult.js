@@ -6,15 +6,9 @@ let _resultValue;
 
 /**
  * @builtin SETRESULT
- * @description Sets a result value that can be consumed by the form engine
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {*} value - The value to set as the result
  * @returns {*} The same value that was passed in
- * @example
- * // Set a calculation result
- * SETRESULT(price * quantity * (1 + taxRate))
- * @example
- * // Set a conditional result
- * SETRESULT(IF(isEligible, discount, 0))
  */
 export const SETRESULT = (value) => {
   _resultSet = true;

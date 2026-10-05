@@ -2,17 +2,8 @@ export { FORM_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin FORM
- * @description Access to the nested JSON form definition (future implementation)
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @returns {Object} The form schema object
- * @example
- * // Get form title
- * FORM().title
- * @example
- * // Access field definitions
- * FORM().elements[0].label
- * @example
- * // Check if form has RepeatableSections
- * FORM().elements.some(el => el.type === 'RepeatableSection')
  */
 export function FORM() {
   // Placeholder for future implementation

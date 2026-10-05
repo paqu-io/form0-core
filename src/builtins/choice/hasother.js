@@ -2,18 +2,9 @@ export { HASOTHER_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin HASOTHER
- * @description Returns true if user entered an other option, false otherwise. Works with both SingleChoiceField and MultiChoiceField.
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {Object} choiceField - The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array
  * @returns {boolean} True if user entered an other option, false otherwise
- * @example
- * // Check if user entered other option in single choice field
- * HASOTHER($city)
- * @example
- * // Check if user entered other option in multi choice field
- * HASOTHER($colors)
- * @example
- * // Use in conditional logic
- * IF(HASOTHER($city), "Custom city: " + OTHER($city), "Selected city: " + CHOICELABEL($city))
  */
 export const HASOTHER = (choiceField) => {
   // Handle null/undefined input

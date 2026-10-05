@@ -2,15 +2,9 @@ export { CHOICEVALUES_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin CHOICEVALUES
- * @description Retrieves an array of all selected choice field values from a MultiChoiceField, preserving the type of each value. Returns an empty array if no selections.
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {Object} multiChoiceField - The multi choice field object with choices and other arrays
  * @returns {Array} Array of selected choice values with preserved types
- * @example
- * // Get all selected color values
- * CHOICEVALUES($colors)
- * @example
- * // Check if "red" is selected
- * CHOICEVALUES($colors).includes("red")
  */
 export const CHOICEVALUES = (multiChoiceField) => {
   // Handle null/undefined input

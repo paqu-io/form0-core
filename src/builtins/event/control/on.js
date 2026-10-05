@@ -3,7 +3,8 @@ export { ON_METADATA } from '../../builtin-definitions.js';
 import { isValidEventType } from '../../../engine/event-registry.js';
 
 /**
- * ON builtin for form events
+ * @builtin ON
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * Registers an event handler within event context
  * Automatically collects operation for platform execution
  *
@@ -11,14 +12,6 @@ import { isValidEventType } from '../../../engine/event-registry.js';
  * @param {string|Function} fieldKeyOrCallback - Field key for field events, or callback for global events
  * @param {Function} [callback] - Callback function for field events
  * @returns {Object} Operation descriptor for platform execution (for backward compatibility)
- *
- * @example
- * // Register global event handler
- * ON('load-record', function() { ALERT('Record loaded!'); });
- *
- * @example
- * // Register field-specific event handler
- * ON('change', 'city', function(event) { ALERT('City changed!'); });
  */
 export function ON(eventType, fieldKeyOrCallback, callback) {
   if (typeof eventType !== 'string' || eventType.trim().length === 0) {

@@ -2,18 +2,9 @@ export { COUNTBLANK_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin COUNTBLANK
- * @description Returns the number of blank values in a dataset
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {Array} values - An array of items to check
  * @returns {number} The count of blank items in the array
- * @example
- * // Returns 3
- * COUNTBLANK([null, null, '', 1])
- * @example
- * // Returns 2
- * COUNTBLANK([undefined, '', 'a', 0])
- * @example
- * // Returns 0 (no blank values)
- * COUNTBLANK([1, 2, 'a', true])
  */
 export const COUNTBLANK = (values) => {
   // Handle null/undefined input
