@@ -283,6 +283,8 @@ function evaluateCalculatedField(
     );
     const previousValue = values[field.data_name];
     const nextValue = runExpression(field.calculate, context, securityConfig, false, schema, {
+      requireResult: true,
+      fieldName: field.data_name,
       suppressConsoleWarning:
         diagnostics?.consoleOverride !== undefined || Array.isArray(runtimeDiagnostics),
       onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),

@@ -8,6 +8,23 @@ import {
   normalizeInlineCalculationExpression,
 } from '../utilities/calculation-expression-utils.js';
 
+const MISSING_RESULT_MESSAGE =
+  'Multiline calculation produced no value because it does not call SETRESULT().';
+
+function reportMissingResult(options) {
+  options.onDiagnostic?.({
+    code: 'missing_result',
+    severity: 'warning',
+    phase: 'runtime',
+    message: MISSING_RESULT_MESSAGE,
+    suggestion: 'Wrap the final value in SETRESULT(), or write the calculation on a single line.',
+  });
+  if (!options.suppressConsoleWarning) {
+    const field = options.fieldName ? ` (${options.fieldName})` : '';
+    console.warn(`[form0] missing_result${field}: ${MISSING_RESULT_MESSAGE}`);
+  }
+}
+
 export function runExpression(
   expr,
   context = {},
@@ -63,6 +80,9 @@ export function runExpression(
           const result = fn(...values);
           // Check for consumed result from SETRESULT() calls in multiline code
           const consumed = __consumeResult();
+          if (options.requireResult && !consumed.called && result === undefined) {
+            reportMissingResult(options);
+          }
           return consumed.called ? consumed.value : result;
         } else {
           // Execute as expression (existing behavior)
