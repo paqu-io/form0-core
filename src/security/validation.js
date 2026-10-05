@@ -1,15 +1,17 @@
-import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
+import {
+  CALCULATION_BUILTIN_DEFINITIONS,
+  EVENT_BUILTIN_DEFINITIONS,
+} from '../builtins/builtin-definitions.js';
 import { DEFAULT_SECURITY_CONFIG, SAFE_SECURITY_CONFIG, SECURITY_MODES } from './config.js';
 
 // Helper function to validate builtin function names in expressions
 function validateBuiltinNames(expr, includeEventBuiltins = false) {
-  // Always use fresh builtin sets (no caching) to support dynamic builtin registration
-  const validCalculationBuiltinsSet = new Set(Object.keys(calculationBuiltins));
-  const validEventBuiltinsSet = new Set(Object.keys(eventBuiltins));
-
-  const allowedBuiltins = includeEventBuiltins
-    ? validEventBuiltinsSet
-    : validCalculationBuiltinsSet;
+  // Read the same immutable catalog used to build the runtime helpers, without
+  // importing their implementations (EVAL itself depends on this validator).
+  const definitions = includeEventBuiltins
+    ? EVENT_BUILTIN_DEFINITIONS
+    : CALCULATION_BUILTIN_DEFINITIONS;
+  const allowedBuiltins = new Set(definitions.map(({ name }) => name));
 
   // Extract function calls from the expression
   // This regex matches function calls like FUNCTIONNAME( allowing for whitespace

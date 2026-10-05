@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { OR_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin OR
@@ -12,13 +12,4 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Validation - either email or phone is required
  * OR(email.length > 0, phone.length > 0)
  */
-export const OR_METADATA = defineBuiltinMetadata({
-  name: 'OR',
-  category: 'logical',
-  signature: 'OR(...conditions)',
-  description: 'Return true when at least one argument is truthy.',
-  examples: ['OR($email, $phone)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const OR = (...args) => args.some(Boolean);

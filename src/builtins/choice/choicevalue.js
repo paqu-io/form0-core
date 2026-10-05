@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { CHOICEVALUE_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin CHOICEVALUE
@@ -12,18 +12,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Use in conditional logic
  * IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogotá!", "Welcome!")
  */
-export const CHOICEVALUE_METADATA = defineBuiltinMetadata({
-  name: 'CHOICEVALUE',
-  category: 'choice',
-  signature: 'CHOICEVALUE(fieldValue)',
-  description: 'Return the selected choice value from a choice field.',
-  examples: [
-    'CHOICEVALUE($city)',
-    'IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogota!", "Welcome!")',
-  ],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const CHOICEVALUE = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

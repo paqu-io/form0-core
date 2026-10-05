@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { HASOTHER_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin HASOTHER
@@ -15,15 +15,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Use in conditional logic
  * IF(HASOTHER($city), "Custom city: " + OTHER($city), "Selected city: " + CHOICELABEL($city))
  */
-export const HASOTHER_METADATA = defineBuiltinMetadata({
-  name: 'HASOTHER',
-  category: 'choice',
-  signature: 'HASOTHER(fieldValue)',
-  description: 'Return true when the field has an "other" value.',
-  examples: ['HASOTHER($city)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const HASOTHER = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

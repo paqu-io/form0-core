@@ -1,5 +1,5 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
+export { OFF_METADATA } from '../../builtin-definitions.js';
 import { isValidEventType } from '../../../engine/event-registry.js';
 
 /**
@@ -28,15 +28,6 @@ import { isValidEventType } from '../../../engine/event-registry.js';
  * // Remove all field event handlers
  * OFF('change', 'city');
  */
-export const OFF_METADATA = defineBuiltinMetadata({
-  name: 'OFF',
-  category: 'event',
-  signature: 'OFF(eventType, fieldKeyOrCallback, callback)',
-  description: 'Remove event handlers within form event code.',
-  examples: ["OFF('change', 'city', specificCallback)"],
-  contexts: [BUILTIN_CONTEXTS.EVENT],
-});
-
 export function OFF(eventType, fieldKeyOrCallback, callback) {
   if (typeof eventType !== 'string' || eventType.trim().length === 0) {
     console.warn('[form0] OFF() requires a non-empty event type string');

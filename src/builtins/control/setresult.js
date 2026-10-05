@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { SETRESULT_METADATA } from '../builtin-definitions.js';
 
 // Global state for result management
 let _resultSet = false;
@@ -16,15 +16,6 @@ let _resultValue;
  * // Set a conditional result
  * SETRESULT(IF(isEligible, discount, 0))
  */
-export const SETRESULT_METADATA = defineBuiltinMetadata({
-  name: 'SETRESULT',
-  category: 'control',
-  signature: 'SETRESULT(value)',
-  description: 'Set the final return value for multiline calculations.',
-  examples: ['SETRESULT($price * $quantity)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION],
-});
-
 export const SETRESULT = (value) => {
   _resultSet = true;
   _resultValue = value;

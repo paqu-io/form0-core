@@ -1,5 +1,5 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
+export { ON_METADATA } from '../../builtin-definitions.js';
 import { isValidEventType } from '../../../engine/event-registry.js';
 
 /**
@@ -20,15 +20,6 @@ import { isValidEventType } from '../../../engine/event-registry.js';
  * // Register field-specific event handler
  * ON('change', 'city', function(event) { ALERT('City changed!'); });
  */
-export const ON_METADATA = defineBuiltinMetadata({
-  name: 'ON',
-  category: 'event',
-  signature: 'ON(eventType, fieldKeyOrCallback, callback)',
-  description: 'Register an event handler within form event code.',
-  examples: ["ON('change', 'city', function(event) { ALERT('City changed!'); })"],
-  contexts: [BUILTIN_CONTEXTS.EVENT],
-});
-
 export function ON(eventType, fieldKeyOrCallback, callback) {
   if (typeof eventType !== 'string' || eventType.trim().length === 0) {
     console.warn('[form0] ON() requires a non-empty event type string');

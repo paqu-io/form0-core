@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { COS_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin COS
@@ -15,13 +15,4 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns -1
  * COS(Math.PI)
  */
-export const COS_METADATA = defineBuiltinMetadata({
-  name: 'COS',
-  category: 'math',
-  signature: 'COS(value)',
-  description: 'Return the cosine of a value in radians.',
-  examples: ['COS($angle_radians)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const COS = (value) => Math.cos(value);

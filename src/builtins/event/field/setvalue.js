@@ -1,5 +1,5 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
+export { SETVALUE_METADATA } from '../../builtin-definitions.js';
 
 /**
  * SETVALUE builtin for form events
@@ -31,15 +31,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.
  * // Set MultiChoiceField value
  * SETVALUE('field_dataname', ['value1', 'value2', 'value3'])
  */
-export const SETVALUE_METADATA = defineBuiltinMetadata({
-  name: 'SETVALUE',
-  category: 'event',
-  signature: 'SETVALUE(fieldDataName, valueToSet)',
-  description: 'Set a field value from a form event handler.',
-  examples: ["SETVALUE('field_dataname', 'value_to_set')"],
-  contexts: [BUILTIN_CONTEXTS.EVENT],
-});
-
 export function SETVALUE(fieldDataName, valueToSet) {
   // Create operation descriptor
   const operation = {

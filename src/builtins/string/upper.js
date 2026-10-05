@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { UPPER_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin UPPER
@@ -15,15 +15,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns "ABC123"
  * UPPER("abc123")
  */
-export const UPPER_METADATA = defineBuiltinMetadata({
-  name: 'UPPER',
-  category: 'string',
-  signature: 'UPPER(value)',
-  description: 'Convert a string to uppercase.',
-  examples: ['UPPER($city_name)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const UPPER = (value) => {
   if (value == null) {
     return '';

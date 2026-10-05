@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { ROUND_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin ROUND
@@ -19,15 +19,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns 3.14
  * ROUND(3.14159, 2)
  */
-export const ROUND_METADATA = defineBuiltinMetadata({
-  name: 'ROUND',
-  category: 'math',
-  signature: 'ROUND(value, places)',
-  description: 'Round a number to a fixed number of decimal places.',
-  examples: ['ROUND($total, 2)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const ROUND = (value, places) => {
   if (typeof value !== 'number' || typeof places !== 'number') {
     throw new Error('ROUND requires two numeric arguments');

@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { OTHER_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin OTHER
@@ -15,15 +15,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Use in conditional logic
  * IF(HASOTHER($city), "Custom city: " + OTHER($city), "No custom city entered")
  */
-export const OTHER_METADATA = defineBuiltinMetadata({
-  name: 'OTHER',
-  category: 'choice',
-  signature: 'OTHER(fieldValue)',
-  description: 'Return the "other" label from a choice field.',
-  examples: ['OTHER($city)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const OTHER = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

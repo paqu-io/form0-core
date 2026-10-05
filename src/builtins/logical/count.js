@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { COUNT_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin COUNT
@@ -15,15 +15,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns 3 (mixed array)
  * COUNT([1, 'a', 2, null, 3])
  */
-export const COUNT_METADATA = defineBuiltinMetadata({
-  name: 'COUNT',
-  category: 'logical',
-  signature: 'COUNT(values)',
-  description: 'Count numeric values.',
-  examples: ['COUNT(ARRAY($score_1, $score_2, $score_3))'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const COUNT = (values) => {
   // Handle null/undefined input
   if (!Array.isArray(values)) {

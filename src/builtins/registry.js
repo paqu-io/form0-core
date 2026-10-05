@@ -1,4 +1,12 @@
 import { cloneBuiltinMetadata, BUILTIN_CONTEXTS } from './builtin-metadata.js';
+import { BUILTIN_DEFINITIONS } from './builtin-definitions.js';
+
+export {
+  BUILTIN_DEFINITIONS,
+  CALCULATION_BUILTIN_DEFINITIONS,
+  EVENT_BUILTIN_DEFINITIONS,
+  BUILTIN_DEFINITION_BY_NAME,
+} from './builtin-definitions.js';
 
 import { IF, IF_METADATA } from './logical/if.js';
 import { AND, AND_METADATA } from './logical/and.js';
@@ -73,7 +81,7 @@ export { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
 
-const COMMON_RUNTIME_ENTRIES = Object.freeze([
+const RUNTIME_ENTRIES = Object.freeze([
   { implementation: IF, definition: IF_METADATA },
   { implementation: AND, definition: AND_METADATA },
   { implementation: OR, definition: OR_METADATA },
@@ -96,60 +104,29 @@ const COMMON_RUNTIME_ENTRIES = Object.freeze([
   { implementation: SIN, definition: SIN_METADATA },
   { implementation: ROUND, definition: ROUND_METADATA },
   { implementation: UPPER, definition: UPPER_METADATA },
-]);
-
-const CALCULATION_ONLY_ENTRIES = Object.freeze([
   { implementation: SETRESULT, definition: SETRESULT_METADATA },
-]);
-
-const EVENT_ONLY_ENTRIES = Object.freeze([
   { implementation: ALERT, definition: ALERT_METADATA },
   { implementation: SETVALUE, definition: SETVALUE_METADATA },
   { implementation: ON, definition: ON_METADATA },
   { implementation: OFF, definition: OFF_METADATA },
 ]);
 
-function buildBuiltinObject(entries) {
+function buildBuiltinObject(context) {
   return Object.freeze(
     Object.fromEntries(
-      entries.map(({ implementation, definition }) => [definition.name, implementation])
+      RUNTIME_ENTRIES.filter(({ definition }) => definition.contexts.includes(context)).map(
+        ({ implementation, definition }) => [definition.name, implementation]
+      )
     )
   );
 }
 
-function filterDefinitionsByContext(definitions, context) {
-  return Object.freeze(definitions.filter((definition) => definition.contexts.includes(context)));
-}
+export const calculationBuiltins = buildBuiltinObject(BUILTIN_CONTEXTS.CALCULATION);
 
-export const calculationBuiltins = buildBuiltinObject([
-  ...COMMON_RUNTIME_ENTRIES,
-  ...CALCULATION_ONLY_ENTRIES,
-]);
-
-export const eventBuiltins = buildBuiltinObject([...COMMON_RUNTIME_ENTRIES, ...EVENT_ONLY_ENTRIES]);
+export const eventBuiltins = buildBuiltinObject(BUILTIN_CONTEXTS.EVENT);
 
 // Backward-compatible alias for calculation runtime helpers.
 export const builtins = calculationBuiltins;
-
-export const BUILTIN_DEFINITIONS = Object.freeze(
-  [...COMMON_RUNTIME_ENTRIES, ...CALCULATION_ONLY_ENTRIES, ...EVENT_ONLY_ENTRIES].map(
-    ({ definition }) => definition
-  )
-);
-
-export const CALCULATION_BUILTIN_DEFINITIONS = filterDefinitionsByContext(
-  BUILTIN_DEFINITIONS,
-  BUILTIN_CONTEXTS.CALCULATION
-);
-
-export const EVENT_BUILTIN_DEFINITIONS = filterDefinitionsByContext(
-  BUILTIN_DEFINITIONS,
-  BUILTIN_CONTEXTS.EVENT
-);
-
-export const BUILTIN_DEFINITION_BY_NAME = new Map(
-  BUILTIN_DEFINITIONS.map((definition) => [definition.name, definition])
-);
 
 export function getBuiltinDefinitions() {
   return BUILTIN_DEFINITIONS.map(cloneBuiltinMetadata);

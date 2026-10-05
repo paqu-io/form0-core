@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { ARRAY_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin ARRAY
@@ -30,15 +30,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // For complex parsing, JSON.parse() can be used:
  * // EVAL('JSON.parse("[1,2,3]")')
  */
-export const ARRAY_METADATA = defineBuiltinMetadata({
-  name: 'ARRAY',
-  category: 'logical',
-  signature: 'ARRAY(...values)',
-  description: 'Build an array from individual arguments.',
-  examples: ['ARRAY($city, $country)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const ARRAY = (...args) => {
   // Handle empty arguments
   if (args.length === 0) {

@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { AND_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin AND
@@ -12,13 +12,4 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Multiple conditions
  * AND(name.length > 0, email.includes("@"), age >= 13)
  */
-export const AND_METADATA = defineBuiltinMetadata({
-  name: 'AND',
-  category: 'logical',
-  signature: 'AND(...conditions)',
-  description: 'Return true only when all arguments are truthy.',
-  examples: ['AND($age >= 18, $country === "it")'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const AND = (...args) => args.every(Boolean);

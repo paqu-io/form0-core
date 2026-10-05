@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { CHOICELABEL_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin CHOICELABEL
@@ -12,15 +12,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Use in display logic
  * "You selected: " + CHOICELABEL($city)
  */
-export const CHOICELABEL_METADATA = defineBuiltinMetadata({
-  name: 'CHOICELABEL',
-  category: 'choice',
-  signature: 'CHOICELABEL(fieldValue)',
-  description: 'Return the selected choice label from a choice field.',
-  examples: ['CHOICELABEL($city)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const CHOICELABEL = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

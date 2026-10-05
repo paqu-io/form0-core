@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { COUNTBLANK_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin COUNTBLANK
@@ -15,15 +15,6 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns 0 (no blank values)
  * COUNTBLANK([1, 2, 'a', true])
  */
-export const COUNTBLANK_METADATA = defineBuiltinMetadata({
-  name: 'COUNTBLANK',
-  category: 'logical',
-  signature: 'COUNTBLANK(values)',
-  description: 'Count blank values.',
-  examples: ['COUNTBLANK(ARRAY($first_name, $last_name, $email))'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const COUNTBLANK = (values) => {
   // Handle null/undefined input
   if (!Array.isArray(values)) {

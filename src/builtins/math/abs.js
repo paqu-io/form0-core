@@ -1,4 +1,4 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { ABS_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin ABS
@@ -15,13 +15,4 @@ import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js'
  * // Returns 3.14
  * ABS(-3.14)
  */
-export const ABS_METADATA = defineBuiltinMetadata({
-  name: 'ABS',
-  category: 'math',
-  signature: 'ABS(value)',
-  description: 'Return the absolute value of a number.',
-  examples: ['ABS($variance)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const ABS = (value) => Math.abs(value);
