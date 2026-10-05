@@ -1,29 +1,11 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { CHOICEVALUE_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin CHOICEVALUE
- * @description Retrieves the currently selected choice field value, preserving the type (if the value is a number preserves the number type, otherwise string). If no selection it returns null.
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {Object} choiceField - The choice field object with choice and other arrays
  * @returns {*} The selected choice value with preserved type, or null if no selection
- * @example
- * // Get the selected city value
- * CHOICEVALUE($city)
- * @example
- * // Use in conditional logic
- * IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogotá!", "Welcome!")
  */
-export const CHOICEVALUE_METADATA = defineBuiltinMetadata({
-  name: 'CHOICEVALUE',
-  category: 'choice',
-  signature: 'CHOICEVALUE(fieldValue)',
-  description: 'Return the selected choice value from a choice field.',
-  examples: [
-    'CHOICEVALUE($city)',
-    'IF(CHOICEVALUE($city) === "bogota", "Welcome to Bogota!", "Welcome!")',
-  ],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const CHOICEVALUE = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

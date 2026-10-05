@@ -1,22 +1,14 @@
 import { __collectEventOperation } from '../event-operations-collector.js';
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../../builtin-metadata.js';
+export { ALERT_METADATA } from '../../builtin-definitions.js';
 
 /**
- * ALERT builtin for form events
+ * @builtin ALERT
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * Automatically collects operation for platform execution
  * @param {string} title - The title to display in the alert
  * @param {string} message - The message to display in the alert (optional)
  * @returns {Object} Operation descriptor for platform execution (for backward compatibility)
  */
-export const ALERT_METADATA = defineBuiltinMetadata({
-  name: 'ALERT',
-  category: 'event',
-  signature: "ALERT(title, message = '')",
-  description: 'Display an alert from a form event handler.',
-  examples: ["ALERT('Saved', 'The record was saved successfully.')"],
-  contexts: [BUILTIN_CONTEXTS.EVENT],
-});
-
 export function ALERT(title, message = '') {
   // Create operation descriptor
   const operation = {

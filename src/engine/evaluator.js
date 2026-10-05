@@ -51,7 +51,9 @@ export function runExpression(
 
       try {
         // Handle both expressions and multi-line code (Windows-safe)
-        const isMultiLine = isMultilineCalculationExpression(sourceExpression);
+        const isMultiLine =
+          options.evaluateAsExpression !== true &&
+          isMultilineCalculationExpression(sourceExpression);
 
         if (isMultiLine) {
           // Execute as code block (recompile each time for now)

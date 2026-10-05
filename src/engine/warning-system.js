@@ -199,7 +199,7 @@ export class WarningSystem {
       try {
         handler(warning);
       } catch (err) {
-        if (options.console !== false) {
+        if (options.console ?? this.enableConsoleWarnings) {
           console.error('[form0] Warning handler failed:', err);
         }
         // Don't remove the handler automatically - let the user decide

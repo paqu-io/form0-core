@@ -34,7 +34,8 @@ import { createCalculationDiagnostics } from './calculation-diagnostics.js';
  * @param {Object} [options.helpers]
  * @param {Object} [options.security]
  * @param {WarningSystem} [options.warningSystem]
- * @param {Array} [options.runtimeDiagnostics] Legacy append-only reporting adapter.
+ * @param {Array} [options.runtimeDiagnostics] Deprecated append-only compatibility adapter.
+ * Use getDiagnostics() for the latest snapshot or onDiagnostics for evaluation notifications.
  * @param {{console?: boolean}} [options.diagnostics] Omit console to preserve legacy reporting.
  * @param {(snapshot: CalculationDiagnostic[]) => (void|Promise<void>)} [options.onDiagnostics]
  * Called once per completed evaluation, including empty/identical snapshots. Failures are isolated.
