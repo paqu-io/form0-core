@@ -291,4 +291,85 @@ assert.equal(rolledBack.valid, false);
 assert.equal(rolledBack.schema, null);
 assert.equal(operationSchema.form.name, 'Operations');
 
+const malformedRename = applyFormMutationBatch({
+  schema: operationSchema,
+  baseRevision: getFormSchemaRevision(operationSchema),
+  operations: [{ op: 'updateForm', patch: { name: 'Must not be silently ignored' } }],
+});
+assert.equal(malformedRename.valid, false, 'a malformed rename must not report success');
+assert.equal(malformedRename.schema, null);
+assert.match(malformedRename.diagnostics[0].message, /changes/);
+assert.equal(operationSchema.form.name, 'Operations');
+
+const updateFormContract = context.mutationOperationCatalog?.find(
+  (entry) => entry.op === 'updateForm'
+);
+assert.deepEqual(updateFormContract?.required, ['changes']);
+assert.equal(updateFormContract?.parameters.changes.type, 'object');
+assert.deepEqual(updateFormContract?.example, {
+  op: 'updateForm',
+  changes: { name: 'Renamed form' },
+});
+
+const validRename = applyFormMutationBatch({
+  schema: operationSchema,
+  baseRevision: getFormSchemaRevision(operationSchema),
+  operations: [updateFormContract.example],
+});
+assert.equal(validRename.valid, true, JSON.stringify(validRename.diagnostics));
+assert.equal(validRename.schema.form.name, 'Renamed form');
+assert.equal(operationSchema.form.name, 'Operations');
+const idempotentRename = applyFormMutationBatch({
+  schema: validRename.schema,
+  baseRevision: validRename.revision,
+  operations: [updateFormContract.example],
+});
+assert.equal(idempotentRename.valid, true, 'core accepts valid idempotent operations');
+assert.equal(idempotentRename.revision, validRename.revision);
+assert.deepEqual(
+  context.mutationOperationCatalog.map(({ op }) => op),
+  context.mutationOperations
+);
+updateFormContract.required.push('must-not-leak');
+updateFormContract.parameters.changes.type = 'must-not-leak';
+const freshContract = getFormAuthoringContext({
+  schema: operationSchema,
+}).mutationOperationCatalog.find(({ op }) => op === 'updateForm');
+assert.deepEqual(freshContract.required, ['changes']);
+assert.equal(freshContract.parameters.changes.type, 'object');
+
+for (const operation of [
+  { op: 'updateForm', changes: null },
+  { op: 'updateForm', changes: [] },
+  { op: 'updateForm', changes: {} },
+  { op: 'updateForm', changes: { name: 'Good' }, patch: { name: 'Ignored' } },
+  { op: 'updateField', fieldKey: 'alpha', patch: { label: 'Ignored' } },
+  { op: 'updateField', fieldKey: 'alpha', changes: 'Ignored' },
+  { op: 'updateField', fieldKey: 'alpha', changes: {} },
+  { op: 'removeField', fieldKey: '' },
+  { op: 'moveField', fieldKey: 'gamma', position: { index: 0 } },
+  { op: 'moveField', fieldKey: 'gamma', position: { beforeKey: 'alpha', afterKey: 'beta' } },
+  { op: 'setTitleField' },
+  { op: 'setStatusField', field: false },
+  { op: 'setFormEventCode' },
+  { op: 'setCalculation', fieldKey: 'alpha' },
+  { op: 'addField', field: textField('delta'), parentKey: 42 },
+  null,
+  [],
+]) {
+  const rejected = applyFormMutationBatch({
+    schema: operationSchema,
+    baseRevision: getFormSchemaRevision(operationSchema),
+    operations: [{ op: 'updateForm', changes: { name: 'Must roll back' } }, operation],
+  });
+  assert.equal(
+    rejected.valid,
+    false,
+    `invalid operation must be rejected: ${JSON.stringify(operation)}`
+  );
+  assert.equal(rejected.schema, null);
+  assert.equal(rejected.diagnostics[0].operationIndex, 1);
+  assert.equal(operationSchema.form.name, 'Operations', 'invalid batches must stay atomic');
+}
+
 console.log('form authoring tests passed');
