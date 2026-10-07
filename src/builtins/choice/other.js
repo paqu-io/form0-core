@@ -1,29 +1,11 @@
-import { BUILTIN_CONTEXTS, defineBuiltinMetadata } from '../builtin-metadata.js';
+export { OTHER_METADATA } from '../builtin-definitions.js';
 
 /**
  * @builtin OTHER
- * @description Retrieves the other label if user entered the other option, otherwise null. Works with both SingleChoiceField and MultiChoiceField.
+ * Name, signature, description, examples, and contexts: see builtin-definitions.js.
  * @param {Object} choiceField - The choice field object (SingleChoiceField with choice array or MultiChoiceField with choices array) and other array
  * @returns {string|null} The other label if user entered an other option, null otherwise
- * @example
- * // Get the other value from single choice field
- * OTHER($city)
- * @example
- * // Get the other value from multi choice field
- * OTHER($colors)
- * @example
- * // Use in conditional logic
- * IF(HASOTHER($city), "Custom city: " + OTHER($city), "No custom city entered")
  */
-export const OTHER_METADATA = defineBuiltinMetadata({
-  name: 'OTHER',
-  category: 'choice',
-  signature: 'OTHER(fieldValue)',
-  description: 'Return the "other" label from a choice field.',
-  examples: ['OTHER($city)'],
-  contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
-});
-
 export const OTHER = (choiceField) => {
   // Handle null/undefined input
   if (!choiceField || typeof choiceField !== 'object') {

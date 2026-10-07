@@ -1,11 +1,11 @@
 # Builtin Metadata Next Steps
 
-This note captures follow-up work after moving builtin editor metadata next to the builtin implementations.
+This note captures follow-up work on builtin editor metadata. The metadata now lives in a single catalog, `src/builtins/builtin-definitions.js`, which security validation reads without loading the implementations.
 
 ## Short-Term Follow-Up
 
-- Align the MDX builtin docs under `src/builtins/docs/` with the new metadata source so signatures, descriptions, and examples do not drift.
-- Review builtin JSDoc blocks and either keep them intentionally human-focused or derive them from the same metadata model.
+- Done: the catalog is the single source of truth for signatures, descriptions, and examples. The stale MDX docs under `src/builtins/docs/` were removed (reader-facing docs live in form0-docs-zudoku), implementation JSDoc keeps only `@builtin`, a catalog pointer, and `@param`/`@returns` types, and `tests/builtin-catalog-examples.test.js` checks that every example parses and validates.
+- Consider building `RUNTIME_ENTRIES` from the catalog plus an implementations map keyed by name, and dropping the per-file `*_METADATA` re-exports, which only internal code can import because `package.json` `exports` exposes `.` alone.
 - Revisit `COUNT`, `COUNTA`, and `COUNTBLANK` UX to decide whether the runtime should stay array-based or move to a more spreadsheet-like varargs API.
 
 ## Calculation Authoring Follow-Up

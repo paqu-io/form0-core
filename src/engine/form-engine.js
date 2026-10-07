@@ -13,6 +13,35 @@ import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
 import { buildCalculationDependencyPlan } from '../utilities/calculation-dependencies.js';
+import { createCalculationDiagnostics } from './calculation-diagnostics.js';
+import { formatLocalDate } from '../utilities/date-utils.js';
+
+/**
+ * @typedef {Object} CalculationDiagnostic
+ * @property {string} code Stable diagnostic identifier.
+ * @property {'warning'|'error'} severity
+ * @property {string} message
+ * @property {string} fieldName Calculated field's data_name.
+ * @property {'dependency'|'scope'|'validation'|'syntax'|'runtime'} phase
+ * @property {string|null} suggestion
+ * @property {Object} context JSON-safe metadata; no expression source, values or stack.
+ */
+
+/**
+ * Create a form engine. Calculations collect diagnostics independently of validation.
+ * @param {Object} options
+ * @param {Object} options.schema
+ * @param {Object} [options.initialValues]
+ * @param {Object} [options.helpers]
+ * @param {Object} [options.security]
+ * @param {WarningSystem} [options.warningSystem]
+ * @param {Array} [options.runtimeDiagnostics] Deprecated append-only compatibility adapter.
+ * Use getDiagnostics() for the latest snapshot or onDiagnostics for evaluation notifications.
+ * @param {{console?: boolean}} [options.diagnostics] Omit console to preserve legacy reporting.
+ * @param {(snapshot: CalculationDiagnostic[]) => (void|Promise<void>)} [options.onDiagnostics]
+ * Called once per completed evaluation, including empty/identical snapshots. Failures are isolated.
+ * @returns {Object} Engine with getDiagnostics(): defensive copy of latest evaluation (initially []).
+ */
 
 export function createFormEngine({
   schema,
@@ -21,6 +50,8 @@ export function createFormEngine({
   security = DEFAULT_SECURITY_CONFIG,
   warningSystem = null,
   runtimeDiagnostics = null,
+  diagnostics = {},
+  onDiagnostics = null,
 }) {
   const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
@@ -97,6 +128,12 @@ export function createFormEngine({
   const contextResolver = new ContextResolver(form);
   const calculationPlan = buildCalculationDependencyPlan(form, contextResolver);
   const sharedWarningSystem = warningSystem || new WarningSystem();
+  const calculationDiagnostics = createCalculationDiagnostics(
+    diagnostics,
+    onDiagnostics,
+    contextResolver,
+    sharedWarningSystem
+  );
 
   // Initialize event system with context resolution
   const eventManager = new EventManager(form, contextResolver, sharedWarningSystem);
@@ -123,20 +160,28 @@ export function createFormEngine({
   }
 
   function evalForm() {
-    evaluateCalculatedFields(
-      form,
-      values,
-      allHelpers,
-      security,
-      contextResolver,
-      sharedWarningSystem,
-      runtimeDiagnostics,
-      calculationPlan
-    );
-    evaluateRequirement(form, values, required);
-    evaluateVisibility(form, values, visible);
-    evaluateReadOnly(form, values, read_only);
-    validateFields(form, values, errors);
+    const frame = calculationDiagnostics.begin();
+    try {
+      evaluateCalculatedFields(
+        form,
+        values,
+        allHelpers,
+        security,
+        contextResolver,
+        sharedWarningSystem,
+        runtimeDiagnostics,
+        calculationPlan,
+        calculationDiagnostics
+      );
+      evaluateRequirement(form, values, required);
+      evaluateVisibility(form, values, visible);
+      evaluateReadOnly(form, values, read_only);
+      validateFields(form, values, errors);
+    } catch (error) {
+      calculationDiagnostics.abort(frame);
+      throw error;
+    }
+    calculationDiagnostics.complete(frame);
   }
 
   function trigger(eventType, fieldKey, metadata = {}) {
@@ -158,6 +203,7 @@ export function createFormEngine({
     eval: evalForm,
     trigger,
     getState,
+    getDiagnostics: calculationDiagnostics.getSnapshot,
     getWarningSystem: () => sharedWarningSystem,
     getContextResolver: () => contextResolver,
     getBuildingPlanMeta: () => buildingPlanMeta,
@@ -222,8 +268,7 @@ function getDefaultValueLegacy(field) {
 
     case 'DateField':
       if (field.default_value === 'now') {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        return formatLocalDate(); // YYYY-MM-DD, local calendar day
       }
       return null;
 

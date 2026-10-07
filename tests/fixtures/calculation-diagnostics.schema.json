@@ -1,0 +1,157 @@
+{
+  "form": {
+    "name": "Calculation diagnostics",
+    "description": "Before/after regression fixture for form0-core issue #100.",
+    "elements": [
+      {
+        "display": "default",
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "required_conditions": null,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": false,
+        "read_only_conditions": null,
+        "default_value": 12,
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "NumericField",
+        "key": "numerator",
+        "data_name": "numerator",
+        "label": "numerator",
+        "min": null,
+        "max": null,
+        "format": "integer"
+      },
+      {
+        "display": "default",
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "required_conditions": null,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": false,
+        "read_only_conditions": null,
+        "default_value": 3,
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "NumericField",
+        "key": "divisor",
+        "data_name": "divisor",
+        "label": "divisor",
+        "min": null,
+        "max": null,
+        "format": "integer"
+      },
+      {
+        "display": {
+          "style": "numeric"
+        },
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": true,
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "CalculatedField",
+        "key": "quotient",
+        "data_name": "quotient",
+        "label": "quotient",
+        "calculate": "if ($divisor === 0) {\n  throw new Error(\"Division by zero\");\n}\nSETRESULT($numerator / $divisor);"
+      },
+      {
+        "display": {
+          "style": "numeric"
+        },
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": true,
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "CalculatedField",
+        "key": "dependent",
+        "data_name": "dependent",
+        "label": "dependent",
+        "calculate": "SETRESULT(($quotient ?? 0) + 1)"
+      },
+      {
+        "display": {
+          "style": "numeric"
+        },
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": true,
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "CalculatedField",
+        "key": "independent",
+        "data_name": "independent",
+        "label": "independent",
+        "calculate": "SETRESULT($numerator * 2)"
+      },
+      {
+        "display": "default",
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "required_conditions": null,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": false,
+        "read_only_conditions": null,
+        "default_value": "initial",
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "TextField",
+        "key": "note",
+        "data_name": "note",
+        "label": "note",
+        "pattern": null,
+        "pattern_description": null
+      },
+      {
+        "display": "default",
+        "description": null,
+        "description_mode": null,
+        "required": false,
+        "required_conditions": null,
+        "visible": false,
+        "visible_conditions": {
+          "field_id": "quotient",
+          "operator": "is_empty"
+        },
+        "read_only": false,
+        "read_only_conditions": null,
+        "default_value": "Calculation unavailable",
+        "supporting_image": false,
+        "supporting_image_path": null,
+        "supporting_image_display": null,
+        "type": "TextField",
+        "key": "failure_notice",
+        "data_name": "failure_notice",
+        "label": "failure_notice",
+        "pattern": null,
+        "pattern_description": null
+      }
+    ],
+    "events": {
+      "code": "ON(\"change\", \"divisor\", function () { SETVALUE(\"note\", \"divisor changed\"); });"
+    }
+  }
+}

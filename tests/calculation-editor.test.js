@@ -688,10 +688,43 @@ const schema = {
     missingResult.issues.some((issue) => issue.code === 'noncanonical_multiline_result'),
     true
   );
+  assert.match(
+    missingResult.issues.find((issue) => issue.code === 'noncanonical_multiline_result').message,
+    /explicit return/
+  );
   assert.equal(misplacedResult.valid, true, 'Style guidance must remain permissive');
   assert.equal(
     misplacedResult.issues.some((issue) => issue.code === 'noncanonical_setresult_placement'),
     true
+  );
+})();
+
+(() => {
+  const explicitReturn = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'const age = $age;\nreturn age + 1;',
+  });
+
+  assert.equal(explicitReturn.valid, true);
+  assert.equal(
+    explicitReturn.issues.some((issue) => issue.code === 'noncanonical_multiline_result'),
+    false,
+    'An explicit return produces a runtime value and must not be reported as missing a result'
+  );
+})();
+
+(() => {
+  const nestedReturnOnly = analyzeCalculationExpression({
+    schema,
+    fieldDataName: 'room_summary',
+    expression: 'function value() { return $age; }\nvalue();',
+  });
+
+  assert.equal(
+    nestedReturnOnly.issues.some((issue) => issue.code === 'noncanonical_multiline_result'),
+    true,
+    'A return inside a nested function does not return a value from the calculation body'
   );
 })();
 

@@ -1,3 +1,4 @@
+import { parse } from 'acorn';
 import { BUILTIN_CONTEXTS } from '../builtins/builtin-metadata.js';
 import {
   BUILTIN_DEFINITION_BY_NAME,
@@ -141,6 +142,38 @@ function isFinalFunctionCall(code, call) {
   if (code[index] === ';') index += 1;
   while (index < code.length && /\s/u.test(code[index])) index += 1;
   return index === code.length;
+}
+
+function hasTopLevelReturnStatement(code) {
+  let program;
+  try {
+    program = parse(code, {
+      ecmaVersion: 'latest',
+      allowReturnOutsideFunction: true,
+    });
+  } catch {
+    return false;
+  }
+
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'ReturnStatement') return true;
+    if (
+      node.type === 'FunctionDeclaration' ||
+      node.type === 'FunctionExpression' ||
+      node.type === 'ArrowFunctionExpression'
+    ) {
+      return false;
+    }
+
+    return Object.entries(node).some(([key, value]) => {
+      if (key === 'start' || key === 'end' || key === 'loc') return false;
+      if (Array.isArray(value)) return value.some(visit);
+      return visit(value);
+    });
+  };
+
+  return program.body.some(visit);
 }
 
 function cloneCatalogDefinition(definition) {
@@ -582,14 +615,19 @@ export function analyzeCalculationExpression({
     );
   }
 
-  if (isMultilineCalculationExpression(normalizedExpression) && setResultCalls.length === 0) {
+  if (
+    isMultilineCalculationExpression(normalizedExpression) &&
+    setResultCalls.length === 0 &&
+    !hasTopLevelReturnStatement(normalizedExpression)
+  ) {
     addIssue(
       issues,
       issueKeys,
       createIssue({
         code: 'noncanonical_multiline_result',
         severity: 'warning',
-        message: 'Multiline calculations should finish with exactly one SETRESULT() call.',
+        message:
+          'Multiline calculations should finish with exactly one SETRESULT() call or an explicit return statement.',
         index: 0,
         length: 1,
       })
@@ -754,13 +792,12 @@ export function createCalculationPreviewSession({
     enableConsoleWarnings: false,
     throttleMs: 0,
   });
-  const runtimeDiagnostics = [];
   const engine = createFormEngine({
     schema: simulationSchema,
     initialValues: {},
     security,
     warningSystem,
-    runtimeDiagnostics,
+    diagnostics: { console: false },
   });
 
   engine.eval();
@@ -777,7 +814,6 @@ export function createCalculationPreviewSession({
       }
 
       warningSystem.clearCollectedWarnings();
-      runtimeDiagnostics.length = 0;
 
       if (typeof nextExpression === 'string' && nextExpression !== currentExpression) {
         targetField.calculate = nextExpression;
@@ -790,6 +826,7 @@ export function createCalculationPreviewSession({
       try {
         engine.eval();
 
+        const runtimeDiagnostics = engine.getDiagnostics();
         const simulatedResult = engineState.values[fieldDataName];
         const runtimeError =
           runtimeDiagnostics.find(
@@ -818,7 +855,6 @@ export function createCalculationPreviewSession({
     dispose: () => {
       disposed = true;
       warningSystem.clearCollectedWarnings();
-      runtimeDiagnostics.length = 0;
       clearRecord(engineState.values);
     },
   };

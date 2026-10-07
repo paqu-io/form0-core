@@ -1,4 +1,12 @@
 import { cloneBuiltinMetadata, BUILTIN_CONTEXTS } from './builtin-metadata.js';
+import { BUILTIN_DEFINITIONS } from './builtin-definitions.js';
+
+export {
+  BUILTIN_DEFINITIONS,
+  CALCULATION_BUILTIN_DEFINITIONS,
+  EVENT_BUILTIN_DEFINITIONS,
+  BUILTIN_DEFINITION_BY_NAME,
+} from './builtin-definitions.js';
 
 import { IF, IF_METADATA } from './logical/if.js';
 import { AND, AND_METADATA } from './logical/and.js';
@@ -10,6 +18,7 @@ import { ARRAY, ARRAY_METADATA } from './logical/array.js';
 import {
   SETRESULT,
   SETRESULT_METADATA,
+  __beginResultScope,
   __consumeResult,
   __resetResult,
 } from './control/setresult.js';
@@ -27,13 +36,14 @@ import { CEILING, CEILING_METADATA } from './math/ceiling.js';
 import { COS, COS_METADATA } from './math/cos.js';
 import { SIN, SIN_METADATA } from './math/sin.js';
 import { ROUND, ROUND_METADATA } from './math/round.js';
+import { DATEADD, DATEADD_METADATA } from './date/dateadd.js';
+import { DAYS, DAYS_METADATA } from './date/days.js';
 import { UPPER, UPPER_METADATA } from './string/upper.js';
 
 import { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 import { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 import { ON, ON_METADATA } from './event/control/on.js';
 import { OFF, OFF_METADATA } from './event/control/off.js';
-import { __consumeEventOperations } from './event/event-operations-collector.js';
 
 export { IF, IF_METADATA } from './logical/if.js';
 export { AND, AND_METADATA } from './logical/and.js';
@@ -45,6 +55,7 @@ export { ARRAY, ARRAY_METADATA } from './logical/array.js';
 export {
   SETRESULT,
   SETRESULT_METADATA,
+  __beginResultScope,
   __consumeResult,
   __resetResult,
 } from './control/setresult.js';
@@ -67,15 +78,16 @@ export { CEILING, CEILING_METADATA } from './math/ceiling.js';
 export { COS, COS_METADATA } from './math/cos.js';
 export { SIN, SIN_METADATA } from './math/sin.js';
 export { ROUND, ROUND_METADATA } from './math/round.js';
+export { DATEADD, DATEADD_METADATA } from './date/dateadd.js';
+export { DAYS, DAYS_METADATA } from './date/days.js';
 export { UPPER, UPPER_METADATA } from './string/upper.js';
 
 export { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 export { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
-export { __consumeEventOperations } from './event/event-operations-collector.js';
 
-const COMMON_RUNTIME_ENTRIES = Object.freeze([
+const RUNTIME_ENTRIES = Object.freeze([
   { implementation: IF, definition: IF_METADATA },
   { implementation: AND, definition: AND_METADATA },
   { implementation: OR, definition: OR_METADATA },
@@ -97,61 +109,32 @@ const COMMON_RUNTIME_ENTRIES = Object.freeze([
   { implementation: COS, definition: COS_METADATA },
   { implementation: SIN, definition: SIN_METADATA },
   { implementation: ROUND, definition: ROUND_METADATA },
+  { implementation: DATEADD, definition: DATEADD_METADATA },
+  { implementation: DAYS, definition: DAYS_METADATA },
   { implementation: UPPER, definition: UPPER_METADATA },
-]);
-
-const CALCULATION_ONLY_ENTRIES = Object.freeze([
   { implementation: SETRESULT, definition: SETRESULT_METADATA },
-]);
-
-const EVENT_ONLY_ENTRIES = Object.freeze([
   { implementation: ALERT, definition: ALERT_METADATA },
   { implementation: SETVALUE, definition: SETVALUE_METADATA },
   { implementation: ON, definition: ON_METADATA },
   { implementation: OFF, definition: OFF_METADATA },
 ]);
 
-function buildBuiltinObject(entries) {
+function buildBuiltinObject(context) {
   return Object.freeze(
     Object.fromEntries(
-      entries.map(({ implementation, definition }) => [definition.name, implementation])
+      RUNTIME_ENTRIES.filter(({ definition }) => definition.contexts.includes(context)).map(
+        ({ implementation, definition }) => [definition.name, implementation]
+      )
     )
   );
 }
 
-function filterDefinitionsByContext(definitions, context) {
-  return Object.freeze(definitions.filter((definition) => definition.contexts.includes(context)));
-}
+export const calculationBuiltins = buildBuiltinObject(BUILTIN_CONTEXTS.CALCULATION);
 
-export const calculationBuiltins = buildBuiltinObject([
-  ...COMMON_RUNTIME_ENTRIES,
-  ...CALCULATION_ONLY_ENTRIES,
-]);
-
-export const eventBuiltins = buildBuiltinObject([...COMMON_RUNTIME_ENTRIES, ...EVENT_ONLY_ENTRIES]);
+export const eventBuiltins = buildBuiltinObject(BUILTIN_CONTEXTS.EVENT);
 
 // Backward-compatible alias for calculation runtime helpers.
 export const builtins = calculationBuiltins;
-
-export const BUILTIN_DEFINITIONS = Object.freeze(
-  [...COMMON_RUNTIME_ENTRIES, ...CALCULATION_ONLY_ENTRIES, ...EVENT_ONLY_ENTRIES].map(
-    ({ definition }) => definition
-  )
-);
-
-export const CALCULATION_BUILTIN_DEFINITIONS = filterDefinitionsByContext(
-  BUILTIN_DEFINITIONS,
-  BUILTIN_CONTEXTS.CALCULATION
-);
-
-export const EVENT_BUILTIN_DEFINITIONS = filterDefinitionsByContext(
-  BUILTIN_DEFINITIONS,
-  BUILTIN_CONTEXTS.EVENT
-);
-
-export const BUILTIN_DEFINITION_BY_NAME = new Map(
-  BUILTIN_DEFINITIONS.map((definition) => [definition.name, definition])
-);
 
 export function getBuiltinDefinitions() {
   return BUILTIN_DEFINITIONS.map(cloneBuiltinMetadata);

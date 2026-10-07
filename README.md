@@ -81,6 +81,69 @@ console.log(engine.getState());
 The engine API exposes `eval()` for calculations, conditions, and validation; `trigger()` for form
 events; and `getState()` for current values and evaluated field state.
 
+Schema event callbacks retain their authored source, so ordinary functions and arrows defined in
+`form.events.code` also work on Hermes. Each dispatch uses current scoped field values; initialization
+runs once. Local initialization variables are not captured. Callbacks supplied by host helpers still
+require executable `toString()` output; unavailable source produces an event warning.
+
+## Calculation diagnostics
+
+Diagnostics are collected automatically, including when console reporting is disabled:
+
+```js
+const engine = createFormEngine({ schema });
+console.log(engine.getDiagnostics()); // [] before the first evaluation
+engine.eval();
+console.log(engine.getDiagnostics()); // latest evaluation, returned as a defensive copy
+```
+
+Configure reporting in application code:
+
+```js
+const engine = createFormEngine({
+  schema,
+  diagnostics: { console: false },
+  onDiagnostics(snapshot) {
+    for (const diagnostic of snapshot) {
+      reportCalculationDiagnostic(diagnostic);
+    }
+  },
+});
+
+engine.eval();
+// For a schema calculating quotient from divisor, correct the input and evaluate again:
+engine.getState().values.divisor = 4;
+engine.eval(); // replaces the snapshot; recovered failures disappear
+```
+
+`onDiagnostics` runs once after every completed evaluation, including identical snapshots and
+`[]`. Observer exceptions cannot interrupt evaluation and are reported according to the console
+policy. Each diagnostic has `code`, `severity`, `message`, `fieldName`, `phase`, `suggestion`, and
+`context`. Context identifies the schema parent path, related/referenced fields, and `expression`
+versus `EVAL` origin. The engine adds no expression source, field values, or stack traces.
+
+Identical diagnostics are deduplicated within an evaluation. Distinct failures are retained,
+including failures observed in intermediate stabilization passes even if a later pass succeeds.
+The snapshot records that evaluation; it is not a history or just the final unresolved errors.
+Legitimate `null`, `undefined`, `NaN`, and `Infinity` results do not produce errors by themselves.
+Diagnostics stay separate from `state.errors` and do not change submission validity.
+
+Omit `diagnostics.console` to preserve existing defaults and supplied `WarningSystem` settings.
+`false` silences calculation-owned reporting, including `EVAL()` warnings and debug logs; `true`
+prints diagnostic reporting in development and production. Event reporting retains its existing
+behavior. `WarningSystem` remains compatible.
+
+The append-only `runtimeDiagnostics` option is deprecated but remains supported for compatibility.
+For new integrations, omit that option and use `engine.getDiagnostics()` for the latest evaluation,
+or `onDiagnostics(snapshot)` to receive every completed evaluation, including recovery (`[]`).
+This is not a drop-in replacement for the legacy array: snapshots use the structured diagnostic
+contract above and replace prior results rather than accumulating them. If you need a history,
+store snapshots in application code. No removal version is scheduled.
+
+See [calculation diagnostics](https://docs.form0.dev/core/engine/calculations-dependencies#seeing-errors-and-warnings)
+for stable codes and the reporting contract. CLI and renderer diagnostics adoption is separate
+from this core API.
+
 ## Schema and record ownership
 
 `form0-core` owns behavioral schema concerns such as fields, conditions, calculations, events, and

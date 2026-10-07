@@ -27,7 +27,7 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 
 ## Project Structure & Module Organization
 
-- `src/`: Library source (ESM). Key areas: `engine/` (form engine, warnings), `schema/` (validators, field specs, operators), `utilities/` (helpers, hashing, versioning), `security/` (config), `builtins/` (field implementations), `index.js` (public exports).
+- `src/`: Library source (ESM). Key areas: `engine/` (form engine, warnings), `schema/` (validators, field specs, operators), `utilities/` (helpers, hashing, versioning), `security/` (config), `builtins/` (builtin functions and their metadata catalog), `index.js` (public exports).
 - `tests/`: Node-run test scripts and security examples. Open `tests/security-browser-test.html` in a browser for manual checks.
 - `.github/`: Workflows for automation and triage. See `GEMINI.md` for bot usage.
 
@@ -51,7 +51,9 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 - **field-value-registry.js**: Registry for field value handlers
 
 ### Built-in Functions (`src/builtins/`)
-- **registry.js**: Central registry for built-in functions
+- **builtin-definitions.js**: Authoritative metadata catalog (name, signature, description, examples, contexts). It must not import builtin implementations, so security validation can read it without loading `EVAL()`
+- **builtin-metadata.js**: `defineBuiltinMetadata()` and the `BUILTIN_CONTEXTS` (calculation, event)
+- **registry.js**: Pairs each implementation with its catalog entry in `RUNTIME_ENTRIES` and builds the calculation and event builtin sets
 - **choice/**: Choice field operations (labels, values, other handling)
 - **control/**: Form control operations (eval, setresult)
 - **event/**: Event handling operations
@@ -92,7 +94,7 @@ This project, `form0-core`, is the foundational JavaScript library that powers t
 - Modules: ES Modules only (`type: module`). File names use `kebab-case.js`.
 - Identifiers: functions `camelCase`, classes/types `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - Public API: export via `src/index.js`; prefer factories like `createFormEngine`, utilities under `utilities/`.
-- Built-in functions: follow JSDoc pattern with `@builtin`, `@description`, `@param`, `@returns`, `@example` tags.
+- Built-in functions: add the metadata (signature, description, examples, contexts) to `src/builtins/builtin-definitions.js`, which is the single source of truth, and register the implementation in `RUNTIME_ENTRIES` in `src/builtins/registry.js`. In the implementation file, keep a short JSDoc block with `@builtin`, a pointer to the catalog, and `@param`/`@returns` types only; do not duplicate descriptions or examples. Catalog examples are shown in editor autocompletion, so write them in form0 syntax (`$data_name`), and `tests/builtin-catalog-examples.test.js` checks that they parse and validate. Reader-facing builtin docs live in the form0-docs-zudoku repository.
 
 ## Testing Guidelines
 

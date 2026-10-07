@@ -6,6 +6,7 @@ import {
   validateFormLinkRecordConditions,
 } from './form-link-validators.js';
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
+import { formatLocalDate } from '../utilities/date-utils.js';
 const AI_ATTRIBUTE_DEFINITION = {
   type: 'object',
   required: false,
@@ -725,8 +726,7 @@ export const FIELD_SPECS = {
     },
     defaultProducer: (field) => {
       if (field.default_value === 'now') {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        return formatLocalDate(); // YYYY-MM-DD, local calendar day
       }
       return null;
     },
