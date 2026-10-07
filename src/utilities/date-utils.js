@@ -3,6 +3,8 @@
 
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MIN_CALENDAR_YEAR = 1;
+const MAX_CALENDAR_YEAR = 9999;
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
 
@@ -28,12 +30,14 @@ export function parseIsoDate(value) {
   if (!match) return null;
 
   const [year, month, day] = match.slice(1).map(Number);
-  const time = Date.UTC(year, month - 1, day);
-  const date = new Date(time);
+  if (year < MIN_CALENDAR_YEAR || year > MAX_CALENDAR_YEAR) return null;
+
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1) return null;
   if (date.getUTCDate() !== day) return null;
 
-  return time / MS_PER_DAY;
+  return date.getTime() / MS_PER_DAY;
 }
 
 /**
@@ -44,7 +48,19 @@ export function parseIsoDate(value) {
  */
 export function formatIsoDate(dayNumber) {
   const date = new Date(dayNumber * MS_PER_DAY);
-  return `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  const year = date.getUTCFullYear();
+  if (
+    !Number.isInteger(dayNumber) ||
+    Number.isNaN(date.getTime()) ||
+    year < MIN_CALENDAR_YEAR ||
+    year > MAX_CALENDAR_YEAR
+  ) {
+    throw new Error(
+      'Date arithmetic result is outside the supported date range 0001-01-01 to 9999-12-31'
+    );
+  }
+
+  return `${pad(year, 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
 /**

@@ -203,7 +203,7 @@ export const DATEADD_METADATA = defineBuiltinMetadata({
   category: 'date',
   signature: 'DATEADD(date, days)',
   description:
-    'Add a whole number of days to a YYYY-MM-DD date. Returns null when an argument is blank.',
+    'Add whole days to a YYYY-MM-DD date from 0001-01-01 through 9999-12-31. Returns null when an argument is blank.',
   examples: ['DATEADD($start_date, 30)', 'DATEADD($due_date, -7)'],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
@@ -213,7 +213,7 @@ export const DAYS_METADATA = defineBuiltinMetadata({
   category: 'date',
   signature: 'DAYS(endDate, startDate)',
   description:
-    'Return the number of days between two YYYY-MM-DD dates. Returns null when an argument is blank.',
+    'Return the days between YYYY-MM-DD dates from 0001-01-01 through 9999-12-31. Returns null when an argument is blank.',
   examples: ['DAYS($end_date, $start_date)'],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });
