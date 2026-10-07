@@ -45,6 +45,8 @@ function evaluate(calculate, engineOptions = { diagnostics: { console: false } }
   assert.equal(diagnostics[0].severity, 'warning');
   assert.equal(diagnostics[0].phase, 'runtime');
   assert.equal(diagnostics[0].fieldName, 'result');
+  assert.match(diagnostics[0].suggestion, /SETRESULT\(\)/);
+  assert.match(diagnostics[0].suggestion, /explicit return/);
 })();
 
 // Single-line expressions, SETRESULT(), and an explicit return are not reported.

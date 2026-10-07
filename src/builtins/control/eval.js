@@ -17,10 +17,15 @@ let _evalReporting = null;
  * Called internally by the expression evaluator
  */
 export function __setEvalContext(context, reporting = null) {
+  const previousContext = _evalContext;
   const previousReporting = _evalReporting;
   _evalContext = context;
   _evalReporting = reporting;
+  let restored = false;
   return () => {
+    if (restored) return;
+    restored = true;
+    _evalContext = previousContext;
     _evalReporting = previousReporting;
   };
 }

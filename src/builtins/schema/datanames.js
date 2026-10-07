@@ -14,7 +14,14 @@ let _dataNamesSchema = null;
  * Called internally by the expression evaluator
  */
 export function __setDataNamesContext(schema) {
+  const previousSchema = _dataNamesSchema;
   _dataNamesSchema = schema;
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    _dataNamesSchema = previousSchema;
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
-import { __consumeResult, __resetResult } from '../builtins/registry.js';
-import { __setEvalContext, __clearEvalContext } from '../builtins/control/eval.js';
-import { __setDataNamesContext, __clearDataNamesContext } from '../builtins/schema/datanames.js';
+import { __beginResultScope, __consumeResult } from '../builtins/registry.js';
+import { __setEvalContext } from '../builtins/control/eval.js';
+import { __setDataNamesContext } from '../builtins/schema/datanames.js';
 import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../utilities/calculation-expression-utils.js';
 
 const MISSING_RESULT_MESSAGE =
-  'Multiline calculation produced no value because it does not call SETRESULT().';
+  'Multiline calculation produced no value because it neither calls SETRESULT() nor returns a value.';
 
 function reportMissingResult(options) {
   options.onDiagnostic?.({
@@ -17,7 +17,8 @@ function reportMissingResult(options) {
     severity: 'warning',
     phase: 'runtime',
     message: MISSING_RESULT_MESSAGE,
-    suggestion: 'Wrap the final value in SETRESULT(), or write the calculation on a single line.',
+    suggestion:
+      'Wrap the final value in SETRESULT(), use an explicit return statement, or write the calculation on a single line.',
   });
   if (!options.suppressConsoleWarning) {
     const field = options.fieldName ? ` (${options.fieldName})` : '';
@@ -33,9 +34,7 @@ export function runExpression(
   schema = null,
   options = {}
 ) {
-  // SETRESULT uses synchronous evaluation-scoped state. Clear it at both boundaries so a
-  // previously failed expression can never influence this evaluation.
-  __resetResult();
+  const restoreResultScope = __beginResultScope();
   let phase = 'runtime';
   try {
     const sourceExpression = options.sourceExpression ?? expr;
@@ -61,10 +60,8 @@ export function runExpression(
     // Execute expression
     const executeExpression = () => {
       // Set context for EVAL() before execution
-      const restoreReporting = __setEvalContext(secureContext, options.evalReporting);
-      if (schema) {
-        __setDataNamesContext(schema);
-      }
+      const restoreEvalContext = __setEvalContext(secureContext, options.evalReporting);
+      const restoreDataNamesContext = schema ? __setDataNamesContext(schema) : null;
 
       try {
         // Handle both expressions and multi-line code (Windows-safe)
@@ -95,13 +92,8 @@ export function runExpression(
           return consumed.called ? consumed.value : result;
         }
       } finally {
-        __resetResult();
-        // Always clear EVAL context after execution
-        __clearEvalContext();
-        restoreReporting();
-        if (schema) {
-          __clearDataNamesContext();
-        }
+        restoreDataNamesContext?.();
+        restoreEvalContext();
       }
     };
 
@@ -131,5 +123,7 @@ export function runExpression(
       console.warn('[form0] Expression evaluation failed:', e.message);
     }
     return null;
+  } finally {
+    restoreResultScope();
   }
 }

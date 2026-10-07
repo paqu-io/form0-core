@@ -18,6 +18,7 @@ import { ARRAY, ARRAY_METADATA } from './logical/array.js';
 import {
   SETRESULT,
   SETRESULT_METADATA,
+  __beginResultScope,
   __consumeResult,
   __resetResult,
 } from './control/setresult.js';
@@ -54,6 +55,7 @@ export { ARRAY, ARRAY_METADATA } from './logical/array.js';
 export {
   SETRESULT,
   SETRESULT_METADATA,
+  __beginResultScope,
   __consumeResult,
   __resetResult,
 } from './control/setresult.js';
