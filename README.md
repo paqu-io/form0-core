@@ -172,6 +172,18 @@ Record utilities follow this contract:
 
 Record status remains top-level as `@status`; it is not stored inside `form_values`.
 
+## Authoring mutation validation
+
+`getFormAuthoringContext({ schema })` includes `mutationOperationCatalog`: the installed operation
+formats, required parameters, and examples. `mutationOperations` remains the list of supported names.
+Use these formats with `applyFormMutationBatch`; for example, a rename uses
+`{ op: 'updateForm', changes: { name: 'Renamed form' } }`, not a `patch` parameter.
+
+Malformed operations, unknown operation parameters, and empty change objects are rejected atomically
+with diagnostics, rather than silently ignored. Clearing a title/status field, calculation, or event
+code requires its explicit parameter (for example, `field: null`), not an omitted value. Valid
+idempotent batches remain valid in core; consumers should check actual changes before offering to save.
+
 ## ✅ Requirements
 
 - Node.js 22 or newer

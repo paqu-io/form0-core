@@ -16,17 +16,77 @@ import {
 } from '../utilities/form-event-editor.js';
 
 const CONTAINER_TYPES = new Set(['Section', 'RepeatableSection', 'BuildingPlanSection']);
-const MUTATION_OPERATIONS = Object.freeze([
-  'updateForm',
-  'addField',
-  'updateField',
-  'moveField',
-  'removeField',
-  'setTitleField',
-  'setStatusField',
-  'setCalculation',
-  'setFormEventCode',
+const FIELD_KEY_PARAMETER = Object.freeze({ type: 'string', minLength: 1 });
+const CHANGES_PARAMETER = Object.freeze({ type: 'object', minProperties: 1 });
+const PLACEMENT_PARAMETERS = Object.freeze({
+  parentKey: { type: ['string', 'null'], minLength: 1 },
+  position: {
+    type: ['object', 'null'],
+    properties: { beforeKey: FIELD_KEY_PARAMETER, afterKey: FIELD_KEY_PARAMETER },
+    maxProperties: 1,
+    description: 'Use one sibling key, or omit position to append in the target container.',
+  },
+});
+const MUTATION_OPERATION_CATALOG = Object.freeze([
+  {
+    op: 'updateForm',
+    description:
+      'Update form attributes; elements, events, title_field and status_field use dedicated operations.',
+    required: ['changes'],
+    parameters: { changes: CHANGES_PARAMETER },
+    example: { op: 'updateForm', changes: { name: 'Renamed form' } },
+  },
+  {
+    op: 'addField',
+    description: 'Add a complete field matching fieldSpecs; missing keys are generated.',
+    required: ['field'],
+    parameters: { field: { type: 'object', minProperties: 1 }, ...PLACEMENT_PARAMETERS },
+  },
+  {
+    op: 'updateField',
+    description: 'Update an existing field by key; type changes require remove/add.',
+    required: ['fieldKey', 'changes'],
+    parameters: { fieldKey: FIELD_KEY_PARAMETER, changes: CHANGES_PARAMETER },
+    example: { op: 'updateField', fieldKey: 'existing-field-key', changes: { label: 'New label' } },
+  },
+  {
+    op: 'moveField',
+    description: 'Move an existing field by key to a container/sibling position.',
+    required: ['fieldKey'],
+    parameters: { fieldKey: FIELD_KEY_PARAMETER, ...PLACEMENT_PARAMETERS },
+  },
+  {
+    op: 'removeField',
+    description: 'Remove an existing field by key only if it is unreferenced.',
+    required: ['fieldKey'],
+    parameters: { fieldKey: FIELD_KEY_PARAMETER },
+  },
+  {
+    op: 'setTitleField',
+    description: 'Set a complete title field, or explicitly pass field: null to clear it.',
+    required: ['field'],
+    parameters: { field: { type: ['object', 'null'] } },
+  },
+  {
+    op: 'setStatusField',
+    description: 'Set a complete status field, or explicitly pass field: null to clear it.',
+    required: ['field'],
+    parameters: { field: { type: ['object', 'null'] } },
+  },
+  {
+    op: 'setCalculation',
+    description: 'Set a CalculatedField expression by key; null explicitly clears it.',
+    required: ['fieldKey', 'expression'],
+    parameters: { fieldKey: FIELD_KEY_PARAMETER, expression: { type: ['string', 'null'] } },
+  },
+  {
+    op: 'setFormEventCode',
+    description: 'Set form event code; an empty string or null explicitly clears it.',
+    required: ['code'],
+    parameters: { code: { type: ['string', 'null'] } },
+  },
 ]);
+const MUTATION_OPERATIONS = Object.freeze(MUTATION_OPERATION_CATALOG.map(({ op }) => op));
 
 const CALCULATION_GUIDANCE = Object.freeze({
   version: 1,
@@ -306,16 +366,66 @@ function mutationError(index, operation, error) {
   };
 }
 
+function validateMutationParameter(value, spec, path) {
+  const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  const types = Array.isArray(spec.type) ? spec.type : [spec.type];
+  if (!types.includes(type)) throw new Error(`${path} must be ${types.join(' or ')}`);
+  if (value === null) return;
+  if (spec.minLength && value.length < spec.minLength) {
+    throw new Error(`${path} must not be empty`);
+  }
+  if (spec.minProperties && Object.keys(value).length < spec.minProperties) {
+    throw new Error(`${path} must be a non-empty object`);
+  }
+  if (spec.maxProperties && Object.keys(value).length > spec.maxProperties) {
+    throw new Error(`${path} must specify at most one property`);
+  }
+  if (spec.properties) {
+    for (const key of Object.keys(value)) {
+      if (!Object.hasOwn(spec.properties, key)) {
+        throw new Error(`Unexpected mutation parameter '${path}.${key}'`);
+      }
+      validateMutationParameter(value[key], spec.properties[key], `${path}.${key}`);
+    }
+  }
+}
+
+function validateMutationOperation(operation) {
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
+    throw new Error('A mutation operation must be an object with an op property');
+  }
+  const definition = MUTATION_OPERATION_CATALOG.find(({ op }) => op === operation.op);
+  if (!definition) throw new Error(`Unsupported mutation operation '${operation.op}'`);
+  for (const name of definition.required) {
+    if (!Object.hasOwn(operation, name) || operation[name] === undefined) {
+      const example = definition.example ? ` Example: ${JSON.stringify(definition.example)}` : '';
+      throw new Error(`${operation.op} requires '${name}'.${example}`);
+    }
+  }
+  for (const name of Object.keys(operation)) {
+    if (name === 'op') continue;
+    if (!Object.hasOwn(definition.parameters, name)) {
+      throw new Error(`Unexpected ${operation.op} parameter '${name}'`);
+    }
+    validateMutationParameter(
+      operation[name],
+      definition.parameters[name],
+      `${operation.op}.${name}`
+    );
+  }
+}
+
 function applyMutation(root, operation) {
+  validateMutationOperation(operation);
   const form = root.form;
   const fields = indexFields(form.elements);
   switch (operation.op) {
     case 'updateForm': {
       const forbidden = new Set(['elements', 'events', 'title_field', 'status_field']);
-      for (const key of Object.keys(operation.changes || {})) {
+      for (const key of Object.keys(operation.changes)) {
         if (forbidden.has(key)) throw new Error(`updateForm cannot change '${key}'`);
       }
-      Object.assign(form, deepClone(operation.changes || {}));
+      Object.assign(form, deepClone(operation.changes));
       return `Updated form attributes`;
     }
     case 'addField': {
@@ -340,7 +450,7 @@ function applyMutation(root, operation) {
       }
       const original = deepClone(target.field);
       const children = target.field.elements;
-      Object.assign(target.field, deepClone(operation.changes || {}));
+      Object.assign(target.field, deepClone(operation.changes));
       if (
         target.field.data_name !== original.data_name &&
         [...fields.values()].some(
@@ -473,6 +583,7 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
     revision: getFormSchemaRevision(root),
     schema: deepClone(root),
     mutationOperations: [...MUTATION_OPERATIONS],
+    mutationOperationCatalog: deepClone(MUTATION_OPERATION_CATALOG),
     fieldSpecs,
     operators,
     eventTypes: getAllEventTypes(),
