@@ -61,6 +61,55 @@ first suggests.
 Please wait for a maintainer response before starting substantial work. Nobody
 enjoys closing a large pull request that was heading somewhere we cannot merge.
 
+### Proposing a builtin
+
+Builtins are the uppercase functions every form can call, such as `IF()` or
+`DATEADD()`. Each one is a long-term commitment for every host that runs form0,
+so start small:
+
+1. **Try it as a helper first.** Pass your function to the engine and call it
+   from a calculation or an event handler:
+
+   ```js
+   const engine = createFormEngine({
+     schema,
+     helpers: { vat: (amount) => amount * 0.22 },
+   });
+   // in a calculation: vat($net_amount)
+   ```
+
+   Use a lowercase name. Uppercase names are reserved for builtins, and the
+   engine rejects uppercase calls that are not in the builtin catalog. If only
+   your forms need the function, you can stop here.
+
+2. **Check that it belongs in core.** A good builtin is useful across many kinds
+   of forms, is deterministic, does no I/O, adds no dependencies, and behaves
+   the same in Node.js, browsers and Hermes, the JavaScript engine of React
+   Native.
+3. **Open an issue** with:
+   - the name, in `UPPER_SNAKE_CASE`, and its signature;
+   - where it runs: calculations, event handlers, or both;
+   - two or three examples in form0 syntax (`$data_name`), with the results you
+     expect;
+   - edge cases, such as blank values, wrong types and out-of-range input;
+   - the helper you use today, if you have one.
+
+Once the proposal is agreed, the pull request usually touches:
+
+- **`src/builtins/builtin-definitions.js`** — the catalog entry: name,
+  category, signature, description, examples and contexts. The catalog is the
+  single source of truth and must not import any implementation.
+- **`src/builtins/<category>/`** — the implementation, with a short JSDoc block:
+  `@builtin`, a pointer to the catalog, and `@param`/`@returns` types only.
+- **`src/builtins/registry.js`** — the new entry in `RUNTIME_ENTRIES`.
+- **`tests/`** — tests for the behaviour and its edge cases.
+  `tests/builtin-catalog-examples.test.js` already checks that your catalog
+  examples parse and validate.
+
+The reference page for the builtin lives in
+[form0-docs-zudoku](https://github.com/paqu-io/form0-docs-zudoku). Write it in
+English; maintainers handle the translations.
+
 ## Making a change
 
 ```bash
