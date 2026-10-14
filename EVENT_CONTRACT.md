@@ -42,8 +42,12 @@ by the host can be read in managed execution. Programmatic writes still emit no 
 
 The managed dispatcher owns `event.type`, `fieldKey`, `timestamp`, `instancePath` and `scopeId`.
 Application metadata cannot replace them. The same metadata snapshot is copied independently for
-each handler. Plain objects, arrays, dates and scalar values are portable event data; functions,
-symbols and other object types are rejected instead of silently serialized.
+each handler. Plain objects, arrays, dates, scalar values and runtime-native File/Blob media handles are portable
+event data; functions,
+symbols and other object types are rejected instead of silently serialized. Media handles retain
+their immutable binary content and standard file metadata in defensive copies; arbitrary custom
+properties on the handles are outside their native serialization contract. Async schema handlers
+remain unsupported. This media compatibility correction requires the core patch following 0.5.0.
 
 ## Engine-bound ownership
 
