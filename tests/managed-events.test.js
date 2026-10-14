@@ -414,4 +414,58 @@ for (const [code, type, expected] of [
   assert.equal(result.operations[1].params.valueToSet, 10);
 }
 
+// Media-bearing forms retain native binary data through managed validation and defensive operations.
+{
+  const file = new File(['image bytes'], 'image.jpg', { type: 'image/jpeg', lastModified: 1234 });
+  const photo = {
+    type: 'PhotoField',
+    key: 'photo',
+    data_name: 'photo',
+    label: 'photo',
+    display: 'default',
+    description: null,
+    description_mode: null,
+    required: false,
+    required_conditions: null,
+    visible: true,
+    visible_conditions: null,
+    read_only: false,
+    read_only_conditions: null,
+    default_value: null,
+    min_length: null,
+    max_length: null,
+  };
+  const original = [{ photo_id: 'media-A', media_id: 'media-A', url: 'blob:image', file }];
+  const engine = createFormEngine({
+    schema: formSchema([photo], {
+      events: {
+        code: `
+      ON('validate-record', function() { if ($photo[0].file.name !== 'image.jpg') INVALID('Wrong file.'); });
+      ON('save-record', function() { SETVALUE('photo', $photo); });
+    `,
+      },
+    }),
+    initialValues: { photo: original },
+    diagnostics: { console: false },
+  });
+  engine.eval();
+  const validation = engine.triggerDetailed('validate-record');
+  assert.deepEqual(validation.issues, []);
+  assert.deepEqual(validation.validationIssues, []);
+  const operation = engine.triggerDetailed('save-record').operations[0];
+  const copied = operation.params.valueToSet[0].file;
+  assert.notEqual(copied, file);
+  assert.equal(copied.name, 'image.jpg');
+  assert.equal(copied.lastModified, 1234);
+  assert.equal(copied.type, 'image/jpeg');
+  assert.equal(await copied.text(), 'image bytes');
+  copied.extra = 'observer-owned';
+  assert.equal(file.extra, undefined);
+  assert.equal(engine.getState().values.photo[0].file, file);
+  assert.equal(engine.getState().values.photo[0].media_id, 'media-A');
+  const blob = new Blob(['opaque bytes'], { type: 'application/octet-stream' });
+  const detail = engine.triggerDetailed('load-record', undefined, { blob });
+  assert.deepEqual(detail.issues, []);
+}
+
 console.log('Managed event tests passed.');
