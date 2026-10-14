@@ -23,6 +23,9 @@ export const EVENT_REGISTRY = {
   'new-record': { category: 'record', scope: 'main' },
   'save-record': { category: 'record', scope: 'main' },
   'validate-record': { category: 'record', scope: 'main' },
+  'unload-record': { category: 'record', scope: 'main' },
+  'cancel-record': { category: 'record', scope: 'main' },
+  'change-status': { category: 'record', scope: 'main' },
 
   // Field-level events (contextual scope)
   change: { category: 'field', scope: 'contextual' },
@@ -36,6 +39,8 @@ export const EVENT_REGISTRY = {
   'edit-repeatable': { category: 'repeatable', scope: 'repeatable' },
   'save-repeatable': { category: 'repeatable', scope: 'repeatable' },
   'validate-repeatable': { category: 'repeatable', scope: 'repeatable' },
+  'unload-repeatable': { category: 'repeatable', scope: 'repeatable' },
+  'cancel-repeatable': { category: 'repeatable', scope: 'repeatable' },
 };
 
 /**
@@ -44,7 +49,9 @@ export const EVENT_REGISTRY = {
  * @returns {Object} Event info with category and scope, or default for unknown events
  */
 export function getEventInfo(eventType) {
-  return EVENT_REGISTRY[eventType] || { category: 'unknown', scope: 'main' };
+  return Object.hasOwn(EVENT_REGISTRY, eventType)
+    ? EVENT_REGISTRY[eventType]
+    : { category: 'unknown', scope: 'main' };
 }
 
 /**
@@ -53,7 +60,7 @@ export function getEventInfo(eventType) {
  * @returns {boolean} True if the event type is registered
  */
 export function isValidEventType(eventType) {
-  return eventType in EVENT_REGISTRY;
+  return Object.hasOwn(EVENT_REGISTRY, eventType);
 }
 
 /**

@@ -20,6 +20,7 @@ const [{ files }] = JSON.parse(output);
 const paths = files.map(({ path }) => path);
 
 const forbiddenPatterns = [
+  /^EVENT_CONTRACT\.md$/,
   /^\.env(?:\.|$)/,
   /^\.github\//,
   /^analyses\//,

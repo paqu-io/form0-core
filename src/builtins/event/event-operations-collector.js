@@ -8,6 +8,7 @@ let boundScope = null;
 export function __collectEventOperation(operation) {
   const scope = boundScope || activeScope;
   scope?.collect(operation);
+  return Boolean(scope);
 }
 
 /**

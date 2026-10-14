@@ -195,13 +195,22 @@ export class WarningSystem {
    * @param {Object} warning - Warning object
    */
   notifyCustomHandlers(warning, options = {}) {
+    const reportFailure = (error) => {
+      if (options.console ?? this.enableConsoleWarnings) {
+        try {
+          console.error('[form0] Warning handler failed:', error);
+        } catch {
+          // Reporting is observational, including a failed console adapter.
+        }
+      }
+    };
     for (const handler of this.warningHandlers) {
       try {
-        handler(warning);
+        const result = handler(warning);
+        if (result && typeof result.then === 'function')
+          Promise.resolve(result).catch(reportFailure);
       } catch (err) {
-        if (options.console ?? this.enableConsoleWarnings) {
-          console.error('[form0] Warning handler failed:', err);
-        }
+        reportFailure(err);
         // Don't remove the handler automatically - let the user decide
       }
     }

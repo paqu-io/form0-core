@@ -27,6 +27,7 @@ export class EventManager {
     this.warningSystem = warningSystem || new WarningSystem();
     this.schema = schema;
     this.callbackSources = createEventSourceRegistry();
+    this.initializationIssues = [];
   }
 
   /**
@@ -64,11 +65,28 @@ export class EventManager {
       const result = runInEventOperationScope(scope, () =>
         runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
           sourceExpression: code,
+          onDiagnostic: (diagnostic) =>
+            this.initializationIssues.push({
+              code: 'initialization_failed',
+              message: diagnostic.message,
+            }),
         })
       );
-      this.reportAsyncHandlerResult(result, executionContext, 'form.events.code');
+      if (this.reportAsyncHandlerResult(result, executionContext, 'form.events.code')) {
+        this.initializationIssues.push({
+          code: 'async_handler_unsupported',
+          message: 'Event initialization must be synchronous.',
+        });
+      }
     } finally {
-      this.processEventOperations(closeEventOperationScope(scope));
+      const operations = closeEventOperationScope(scope);
+      if (operations.some((operation) => operation?.operation === 'INVALID')) {
+        this.initializationIssues.push({
+          code: 'invalid_context',
+          message: 'INVALID() cannot run while registering event handlers.',
+        });
+      }
+      this.processEventOperations(operations);
     }
   }
 
@@ -114,7 +132,7 @@ export class EventManager {
       then = result.then;
     } catch {
       this.emitHandlerWarning('async_handler_rejected', executionContext, handlerName);
-      return;
+      return true;
     }
 
     if (typeof then !== 'function') return;
@@ -123,6 +141,7 @@ export class EventManager {
     Promise.resolve(result).catch(() => {
       this.emitHandlerWarning('async_handler_rejected', executionContext, handlerName);
     });
+    return true;
   }
 
   /**
@@ -249,7 +268,7 @@ export class EventManager {
    * @param {Object} event - The event object
    * @returns {*} The result of the event handler
    */
-  executeHandlerWithContext(callback, event, scope) {
+  executeHandlerWithContext(callback, event, scope, managed = null) {
     // Create execution context for this event
     const executionContext = {
       type: 'event',
@@ -258,11 +277,13 @@ export class EventManager {
     };
 
     // Get the callback code for field reference analysis
-    const callbackCode = this.callbackSources.getSource(callback);
+    const callbackCode = managed?.source ?? this.callbackSources.getSource(callback);
 
     // Build scoped context if context resolver is available
     let contextWithEvent;
-    if (this.contextResolver && this.warningSystem) {
+    if (managed) {
+      contextWithEvent = managed.context;
+    } else if (this.contextResolver && this.warningSystem) {
       contextWithEvent = this.buildScopedEventContext(
         this.eventContext,
         executionContext,
@@ -285,6 +306,7 @@ export class EventManager {
     return runInEventOperationScope(scope, () =>
       runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema, {
         evaluateAsExpression: true,
+        ...(managed?.reporting || {}),
       })
     );
   }

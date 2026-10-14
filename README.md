@@ -79,12 +79,50 @@ console.log(engine.getState());
 ```
 
 The engine API exposes `eval()` for calculations, conditions, and validation; `trigger()` for form
-events; and `getState()` for current values and evaluated field state.
+events; `triggerDetailed()` for managed events and custom validation; and `getState()` for current
+values and evaluated field state.
 
 Schema event callbacks retain their authored source, so ordinary functions and arrows defined in
 `form.events.code` also work on Hermes. Each dispatch uses current scoped field values; initialization
 runs once. Local initialization variables are not captured. Callbacks supplied by host helpers still
 require executable `toString()` output; unavailable source produces an event warning.
+
+## Managed events and custom validation
+
+Use synchronous `engine.triggerDetailed(eventType, fieldDataName, metadata)` to receive defensive
+`operations`, `validationIssues` and execution `issues`. It does not evaluate, apply operations,
+persist or close an editor. Inspect issues before applying a batch; execution failures return no
+applicable operations. The existing `trigger()` operation-array interface retains its legacy behavior.
+
+```js
+// In schema.form.events.code:
+ON('validate-record', function (event) {
+  if ($amount < 4) INVALID('Amount must be at least four.');
+});
+
+// In the host, after evaluating the intended snapshot:
+const result = engine.triggerDetailed('validate-record', undefined, {
+  isDraft: false,
+  isValid: true,
+});
+console.log(result.validationIssues);
+```
+
+`INVALID()` requires a nonempty string and is valid only during managed validation. Findings remain
+separate from intrinsic field errors and calculation diagnostics. Validation handlers cannot return
+value or UI operations; cancel/unload handlers are read-only notifications. Promise-returning schema
+handlers are rejected, and late operations cannot enter a later dispatch.
+
+Root scope defaults to `[]`. Headless row engines must provide `eventScope.instancePath` at creation,
+using complete repeatable keys and existing IDs (or explicit positional identity). Managed row
+handlers can read current, ancestor and main fields supplied by the host, but `SETVALUE()` writes
+only current-row fields. Dispatch metadata cannot replace engine scope or event identity.
+
+See [the maintained event contract](https://github.com/paqu-io/form0-core/blob/main/EVENT_CONTRACT.md)
+for routing, supported events, metadata,
+failure behavior and the subsequent binding adoption. Core does not introduce automatic renderer
+lifecycle or save preparation by itself. Applications retain persistence and closing ownership;
+`save-*` events are pre-save, with no `saved-*` schema events.
 
 ## Calculation diagnostics
 
