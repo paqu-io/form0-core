@@ -85,3 +85,4 @@ export {
   validateFormAuthoringSchema,
   applyFormMutationBatch,
 } from './authoring/form-authoring.js';
+export { INVALID } from './builtins/event/control/invalid.js';

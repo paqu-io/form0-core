@@ -1,0 +1,238 @@
+import { getEventInfo, isValidEventType } from './event-registry.js';
+import { closeEventOperationScope, createEventOperationScope } from './event-operation-scope.js';
+import { getEventFieldReferences } from './event-field-references.js';
+
+// Portable defensive copies also work in runtimes without structuredClone (including Hermes).
+function copy(value, seen = new Map()) {
+  if (typeof value === 'function' || typeof value === 'symbol')
+    throw new Error('Event data must not contain functions or symbols.');
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) return seen.get(value);
+  if (value instanceof Date) return new Date(value.getTime());
+  if (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+    throw new Error('Event data must use plain objects, arrays or dates.');
+  const result = Array.isArray(value) ? [] : {};
+  seen.set(value, result);
+  for (const key of Object.keys(value)) {
+    Object.defineProperty(result, key, {
+      value: copy(value[key], seen),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return result;
+}
+
+/** Internal adapter; the public synchronous API is engine.triggerDetailed(). */
+export function createManagedEventDispatcher(manager, constructionScope) {
+  const instancePath = copy(constructionScope?.instancePath);
+  const scopeId = constructionScope?.scopeId;
+  if (scopeId !== undefined && (typeof scopeId !== 'string' || !scopeId.trim()))
+    throw new Error('eventScope.scopeId must be a nonempty string when supplied.');
+  const resolver = manager.contextResolver;
+  const fields = new Map(resolver.fieldOwnership);
+  const statusField = manager.schema?.status_field;
+  if (statusField?.enabled && typeof statusField.data_name === 'string')
+    fields.set(statusField.data_name, { field: statusField, parentPath: [] });
+  if (!Array.isArray(instancePath)) throw new Error('eventScope.instancePath must be an array.');
+  const ownershipPath = [];
+  for (const segment of instancePath) {
+    const repeatable = [...resolver.repeatableSectionTree.values()].find(
+      (entry) =>
+        entry.preferredKey === segment?.repeatableKey &&
+        JSON.stringify(entry.parentPath) === JSON.stringify(ownershipPath)
+    );
+    if (
+      !repeatable ||
+      JSON.stringify(repeatable.parentPath) !== JSON.stringify(ownershipPath) ||
+      !Number.isInteger(segment.index) ||
+      segment.index < 0 ||
+      !['id', 'position'].includes(segment.identity) ||
+      (segment.identity === 'id'
+        ? !(typeof segment.instanceId === 'string' && segment.instanceId.trim()) &&
+          !(typeof segment.instanceId === 'number' && Number.isFinite(segment.instanceId))
+        : segment.instanceId !== null)
+    ) {
+      throw new Error(
+        'eventScope.instancePath must describe a complete repeatable ancestry with an ID or explicit positional identity.'
+      );
+    }
+    ownershipPath.push(repeatable.preferredKey);
+  }
+  const same = (path) => JSON.stringify(path) === JSON.stringify(ownershipPath);
+  const readable = (path) =>
+    path.length <= ownershipPath.length && path.every((key, index) => ownershipPath[index] === key);
+  const ownedField = (name) => fields.get(name) || resolver.repeatableSectionTree.get(name);
+  const referenceCache = new WeakMap();
+  return function dispatch(eventType, fieldKey, metadata = {}) {
+    const result = { operations: [], validationIssues: [], issues: [] };
+    const issue = (code, message) =>
+      result.issues.push({
+        code,
+        message,
+        eventType: typeof eventType === 'string' ? eventType : null,
+        instancePath: copy(instancePath),
+      });
+    if (
+      typeof eventType !== 'string' ||
+      !isValidEventType(eventType) ||
+      !metadata ||
+      typeof metadata !== 'object' ||
+      Array.isArray(metadata)
+    ) {
+      issue('invalid_request', 'A registered event type and metadata object are required.');
+      return result;
+    }
+    const info = getEventInfo(eventType);
+    const target = ownedField(fieldKey);
+    const routeValid =
+      info.category === 'record'
+        ? ownershipPath.length === 0 &&
+          (fieldKey === undefined ||
+            fieldKey === null ||
+            (eventType === 'change-status' &&
+              statusField?.enabled &&
+              fieldKey === statusField.data_name))
+        : info.category === 'repeatable'
+          ? resolver.repeatableSectionTree.has(fieldKey) && same(target.currentPath)
+          : typeof fieldKey === 'string' && target && same(target.parentPath);
+    if (!routeValid) {
+      issue(
+        'invalid_routing_context',
+        'The event target is not owned by the executing engine scope.'
+      );
+      return result;
+    }
+    for (const initializationIssue of manager.initializationIssues)
+      issue(initializationIssue.code, initializationIssue.message);
+    if (result.issues.length) return result;
+    let event;
+    try {
+      event = {
+        ...copy(metadata),
+        type: eventType,
+        fieldKey,
+        timestamp: Date.now(),
+        instancePath: copy(instancePath),
+        scopeId,
+      };
+    } catch {
+      issue('invalid_request', 'Event metadata must contain portable data.');
+      return result;
+    }
+    const validation = eventType === 'validate-record' || eventType === 'validate-repeatable';
+    const closing = /^(cancel|unload)-/.test(eventType);
+    const eventMap = manager.listeners.get(eventType);
+    const listeners = [...(eventMap?.get(fieldKey) || []), ...(eventMap?.get('*') || [])];
+    for (const callback of listeners) {
+      const scope = createEventOperationScope((operationName) => {
+        // Late async work cannot mutate this completed result or break another dispatch.
+        try {
+          manager.emitHandlerWarning(
+            'late_event_operation_discarded',
+            { type: 'event', eventType, fieldName: fieldKey || null },
+            callback.name || '<anonymous>',
+            operationName
+          );
+        } catch {
+          /* Reporting is observational. */
+        }
+      });
+      let returned;
+      let collected;
+      try {
+        const source = manager.callbackSources.getSource(callback);
+        if (referenceCache.get(callback)?.source !== source)
+          referenceCache.set(callback, { source, references: getEventFieldReferences(source) });
+        let rejectedReference = false;
+        for (const name of referenceCache.get(callback).references) {
+          const field = fields.get(name);
+          if (!field || !readable(field.parentPath)) {
+            issue(
+              'read_scope_restricted',
+              `Field '${name}' is not readable from the executing scope.`
+            );
+            rejectedReference = true;
+          }
+        }
+        if (rejectedReference) continue;
+        const context = { event: copy(event) };
+        for (const [key, value] of Object.entries(manager.eventContext)) {
+          if (!key.startsWith('$')) context[key] = value;
+          else {
+            const field = fields.get(key.slice(1));
+            if (field && readable(field.parentPath)) context[key] = copy(value);
+          }
+        }
+        context.event = copy(event);
+        returned = manager.executeHandlerWithContext(callback, event, scope, {
+          source,
+          context,
+          reporting: {
+            suppressConsoleWarning: true,
+            onDiagnostic: (diagnostic) => issue('handler_failed', diagnostic.message),
+            evalReporting: {
+              suppressConsole: true,
+              onDiagnostic: (diagnostic) => issue('read_scope_restricted', diagnostic.message),
+            },
+          },
+        });
+        if (returned && typeof returned.then === 'function') {
+          issue('async_handler_unsupported', 'Managed schema handlers must be synchronous.');
+          Promise.resolve(returned).catch(() => {});
+        }
+      } catch {
+        issue('handler_failed', 'The managed event handler failed.');
+      } finally {
+        collected = closeEventOperationScope(scope);
+      }
+      try {
+        if (returned?.type === 'UI_OPERATION' && !collected.includes(returned))
+          collected.push(copy(returned));
+      } catch {
+        issue('invalid_operation', 'The returned event operation must contain portable data.');
+      }
+      for (const operation of collected) {
+        if (operation?.type === 'EVENT_OPERATION') continue;
+        if (operation?.operation === 'INVALID') {
+          if (!validation)
+            issue('invalid_context', 'INVALID() is only available during managed validation.');
+          else
+            result.validationIssues.push({
+              message: operation.params.message,
+              instancePath: copy(instancePath),
+            });
+        } else if (validation || closing) {
+          issue(
+            'operation_not_allowed',
+            'Validation and close handlers cannot perform value or UI operations.'
+          );
+        } else if (operation?.type === 'FIELD_OPERATION' && operation.operation === 'SETVALUE') {
+          const field = fields.get(operation.params?.fieldDataName);
+          if (!field || !same(field.parentPath))
+            issue(
+              'write_scope_restricted',
+              'SETVALUE() may only write fields owned by the executing scope.'
+            );
+          else {
+            try {
+              result.operations.push(copy(operation));
+            } catch {
+              issue('invalid_operation', 'Event operations must contain portable data.');
+            }
+          }
+        } else {
+          try {
+            result.operations.push(copy(operation));
+          } catch {
+            issue('invalid_operation', 'Event operations must contain portable data.');
+          }
+        }
+      }
+    }
+    // A failed managed dispatch is not a partially applicable operation batch.
+    if (result.issues.length) result.operations = [];
+    return copy(result);
+  };
+}

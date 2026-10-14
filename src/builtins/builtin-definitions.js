@@ -272,6 +272,18 @@ export const OFF_METADATA = defineBuiltinMetadata({
   contexts: [BUILTIN_CONTEXTS.EVENT],
 });
 
+export const INVALID_METADATA = defineBuiltinMetadata({
+  name: 'INVALID',
+  category: 'event',
+  signature: 'INVALID(message)',
+  description:
+    'Report a scope-level custom validation message during managed validate-record or validate-repeatable execution. Requires a nonempty string; does not modify field errors.',
+  examples: [
+    "ON('validate-record', function(event) { if ($amount < 4) INVALID('Amount must be at least four.'); })",
+  ],
+  contexts: [BUILTIN_CONTEXTS.EVENT],
+});
+
 export const BUILTIN_DEFINITIONS = Object.freeze([
   IF_METADATA,
   AND_METADATA,
@@ -302,6 +314,7 @@ export const BUILTIN_DEFINITIONS = Object.freeze([
   SETVALUE_METADATA,
   ON_METADATA,
   OFF_METADATA,
+  INVALID_METADATA,
 ]);
 
 function filterDefinitionsByContext(context) {

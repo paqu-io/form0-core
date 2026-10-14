@@ -3,7 +3,7 @@ import {
   __runWithEventOperationScope,
 } from '../builtins/event/event-operations-collector.js';
 
-const EVENT_OPERATION_BUILTINS = ['ALERT', 'SETVALUE', 'ON', 'OFF'];
+const EVENT_OPERATION_BUILTINS = ['ALERT', 'SETVALUE', 'ON', 'OFF', 'INVALID'];
 
 /**
  * Create an operation scope owned by one synchronous event execution.

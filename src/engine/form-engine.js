@@ -15,6 +15,7 @@ import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
 import { buildCalculationDependencyPlan } from '../utilities/calculation-dependencies.js';
 import { createCalculationDiagnostics } from './calculation-diagnostics.js';
 import { formatLocalDate } from '../utilities/date-utils.js';
+import { createManagedEventDispatcher } from './managed-events.js';
 
 /**
  * @typedef {Object} CalculationDiagnostic
@@ -25,6 +26,23 @@ import { formatLocalDate } from '../utilities/date-utils.js';
  * @property {'dependency'|'scope'|'validation'|'syntax'|'runtime'} phase
  * @property {string|null} suggestion
  * @property {Object} context JSON-safe metadata; no expression source, values or stack.
+ */
+
+/**
+ * @typedef {Object} ManagedValidationIssue
+ * @property {string} message Scope-level message, without an invented field association.
+ * @property {Object[]} instancePath Complete engine-owned row ancestry; [] for root.
+ *
+ * @typedef {Object} ManagedEventIssue
+ * @property {string} code Stable execution failure identifier.
+ * @property {string} message
+ * @property {string|null} eventType Null for a malformed event-type argument.
+ * @property {Object[]} instancePath
+ *
+ * @typedef {Object} ManagedEventResult
+ * @property {Object[]} operations Defensive accepted operation batch; [] on execution failure.
+ * @property {ManagedValidationIssue[]} validationIssues Fresh findings for this attempt.
+ * @property {ManagedEventIssue[]} issues Execution failures, separate from validation findings.
  */
 
 /**
@@ -40,6 +58,9 @@ import { formatLocalDate } from '../utilities/date-utils.js';
  * @param {{console?: boolean}} [options.diagnostics] Omit console to preserve legacy reporting.
  * @param {(snapshot: CalculationDiagnostic[]) => (void|Promise<void>)} [options.onDiagnostics]
  * Called once per completed evaluation, including empty/identical snapshots. Failures are isolated.
+ * @param {{scopeId?: string, instancePath: Array<{repeatableKey: string, instanceId: string|number|null, index: number, identity: 'id'|'position'}>}} [options.eventScope]
+ * Managed event ownership, fixed for this engine lifetime. Root is []; headless row engines must
+ * provide the complete repeatable path. triggerDetailed() never evaluates or applies operations.
  * @returns {Object} Engine with getDiagnostics(): defensive copy of latest evaluation (initially []).
  */
 
@@ -52,6 +73,7 @@ export function createFormEngine({
   runtimeDiagnostics = null,
   diagnostics = {},
   onDiagnostics = null,
+  eventScope = { instancePath: [] },
 }) {
   const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
@@ -139,6 +161,7 @@ export function createFormEngine({
   const eventManager = new EventManager(form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...eventBuiltins, ...helpers };
+  const dispatchManagedEvent = createManagedEventDispatcher(eventManager, eventScope);
 
   // Initialize event code if present
   if (form.events && form.events.code) {
@@ -199,9 +222,22 @@ export function createFormEngine({
     return { values, errors, visible, required, read_only };
   }
 
+  /**
+   * Dispatch synchronously within this engine's construction scope. No operations are applied.
+   * @param {string} eventType Registered event name.
+   * @param {string} [fieldKey] Field/repeatable data_name; omitted for record lifecycle events.
+   * @param {Object} [metadata] Portable host metadata; dispatcher-owned identity is authoritative.
+   * @returns {ManagedEventResult}
+   */
+  function triggerDetailed(eventType, fieldKey, metadata = {}) {
+    eventManager.eventContext = buildEventContext(values, eventHelpers, {});
+    return dispatchManagedEvent(eventType, fieldKey, metadata);
+  }
+
   return {
     eval: evalForm,
     trigger,
+    triggerDetailed,
     getState,
     getDiagnostics: calculationDiagnostics.getSnapshot,
     getWarningSystem: () => sharedWarningSystem,

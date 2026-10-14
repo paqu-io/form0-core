@@ -44,6 +44,7 @@ import { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 import { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 import { ON, ON_METADATA } from './event/control/on.js';
 import { OFF, OFF_METADATA } from './event/control/off.js';
+import { INVALID, INVALID_METADATA } from './event/control/invalid.js';
 
 export { IF, IF_METADATA } from './logical/if.js';
 export { AND, AND_METADATA } from './logical/and.js';
@@ -86,6 +87,7 @@ export { ALERT, ALERT_METADATA } from './event/ui/alert.js';
 export { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
+export { INVALID, INVALID_METADATA } from './event/control/invalid.js';
 
 const RUNTIME_ENTRIES = Object.freeze([
   { implementation: IF, definition: IF_METADATA },
@@ -117,6 +119,7 @@ const RUNTIME_ENTRIES = Object.freeze([
   { implementation: SETVALUE, definition: SETVALUE_METADATA },
   { implementation: ON, definition: ON_METADATA },
   { implementation: OFF, definition: OFF_METADATA },
+  { implementation: INVALID, definition: INVALID_METADATA },
 ]);
 
 function buildBuiltinObject(context) {
