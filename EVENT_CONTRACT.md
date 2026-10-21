@@ -186,7 +186,9 @@ styling remain separate.
 ## Delivery and acceptance
 
 Deliver and publish core first, then adopt the actual released minimum in bindings and CLI tooling.
-CLI adoption recognizes the new builtin; it adds no lifecycle interface. Use independent dependency
+CLI tooling recognizes the new builtin. The follow-up built-in browser preview adopts opt-in
+lifecycle, scoped dispatch and save preparation; standalone CLI commands keep their existing
+reporting/outcome contract. Preview connector persistence remains host-owned. Use independent dependency
 trees, real engine/worker conformance tests, package/packed-consumer checks and explicit CodeQL
 finding review. Fresh browser main-thread, actual browser-worker and Android/Hermes manual acceptance
 is required for binding adoption; earlier diagnostic acceptance does not count as event acceptance.
