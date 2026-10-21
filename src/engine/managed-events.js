@@ -9,8 +9,14 @@ function copy(value, seen = new Map()) {
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return seen.get(value);
   if (value instanceof Date) return new Date(value.getTime());
+  // Media controls retain native binary handles. Copy their immutable data and standard metadata
+  // without serializing custom properties or loading the bytes into JavaScript memory.
+  if (typeof File === 'function' && value instanceof File)
+    return new File([value], value.name, { type: value.type, lastModified: value.lastModified });
+  if (typeof Blob === 'function' && value instanceof Blob)
+    return Blob.prototype.slice.call(value, 0, value.size, value.type);
   if (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
-    throw new Error('Event data must use plain objects, arrays or dates.');
+    throw new Error('Event data must use plain objects, arrays, dates or native media handles.');
   const result = Array.isArray(value) ? [] : {};
   seen.set(value, result);
   for (const key of Object.keys(value)) {
