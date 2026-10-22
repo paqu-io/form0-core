@@ -3,8 +3,8 @@
 Updated: 22 October 2026.
 
 Status: agreed directions and open choices. The maintainer approved implementation of Plan 1
-(condition scope, core #103) on 22 October. Plans 2 and 3 remain separate planning work; their open
-policies are not delegated to the Plan 1 implementation. This document does not describe a released
+(condition scope, core #103) on 22 October. Plan 2 was subsequently approved for implementation. Plan 3 remains separate consumer-adoption
+planning; renderer and persistence changes are not delegated to Plan 2. This document does not describe a released
 contract.
 
 ### Approved delivery sequence
@@ -515,3 +515,38 @@ acceptance remains deferred. Separate Native/mobile dependency exceptions expire
 Plan 1 execution evidence is recorded separately in
 [`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/form0-condition-scope-20261022/CHECKS.md).
 Earlier observations above retain their original provenance and are not retroactively new test runs.
+
+
+## 13. Plan 2 implementation agreement
+
+Plan 1 is released in core 0.6.0; #103 is closed. Plan 2 is approved: shared core record evaluation,
+submission validation (#99/#104), and calculation-only repeatable collections. Consumer adoption is
+Plan 3. Existing consumer dependency edits must remain intact.
+
+- Accepted-row edits update root collections after row acceptance; cancelled edits do not. Closed
+  calculations remain accepted snapshots during editing. Submission prepares an immutable full-tree
+  refresh, with root aggregates corresponding to the selected child values.
+- Retained submissions validate the selected retained snapshot, including its calculation-dependent
+  condition outcomes. Host permission is mandatory. Freshness is reported separately from validity.
+- Automatically run participating closed-row custom validation when managed events are enabled.
+  Genuine input failures block ordinary submit, even if many rows require correction. Root drafts
+  remain allowed; no row must be opened merely to recalculate or revalidate.
+- Root drafts preserve accepted child calculations without confirmation and carry pending freshness.
+- Preserve missing collection positions: `[100, null, 200]`; sum finite numeric values to 300 and return
+  zero for no rows. Only NumericField and CalculatedField sum targets are supported. Do not coerce
+  numeric strings. Choice strings remain strings, including numeric-looking schema codes.
+- Empty single choices return null; empty multiple choices return an empty array. Reject malformed
+  or ambiguous selections. Preserve multiple-choice grouping, predefined selection order and Other
+  text. FormLink collections return grouped `{ record_id }` reference objects without fetching.
+- A single nested `tasks` definition may have rows below multiple `projects` records. Root collection
+  reads all matching tasks in record order; a calculation in project P1 reads only tasks below P1.
+  Reject unrelated nested source branches. Targets must belong to the referenced section's rows.
+- Include accepted rows regardless of visibility. Submission validation separately excludes hidden
+  ancestors. No implicit flattening of array-valued target fields.
+- Use `form.repeatable_recalculation`: automatic (default) or confirm. Host-required confirmation
+  cannot weaken authored confirmation. Durable freshness metadata stays outside the record.
+- Core returns proposals and selected evaluated snapshots without persistence, ID/timestamp generation,
+  or mutation of the caller's tree. Hosts retain save-hook ownership and save-once/revalidation order.
+- Test 200/2,000-row and at-least-20-level fixtures; share schema preparation and yield cooperatively.
+  Reference-machine warmed preparation targets: 250 ms / 2 seconds respectively. Actual Hermes
+  performance acceptance and renderer UI/persistence integration remain Plan 3.
