@@ -572,3 +572,12 @@ Plan 2 adds core contracts and localized documentation. Plan 3 still owns bindin
 end-to-end parity requirements: keep #99/#104 and React #73 open until that delivery is verified.
 Recommend a core minor release after verification and before consumer adoption; the maintainer owns
 the actual version edit, promotion and publication. #103 remains the already-released Plan 1 work.
+
+A subsequent payload breakdown distinguishes temporary evaluation from persistence: the 2,000-row
+fixture serializes to a 2.46 MB structured record, a 6.63 MB evaluated snapshot and a 5.81 MB change
+report. A retained submission also creates 5.43 MB of persistable pending-freshness metadata because
+16,000 affected field entries repeat complete row paths. This qualifies the release recommendation:
+settle a compact, unambiguous persistable freshness representation before publishing the new API.
+Grouping a row path with its affected field identities is a candidate for discussion, not an agreed
+or implemented format change. Peak memory, confirmation lifetime and worker transport remain
+explicit Plan 3 acceptance inputs. See the follow-up verification's payload breakdown.

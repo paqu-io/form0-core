@@ -87,6 +87,38 @@ observed scheduling gaps are concrete Plan 3 worker/renderer/mobile acceptance i
 and RSS are recorded in JSON as process observations, not retained-heap/leak or Hermes measurements.
 Actual Hermes/device performance and UI adoption remain Plan 3; iOS acceptance remains deferred.
 
+### Prepared payload versus persisted record
+
+An additional serialization breakdown uses the existing createStructuredRecord() transformer on the
+same 2,000-row fixture. These are UTF-8 JSON sizes for the whole root record and all 2,000 descendants,
+not a fixed allocation per stored record or a cost per child row. No photo/video binary is included.
+
+| Component                                   | Bytes      | Persistence/lifetime                                                                 |
+| ------------------------------------------- | ---------- | ------------------------------------------------------------------------------------ |
+| Accepted runtime input tree                 | 1,705,756  | Host's existing record representation                                                |
+| Structured record from existing transformer | 2,459,451  | Payload a host may persist, using the existing record format                         |
+| Evaluated snapshot                          | 6,626,504  | Values/metadata plus transient visibility, required, read-only and error maps        |
+| Complete change report                      | 5,813,845  | 16,008 before/after changes; disposable evaluation/review result                     |
+| Complete automatic preparation result       | 12,440,656 | Transient result; core does not persist it                                           |
+| Current freshness companion                 | 88         | Host-persistable status/revision, no affected entries                                |
+| Pending freshness companion after retain    | 5,428,719  | Host-persistable; 16,000 field identities repeat full instance paths                 |
+| Complete confirmation review result         | 17,869,408 | Transient proposal/report/freshness result; factory also captures the pending review |
+
+The 12.4 MB measurement is therefore not the saved record size. It also is not a RAM measurement:
+JavaScript objects, defensive copies, active editor state and captured proposals can use more memory
+than their serialized JSON. Releasing transient reports/proposals after selection remains necessary.
+
+The pending companion is a separate, real storage concern for very large retained submissions.
+For example, eight changed fields in one row currently repeat that row's full ancestry eight times.
+Recommended follow-up: assess storing the ancestry once with its affected field identities and
+bounded/summarized change transport, while preserving exact instance targeting and review semantics.
+These are recommendations, not an implemented metadata-format change. Settle the persistable format
+before publishing the new API; carry peak-memory, review retention and transport acceptance into
+Plan 3. Existing reader documentation still describes the currently implemented versioned contract.
+
+Measurement details: local harness logs/payload-breakdown.json. This measurement writes no app data,
+database record or device storage; persistence remains host-owned.
+
 ## Verification and provenance
 
 | Gate                                                                | Result                                                                                                |
