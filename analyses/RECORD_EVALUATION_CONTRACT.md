@@ -108,12 +108,21 @@ Freshness companion:
   "version": 1,
   "status": "pending",
   "schemaRevision": "form0-...",
-  "affected": [{ "instancePath": [], "fieldName": "total", "fieldKey": "total_key" }]
+  "affected": [
+    {
+      "instancePath": [{ "repeatableKey": "tasks", "instanceId": 0, "index": 0, "identity": "id" }],
+      "fields": [{ "fieldName": "total", "fieldKey": "total_key" }]
+    }
+  ]
 }
 ```
 
 Actual affected paths identify child records. The schema revision is the existing deterministic
-schema revision. Companion metadata contains no old values or executable proposals. Hosts persist it
+schema revision. Each affected entry represents one row; its fields retain both data_name and schema
+key identities, in deterministic field order. Complete instance ancestry is stored once per row,
+including ID zero and positional identities. Current freshness has an empty affected list. This is
+the first published version-1 shape; the earlier flat shape was an unpublished candidate.
+Companion metadata contains no old values or executable proposals. Hosts persist it
 alongside the record and restore it for their pending-state UI. Every preparation recomputes from
 current inputs; a previously persisted current/pending label never replaces evaluation. Clear pending
 storage only after persisting a matching current result. No persistence location is prescribed.

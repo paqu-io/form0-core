@@ -108,18 +108,15 @@ The 12.4 MB measurement is therefore not the saved record size. It also is not a
 JavaScript objects, defensive copies, active editor state and captured proposals can use more memory
 than their serialized JSON. Releasing transient reports/proposals after selection remains necessary.
 
-The pending companion is a separate, real storage concern for very large retained submissions.
-For example, eight changed fields in one row currently repeat that row's full ancestry eight times.
-Recommended follow-up: assess storing the ancestry once with its affected field identities and
-bounded/summarized change transport, while preserving exact instance targeting and review semantics.
-These are recommendations, not an implemented metadata-format change. Settle the persistable format
-before publishing the new API; carry peak-memory, review retention and transport acceptance into
-Plan 3. Existing reader documentation still describes the currently implemented versioned contract.
+The initial flat pending companion exposed a real storage concern for very large retained submissions:
+eight changed fields in one row repeated that row's full ancestry eight times. The approved correction
+below groups those identities by row before the first release. Bounded change transport, peak memory
+and review lifetime remain Plan 3 acceptance inputs.
 
 Measurement details: local harness logs/payload-breakdown.json. This measurement writes no app data,
 database record or device storage; persistence remains host-owned.
 
-## Verification and provenance
+## Initial follow-up verification and provenance
 
 | Gate                                                                | Result                                                                                                |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -151,3 +148,48 @@ core internals/tests and these analysis documents without changing the documente
 
 No manual test is required for this core follow-up. Maintainer owns releases and issue closure.
 Keep #99/#104 and React #73 open for Plan 3's actual consumer adoption/parity; #103 is already closed.
+
+## Grouped freshness correction before first release
+
+Implementation and regression tests: `e254d38`.
+
+The first published version-1 companion has one entry per affected row:
+`{ instancePath, fields: [{ fieldName, fieldKey }] }`. It preserves all instance segments, IDs including
+zero, positional identities, schema revision, and deterministic row/field order. Expanding the groups
+reproduces the original flat identities in the same order. Root/child calculations, validation,
+all-or-none decisions, draft rules, captured reviews and the stored record remain unchanged.
+
+The correction changes only the new companion's representation. Consumers count affected rows using
+the affected array's length and count affected calculations by summing each row's fields length.
+Returned metadata is defensive: mutating its paths or fields cannot alter a captured review.
+The flat candidate was not published, and no maintained renderer has adopted it.
+
+| Same 2,000-row fixture                     | Initial flat candidate | Grouped version 1 |
+| ------------------------------------------ | ---------------------- | ----------------- |
+| Pending companion, 16,000 field identities | 5,428,719 bytes        | 1,425,386 bytes   |
+| Complete confirmation review result        | 17,869,408 bytes       | 13,866,075 bytes  |
+| Complete retained preparation result       | 17,867,324 bytes       | 13,863,991 bytes  |
+| Automatic preparation result               | 12,440,656 bytes       | 12,440,656 bytes  |
+| Current companion                          | 88 bytes               | 88 bytes          |
+
+The pending companion is 73.7% smaller, with 2,000 row entries and all 16,000 field identities.
+The automatic result still includes the evaluated tree and complete change report; grouping pending
+metadata does not claim to remove that temporary cost. The existing structured-record transformer
+and saved values are unchanged. JSON sizes remain distinct from heap/peak-memory observations.
+
+Core verification adds a 44th record scenario covering grouping, equal IDs in different branches,
+ID zero, positional targeting, field-key aliases, serialization/reopening and review isolation in
+TRUSTED/SAFE. The seven complex scenarios also check a real 2,000-row pending result under 1.5 MB
+with every expected field identity. The portable 17-case contract now asserts the grouped field shape.
+Node 24's full suite and the Node 22 record/complex suites verify the correction. Packed browser main
+thread/actual Worker, Native adapter and CLI contract checks use independent dependency trees.
+
+Packed candidate: 94 allowed files; SHA-256:
+
+```text
+0d3edd5d356c171836ada5767a1d9317dbf9b5193cc1e0215a51ac55c3d79cda
+```
+
+Evidence: `.local-test-harnesses/form0-record-grouped-20261022/`, including PACKED_PROOF.json,
+logs/payload.json, core-check.log, browser.log, worker-conformance.json, native-tests.log and cli.log.
+Earlier archives and timing evidence above remain historical; core runtime dependencies are unchanged.
