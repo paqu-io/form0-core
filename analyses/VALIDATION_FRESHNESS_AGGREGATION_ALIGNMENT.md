@@ -553,3 +553,22 @@ Plan 3. Existing consumer dependency edits must remain intact.
 - Test 200/2,000-row and at-least-20-level fixtures; share schema preparation and yield cooperatively.
   Reference-machine warmed preparation targets: 250 ms / 2 seconds respectively. Actual Hermes
   performance acceptance and renderer UI/persistence integration remain Plan 3.
+
+### Large-form follow-up
+
+Assess record count, schema breadth and populated nesting together. The dedicated complex fixture
+has 377 schema elements (360 fields, eight RepeatableSections and nine Sections), 90 calculation
+definitions, 549 condition leaves and six populated repeatable levels with uneven sibling branches.
+Its 200/2,000-row sizes count every row across the tree, rather than rows per level. The larger case
+contains 80,040 input/calculated value cells and executes 20,010 calculation tasks during refresh.
+
+Keep original narrow-schema measurements and broader-schema measurements distinct. Factory setup,
+cold/warmed preparation, scheduling gaps, complete proposal transport and memory observations need
+separate reporting. Shared immutable calculation binding metadata may be cached; instance values
+must stay current and must never be retained in that cache. Preserve the complete permitted EVAL
+context and existing diagnostics. See [the follow-up evidence](COMPLEX_RECORD_EVALUATION_VERIFICATION.md).
+
+Plan 2 adds core contracts and localized documentation. Plan 3 still owns binding adoption and its
+end-to-end parity requirements: keep #99/#104 and React #73 open until that delivery is verified.
+Recommend a core minor release after verification and before consumer adoption; the maintainer owns
+the actual version edit, promotion and publication. #103 remains the already-released Plan 1 work.

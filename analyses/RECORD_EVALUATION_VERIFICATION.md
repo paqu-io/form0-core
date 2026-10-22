@@ -79,8 +79,8 @@ Archive SHA-256:
 90978771268979b3adcd80b71b6ad781e61e7e7e0189bfdaccd96fd02633db3d
 ```
 
-All 92 archived files match current workspace package sources and each independently copied
-browser/Native-adapter/CLI tree. Symlink audit found no links outside those independent trees.
+At the original verification, all 92 archived files matched the then-current workspace package sources
+and each independently copied browser/Native-adapter/CLI tree. Symlink audit found no links outside those independent trees.
 Existing accepted evidence and maintained consumer dependency edits were preserved.
 
 Local drivers, archives, complete logs and JSON evidence:
@@ -94,3 +94,15 @@ No new manual acceptance is required for this core delivery. Production/rendered
 with docs PR CI; no local production docs build was run. Maintainer owns merges, version bump,
 publication, deployment and issue closure. Existing Native/mobile dependency exceptions remain
 separate targeted work and expire 7 November 2026.
+
+## Large-schema follow-up
+
+The original 200/2,000-row timing fixture has nine schema elements, eight scalar field definitions,
+five row calculation definitions and one repeatable level. The 22-level correctness fixture has 26
+schema elements and 22 populated rows; the separate condition-scope test has 514 elements and 12
+levels. These dimensions were originally exercised separately, not as a single large populated form.
+
+The subsequent [complex-form verification](COMPLEX_RECORD_EVALUATION_VERIFICATION.md) combines
+377 schema elements, six populated repeatable levels, 549 condition leaves and up to 2,000 total rows.
+Its independent packed candidate, profiling, performance improvement and automated evidence are
+recorded separately; the original archive and accepted results above remain historical evidence.
