@@ -249,7 +249,7 @@ export function createFormEngine({
   };
 }
 
-function getDefaultValue(field) {
+export function getDefaultValue(field) {
   const spec = FIELD_SPECS[field.type];
   if (spec && spec.defaultProducer) {
     return spec.defaultProducer(field);

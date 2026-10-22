@@ -30,6 +30,10 @@ function copy(value, seen = new Map()) {
   return result;
 }
 
+const managedReferenceCaches = new WeakMap();
+const managedFieldCaches = new WeakMap();
+const managedRepeatableCaches = new WeakMap();
+
 /** Internal adapter; the public synchronous API is engine.triggerDetailed(). */
 export function createManagedEventDispatcher(manager, constructionScope) {
   const instancePath = copy(constructionScope?.instancePath);
@@ -37,18 +41,27 @@ export function createManagedEventDispatcher(manager, constructionScope) {
   if (scopeId !== undefined && (typeof scopeId !== 'string' || !scopeId.trim()))
     throw new Error('eventScope.scopeId must be a nonempty string when supplied.');
   const resolver = manager.contextResolver;
-  const fields = new Map(resolver.fieldOwnership);
+  if (!managedFieldCaches.has(resolver))
+    managedFieldCaches.set(resolver, new Map(resolver.fieldOwnership));
+  const fields = managedFieldCaches.get(resolver);
+  if (!managedRepeatableCaches.has(resolver))
+    managedRepeatableCaches.set(
+      resolver,
+      new Map(
+        [...resolver.repeatableSectionTree.values()].map((entry) => [
+          JSON.stringify([entry.parentPath, entry.preferredKey]),
+          entry,
+        ])
+      )
+    );
+  const repeatableIndex = managedRepeatableCaches.get(resolver);
   const statusField = manager.schema?.status_field;
   if (statusField?.enabled && typeof statusField.data_name === 'string')
     fields.set(statusField.data_name, { field: statusField, parentPath: [] });
   if (!Array.isArray(instancePath)) throw new Error('eventScope.instancePath must be an array.');
   const ownershipPath = [];
   for (const segment of instancePath) {
-    const repeatable = [...resolver.repeatableSectionTree.values()].find(
-      (entry) =>
-        entry.preferredKey === segment?.repeatableKey &&
-        JSON.stringify(entry.parentPath) === JSON.stringify(ownershipPath)
-    );
+    const repeatable = repeatableIndex.get(JSON.stringify([ownershipPath, segment?.repeatableKey]));
     if (
       !repeatable ||
       JSON.stringify(repeatable.parentPath) !== JSON.stringify(ownershipPath) ||
@@ -70,7 +83,8 @@ export function createManagedEventDispatcher(manager, constructionScope) {
   const readable = (path) =>
     path.length <= ownershipPath.length && path.every((key, index) => ownershipPath[index] === key);
   const ownedField = (name) => fields.get(name) || resolver.repeatableSectionTree.get(name);
-  const referenceCache = new WeakMap();
+  if (!managedReferenceCaches.has(manager)) managedReferenceCaches.set(manager, new WeakMap());
+  const referenceCache = managedReferenceCaches.get(manager);
   return function dispatch(eventType, fieldKey, metadata = {}) {
     const result = { operations: [], validationIssues: [], issues: [] };
     const issue = (code, message) =>
@@ -149,8 +163,12 @@ export function createManagedEventDispatcher(manager, constructionScope) {
       let collected;
       try {
         const source = manager.callbackSources.getSource(callback);
-        if (referenceCache.get(callback)?.source !== source)
-          referenceCache.set(callback, { source, references: getEventFieldReferences(source) });
+        if (referenceCache.get(callback)?.source !== source) {
+          const references =
+            manager.referenceSourceCache?.get(source) ?? getEventFieldReferences(source);
+          manager.referenceSourceCache?.set(source, references);
+          referenceCache.set(callback, { source, references });
+        }
         let rejectedReference = false;
         for (const name of referenceCache.get(callback).references) {
           const field = fields.get(name);

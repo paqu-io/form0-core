@@ -1,3 +1,9 @@
+import {
+  REPEATABLEVALUES,
+  REPEATABLESUM,
+  REPEATABLEVALUES_METADATA,
+  REPEATABLESUM_METADATA,
+} from './repeatable/repeatable.js';
 import { cloneBuiltinMetadata, BUILTIN_CONTEXTS } from './builtin-metadata.js';
 import { BUILTIN_DEFINITIONS } from './builtin-definitions.js';
 
@@ -115,6 +121,8 @@ const RUNTIME_ENTRIES = Object.freeze([
   { implementation: DAYS, definition: DAYS_METADATA },
   { implementation: UPPER, definition: UPPER_METADATA },
   { implementation: SETRESULT, definition: SETRESULT_METADATA },
+  { implementation: REPEATABLEVALUES, definition: REPEATABLEVALUES_METADATA },
+  { implementation: REPEATABLESUM, definition: REPEATABLESUM_METADATA },
   { implementation: ALERT, definition: ALERT_METADATA },
   { implementation: SETVALUE, definition: SETVALUE_METADATA },
   { implementation: ON, definition: ON_METADATA },

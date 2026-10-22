@@ -1,3 +1,4 @@
+import { analyzeRepeatableCollections } from './repeatable-collections.js';
 import { ContextResolver } from '../engine/context-resolver.js';
 import { flattenFields } from './field-helpers.js';
 
@@ -378,7 +379,7 @@ export function removeEvalContents(code) {
 }
 
 export function extractStaticFieldReferenceMatches(code) {
-  const cleanedCode = removeEvalContents(code);
+  const cleanedCode = removeEvalContents(analyzeRepeatableCollections(code).scalarSource);
   const fieldRegex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
   const matches = [];
   let match;

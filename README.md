@@ -256,3 +256,36 @@ See [SUPPORT.md](https://github.com/paqu-io/form0-core/blob/main/SUPPORT.md) for
 ## 📄 License
 
 [MIT](./LICENSE)
+
+### Record-tree evaluation and submission preparation (unreleased)
+
+`createRecordEvaluator()` coordinates root and nested accepted records without changing the caller's
+snapshot. It shares the existing calculation executor and scope/security rules; `engine.eval()` keeps
+its intrinsic evaluation contract.
+
+```js
+import { createRecordEvaluator, validateSubmission } from 'form0-core';
+
+const evaluator = createRecordEvaluator({ schema });
+const accepted = await evaluator.evaluate(snapshot); // retained child calculations
+const refreshed = await evaluator.evaluate(snapshot, { mode: 'refresh' });
+const prepared = await evaluator.prepareSubmission(snapshot);
+// Persist only when prepared.eligible; persistence and save hooks belong to the host.
+const summary = validateSubmission({ schema, snapshot: refreshed.snapshot });
+```
+
+The runtime snapshot is `{ values, repeatable }`, using existing row objects with `id`, `values`,
+nested `repeatable` and metadata. `REPEATABLEVALUES($tasks, 'cost')` and
+`REPEATABLESUM($tasks, 'cost')` require this record-tree context and are calculation-only.
+
+`form.repeatable_recalculation` accepts `automatic` (default) or `confirm`. A changed child proposal
+in confirm mode returns `status: 'requires_decision'`, `reviewId`, `proposal`, `changes` and no selected
+snapshot. Resume with the current snapshot and
+`{ decision: { reviewId, action: 'refresh' } }`; `retain` additionally requires `allowRetain: true` on
+both preparation calls. Decisions are single-use and reject obsolete inputs/configuration.
+
+Draft preparation uses `{ intent: 'draft' }`, retains child values without confirmation, and permits
+ordinary validation failures. Persist the returned `freshness` companion separately from the record
+and supply it to the host on reopening; do not clear stored pending status before persistence succeeds.
+`managedEvents: true` enables root and participating closed-row custom validation only. No save or
+closed-row lifecycle hooks are replayed. Renderer/worker/Native/CLI UI adoption is separate work.

@@ -86,3 +86,6 @@ export {
   applyFormMutationBatch,
 } from './authoring/form-authoring.js';
 export { INVALID } from './builtins/event/control/invalid.js';
+
+export { createRecordEvaluator } from './engine/record-evaluator.js';
+export { validateSubmission, isFieldValueEmpty } from './engine/submission-validation.js';

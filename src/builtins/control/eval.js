@@ -1,3 +1,4 @@
+import { extractStaticFieldReferences } from '../../utilities/calculation-dependencies.js';
 import { validateExpression } from '../../security/validation.js';
 import { SAFE_SECURITY_CONFIG } from '../../security/config.js';
 export { EVAL_METADATA } from '../builtin-definitions.js';
@@ -182,7 +183,9 @@ function evaluateHybridExpression(expression, formContext) {
 
     if (isFieldReference(expression)) {
       // Field reference - resolve from context
-      const fieldValue = formContext?.[expression];
+      const fieldValue = _evalReporting?.resolveReference
+        ? _evalReporting.resolveReference(expression)
+        : formContext?.[expression];
       if (fieldValue !== undefined) {
         logDebug('[form0] EVAL() resolved field reference:', expression, '→', fieldValue);
         return fieldValue;
@@ -208,6 +211,10 @@ function evaluateHybridExpression(expression, formContext) {
 
     // Step 3c: Add form context for variable access
     Object.assign(basicContext, formContext || {});
+    if (_evalReporting?.resolveReference) {
+      for (const name of extractStaticFieldReferences(expression))
+        basicContext[`$${name}`] = _evalReporting.resolveReference(`$${name}`);
+    }
 
     // Step 3d: Evaluate expression for string building
     const keys = Object.keys(basicContext);
@@ -221,7 +228,9 @@ function evaluateHybridExpression(expression, formContext) {
     // Step 3e: Check if result should be resolved as field reference
     if (typeof result === 'string' && result.startsWith('$')) {
       // This is a field reference - resolve it from context
-      const fieldValue = formContext?.[result];
+      const fieldValue = _evalReporting?.resolveReference
+        ? _evalReporting.resolveReference(result)
+        : formContext?.[result];
       if (fieldValue !== undefined) {
         logDebug(
           '[form0] EVAL() resolved field reference:',

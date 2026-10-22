@@ -85,6 +85,11 @@ export function validateSchemaWithContext(form, contextResolver) {
   const duplicateDataNames = new Set();
   const duplicateKeys = new Set();
   const errors = [];
+  if (
+    form.repeatable_recalculation !== undefined &&
+    !['automatic', 'confirm'].includes(form.repeatable_recalculation)
+  )
+    errors.push('form.repeatable_recalculation must be automatic or confirm');
 
   const formAIValidation = validateFormAIMetadata(form);
   if (!formAIValidation.isValid) {
