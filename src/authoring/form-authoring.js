@@ -1,3 +1,5 @@
+import { getFormSchemaRevision } from '../utilities/schema-revision.js';
+export { getFormSchemaRevision } from '../utilities/schema-revision.js';
 import { FIELD_SPECS } from '../schema/field-specs.js';
 import { getValidOperators } from '../schema/operators.js';
 import { validateSchema } from '../schema/schema-validator.js';
@@ -160,25 +162,6 @@ function normalizeRootSchema(schema) {
     return { form: schema };
   }
   throw new Error('Expected a root schema containing form.elements or a form schema');
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, stableValue(value[key])])
-  );
-}
-
-function fnv1a64(input) {
-  let hash = 0xcbf29ce484222325n;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= BigInt(input.charCodeAt(index));
-    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
-  }
-  return hash.toString(16).padStart(16, '0');
 }
 
 function toSerializable(value) {
@@ -551,12 +534,6 @@ function validateDraft(root, security) {
   return diagnostics;
 }
 
-/** Return a deterministic revision for optimistic authoring concurrency. */
-export function getFormSchemaRevision(schema) {
-  const root = normalizeRootSchema(schema);
-  return `form0-${fnv1a64(JSON.stringify(stableValue(root)))}`;
-}
-
 /** Return the installed-version authoring capabilities and complete schema context. */
 export function getFormAuthoringContext({ schema, coreVersion = null }) {
   const root = normalizeRootSchema(schema);
@@ -575,6 +552,7 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
         schema: root,
         fieldDataName: field.data_name,
         includeRestricted: true,
+        includeCollections: true,
       }),
     }));
   return {
@@ -589,7 +567,19 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
     eventTypes: getAllEventTypes(),
     eventGuidance: deepClone(EVENT_GUIDANCE),
     calculationBuiltins: getCalculationBuiltinCatalog(),
-    calculationGuidance: deepClone(CALCULATION_GUIDANCE),
+    calculationGuidance: {
+      ...deepClone(CALCULATION_GUIDANCE),
+      repeatableCollections: {
+        context: 'calculation-only',
+        requiresRecordEvaluator: true,
+        directSectionReference: true,
+        literalTargetDataName: true,
+        examples: ["REPEATABLEVALUES($tasks, 'cost')", "REPEATABLESUM($tasks, 'cost')"],
+      },
+    },
+    formSettings: {
+      repeatable_recalculation: { values: ['automatic', 'confirm'], default: 'automatic' },
+    },
     eventBuiltins: getFormEventBuiltinCatalog(),
     eventReferences: getFormEventReferenceCatalog({ schema: root }),
     calculations,

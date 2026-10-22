@@ -1,3 +1,5 @@
+import { analyzeRepeatableCollections } from './repeatable-collections.js';
+import { createRecordEvaluator } from '../engine/record-evaluator.js';
 import { parse } from 'acorn';
 import { BUILTIN_CONTEXTS } from '../builtins/builtin-metadata.js';
 import {
@@ -363,6 +365,7 @@ function createSimulationErrorResult(runtimeError, warnings = []) {
  * @property {string | null} description
  * @property {string | null} displayStyle
  * @property {string[]} parentPath
+ * @property {boolean} [collectionOnly] Section references are valid only in collection calls.
  * @property {{
  *   level: 'accessible' | 'restricted',
  *   code: 'main_form' | 'same_repeatable_section' | 'ancestor_repeatable_context' | 'different_repeatable_section',
@@ -396,18 +399,20 @@ export function getCalculationBuiltinCatalog() {
  * @param {Object} options.schema
  * @param {string} options.fieldDataName
  * @param {boolean} [options.includeRestricted=false]
+ * @param {boolean} [options.includeCollections=false] Include collection-only section references.
  * @returns {CalculationReferenceDefinition[]}
  */
 export function getCalculationReferenceCatalog({
   schema,
   fieldDataName,
   includeRestricted = false,
+  includeCollections = false,
 }) {
   const form = normalizeCalculationFormSchema(schema);
   const resolver = new ContextResolver(form);
   const executionContext = buildCalculationExecutionContext(form, fieldDataName, resolver);
 
-  return flattenFields(form.elements)
+  const scalarReferences = flattenFields(form.elements)
     .filter((field) => field && typeof field === 'object')
     .filter((field) => field.data_name && field.data_name !== fieldDataName)
     .filter(
@@ -419,6 +424,33 @@ export function getCalculationReferenceCatalog({
     .map((field) => toCalculationReferenceDefinition(field, resolver, executionContext))
     .filter((reference) => reference !== null)
     .filter((reference) => includeRestricted || reference.access.level === 'accessible');
+  if (!includeCollections) return scalarReferences;
+  const collections = [...resolver.repeatableSectionTree.values()]
+    .map((info) => {
+      const accessible =
+        ContextResolver.isPrefix(executionContext.parentPath, info.parentPath) ||
+        ContextResolver.isPrefix(info.parentPath, executionContext.parentPath);
+      return {
+        key: info.preferredKey,
+        reference: `$${info.field.data_name}`,
+        dataName: info.field.data_name,
+        label: info.field.label,
+        type: 'RepeatableSection',
+        description: info.field.description,
+        displayStyle: null,
+        parentPath: [...info.parentPath],
+        collectionOnly: true,
+        access: {
+          level: accessible ? 'accessible' : 'restricted',
+          code: accessible ? 'same_repeatable_section' : 'different_repeatable_section',
+          message: accessible ? null : 'Collection is outside the record ancestry.',
+          suggestion:
+            'Use this reference only as the first argument of REPEATABLEVALUES or REPEATABLESUM.',
+        },
+      };
+    })
+    .filter((reference) => includeRestricted || reference.access.level === 'accessible');
+  return [...scalarReferences, ...collections];
 }
 
 /**
@@ -434,6 +466,7 @@ export function getCalculationReferenceCatalog({
  *   issues: CalculationExpressionIssue[],
  *   usedBuiltins: string[],
  *   referencedFields: string[],
+ *   collectionReferences: Array<{builtinName: string, sectionDataName: string, targetDataName: string, startIndex: number, endIndex: number}>,
  * }}
  */
 export function analyzeCalculationExpression({
@@ -651,6 +684,13 @@ export function analyzeCalculationExpression({
     );
   }
 
+  const collectionAnalysis = analyzeRepeatableCollections(
+    normalizedExpression,
+    resolver,
+    fieldDataName
+  );
+  for (const issue of collectionAnalysis.issues)
+    addIssue(issues, issueKeys, createIssue({ ...issue, severity: 'error' }));
   for (const reference of extractStaticFieldReferenceMatches(normalizedExpression)) {
     if (!referencedFieldNames.has(reference.fieldName)) {
       referencedFieldNames.add(reference.fieldName);
@@ -732,6 +772,13 @@ export function analyzeCalculationExpression({
     issues,
     usedBuiltins,
     referencedFields,
+    collectionReferences: collectionAnalysis.calls.map((call) => ({
+      builtinName: call.name,
+      sectionDataName: call.section,
+      targetDataName: call.target,
+      startIndex: call.index,
+      endIndex: call.index + call.length,
+    })),
   };
 }
 
@@ -757,6 +804,7 @@ export function analyzeCalculationExpression({
  *       fieldContext: Object | null,
  *     }>,
  *   },
+ *   runRecord: (options: {snapshot: Object, instancePath?: Object[], expression?: string}) => Promise<{result: unknown, runtimeError: string|null, warnings: Object[], evaluation?: Object}>,
  *   dispose: () => void,
  * }}
  */
@@ -774,6 +822,10 @@ export function createCalculationPreviewSession({
     return {
       run: () =>
         createSimulationErrorResult(`Field '${fieldDataName}' does not exist in the form schema.`),
+      runRecord: async () =>
+        createSimulationErrorResult(
+          `Field '${fieldDataName}' does not exist or is not a CalculatedField.`
+        ),
       dispose: () => {},
     };
   }
@@ -781,6 +833,10 @@ export function createCalculationPreviewSession({
   if (targetField.type !== 'CalculatedField') {
     return {
       run: () => createSimulationErrorResult(`Field '${fieldDataName}' is not a CalculatedField.`),
+      runRecord: async () =>
+        createSimulationErrorResult(
+          `Field '${fieldDataName}' does not exist or is not a CalculatedField.`
+        ),
       dispose: () => {},
     };
   }
@@ -851,6 +907,43 @@ export function createCalculationPreviewSession({
           sanitizeCollectedWarnings(warningSystem.getCollectedWarnings())
         );
       }
+    },
+    runRecord: async ({ snapshot, instancePath = [], expression: nextExpression, ...options }) => {
+      if (disposed)
+        return createSimulationErrorResult('Calculation preview session has been disposed.');
+      if (typeof nextExpression === 'string') targetField.calculate = nextExpression;
+      const evaluator = createRecordEvaluator({
+        schema: simulationSchema,
+        security,
+        warningSystem,
+        diagnostics: { console: false },
+      });
+      const evaluation = await evaluator.evaluate(snapshot, { ...options, mode: 'refresh' });
+      if (evaluation.status !== 'evaluated')
+        return {
+          ...createSimulationErrorResult(evaluation.issues[0]?.message || 'Record preview failed.'),
+          evaluation,
+        };
+      let record = evaluation.snapshot;
+      for (const segment of instancePath)
+        record = record?.repeatable?.[segment.repeatableKey]?.[segment.index];
+      if (!record?.values || !Object.hasOwn(record.values, fieldDataName))
+        return {
+          ...createSimulationErrorResult(
+            'Preview instancePath must identify the record owning the calculated field.'
+          ),
+          evaluation,
+        };
+      const runtimeError =
+        evaluation.diagnostics.find(
+          (item) => item.fieldName === fieldDataName && item.severity === 'error'
+        )?.message || null;
+      return {
+        result: record?.values?.[fieldDataName] ?? null,
+        runtimeError,
+        warnings: sanitizeCollectedWarnings(warningSystem.getCollectedWarnings()),
+        evaluation,
+      };
     },
     dispose: () => {
       disposed = true;

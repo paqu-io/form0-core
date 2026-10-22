@@ -284,6 +284,26 @@ export const INVALID_METADATA = defineBuiltinMetadata({
   contexts: [BUILTIN_CONTEXTS.EVENT],
 });
 
+export const REPEATABLEVALUES_METADATA = defineBuiltinMetadata({
+  name: 'REPEATABLEVALUES',
+  category: 'repeatable',
+  signature: 'REPEATABLEVALUES($repeatable_data_name, target_data_name)',
+  description:
+    'Collect accepted or refreshed row values from the named RepeatableSection in record-tree context. Preserves row order and grouping; requires a literal target data_name.',
+  examples: ["REPEATABLEVALUES($tasks, 'cost')"],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION],
+});
+
+export const REPEATABLESUM_METADATA = defineBuiltinMetadata({
+  name: 'REPEATABLESUM',
+  category: 'repeatable',
+  signature: 'REPEATABLESUM($repeatable_data_name, target_data_name)',
+  description:
+    'Sum finite NumericField or CalculatedField row values in record-tree context. Skips missing values, returns zero for no rows, and never coerces strings.',
+  examples: ["REPEATABLESUM($tasks, 'cost')"],
+  contexts: [BUILTIN_CONTEXTS.CALCULATION],
+});
+
 export const BUILTIN_DEFINITIONS = Object.freeze([
   IF_METADATA,
   AND_METADATA,
@@ -315,6 +335,8 @@ export const BUILTIN_DEFINITIONS = Object.freeze([
   ON_METADATA,
   OFF_METADATA,
   INVALID_METADATA,
+  REPEATABLEVALUES_METADATA,
+  REPEATABLESUM_METADATA,
 ]);
 
 function filterDefinitionsByContext(context) {

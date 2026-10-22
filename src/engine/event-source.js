@@ -1,10 +1,43 @@
 import { parse } from 'acorn';
 
 /** Retains authored callback source without depending on engine-specific toString output. */
-export function createEventSourceRegistry() {
+export function createEventSourceRegistry(preparationCache = null) {
   const sources = new WeakMap();
 
+  function bindPrepared(prepared, context) {
+    const propertyNames = new Map();
+    const capture = (callback, source, name) => {
+      sources.set(callback, source);
+      if (name && !callback.name)
+        Object.defineProperty(callback, 'name', { value: name, configurable: true });
+      return callback;
+    };
+    capture.key = (value, id) => {
+      const key = Reflect.ownKeys({ [value]: null })[0];
+      propertyNames.set(
+        id,
+        typeof key === 'symbol'
+          ? key.description === undefined
+            ? ''
+            : `[${key.description}]`
+          : key
+      );
+      return key;
+    };
+    capture.nameFor = (id) => propertyNames.get(id);
+
+    return {
+      code: prepared.code,
+      context: {
+        ...context,
+        [prepared.captureName]: capture,
+      },
+    };
+  }
+
   function prepare(code, context) {
+    const cached = preparationCache?.get(code);
+    if (cached && !Object.hasOwn(context, cached.captureName)) return bindPrepared(cached, context);
     let tree;
     try {
       // Event scripts are Function bodies, rather than modules or global scripts.
@@ -27,7 +60,6 @@ export function createEventSourceRegistry() {
     let captureName = '__form0CaptureEventSource';
     while (identifiers.has(captureName) || Object.hasOwn(context, captureName)) captureName += '_';
     const edits = [];
-    const propertyNames = new Map();
 
     function inferredName(node, parent) {
       if (node.id) return '';
@@ -120,33 +152,9 @@ export function createEventSourceRegistry() {
       prepared = prepared.slice(0, position) + text + prepared.slice(position);
     }
 
-    const capture = (callback, source, name) => {
-      sources.set(callback, source);
-      if (name && !callback.name)
-        Object.defineProperty(callback, 'name', { value: name, configurable: true });
-      return callback;
-    };
-    capture.key = (value, id) => {
-      const key = Reflect.ownKeys({ [value]: null })[0];
-      propertyNames.set(
-        id,
-        typeof key === 'symbol'
-          ? key.description === undefined
-            ? ''
-            : `[${key.description}]`
-          : key
-      );
-      return key;
-    };
-    capture.nameFor = (id) => propertyNames.get(id);
-
-    return {
-      code: prepared,
-      context: {
-        ...context,
-        [captureName]: capture,
-      },
-    };
+    const result = { code: prepared, captureName };
+    preparationCache?.set(code, result);
+    return bindPrepared(result, context);
   }
 
   function getSource(callback) {

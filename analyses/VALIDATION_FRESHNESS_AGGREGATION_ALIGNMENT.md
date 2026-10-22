@@ -2,18 +2,19 @@
 
 Updated: 22 October 2026.
 
-Status: agreed directions and open choices. The maintainer approved implementation of Plan 1
-(condition scope, core #103) on 22 October. Plans 2 and 3 remain separate planning work; their open
-policies are not delegated to the Plan 1 implementation. This document does not describe a released
-contract.
+Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is implemented as an unpublished
+core candidate with automated evidence. Plan 3 remains separate consumer-adoption planning; renderer,
+Builder and persistence integration changes are not included in Plan 2. See
+[the core contract](RECORD_EVALUATION_CONTRACT.md) and
+[verification evidence](RECORD_EVALUATION_VERIFICATION.md).
 
 ### Approved delivery sequence
 
-| Plan                       | Delivery                                                                                                                                   | Status                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Approved for implementation.                                               |
-| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Finalize remaining collection and snapshot policies before implementation. |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Plan separately against this alignment.                                    |
+| Plan                       | Delivery                                                                                                                                   | Status                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                  |
+| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Implemented and verified; unpublished core candidate. |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Plan separately against this alignment.               |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -62,7 +63,7 @@ particular current engine, adapter or traversal is reused, extracted or replaced
   `SETVALUE` remains event-only. Events may read an accessible aggregate CalculatedField result.
 - Choice collections return selected schema values rather than internal choice objects. A custom
   Other selection such as Teal returns the entered text `'Teal'`. Preserve MultiChoiceField grouping
-  by row. Include FormLinkField selected records/references; exact reference projection remains open.
+  by row. Include FormLinkField selected records/references; the selected projection is grouped record_id objects.
 - Exclude StatusField and TitleField from these collection functions for now. Repeatable row titles
   already exist, including nested titles; excluding collection access does not remove that behavior.
 - Web and mobile performance is part of the design and acceptance criteria, including complex
@@ -92,8 +93,7 @@ not required for that rule. #103 separately enforces scope for accidental invali
 - **Pending freshness:** a durable indication that a permitted submission retained affected values.
 
 Freshness and validity are separate facts. Declining a refresh must not label a stale result as fully
-current. It also must not bypass known ordinary validation failures. The precise validation
-evaluation for a retained-values branch still needs design.
+current. It also must not bypass known ordinary validation failures. The retained-values branch validates that selected snapshot and its calculation-dependent rules, as specified in the Plan 2 contract.
 
 ## 4. Current behavior and the missing guarantee
 
@@ -129,8 +129,8 @@ explicit collection read. Cross-scope writes remain forbidden.
 Use an optional form-level setting, so a schema authored in Reform Builder can carry the same
 behavior to supported runtimes. The maintainer notes that many existing form settings are direct
 properties of `form`. The current recommendation is a direct attribute; a submission umbrella is
-not justified solely by possible future settings. The exact property name is still provisional.
-This JSON illustrates the proposal; it is not supported by the current runtime:
+not justified solely by possible future settings. The selected property name is `repeatable_recalculation`.
+This JSON is supported by the unpublished Plan 2 record evaluator; published 0.6.0 and existing renderer submission paths do not implement it:
 
 ```json
 {
@@ -153,7 +153,7 @@ Older runtimes do not gain the new behavior merely by receiving the property.
 | Confirm, no relevant value changes           | Proposed child values equal stored values.                   | No recalculation consent dialog is necessary; validation still applies.                 |
 
 The permission to retain stale values is an application policy. A schema cannot enable it against
-the host's restriction. Final naming, override precedence and headless decision transport remain open.
+the host's restriction. Core naming, precedence and headless review transport are implemented; binding interaction is Plan 3.
 Confirmation should identify affected records, fields and old/new values. Review the actual final
 proposal; invalidate it if relevant inputs change. Parent aggregates must correspond to selected
 child values: old totals `[110, 220]` cannot be accompanied by their proposed sum 360.
@@ -165,7 +165,7 @@ change is authorized by this discussion document.
 
 Pending freshness is record-instance state, not a schema preference. Preferred storage direction:
 optional companion submission metadata persisted by the host and supplied again on reopening.
-The exact shape/location is open. It needs enough attribution to explain affected instances and
+The version-1 core companion shape is specified in the contract; host storage location and consumer wiring are Plan 3. It needs enough attribution to explain affected instances and
 avoid applying an old decision to changed inputs. Returning callback metadata alone is not durable.
 Clear durable pending state when the corresponding fresh result has actually been persisted.
 
@@ -173,34 +173,32 @@ Clear durable pending state when the corresponding fresh result has actually bee
 
 Current source registers **18** field types. The spelling is `MultiChoiceField`.
 The maintainer has accepted selected choice values, inclusion of selected linked records, and
-exclusion of title/status targets. The table records the current direction; detailed numeric,
-empty/malformed-value and linked-reference rules are not yet fully approved or implemented.
+exclusion of title/status targets. The table records the current direction; numeric, empty/malformed-value and linked-reference rules are selected and implemented in the Plan 2 candidate; see section 13 and the contract.
 
-| Field type          | Proposed `REPEATABLEVALUES` treatment                                                      | Proposed `REPEATABLESUM` treatment                                                |
-| ------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| TextField           | Collect strings, preserving per-row positions.                                             | Reject text; no numeric-string coercion.                                          |
-| NumericField        | Collect numeric values.                                                                    | Sum finite numeric values.                                                        |
-| SingleChoiceField   | Collect selected schema values, or entered Other text; empty/malformed cases remain open.  | Numeric selected values only; exact sum eligibility remains to be agreed.         |
-| MultiChoiceField    | Collect one selected-values array per row, without implicit flattening.                    | Reject arrays; authors can derive a numeric row value first.                      |
-| BooleanField        | Collect selected schema values; do not assume the runtime value is a JavaScript boolean.   | Numeric selected values only if agreed; no implicit boolean-to-number conversion. |
-| DateField           | Collect existing date strings.                                                             | Reject date strings.                                                              |
-| TimeField           | Collect existing time strings.                                                             | Reject time strings.                                                              |
-| CalculatedField     | Collect evaluated results, preserving types and row grouping.                              | Sum only finite numeric results.                                                  |
-| Section             | Not a value target.                                                                        | Not a value target.                                                               |
-| RepeatableSection   | Collection source in the first argument, not a field-value target in the second.           | Same distinction.                                                                 |
-| BuildingPlanSection | Organizational blueprint; use actual expanded repeatable definitions for collections.      | Not a numeric value target.                                                       |
-| LabelField          | Exclude: display-only, with null placeholders.                                             | Exclude.                                                                          |
-| SignatureField      | Defer collection projection until content versus storage-reference semantics are explicit. | Exclude.                                                                          |
-| PhotoField          | Defer media collection projection; preserve existing child media unchanged.                | Exclude.                                                                          |
-| VideoField          | Defer media collection projection; preserve existing child media unchanged.                | Exclude.                                                                          |
-| FormLinkField       | Include selected record references per row; exact ID/object projection remains open.       | Exclude record references.                                                        |
-| StatusField         | Exclude for now, as agreed.                                                                | Exclude.                                                                          |
-| TitleField          | Exclude for now, including existing derived repeatable titles.                             | Exclude.                                                                          |
+| Field type          | Proposed `REPEATABLEVALUES` treatment                                                                                          | Proposed `REPEATABLESUM` treatment                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| TextField           | Collect strings, preserving per-row positions.                                                                                 | Reject text; no numeric-string coercion.                     |
+| NumericField        | Collect numeric values.                                                                                                        | Sum finite numeric values.                                   |
+| SingleChoiceField   | Collect selected schema values, or entered Other text; empty returns null; malformed or ambiguous selections fail calculation. | Exclude; convert explicitly in a row CalculatedField.        |
+| MultiChoiceField    | Collect one selected-values array per row, without implicit flattening.                                                        | Reject arrays; authors can derive a numeric row value first. |
+| BooleanField        | Collect selected schema values; do not assume the runtime value is a JavaScript boolean.                                       | Exclude; convert explicitly in a row CalculatedField.        |
+| DateField           | Collect existing date strings.                                                                                                 | Reject date strings.                                         |
+| TimeField           | Collect existing time strings.                                                                                                 | Reject time strings.                                         |
+| CalculatedField     | Collect evaluated results, preserving types and row grouping.                                                                  | Sum only finite numeric results.                             |
+| Section             | Not a value target.                                                                                                            | Not a value target.                                          |
+| RepeatableSection   | Collection source in the first argument, not a field-value target in the second.                                               | Same distinction.                                            |
+| BuildingPlanSection | Organizational blueprint; use actual expanded repeatable definitions for collections.                                          | Not a numeric value target.                                  |
+| LabelField          | Exclude: display-only, with null placeholders.                                                                                 | Exclude.                                                     |
+| SignatureField      | Defer collection projection until content versus storage-reference semantics are explicit.                                     | Exclude.                                                     |
+| PhotoField          | Defer media collection projection; preserve existing child media unchanged.                                                    | Exclude.                                                     |
+| VideoField          | Defer media collection projection; preserve existing child media unchanged.                                                    | Exclude.                                                     |
+| FormLinkField       | Include selected record references per row; grouped record_id objects, matching stored references.                             | Exclude record references.                                   |
+| StatusField         | Exclude for now, as agreed.                                                                                                    | Exclude.                                                     |
+| TitleField          | Exclude for now, including existing derived repeatable titles.                                                                 | Exclude.                                                     |
 
 FormLinkField currently holds selected record references. Collection access must not implicitly
 fetch the linked records' contents. For example, preserving each row's reference array might yield
-`[[{ record_id: 'R1' }], [{ record_id: 'R2' }, { record_id: 'R3' }]]`; using ID arrays instead is an
-open projection choice. Inclusion of selected linked records is agreed; this exact shape is not.
+`[[{ record_id: 'R1' }], [{ record_id: 'R2' }, { record_id: 'R3' }]]`; this grouped reference shape is the selected Plan 2 projection. No linked contents are fetched.
 
 Repeatable titles are already implemented through `RepeatableSection.title_field`, dataset-scoped
 validation and resolution, nested structured record `@title` values, and React/Native presentation.
@@ -225,8 +223,7 @@ SETRESULT(REPEATABLESUM($repeatable_section_1, 'fieldA'));
 | C   | Other: Teal                        | `{ choice: [], other: [{ label: 'Teal' }] }`                | `'Teal'`                        |
 
 The three-row collection is `['red', 'blue', 'Teal']`. Known selections return their schema values,
-not display labels or canonical objects; custom Other returns the entered text. Empty selections,
-malformed inputs and any combination of predefined and other selections still need explicit rules.
+not display labels or canonical objects; custom Other returns the entered text. Empty single selections return null; empty multiple selections return []. Malformed or ambiguous single selections fail calculation. Multiple choices preserve predefined selection order followed by Other text.
 
 For MultiChoiceField rows selecting Red/Blue and Green, respectively, the proposed result is
 `[['red', 'blue'], ['green']]`. Preserving grouping distinguishes two rows from three selections.
@@ -292,11 +289,11 @@ The problematic configuration puts this required condition directly on `approval
 }
 ```
 
-Current payment-row engine creation merges root/current-row inputs, then initializes other schema
+Before core 0.6.0, payment-row engine creation merged root/current-row inputs and initialized other schema
 fields with defaults. It does not receive one identified inspection record as an ancestor. Condition
-evaluation bypasses ownership checks and can therefore read the unrelated score default 50.
+evaluation then bypassed ownership checks and could read the unrelated score default 50. Core 0.6.0 rejects this configuration.
 
-| Question                                    | Current result                    | Intended business result                       |
+| Question                                    | Before core 0.6.0                 | Intended business result                       |
 | ------------------------------------------- | --------------------------------- | ---------------------------------------------- |
 | Which scores were accepted?                 | I1 = 95; I2 = 90.                 | Both are relevant to the all-inspections rule. |
 | What score does the payment condition read? | Default 50 in its own engine map. | An explicitly defined collection result.       |
@@ -315,16 +312,16 @@ read it in each payment's helper CalculatedField, `needs_approval_note`. The not
 condition reads the local helper. This is the primary agreed authoring direction for this example:
 
 ```js
-// Root CalculatedField: inspection_scores (proposed builtin, not implemented yet).
+// Root CalculatedField: inspection_scores (unpublished Plan 2 builtin).
 SETRESULT(REPEATABLEVALUES($inspections, 'inspection_score'));
 
 // CalculatedField inside payments: needs_approval_note.
-SETRESULT($inspection_scores.some((score) => score < 80));
+SETRESULT($inspection_scores.some((score) => typeof score === 'number' && score < 80));
 ```
 
-These are two separate field calculations. The example assumes finite numeric scores. Null or
-invalid score policy is still open: JavaScript compares `null < 80` as true, so the final documented
-expression or input policy must handle missing values deliberately.
+These are two separate field calculations. Missing entries retain their positions as null. The
+selected expression explicitly ignores non-numeric entries, avoiding JavaScript's `null < 80` result.
+Ordinary source-field validation remains separate from this business-rule helper.
 
 The `approval_note` field can then use this existing visibility-condition shape:
 
@@ -398,11 +395,12 @@ The selected tree supplies validation, structured output and companion repeatabl
 Do not validate the refreshed proposal and deliver different retained values with its validation claim.
 Keep scope-level INVALID findings distinct from field-associated errors and calculation diagnostics.
 
-Preserve the delivered save-once / conditional-revalidation path and operation completion. Custom
-closed-row validation, its participating scopes and retained-values behavior need explicit agreement.
+Preserve the delivered save-once / conditional-revalidation path and operation completion. Plan 2 runs custom validation for participating selected scopes when managed events are enabled,
+including retained-value preparation.
 Do not replay closed-row load/edit/save/unload lifecycle to refresh calculations. If a pre-save hook
 changes inputs, include the resulting values in the final proposal without rerunning the hook.
-Confirmation invalidation and committing refreshed list state after success/failure remain open.
+Core review invalidation is implemented. Applying selected snapshots to editor/list state after
+success/failure remains Plan 3 host integration.
 
 ## 9. Programmatic controller means host-driven preparation
 
@@ -425,26 +423,28 @@ shape is open; this guard is not already delivered. Preserve generation, queue, 
 duplicate-save protections.
 
 Automatic mode should prepare without user confirmation in both paths. Confirm mode needs a
-host-visible decision state: a custom button cannot silently bypass a required review. Exact callback,
-result and continuation shapes are open. They must bind decisions to the reviewed tree version and
+host-visible decision state: a custom button cannot silently bypass a required review. The core review/status/decision shapes are implemented; binding callbacks and controller
+continuations remain Plan 3 integration. They must bind decisions to the reviewed tree version and
 avoid returning a deliverable payload before any required decision. A headless caller must explicitly
 resolve required decisions; lack of UI is not automatic consent.
 
-## 10. Remaining alignment choices
+## 10. Selected policies and remaining consumer work
 
-| Choice                                        | Concrete scenario                                                                              | Current recommendation / status                                                                                     |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Final schema setting name and host precedence | Builder chooses confirm; host forbids stale retention.                                         | Direct form attribute is the current recommendation; default automatic and separate host permission are agreed.     |
-| Empty/malformed choice projection             | Known Red, custom Other Teal, or no selection.                                                 | Known schema values and custom Other text are agreed; empty/malformed/combined cases remain open.                   |
-| Linked-record projection                      | One row selects R1; another selects R2 and R3.                                                 | Include selected record references; settle ID arrays versus reference objects without fetching contents.            |
-| Empty/invalid collection values               | `[100, null, 200]` versus `[100, 'invalid', 200]`.                                             | Preserve positions, skip missing numeric entries, reject invalid numeric entries; pending agreement.                |
-| Aggregate timing during editing               | Accepted child amount changes 100 to 150, or an ancestor changes while descendants are closed. | Recompute accepted-row aggregates; explicitly distinguish any proposal over stale descendants. Exact behavior open. |
-| Durable freshness storage                     | Save old total 110 with tax now 20%, then reopen.                                              | Host persists companion state; exact shape and consumer storage integration open.                                   |
-| Retained-values validity                      | Declined fresh total 120; submitted total stays 110 under current rules.                       | No false freshness claim, no ordinary-error bypass; exact rule evaluation open.                                     |
-| Invalid condition trees                       | Out-of-scope reference under not-equal/or changes requiredness.                                | Settled: reject the schema; defensively throw and emit a structured warning at runtime.                             |
-| Failure and review lifecycle                  | A save hook changes tax after initial preparation, or persistence fails.                       | Save hook once; review final values; define proposal invalidation and local commit timing.                          |
-| Programmatic pending child                    | Host toolbar prepares root while a child has unaccepted edits.                                 | Explicit handling agreed; exact interface open.                                                                     |
-| Performance evidence                          | Wide/deep records and many payment rows scanning one root collection.                          | Include web/worker/Native timing and memory requirements below; budgets remain to be agreed.                        |
+| Choice                  | Selected policy / delivery                                                                                                                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema setting          | Direct `form.repeatable_recalculation`, automatic by default; host can require confirmation but cannot weaken authored confirmation. Retention requires explicit host permission.                                                |
+| Empty/malformed choices | Single null, multiple []; preserve codes/Other text; diagnose malformed or ambiguous values.                                                                                                                                     |
+| Linked records          | Grouped `{ record_id }` references, without fetching contents.                                                                                                                                                                   |
+| Numeric collections     | Preserve positions; skip missing sum entries; Numeric/Calculated finite numbers only; reject strings and overflow.                                                                                                               |
+| Editing                 | Root aggregates read accepted children. Accepted child saves update them; cancelled edits do not. Full refresh is an immutable proposal.                                                                                         |
+| Freshness               | Version-1 companion contains status, schema revision and affected instance/field identities. Host storage/wiring remains Plan 3.                                                                                                 |
+| Retention               | Validate the selected retained snapshot and its calculation-dependent rules; report pending freshness separately.                                                                                                                |
+| Conditions              | Released strict schema rejection in 0.6.0; the record evaluator reuses the global reference index with local condition owners.                                                                                                   |
+| Review/failure          | Single-use captured proposals; changed inputs/options or newer preparation invalidate review. No caller mutation or persistence. Host list commit/persistence acknowledgement remains Plan 3.                                    |
+| Closed-row validation   | Automatically validate every participating selected row when managed events are enabled. Scope-specific registration shares source analysis/compilation. Genuine input errors block ordinary submit; root drafts remain allowed. |
+| Drafts                  | Retain child values without confirmation, allow ordinary validation failures and return pending freshness when appropriate.                                                                                                      |
+| Pending editors         | Host guard/continuation integration remains Plan 3. Core consumes accepted record snapshots, excluding unaccepted work.                                                                                                          |
+| Performance             | 200/2,000 changed-row fixtures, 22-level nesting, Node and browser/worker evidence are recorded in the verification report. Native/Hermes device and full editor interactions remain Plan 3.                                     |
 
 ## 11. Web and mobile performance requirements
 
@@ -465,17 +465,21 @@ trees, multiple aggregate consumers, and repeated edits or submissions.
 - Confirm equivalent final values and failure behavior across hosts. Bound evaluation work and
   report explicit failures instead of serializing a partially evaluated tree.
 
-Representative fixture sizes, numerical latency/memory budgets, live aggregate timing and the small
-set of device checks remain to be agreed in planning. No benchmark or platform performance pass is
-claimed by this document.
+Plan 2 fixes accepted-value aggregate timing and supplies reproducible 200/2,000-row fixtures and
+Node/browser/worker metrics. Reference preparation targets are 250 ms / 2 seconds. Actual Hermes
+memory/latency and the small set of device/UI checks remain Plan 3; see the verification report for
+measured results and limits.
 
-## 12. Evidence and operating constraints
+## 12. Initial evidence and operating constraints
+
+This section preserves the original alignment observations; current implementation evidence is in
+RECORD_EVALUATION_VERIFICATION.md.
 
 Source inspection on 22 October and a small direct core probe confirmed the 18-type catalog, the
 null section placeholder and the payment-condition default-50 result. Earlier probes confirmed
 hidden-ancestor validation and LabelField null output. These are targeted observations, not a new
 full-suite or browser/device acceptance claim. No feature implementation or dependency install
-occurred while creating or updating this document. A later direct probe of a supplied root score
+occurred while gathering those initial observations. A later direct probe of a supplied root score
 array, payment-local `.some(...)` helper and boolean visibility condition passed for `[95, 90]`
 and `[95, 60]` under both TRUSTED and SAFE configurations. That probe verifies the existing
 array-read/helper/condition path, not an implementation of REPEATABLEVALUES or a whole-tree
@@ -515,3 +519,71 @@ acceptance remains deferred. Separate Native/mobile dependency exceptions expire
 Plan 1 execution evidence is recorded separately in
 [`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/form0-condition-scope-20261022/CHECKS.md).
 Earlier observations above retain their original provenance and are not retroactively new test runs.
+
+## 13. Plan 2 implementation agreement
+
+Plan 1 is released in core 0.6.0; #103 is closed. Plan 2 is approved: shared core record evaluation,
+submission validation (#99/#104), and calculation-only repeatable collections. Consumer adoption is
+Plan 3. Existing consumer dependency edits must remain intact.
+
+- Accepted-row edits update root collections after row acceptance; cancelled edits do not. Closed
+  calculations remain accepted snapshots during editing. Submission prepares an immutable full-tree
+  refresh, with root aggregates corresponding to the selected child values.
+- Retained submissions validate the selected retained snapshot, including its calculation-dependent
+  condition outcomes. Host permission is mandatory. Freshness is reported separately from validity.
+- Automatically run participating closed-row custom validation when managed events are enabled.
+  Genuine input failures block ordinary submit, even if many rows require correction. Root drafts
+  remain allowed; no row must be opened merely to recalculate or revalidate.
+- Root drafts preserve accepted child calculations without confirmation and carry pending freshness.
+- Preserve missing collection positions: `[100, null, 200]`; sum finite numeric values to 300 and return
+  zero for no rows. Only NumericField and CalculatedField sum targets are supported. Do not coerce
+  numeric strings. Choice strings remain strings, including numeric-looking schema codes.
+- Empty single choices return null; empty multiple choices return an empty array. Reject malformed
+  or ambiguous selections. Preserve multiple-choice grouping, predefined selection order and Other
+  text. FormLink collections return grouped `{ record_id }` reference objects without fetching.
+- A single nested `tasks` definition may have rows below multiple `projects` records. Root collection
+  reads all matching tasks in record order; a calculation in project P1 reads only tasks below P1.
+  Reject unrelated nested source branches. Targets must belong to the referenced section's rows.
+- Include accepted rows regardless of visibility. Submission validation separately excludes hidden
+  ancestors. No implicit flattening of array-valued target fields.
+- Use `form.repeatable_recalculation`: automatic (default) or confirm. Host-required confirmation
+  cannot weaken authored confirmation. Durable freshness metadata stays outside the record.
+- Core returns proposals and selected evaluated snapshots without persistence, ID/timestamp generation,
+  or mutation of the caller's tree. Hosts retain save-hook ownership and save-once/revalidation order.
+- Test 200/2,000-row and at-least-20-level fixtures; share schema preparation and yield cooperatively.
+  Reference-machine warmed preparation targets: 250 ms / 2 seconds respectively. Actual Hermes
+  performance acceptance and renderer UI/persistence integration remain Plan 3.
+
+### Large-form follow-up
+
+Assess record count, schema breadth and populated nesting together. The dedicated complex fixture
+has 377 schema elements (360 fields, eight RepeatableSections and nine Sections), 90 calculation
+definitions, 549 condition leaves and six populated repeatable levels with uneven sibling branches.
+Its 200/2,000-row sizes count every row across the tree, rather than rows per level. The larger case
+contains 80,040 input/calculated value cells and executes 20,010 calculation tasks during refresh.
+
+Keep original narrow-schema measurements and broader-schema measurements distinct. Factory setup,
+cold/warmed preparation, scheduling gaps, complete proposal transport and memory observations need
+separate reporting. Shared immutable calculation binding metadata may be cached; instance values
+must stay current and must never be retained in that cache. Preserve the complete permitted EVAL
+context and existing diagnostics. See [the follow-up evidence](COMPLEX_RECORD_EVALUATION_VERIFICATION.md).
+
+Plan 2 adds core contracts and localized documentation. Plan 3 still owns binding adoption and its
+end-to-end parity requirements: keep #99/#104 and React #73 open until that delivery is verified.
+Recommend a core minor release after verification and before consumer adoption; the maintainer owns
+the actual version edit, promotion and publication. #103 remains the already-released Plan 1 work.
+
+A subsequent payload breakdown distinguishes temporary evaluation from persistence: the 2,000-row
+fixture serializes to a 2.46 MB structured record, a 6.63 MB evaluated snapshot and a 5.81 MB change
+report. The initial retained-submission format created 5.43 MB of persistable pending-freshness
+metadata because 16,000 affected field entries repeated complete row paths.
+
+Selected correction: publish version 1 with one affected entry per row:
+`{ instancePath, fields: [{ fieldName, fieldKey }] }`. This lossless grouping preserves complete
+ancestry, IDs including zero, positional identities, schema revision and deterministic row/field
+order. It reduces the same fixture's pending companion to 1.43 MB while retaining all 16,000 field
+identities. Root/child calculation behavior, validation, review selection and saved record shape
+remain unchanged. The earlier flat metadata was never published; no maintained consumer has adopted
+it. Tests cover serialization/reopening, same-ID rows in different branches, positional rows and
+defensive review isolation. Peak memory, confirmation lifetime and worker transport remain explicit
+Plan 3 acceptance inputs. See the follow-up verification's payload breakdown.

@@ -1,3 +1,4 @@
+import { analyzeRepeatableCollections } from '../utilities/repeatable-collections.js';
 import { runExpression } from './evaluator.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
@@ -107,32 +108,59 @@ function buildScopedContext(
   contextResolver,
   warningSystem,
   expressionCode,
-  diagnostics
+  diagnostics,
+  preparation = null
 ) {
   const ctx = { ...helpers };
 
-  const referencedFields = extractStaticFieldReferences(expressionCode);
+  const referencedFields = preparation?.references ?? extractStaticFieldReferences(expressionCode);
+  const access = (fieldName) => {
+    if (
+      !preparation ||
+      (!contextResolver.elementOwnership.has(fieldName) && !referencedFields.has(fieldName))
+    )
+      return contextResolver.resolveFieldAccess(executionContext, fieldName);
+    if (!preparation.access.has(fieldName))
+      preparation.access.set(
+        fieldName,
+        contextResolver.resolveFieldAccess(executionContext, fieldName)
+      );
+    return preparation.access.get(fieldName);
+  };
   const restrictedAccessedFields = [];
   const notFoundAccessedFields = [];
 
-  for (const [fieldName, value] of Object.entries(values)) {
-    const accessLevel = contextResolver.resolveFieldAccess(executionContext, fieldName);
+  if (preparation) {
+    // The record evaluator has one immutable schema. Enumerate permitted bindings once,
+    // then read their CURRENT values on every execution (including all EVAL-accessible fields).
+    preparation.bindings ??= [...contextResolver.fieldOwnership.keys()]
+      .filter((name) => access(name) === 'accessible')
+      .map((name) => [name, `$${name}`]);
+    for (const [name, identifier] of preparation.bindings)
+      if (Object.hasOwn(values, name)) ctx[identifier] = values[name];
+  } else {
+    for (const [fieldName, value] of Object.entries(values)) {
+      const accessLevel = access(fieldName);
 
-    if (accessLevel === 'accessible') {
-      ctx[`$${fieldName}`] = value;
-    } else if (accessLevel === 'restricted') {
-      if (referencedFields.has(fieldName)) {
-        ctx[`$${fieldName}`] = undefined;
-        restrictedAccessedFields.push(fieldName);
+      if (accessLevel === 'accessible') {
+        ctx[`$${fieldName}`] = value;
+      } else if (accessLevel === 'restricted') {
+        if (referencedFields.has(fieldName)) {
+          ctx[`$${fieldName}`] = undefined;
+          restrictedAccessedFields.push(fieldName);
+        }
       }
     }
   }
 
   for (const fieldName of referencedFields) {
-    if (!(fieldName in values)) {
-      const accessLevel = contextResolver.resolveFieldAccess(executionContext, fieldName);
-      if (accessLevel === 'not_found') {
+    if (preparation || !(fieldName in values)) {
+      const accessLevel = access(fieldName);
+      if (accessLevel === 'not_found' && !(fieldName in values)) {
         notFoundAccessedFields.push(fieldName);
+      } else if (accessLevel === 'restricted') {
+        ctx[`$${fieldName}`] = undefined;
+        restrictedAccessedFields.push(fieldName);
       }
     }
   }
@@ -255,7 +283,7 @@ function emitDependencyPlanWarnings(plan, warningSystem, runtimeDiagnostics, dia
   });
 }
 
-function evaluateCalculatedField(
+export function evaluateCalculatedField(
   field,
   schema,
   values,
@@ -264,14 +292,27 @@ function evaluateCalculatedField(
   resolver,
   warnings,
   runtimeDiagnostics,
-  diagnostics
+  diagnostics,
+  execution = {}
 ) {
   if (!field?.data_name || !field.calculate) {
     return { changed: false, hasError: false };
   }
 
   try {
-    const executionContext = buildCalculationExecutionContext(schema, field.data_name, resolver);
+    // Factory-owned metadata only: never retain instance values, diagnostics or permissions
+    // from a different schema. The ordinary engine path continues without this private cache.
+    let preparation = execution.preparationCache?.get(field.data_name);
+    if (!preparation && execution.preparationCache) {
+      preparation = {
+        context: buildCalculationExecutionContext(schema, field.data_name, resolver),
+        references: extractStaticFieldReferences(field.calculate),
+        access: new Map(),
+      };
+      execution.preparationCache.set(field.data_name, preparation);
+    }
+    const executionContext =
+      preparation?.context ?? buildCalculationExecutionContext(schema, field.data_name, resolver);
     const context = buildScopedContext(
       values,
       helpers,
@@ -279,30 +320,52 @@ function evaluateCalculatedField(
       resolver,
       warnings,
       field.calculate,
-      diagnostics
+      diagnostics,
+      preparation
     );
     const previousValue = values[field.data_name];
-    const nextValue = runExpression(field.calculate, context, securityConfig, false, schema, {
-      requireResult: true,
-      fieldName: field.data_name,
-      suppressConsoleWarning:
-        diagnostics?.consoleOverride !== undefined || Array.isArray(runtimeDiagnostics),
-      onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),
-      evalReporting: {
-        suppressConsole: diagnostics?.consoleOverride !== undefined,
+    const collection =
+      execution.expression === undefined
+        ? analyzeRepeatableCollections(field.calculate, resolver, field.data_name)
+        : null;
+    if (collection?.issues.length) {
+      values[field.data_name] = null;
+      for (const issue of collection.issues)
+        diagnostics?.record(field.data_name, { ...issue, phase: 'validation' });
+      return { changed: previousValue !== null, hasError: true };
+    }
+    const nextValue = runExpression(
+      execution.expression ?? collection?.expression ?? field.calculate,
+      context,
+      securityConfig,
+      false,
+      schema,
+      {
+        sourceExpression: field.calculate,
+        compileCache: execution.compileCache,
+        requireResult: true,
+        fieldName: field.data_name,
+        suppressConsoleWarning:
+          diagnostics?.consoleOverride !== undefined || Array.isArray(runtimeDiagnostics),
         onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),
-      },
-      onError: (error) => {
-        pushRuntimeDiagnostic(
-          runtimeDiagnostics,
-          field.data_name,
-          error instanceof Error && error.message
-            ? error.message
-            : 'Unknown calculation runtime error.'
-        );
-      },
-    });
+        evalReporting: {
+          resolveReference: execution.resolveReference,
+          suppressConsole: diagnostics?.consoleOverride !== undefined,
+          onDiagnostic: (diagnostic) => diagnostics?.record(field.data_name, diagnostic),
+        },
+        onError: (error) => {
+          pushRuntimeDiagnostic(
+            runtimeDiagnostics,
+            field.data_name,
+            error instanceof Error && error.message
+              ? error.message
+              : 'Unknown calculation runtime error.'
+          );
+        },
+      }
+    );
     values[field.data_name] = nextValue;
+    execution.writeValue?.(nextValue);
 
     return {
       changed: !areStructuredValuesEqual(previousValue, nextValue),

@@ -17,7 +17,7 @@ const _loggedHandlers = new Set();
  * EventManager handles form event registration and execution
  */
 export class EventManager {
-  constructor(schema = null, contextResolver = null, warningSystem = null) {
+  constructor(schema = null, contextResolver = null, warningSystem = null, preparation = {}) {
     this.listeners = new Map(); // eventType -> Map<fieldKey, callback[]>
     this.eventContext = null;
     this.securityConfig = null;
@@ -26,7 +26,9 @@ export class EventManager {
     this.contextResolver = contextResolver || (schema ? new ContextResolver(schema) : null);
     this.warningSystem = warningSystem || new WarningSystem();
     this.schema = schema;
-    this.callbackSources = createEventSourceRegistry();
+    this.callbackSources = createEventSourceRegistry(preparation.sourceCache);
+    this.compilationCache = preparation.compilationCache;
+    this.referenceSourceCache = preparation.referenceSourceCache;
     this.initializationIssues = [];
   }
 
@@ -65,6 +67,7 @@ export class EventManager {
       const result = runInEventOperationScope(scope, () =>
         runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
           sourceExpression: code,
+          compileCache: this.compilationCache,
           onDiagnostic: (diagnostic) =>
             this.initializationIssues.push({
               code: 'initialization_failed',
@@ -305,6 +308,7 @@ export class EventManager {
     const functionCall = `(${callbackCode})(event)`;
     return runInEventOperationScope(scope, () =>
       runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema, {
+        compileCache: this.compilationCache,
         evaluateAsExpression: true,
         ...(managed?.reporting || {}),
       })
