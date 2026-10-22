@@ -80,6 +80,20 @@ for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
       assert.equal(result.snapshot.repeatable.projects[0].visible.projects_t5, true);
       assert.equal(result.snapshot.repeatable.projects[0].required.projects_t5, true);
       assert.equal(result.snapshot.repeatable.projects[0].read_only.projects_t0, true);
+      if (size === 2000 && !security) {
+        const draft = await evaluator.prepareSubmission(snapshot, { intent: 'draft' });
+        assert.equal(draft.status, 'ready');
+        assert.equal(draft.freshness.affected.length, size);
+        assert.equal(
+          draft.freshness.affected.reduce((total, row) => total + row.fields.length, 0),
+          16000
+        );
+        assert.ok(Buffer.byteLength(JSON.stringify(draft.freshness)) < 1500000);
+        assert.equal(
+          checkComplexSnapshot(draft.snapshot, expectedComplexSnapshot(snapshot, 'accepted')),
+          size
+        );
+      }
     } finally {
       ContextResolver.prototype.resolveFieldAccess = originalResolve;
     }

@@ -14,6 +14,7 @@ import { copyRecordData } from '../utilities/record-data.js';
 import { areStructuredValuesEqual } from '../utilities/value-equality.js';
 import { projectCollectionValue } from '../utilities/repeatable-collections.js';
 import { getFormSchemaRevision } from '../utilities/schema-revision.js';
+import { createRecordFreshness } from './record-freshness.js';
 
 const clock = () => globalThis.performance?.now?.() ?? Date.now();
 const issue = (code, message, instancePath = []) => ({ code, message, instancePath });
@@ -71,7 +72,7 @@ function scheduler(options) {
  * @property {1} version
  * @property {'current'|'pending'} status
  * @property {string} schemaRevision
- * @property {Array<{instancePath: RecordInstanceSegment[], fieldName: string, fieldKey: string}>} affected
+ * @property {Array<{instancePath: RecordInstanceSegment[], fields: Array<{fieldName: string, fieldKey: string}>}>} affected One entry per affected row, in record order.
  *
  * @typedef {Object} RecordEvaluationOptions
  * @property {'accepted'|'refresh'} [mode='accepted'] Closed-child calculation policy.
@@ -629,16 +630,7 @@ export function createRecordEvaluator({
             validationSummary: validateSubmissionWithContext(fresh.snapshot, context),
             diagnostics: copyRecordData(fresh.diagnostics),
             issues: [],
-            freshness: {
-              version: 1,
-              status: 'pending',
-              schemaRevision,
-              affected: childChanges.map(({ instancePath, fieldName, fieldKey }) => ({
-                instancePath,
-                fieldName,
-                fieldKey,
-              })),
-            },
+            freshness: createRecordFreshness(schemaRevision, childChanges),
             choices: settings.allowRetain ? ['refresh', 'retain', 'cancel'] : ['refresh', 'cancel'],
           };
         }
@@ -655,18 +647,7 @@ export function createRecordEvaluator({
       return copyRecordData({
         ...prepared,
         changes: fresh.changes,
-        freshness: {
-          version: 1,
-          status: pending ? 'pending' : 'current',
-          schemaRevision,
-          affected: pending
-            ? childChanges.map(({ instancePath, fieldName, fieldKey }) => ({
-                instancePath,
-                fieldName,
-                fieldKey,
-              }))
-            : [],
-        },
+        freshness: createRecordFreshness(schemaRevision, pending ? childChanges : []),
       });
     } catch (error) {
       return failure(error);

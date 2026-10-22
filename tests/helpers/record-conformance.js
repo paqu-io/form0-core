@@ -70,8 +70,9 @@ export async function runRecordConformance(core) {
         retained.snapshot.values.total,
         retained.freshness.status,
         retained.freshness.affected[0].instancePath[0].instanceId,
+        retained.freshness.affected[0].fields,
       ],
-      [330, 'pending', 0],
+      [330, 'pending', 0, [{ fieldName: 'cost', fieldKey: 'cost' }]],
       `${mode}: retained consistency and identity zero`
     );
     const nested = formSchema([

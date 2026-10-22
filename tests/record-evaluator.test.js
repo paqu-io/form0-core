@@ -1018,4 +1018,102 @@ await test('all condition properties resolve root and multiple ancestor-row refe
     );
   }
 });
+await test('grouped freshness preserves identities, row order, review isolation and reopening', async () => {
+  const schema = formSchema(
+    [
+      numericField('rate'),
+      calculatedField('grand', "REPEATABLESUM($tasks, 'subtotal')"),
+      repeatableSection('parents', [
+        numericField('multiplier'),
+        repeatableSection('tasks', [
+          numericField('amount'),
+          calculatedField('subtotal', 'SETRESULT($rate * $multiplier * $amount)', {
+            key: 'subtotal_key',
+          }),
+          calculatedField('tax', 'SETRESULT($subtotal * 0.1)', { key: 'tax_key' }),
+        ]),
+      ]),
+    ],
+    { repeatable_recalculation: 'confirm' }
+  );
+  const snapshot = {
+    values: { rate: 3 },
+    repeatable: {
+      parents: [
+        row(
+          0,
+          { multiplier: 2 },
+          {
+            tasks: [
+              row(0, { amount: 10, subtotal: 40, tax: 4 }),
+              { values: { amount: 5, subtotal: 20, tax: 2 } },
+            ],
+          }
+        ),
+        row(1, { multiplier: 5 }, { tasks: [row(0, { amount: 1, subtotal: 10, tax: 1 })] }),
+      ],
+    },
+  };
+  for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+    const instance = evaluator(schema, { security });
+    const pending = await instance.prepareSubmission(snapshot, { allowRetain: true });
+    assert.equal(pending.status, 'requires_decision');
+    const metadata = JSON.parse(JSON.stringify(pending.freshness));
+    assert.equal(metadata.version, 1);
+    assert.equal(metadata.affected.length, 3);
+    assert.deepEqual(
+      metadata.affected.map(({ instancePath }) =>
+        instancePath.map(({ instanceId, identity }) => [instanceId, identity])
+      ),
+      [
+        [
+          [0, 'id'],
+          [0, 'id'],
+        ],
+        [
+          [0, 'id'],
+          [null, 'position'],
+        ],
+        [
+          [1, 'id'],
+          [0, 'id'],
+        ],
+      ]
+    );
+    for (const entry of metadata.affected)
+      assert.deepEqual(entry.fields, [
+        { fieldName: 'subtotal', fieldKey: 'subtotal_key' },
+        { fieldName: 'tax', fieldKey: 'tax_key' },
+      ]);
+    const flat = metadata.affected.flatMap(({ instancePath, fields }) =>
+      fields.map((field) => ({ instancePath, ...field }))
+    );
+    assert.deepEqual(
+      flat,
+      pending.changes
+        .filter(({ instancePath }) => instancePath.length)
+        .map(({ instancePath, fieldName, fieldKey }) => ({ instancePath, fieldName, fieldKey }))
+    );
+    pending.freshness.affected[0].instancePath[0].instanceId = 'tampered';
+    pending.freshness.affected[0].fields[0].fieldName = 'tampered';
+    const retained = await instance.prepareSubmission(snapshot, {
+      allowRetain: true,
+      decision: { reviewId: pending.reviewId, action: 'retain' },
+    });
+    assert.equal(retained.status, 'ready');
+    assert.equal(retained.snapshot.values.grand, 70);
+    assert.deepEqual(retained.freshness, metadata);
+    const reopened = JSON.parse(JSON.stringify(retained.snapshot));
+    const review = await instance.prepareSubmission(reopened, { allowRetain: true });
+    assert.equal(review.status, 'requires_decision');
+    assert.deepEqual(review.freshness, metadata);
+    const refreshed = await instance.prepareSubmission(reopened, {
+      allowRetain: true,
+      decision: { reviewId: review.reviewId, action: 'refresh' },
+    });
+    assert.equal(refreshed.snapshot.values.grand, 105);
+    assert.equal(refreshed.freshness.status, 'current');
+    assert.deepEqual(refreshed.freshness.affected, []);
+  }
+});
 console.log(`Record evaluator: ${count} scenarios passed.`);
