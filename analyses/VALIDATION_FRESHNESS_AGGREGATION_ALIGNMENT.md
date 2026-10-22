@@ -2,19 +2,19 @@
 
 Updated: 22 October 2026.
 
-Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is implemented as an unpublished
-core candidate with automated evidence. Plan 3 remains separate consumer-adoption planning; renderer,
-Builder and persistence integration changes are not included in Plan 2. See
+Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is published in core 0.7.0.
+Plan 3 is approved and in implementation. It covers the consumers and Builder; production Reform
+record persistence remains the separately documented follow-up. See
 [the core contract](RECORD_EVALUATION_CONTRACT.md) and
 [verification evidence](RECORD_EVALUATION_VERIFICATION.md).
 
 ### Approved delivery sequence
 
-| Plan                       | Delivery                                                                                                                                   | Status                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                  |
-| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Implemented and verified; unpublished core candidate. |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Plan separately against this alignment.               |
+| Plan                       | Delivery                                                                                                                                   | Status                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                   |
+| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                               |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Approved; implementation and verification in progress. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
