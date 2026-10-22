@@ -1,4 +1,5 @@
 import { FIELD_TYPES } from '../utilities/field-types.js';
+import { forEachConditionReference } from '../engine/condition-context.js';
 
 // Define which operators are valid for each field type
 const FIELD_TYPE_OPERATORS = {
@@ -188,26 +189,7 @@ export function validateFieldConditions(field, conditions, allFields = {}) {
     return { isValid: false, errors };
   }
 
-  // Skip validation for container fields
-  if (
-    field.type === 'Section' ||
-    field.type === 'LabelField' ||
-    field.type === 'RepeatableSection'
-  ) {
-    return { isValid: true, errors: [] };
-  }
-
   const validateCondition = (condition) => {
-    if (condition.and) {
-      condition.and.forEach(validateCondition);
-      return;
-    }
-
-    if (condition.or) {
-      condition.or.forEach(validateCondition);
-      return;
-    }
-
     // Use field_id (normalized to key by ensure-keys.js)
     if (condition.operator && condition.field_id) {
       // Find the target field being referenced
@@ -236,11 +218,7 @@ export function validateFieldConditions(field, conditions, allFields = {}) {
     }
   };
 
-  if (Array.isArray(conditions)) {
-    conditions.forEach(validateCondition);
-  } else {
-    validateCondition(conditions);
-  }
+  forEachConditionReference(conditions, validateCondition);
 
   return { isValid: errors.length === 0, errors };
 }

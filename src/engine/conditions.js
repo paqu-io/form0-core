@@ -1,4 +1,4 @@
-import { flattenFields } from '../utilities/field-helpers.js';
+import { assertConditionReferences, createConditionContext } from './condition-context.js';
 
 const valuesEqual = (a, b) => {
   if (Array.isArray(a) && Array.isArray(b)) {
@@ -81,27 +81,40 @@ function normalizeConditionValue(field, value) {
   return value;
 }
 
-export function evaluateConditions(conditions, values, allFields) {
+export function evaluateConditions(conditions, values, allFields, scope = null) {
+  if (scope) {
+    assertConditionReferences(conditions, scope.owner, scope.property, scope.context);
+  }
+  return evaluateConditionExpression(conditions, values, allFields);
+}
+
+function evaluateConditionExpression(conditions, values, allFields) {
   if (Array.isArray(conditions)) {
-    return conditions.every((c) => evaluateConditions(c, values, allFields));
+    return conditions.every((c) => evaluateConditionExpression(c, values, allFields));
   }
 
   if (conditions.and) {
-    return conditions.and.every((c) => evaluateConditions(c, values, allFields));
+    return conditions.and.every((c) => evaluateConditionExpression(c, values, allFields));
   }
 
   if (conditions.or) {
-    return conditions.or.some((c) => evaluateConditions(c, values, allFields));
+    return conditions.or.some((c) => evaluateConditionExpression(c, values, allFields));
   }
 
   // Map field_id (key) to data_name for value lookup
   const field = allFields ? allFields[conditions.field_id] : undefined;
   const dataName = field ? field.data_name : undefined;
   const val = normalizeConditionValue(field, dataName ? values[dataName] : undefined);
-  // Debug log: show what is being checked
-  //console.log('[evaluateConditions] field_id:', conditions.field_id, 'data_name:', dataName, 'value in values:', val, 'expected:', conditions.value, 'operator:', conditions.operator);
   const fn = OPERATORS[conditions.operator];
   return fn ? fn(val, conditions.value) : false;
+}
+
+function evaluateElementCondition(owner, property, values, context) {
+  return evaluateConditions(owner[property], values, context.allFields, {
+    owner,
+    property,
+    context,
+  });
 }
 
 /**
@@ -109,9 +122,9 @@ export function evaluateConditions(conditions, values, allFields) {
  * @param {Array} elements - Form elements to evaluate
  * @param {Object} values - Current form values
  * @param {Object} visible - Visibility state object to populate
- * @param {Object} allFields - Map of all fields by key for condition evaluation
+ * @param {Object} context - Shared field index and ownership resolver
  */
-function evaluateVisibilityRecursive(elements, values, visible, allFields) {
+function evaluateVisibilityRecursive(elements, values, visible, context) {
   elements.forEach((element) => {
     if (
       element.type === 'Section' ||
@@ -120,7 +133,7 @@ function evaluateVisibilityRecursive(elements, values, visible, allFields) {
     ) {
       // First evaluate children (bottom-up approach)
       if (element.elements && element.elements.length > 0) {
-        evaluateVisibilityRecursive(element.elements, values, visible, allFields);
+        evaluateVisibilityRecursive(element.elements, values, visible, context);
 
         // Check if any child is visible
         const hasVisibleChild = element.elements.some(
@@ -133,7 +146,12 @@ function evaluateVisibilityRecursive(elements, values, visible, allFields) {
         } else {
           // At least one child visible → respect explicit section visibility settings
           if (element.visible_conditions) {
-            const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+            const isVisible = evaluateElementCondition(
+              element,
+              'visible_conditions',
+              values,
+              context
+            );
             visible[element.data_name] = isVisible;
           } else {
             visible[element.data_name] = element.visible === true;
@@ -142,7 +160,12 @@ function evaluateVisibilityRecursive(elements, values, visible, allFields) {
       } else {
         // Empty section fallback (though schema validation should prevent this)
         if (element.visible_conditions) {
-          const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+          const isVisible = evaluateElementCondition(
+            element,
+            'visible_conditions',
+            values,
+            context
+          );
           visible[element.data_name] = isVisible;
         } else {
           visible[element.data_name] = element.visible === true;
@@ -151,7 +174,7 @@ function evaluateVisibilityRecursive(elements, values, visible, allFields) {
     } else {
       // Regular field - existing logic
       if (element.visible_conditions) {
-        const isVisible = evaluateConditions(element.visible_conditions, values, allFields);
+        const isVisible = evaluateElementCondition(element, 'visible_conditions', values, context);
         visible[element.data_name] = isVisible;
       } else {
         visible[element.data_name] = element.visible === true;
@@ -160,34 +183,24 @@ function evaluateVisibilityRecursive(elements, values, visible, allFields) {
   });
 }
 
-export function evaluateVisibility(schema, values, visible) {
-  // Build allFields map by key using flattened fields for condition evaluation
-  // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
-  // to avoid rebuilding on every evaluation. See #perf-caching-idea.
-  const fields = flattenFields(schema.elements);
-  const allFields = {};
-  fields.forEach((field) => {
-    if (field.key) allFields[field.key] = field;
-    if (field.data_name) allFields[field.data_name] = field;
-  });
-
-  // Use recursive approach for single-pass visibility evaluation
-  evaluateVisibilityRecursive(schema.elements, values, visible, allFields);
+export function evaluateVisibility(
+  schema,
+  values,
+  visible,
+  context = createConditionContext(schema)
+) {
+  evaluateVisibilityRecursive(schema.elements, values, visible, context);
 }
 
-export function evaluateRequirement(schema, values, required) {
-  const fields = flattenFields(schema.elements);
-  // Build allFields map by key
-  // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
-  // to avoid rebuilding on every evaluation. See #perf-caching-idea.
-  const allFields = {};
-  fields.forEach((field) => {
-    if (field.key) allFields[field.key] = field;
-    if (field.data_name) allFields[field.data_name] = field;
-  });
-  fields.forEach((field) => {
+export function evaluateRequirement(
+  schema,
+  values,
+  required,
+  context = createConditionContext(schema)
+) {
+  context.fields.forEach((field) => {
     if (field.required_conditions) {
-      const isRequired = evaluateConditions(field.required_conditions, values, allFields);
+      const isRequired = evaluateElementCondition(field, 'required_conditions', values, context);
       required[field.data_name] = isRequired;
     } else {
       required[field.data_name] = field.required === true;
@@ -195,19 +208,15 @@ export function evaluateRequirement(schema, values, required) {
   });
 }
 
-export function evaluateReadOnly(schema, values, read_only) {
-  const fields = flattenFields(schema.elements);
-  // Build allFields map by key
-  // PERFORMANCE NOTE: For large/static schemas, consider caching/memoizing allFields per schema
-  // to avoid rebuilding on every evaluation. See #perf-caching-idea.
-  const allFields = {};
-  fields.forEach((field) => {
-    if (field.key) allFields[field.key] = field;
-    if (field.data_name) allFields[field.data_name] = field;
-  });
-  fields.forEach((field) => {
+export function evaluateReadOnly(
+  schema,
+  values,
+  read_only,
+  context = createConditionContext(schema)
+) {
+  context.fields.forEach((field) => {
     if (field.read_only_conditions) {
-      const isReadOnly = evaluateConditions(field.read_only_conditions, values, allFields);
+      const isReadOnly = evaluateElementCondition(field, 'read_only_conditions', values, context);
       read_only[field.data_name] = isReadOnly;
     } else {
       read_only[field.data_name] = field.read_only === true;

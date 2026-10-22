@@ -1,5 +1,5 @@
 /**
- * Context-aware field resolution for calculations and events
+ * Context-aware field resolution for calculations, conditions and events
  * Determines which fields are accessible based on execution context
  * Reuses tree-building logic from record-transformer.js
  */
@@ -10,6 +10,7 @@ export class ContextResolver {
   constructor(schema) {
     // Maps to store field context information (similar to record-transformer.js)
     this.fieldOwnership = new Map(); // Field data_name -> { preferredKey, field, parentPath }
+    this.elementOwnership = new Map(); // Includes containers in their containing record context.
     this.repeatableSectionTree = new Map(); // RepeatableSection data_name -> tree info
     this.sectionFields = new Set(); // Section field names (organizational only)
 
@@ -26,6 +27,12 @@ export class ContextResolver {
     if (!Array.isArray(elements)) return;
 
     elements.forEach((element) => {
+      const preferredKey =
+        typeof element.key === 'string' && element.key.trim() !== ''
+          ? element.key
+          : element.data_name;
+      const ownership = { preferredKey, field: element, parentPath: [...parentPath] };
+      this.elementOwnership.set(element.data_name, ownership);
       if (element.type === 'Section' || element.type === 'BuildingPlanSection') {
         this.sectionFields.add(element.data_name);
         // Recursively process Section children with same parentPath
@@ -34,8 +41,6 @@ export class ContextResolver {
           this.buildFieldContext(element.elements, parentPath);
         }
       } else if (element.type === 'RepeatableSection') {
-        const preferredKey =
-          element.key && element.key.trim() !== '' ? element.key : element.data_name;
         const currentPath = [...parentPath, preferredKey];
 
         // Store this RepeatableSection in the tree
@@ -54,13 +59,7 @@ export class ContextResolver {
         }
       } else {
         // This is a regular field - determine its ownership
-        const preferredFieldKey =
-          element.key && element.key.trim() !== '' ? element.key : element.data_name;
-        this.fieldOwnership.set(element.data_name, {
-          preferredKey: preferredFieldKey,
-          field: element,
-          parentPath: [...parentPath], // Copy the current path
-        });
+        this.fieldOwnership.set(element.data_name, ownership);
       }
     });
   }
@@ -145,6 +144,19 @@ export class ContextResolver {
    */
   checkRepeatableSectionAccessInfo(executionContext, fieldName, fieldInfo) {
     const { type: contextType, eventType, fieldName: contextFieldName } = executionContext;
+
+    if (contextType === 'condition') {
+      const owner = this.elementOwnership.get(contextFieldName);
+      if (owner) {
+        return this.resolveRepeatableSectionRelationship(
+          owner.parentPath,
+          fieldInfo.parentPath,
+          fieldName,
+          fieldInfo,
+          executionContext
+        );
+      }
+    }
 
     if (contextType === 'calculation') {
       // CalculatedField can only access fields in same RepeatableSection context
@@ -317,6 +329,10 @@ export class ContextResolver {
 
   buildRestrictedAccessSuggestion(executionContext, fieldName, fieldInfo, code) {
     const { type: contextType, eventType } = executionContext;
+
+    if (contextType === 'condition') {
+      return `Conditions can only reference fields in their containing record or its ancestors. Field '${fieldName}' belongs to: ${this.formatRepeatableSectionPath(fieldInfo.parentPath)}`;
+    }
 
     if (contextType === 'calculation') {
       if (code === 'different_repeatable_section') {
