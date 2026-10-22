@@ -145,6 +145,7 @@ export function createRecordEvaluator({
     warningSystem
   );
   const compileCache = new Map();
+  const calculationPreparationCache = new Map();
   const eventSourceCache = new Map();
   const eventReferenceCache = new Map();
   const evaluatorId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -380,6 +381,7 @@ export function createRecordEvaluator({
             {
               expression: analysis.expression,
               compileCache,
+              preparationCache: calculationPreparationCache,
               writeValue: (value) => {
                 node.scope.record.values[node.field.data_name] = value;
               },
