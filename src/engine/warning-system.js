@@ -179,6 +179,10 @@ export class WarningSystem {
       return `CalculatedField '${fieldName}'`;
     }
 
+    if (type === 'condition') {
+      return `${executionContext.conditionProperty} on '${fieldName}'`;
+    }
+
     if (type === 'event') {
       if (fieldName) {
         return `Event '${eventType}' on field '${fieldName}'`;

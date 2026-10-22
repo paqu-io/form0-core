@@ -4,7 +4,8 @@ import { evaluateRequirement } from './conditions.js';
 import { evaluateReadOnly } from './conditions.js';
 import { validateFields } from './field-validation.js';
 import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
-import { validateSchema } from '../schema/schema-validator.js';
+import { validateSchemaWithContext } from '../schema/schema-validator.js';
+import { createConditionContext } from './condition-context.js';
 import { flattenFields } from '../utilities/field-helpers.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import { EventManager } from './events.js';
@@ -77,7 +78,8 @@ export function createFormEngine({
 }) {
   const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
-  validateSchema(preparedSchema.form);
+  const contextResolver = new ContextResolver(preparedSchema.form);
+  validateSchemaWithContext(preparedSchema.form, contextResolver);
 
   const { form } = preparedSchema;
   const values = { ...initialValues };
@@ -147,9 +149,9 @@ export function createFormEngine({
   const allHelpers = { ...calculationBuiltins, ...helpers };
 
   // Initialize context resolution system
-  const contextResolver = new ContextResolver(form);
   const calculationPlan = buildCalculationDependencyPlan(form, contextResolver);
   const sharedWarningSystem = warningSystem || new WarningSystem();
+  const conditionContext = createConditionContext(form, contextResolver, sharedWarningSystem);
   const calculationDiagnostics = createCalculationDiagnostics(
     diagnostics,
     onDiagnostics,
@@ -196,9 +198,9 @@ export function createFormEngine({
         calculationPlan,
         calculationDiagnostics
       );
-      evaluateRequirement(form, values, required);
-      evaluateVisibility(form, values, visible);
-      evaluateReadOnly(form, values, read_only);
+      evaluateRequirement(form, values, required, conditionContext);
+      evaluateVisibility(form, values, visible, conditionContext);
+      evaluateReadOnly(form, values, read_only, conditionContext);
       validateFields(form, values, errors);
     } catch (error) {
       calculationDiagnostics.abort(frame);

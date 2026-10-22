@@ -4,6 +4,8 @@ import { isSupportedFieldType } from '../utilities/field-types.js';
 import { validateFieldConditions } from './operators.js';
 import { validateFormAIMetadata } from './ai-metadata-validator.js';
 import { buildDatasetDescriptors } from '../utilities/dataset-descriptors.js';
+import { ContextResolver } from '../engine/context-resolver.js';
+import { CONDITION_PROPERTIES, getConditionReferenceIssues } from '../engine/condition-context.js';
 
 const toNonEmptyString = (value) =>
   typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -72,6 +74,11 @@ const validateScopedTitleFields = (form, errors) => {
 };
 
 export function validateSchema(form) {
+  return validateSchemaWithContext(form, new ContextResolver(form));
+}
+
+// Internal entrypoint lets engine construction reuse its ownership index.
+export function validateSchemaWithContext(form, contextResolver) {
   const fields = flattenFields(form.elements);
   const seenDataNames = new Set();
   const seenKeys = new Set();
@@ -85,7 +92,7 @@ export function validateSchema(form) {
   }
 
   // Create a map of all fields by key and data_name for condition validation
-  const allFields = {};
+  const allFields = Object.create(null);
   fields.forEach((field) => {
     if (field.key) {
       allFields[field.key] = field;
@@ -145,25 +152,18 @@ export function validateSchema(form) {
       errors.push(...fieldValidation.errors);
     }
 
-    // Validate conditions for all field types
-    if (field.visible_conditions) {
-      const validation = validateFieldConditions(field, field.visible_conditions, allFields);
-      if (!validation.isValid) {
-        errors.push(...validation.errors);
-      }
-    }
-
-    if (field.required_conditions) {
-      const validation = validateFieldConditions(field, field.required_conditions, allFields);
-      if (!validation.isValid) {
-        errors.push(...validation.errors);
-      }
-    }
-
-    if (field.read_only_conditions) {
-      const validation = validateFieldConditions(field, field.read_only_conditions, allFields);
-      if (!validation.isValid) {
-        errors.push(...validation.errors);
+    for (const property of CONDITION_PROPERTIES) {
+      if (!field[property]) continue;
+      const conditionErrors = validateFieldConditions(field, field[property], allFields).errors;
+      errors.push(...conditionErrors);
+      for (const issue of getConditionReferenceIssues(
+        field,
+        property,
+        field[property],
+        allFields,
+        contextResolver
+      )) {
+        if (!conditionErrors.includes(issue.message)) errors.push(issue.message);
       }
     }
 
