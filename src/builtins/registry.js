@@ -1,9 +1,5 @@
-import {
-  REPEATABLEVALUES,
-  REPEATABLESUM,
-  REPEATABLEVALUES_METADATA,
-  REPEATABLESUM_METADATA,
-} from './repeatable/repeatable.js';
+import { REPEATABLEVALUES, REPEATABLEVALUES_METADATA } from './repeatable/repeatablevalues.js';
+import { REPEATABLESUM, REPEATABLESUM_METADATA } from './repeatable/repeatablesum.js';
 import { cloneBuiltinMetadata, BUILTIN_CONTEXTS } from './builtin-metadata.js';
 import { BUILTIN_DEFINITIONS } from './builtin-definitions.js';
 
