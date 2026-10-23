@@ -84,7 +84,7 @@ and each independently copied browser/Native-adapter/CLI tree. Symlink audit fou
 Existing accepted evidence and maintained consumer dependency edits were preserved.
 
 Local drivers, archives, complete logs and JSON evidence:
-`.local-test-harnesses/form0-record-evaluation-20261022/` in the parent workspace. In particular:
+`.local-test-harnesses/_archive/form0-record-evaluation-20261022/` in the parent workspace. In particular:
 PACKED_PROOF.json, artifacts/core-pack.json, logs/core-check.log, logs/node22-record-tests.log,
 logs/benchmark.json, logs/browser-benchmark.json, logs/browser.log, logs/native-tests.log,
 logs/cli.log and logs/docs-final.log. Portable conformance and benchmark fixtures are committed under

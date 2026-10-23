@@ -66,7 +66,7 @@ npm run package:check
 ```
 
 Local consumer drivers, results, complete logs and file hashes are retained at
-`.local-test-harnesses/form0-condition-scope-20261022/` in the parent workspace:
+`.local-test-harnesses/_archive/form0-condition-scope-20261022/` in the parent workspace:
 
 - `fixture.mjs`, `fields.mjs`, `web/check.mjs`, `web/main.jsx`: browser renderer and worker checks.
 - `adapter/build.mjs`, `adapter/scope.test.jsx`: packed Native renderer with platform primitives

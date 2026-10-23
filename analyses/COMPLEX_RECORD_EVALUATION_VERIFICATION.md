@@ -131,7 +131,7 @@ database record or device storage; persistence remains host-owned.
 | Whitespace checks                                                   | PASS                                                                                                  |
 
 The independent candidate and logs live under the parent workspace's
-`.local-test-harnesses/form0-record-scale-20261022/`. Original accepted evidence under
+`.local-test-harnesses/_archive/form0-record-scale-20261022/`. Original accepted evidence under
 `form0-record-evaluation-20261022/` was preserved. No maintained dependency tree was replaced.
 
 Candidate SHA-256:

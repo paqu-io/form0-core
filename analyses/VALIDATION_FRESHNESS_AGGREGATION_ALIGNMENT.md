@@ -1,20 +1,20 @@
 # Validation, repeatable freshness and aggregation: alignment
 
-Updated: 22 October 2026.
+Updated: 23 October 2026.
 
 Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is published in core 0.7.0.
-Plan 3 is approved and in implementation. It covers the consumers and Builder; production Reform
+Plan 3 implementation and automated verification are complete; actual Android acceptance is pending. It covers the consumers and Builder; production Reform
 record persistence remains the separately documented follow-up. See
 [the core contract](RECORD_EVALUATION_CONTRACT.md) and
 [verification evidence](RECORD_EVALUATION_VERIFICATION.md).
 
 ### Approved delivery sequence
 
-| Plan                       | Delivery                                                                                                                                   | Status                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                   |
-| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                               |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Approved; implementation and verification in progress. |
+| Plan                       | Delivery                                                                                                                                   | Status                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                                  |
+| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                                              |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Implementation/automated checks complete; Android acceptance pending. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -32,14 +32,14 @@ superseded by this clarification.
 
 Design these concerns together, with separately reviewable delivery surfaces:
 
-| Concern                                                                                                                  | Direction                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Core [#99](https://github.com/paqu-io/form0-core/issues/99) and [#104](https://github.com/paqu-io/form0-core/issues/104) | Shared submission-validation rules and field participation.                                               |
-| React [#73](https://github.com/paqu-io/form0-react/issues/73) and equivalent Native behavior                             | Current closed-child state before validation and serialization.                                           |
-| `REPEATABLEVALUES` and `REPEATABLESUM`                                                                                   | Include aggregation in the next delivery; this expands #73's original non-aggregation scope.              |
-| Core [#103](https://github.com/paqu-io/form0-core/issues/103)                                                            | Separately reviewable condition-scope correctness, required before complete nested-validity claims.       |
-| Core [#101](https://github.com/paqu-io/form0-core/issues/101)                                                            | Keep setters and input normalization separate unless a concrete dependency emerges.                       |
-| Reform Builder                                                                                                           | Identify the authoring integration for portable form settings; implementation scope remains to be agreed. |
+| Concern                                                                                                                  | Direction                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core [#99](https://github.com/paqu-io/form0-core/issues/99) and [#104](https://github.com/paqu-io/form0-core/issues/104) | Shared submission-validation rules and field participation.                                                                                                                                 |
+| React [#73](https://github.com/paqu-io/form0-react/issues/73) and equivalent Native behavior                             | Current closed-child state before validation and serialization.                                                                                                                             |
+| `REPEATABLEVALUES` and `REPEATABLESUM`                                                                                   | Include aggregation in the next delivery; this expands #73's original non-aggregation scope.                                                                                                |
+| Core [#103](https://github.com/paqu-io/form0-core/issues/103)                                                            | Separately reviewable condition-scope correctness, required before complete nested-validity claims.                                                                                         |
+| Core [#101](https://github.com/paqu-io/form0-core/issues/101)                                                            | Keep setters and input normalization separate unless a concrete dependency emerges.                                                                                                         |
+| Reform Builder                                                                                                           | Identify the authoring integration for portable form settings; root recalculation control, authoritative collection metadata and unsaved full-form preview shortcut are included in Plan 3. |
 
 Core should own shared domain evaluation and validation rules. Hosts own editor interaction,
 settling pending updates, presenting decisions and persistence. This does not settle whether a
@@ -517,7 +517,7 @@ avoid local docs production builds and secret-file reads, and keep device steps 
 acceptance remains deferred. Separate Native/mobile dependency exceptions expire 7 November 2026.
 
 Plan 1 execution evidence is recorded separately in
-[`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/form0-condition-scope-20261022/CHECKS.md).
+[`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/_archive/form0-condition-scope-20261022/CHECKS.md).
 Earlier observations above retain their original provenance and are not retroactively new test runs.
 
 ## 13. Plan 2 implementation agreement
@@ -587,3 +587,24 @@ remain unchanged. The earlier flat metadata was never published; no maintained c
 it. Tests cover serialization/reopening, same-ID rows in different branches, positional rows and
 defensive review isolation. Peak memory, confirmation lifetime and worker transport remain explicit
 Plan 3 acceptance inputs. See the follow-up verification's payload breakdown.
+
+## Plan 3 implementation checkpoint — 23 October 2026
+
+The selected editor/submission contracts are implemented in core, React main-thread/actual worker,
+Native, CLI preview and Builder. See [verification and issue acceptance mapping](PLAN_3_VERIFICATION.md).
+The implementation preserves the selected all-or-none review, host-enabled retention, durable
+companion, callback success acknowledgement and unsaved selected values after failure. Private
+reports are paged and released; routine worker replies carry selected data once. The root serializer
+preserves numeric ID zero. Authored confirmation and managed-event opt-out keep their agreed meaning.
+
+Automated source, package, security-policy, cross-consumer, wide/deep performance and four-locale
+documentation gates pass. Actual Android/Expo Go/Hermes acceptance remains the three focused
+walkthroughs in the Native repository. iOS remains deferred. Production reform persistence and
+Native/mobile dependency-exception remediation remain separate follow-ups. The new additive scoped
+core API must be published before dependent consumer releases; the maintainer owns version edits,
+minimum dependency ranges, publication, merges, deployment and issue closure. No issue is closed here.
+
+Storage cleanup preserved older evidence under the harness root archive and updated active repository
+references. Continue from `.local-test-harnesses/CURRENT_WORK.md`, not a historical handoff. Flag future
+large allocations before creating/installing dependency trees, and retain the active device harness
+until actual acceptance is complete.
