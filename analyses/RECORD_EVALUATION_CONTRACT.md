@@ -163,3 +163,27 @@ hook that changes reviewed inputs invalidates that review; resolve a new proposa
 the hook. Core does not apply proposals to editor/list state, persist, or generate timestamps/IDs.
 Programmatic pending-child protection, dialog presentation, visible list commit timing, persistence
 acknowledgements and transport adoption remain Plan 3 responsibilities.
+
+## Scoped editor evaluation
+
+The evaluator also exposes `evaluateScope(snapshot, { instancePath, signal, budgetMs, yieldToHost })`.
+Omit `instancePath` or supply `[]` for the root; identified child segments include complete ancestry,
+repeatable keys, ID (including zero), index and identity kind. An ID resolves after reordering;
+positional segments stay tied to the captured order. Invalid targets fail explicitly.
+
+The method evaluates only that record's calculations, field state and built-in submission findings.
+It reads supplied current ancestors and accepted other rows through the existing scope/collection
+resolver. It preserves every other record's calculations, runs no lifecycle/custom validation or
+persistence, generates no record IDs/timestamps and never mutates its caller. Its reply is
+`{ status, instancePath, state, validationSummary, changes, diagnostics, issues }`, without another
+complete record tree. Execution failure or cancellation supplies no partial state.
+
+For a project whose accepted task costs are `[10,20]`, editing its surcharge to `5` shows subtotal
+`35`. Accepting the project lets its parent aggregate update; cancelling retains the accepted value.
+Whole-record refresh/review remains the responsibility of `prepareSubmission()`. Live engines retain
+event ownership. These contracts do not alter intrinsic scalar `engine.eval()` behavior.
+
+Consumer preparation identities belong to one session and attempt. Acknowledgement means the exact
+selected record and companion were successfully persisted; it does not perform persistence. Selected
+values remain unsaved work after validation or persistence failure. Root drafts retain accepted
+children. Complete reports/proposals stay private to the coordinator/worker, with bounded change pages.

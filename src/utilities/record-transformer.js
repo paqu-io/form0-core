@@ -8,6 +8,9 @@ import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
 import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
 
+const resolveRecordId = (primary, fallback) =>
+  primary === 0 ? 0 : primary || (fallback === 0 ? 0 : fallback || null);
+
 const hasMeaningfulValue = (value) => {
   if (value === null || value === undefined) {
     return false;
@@ -614,7 +617,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     ),
 
     // Ensure our specific handling isn't overridden (always set last)
-    id: options.mainRecordId || id || null,
+    id: resolveRecordId(options.mainRecordId, id),
     changeset_id: options.changeset_id || null, // Ensure changeset_id isn't overridden
     created_at: clientCreatedAt, // Ensure canonical created_at isn't overridden
     updated_at: serverUpdatedAt, // Ensure canonical updated_at isn't overridden
