@@ -706,3 +706,38 @@ proposed mode, but a guarded write on an editable load would run only when initi
 It would not run later after a readonly opening; initialization that must occur on entering editing
 belongs in new-record/edit-record or the equivalent repeatable events. This explanation adds no
 implemented public property and settles no unapproved load-policy or compatibility choice.
+
+## Load policy approved and lifecycle order verified — 23 October 2026
+
+The maintainer approved the recommended accepted-snapshot/load policy above and the addition of
+`event.mode: 'readonly' | 'edit'`. This supersedes the discussion-only status of those choices;
+the runtime implementation remains pending. Preserve readable views, reject prohibited write
+batches with execution issues, and keep permissions independent of mutable handler metadata.
+Editable load handlers may still write. Existing setters that also execute on view-time load need
+author guards or migration to the appropriate new/edit event; no writable-view escape is selected.
+
+Source inspection confirms that the managed lifecycle in both bindings already awaits load before
+dispatching the applicable new/edit event. The shared scheduling utility completes accepted
+operation processing before that dispatch resolves. Core registers/dispatches events but does not
+automatically open records or choose their lifecycle sequence; the bindings or a headless host own
+that orchestration. Preserve this ordering rather than changing it to introduce mode metadata.
+
+| Opening or transition | Selected managed sequence |
+| --- | --- |
+| Open existing root directly in Edit | `load-record(edit)` then `edit-record(edit)` |
+| Create root | `load-record(edit)` then `new-record(edit)` |
+| Open existing root in View, then press Edit | `load-record(readonly)` at opening; `edit-record(edit)` on entering editing, with no second load |
+| Open existing child directly in Edit | `load-repeatable(edit)` then `edit-repeatable(edit)` |
+| Create child | `load-repeatable(edit)` then `new-repeatable(edit)` |
+| Open existing child in View, then press Edit | `load-repeatable(readonly)` at opening; `edit-repeatable(edit)` on entering editing, with no second load |
+
+Here the parenthesized value denotes the proposed `event.mode`, not a new event name. Each
+sequence applies to the executing record's effective mode. Direct editable load can set amount
+100 and new/edit can subsequently read 100. A view-time load can display an alert while accepted
+total 110 remains unchanged; entering Edit can then calculate 120 using the current ancestor tax.
+
+The existing managed lifecycle remains opt-in and uses explicit root new/existing classification.
+Legacy automatic root load/edit dispatch must remain compatible in routing and ordering, while
+receiving the agreed view-write protection and mode context. This verification adds no runtime
+property, changes no saved record, and does not resume Android acceptance before the new policy is
+implemented and automatically verified.
