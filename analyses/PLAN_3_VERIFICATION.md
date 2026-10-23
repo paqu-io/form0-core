@@ -161,7 +161,27 @@ with the unpublished Plan 3 interface.
 | Production reform          | Required persistence/revision/media/callback/offline changes are documented separately.                                                                                               | Separate delivery across web/public-share/mobile/backend; no durable authenticated-web drafts added.                    |
 | Native/mobile dependencies | Existing exception policy preserved.                                                                                                                                                  | Separate targeted remediation before 7 November 2026; iOS acceptance deferred.                                          |
 
-The isolated Expo SDK 57 / React Native 0.86.3 fixture builds an Android Hermes bytecode bundle and
+The original isolated Expo SDK 57 / React Native 0.86.3 fixture built an Android Hermes bytecode bundle and
 persists a record-plus-companion envelope in a separate SQLite database. The maintainer has an Android
 Expo Go device available. Record the actual model, Android/client/RN versions and Hermes flag when
 running the three walkthroughs; a successful export does not establish actual device acceptance.
+
+## Android host migration to SDK 58 — 23 October 2026
+
+The maintainer could not install the matching SDK 57 Expo Go client and selected migration of the
+form0 starter and acceptance harness to SDK 58 before the device walkthroughs. Production Reform
+adoption remains deferred. The active device tree now uses Expo 58.0.17, React Native 0.88.0 and
+React 19.3.0, preserving the candidate archives and SDK 57 evidence above.
+
+Both starter and harness pass Expo Doctor 20/20 and dependency compatibility checks. Starter
+Android/iOS bundle exports, disposable native generation, the device Android Hermes export, Native's
+54 Node tests, public declaration consumption and the 23-test four-locale documentation gates pass.
+A local Metro manifest reports SDK 58.0.0. Actual Android/Hermes timings and the three walkthroughs
+remain pending; previous browser/Node performance evidence is not reclassified as SDK 58 acceptance.
+
+The starter's exact temporary audit graph was re-reviewed for SDK 58. The same two known advisories
+still produce 15 high dependency entries; policy tests pass 19/19, with no deadline extension or
+advisory expansion. Native's separate peer exception is unchanged. See the
+[migration evidence](../../form0-mobile-tmpl-react-native-expo/analyses/SDK_58_MIGRATION.md) and updated
+Native Android guide for commands, limits, storage and remaining work. No local docs production build
+or actual device acceptance is claimed.

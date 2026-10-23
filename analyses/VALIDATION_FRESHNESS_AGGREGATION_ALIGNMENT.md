@@ -608,3 +608,9 @@ Storage cleanup preserved older evidence under the harness root archive and upda
 references. Continue from `.local-test-harnesses/CURRENT_WORK.md`, not a historical handoff. Flag future
 large allocations before creating/installing dependency trees, and retain the active device harness
 until actual acceptance is complete.
+
+On 23 October, the maintainer selected an SDK 58 migration for the form0 mobile starter and Android
+acceptance harness because the matching SDK 57 Expo Go client could not be installed. Automated
+migration checks pass; the three actual-device walkthroughs remain pending. The same packed form0
+candidates are retained, and this host-runtime migration does not raise binding peer requirements
+or include production Reform adoption. See the SDK 58 section of the verification report.
