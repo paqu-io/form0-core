@@ -679,3 +679,30 @@ The following load/builtin policy is a recommendation for discussion, not an agr
 Compatibility remains a decision: existing load handlers that write would need migration for
 snapshot view mode. Do not add a silent compatibility escape that permits record mutation in view.
 No runtime code or public interface was changed while recording these discussion proposals.
+
+## Fulcrum comparison and event.mode explanation — 23 October 2026
+
+The maintainer asked for an independent review of Fulcrum before deciding the load policy.
+See [the official-source comparison](FULCRUM_LOAD_VIEW_POLICY_RESEARCH.md). Public documentation
+confirms load-record in both edit and view-only modes, distinguishes new/edit hooks, and includes
+load handlers using SETVALUE. An example with SETVALUE in load is not evidence that a view-only
+host applies or persists that write. Exact read-only write and calculation behavior must remain
+unconfirmed where the public sources do not specify it. Our proposed write restrictions are an
+explicit form0 contract rather than a claim of identical Fulcrum behavior.
+
+For discussion, event.mode would describe the executing record scope's effective interaction mode
+at dispatch: 'readonly' or 'edit', matching the renderer's existing vocabulary. The root can be
+editing while a viewed child receives readonly. New/existing classification, draft intent, record
+status and individual field read_only flags are separate concepts. Runtime scope state is the
+permission authority; a handler or programmatic caller cannot upgrade permissions by changing
+metadata. Each dispatch captures its mode; switching to Edit starts the edit lifecycle rather than
+mutating a previously delivered load event. Stricter validation and close restrictions still apply.
+Headless validation metadata needs an explicit definition before implementation; mode must not
+pretend closed records were reopened or enable writes in validators.
+
+Load remains useful under the proposal for scoped reads, one-time setup of handlers and allowed
+view UI such as ALERT, while preserving accepted values. Conditional load code could inspect the
+proposed mode, but a guarded write on an editable load would run only when initially opened in edit.
+It would not run later after a readonly opening; initialization that must occur on entering editing
+belongs in new-record/edit-record or the equivalent repeatable events. This explanation adds no
+implemented public property and settles no unapproved load-policy or compatibility choice.
