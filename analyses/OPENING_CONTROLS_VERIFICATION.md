@@ -1,5 +1,10 @@
 # Opening-controls verification — 23 October 2026
 
+Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
+[the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
+below retain their original candidate provenance. Actual Android acceptance remains pending.
+
+
 This is a binding-only follow-up to Plan 3. Existing repeatable rows open in view mode; Edit
 enters editing. `repeatableEntryMode="edit"` selects direct editing. New rows always start editing.
 The setting applies at every nesting level. Read-only ancestors allow browsing and prevent

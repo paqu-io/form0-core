@@ -1,5 +1,10 @@
 # Plan 3 execution
 
+Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
+[the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
+below retain their original candidate provenance. Actual Android acceptance remains pending.
+
+
 Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md). Core 0.7.0 is published.
 
 ## Selected contracts

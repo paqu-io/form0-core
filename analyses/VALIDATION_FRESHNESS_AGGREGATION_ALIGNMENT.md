@@ -741,3 +741,20 @@ Legacy automatic root load/edit dispatch must remain compatible in routing and o
 receiving the agreed view-write protection and mode context. This verification adds no runtime
 property, changes no saved record, and does not resume Android acceptance before the new policy is
 implemented and automatically verified.
+
+## Accepted view and event.mode implemented — 23 October 2026
+
+The approved policy is implemented and automatically verified in core, React main-thread/actual
+worker, Native and CLI conformance. See [current verification](ACCEPTED_VIEW_VERIFICATION.md) for
+exact candidates, checks, timings, storage and limitations. Scalar engines default to edit and add
+getMode/setMode; evaluateScope adds interactionMode readonly. Event mode is engine-owned; view-time
+write batches are rejected before delegation. Missing defaults wait for editing, including choices.
+Load order is preserved; View → Edit does not replay load. Intrinsic field state still evaluates
+from accepted values in View. Failed persistence selections remain unsaved work when returning to
+View. No form schema/output attribute, record metadata migration or closed-row lifecycle replay
+was added. Headless closed-scope validation uses readonly execution context without reopening rows.
+
+The updated core/Native archives are installed in the retained SDK 58 device harness with exact
+source-byte parity and unchanged SDK dependency versions. Android acceptance may resume using the
+three updated walkthroughs; actual results and iOS acceptance are not claimed. The new core
+capabilities must be released before dependent consumers; maintainer release ownership is unchanged.

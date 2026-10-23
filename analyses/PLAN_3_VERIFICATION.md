@@ -1,5 +1,10 @@
 # Plan 3 verification — 23 October 2026
 
+Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
+[the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
+below retain their original candidate provenance. Actual Android acceptance remains pending.
+
+
 Implementation and automated verification are complete. Actual Android/Expo Go/Hermes acceptance is
 pending the three maintained walkthroughs; iOS remains deferred. This document does not authorize
 publication, deployment, issue closure or production reform persistence adoption.

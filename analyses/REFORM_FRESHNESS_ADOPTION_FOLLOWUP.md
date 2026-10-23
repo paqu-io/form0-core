@@ -132,3 +132,18 @@ Primary references:
 - [Router 55 → 56](https://docs.expo.dev/router/migrate/sdk-55-to-56/).
 - [Router 57 → 58](https://docs.expo.dev/router/migrate/sdk-57-to-58/).
 - [SDK 58 release notes](https://expo.dev/changelog/sdk-58).
+
+## Accepted-view/load migration boundary — 23 October 2026
+
+The new coordinated core and bindings preserve supplied accepted calculations in View and expose
+engine-owned event.mode readonly/edit. Audit production load-record/load-repeatable handlers before
+adopting the new releases: SETVALUE in a readonly load rejects the complete batch. Move creation
+defaults to new handlers and initialization needed on entering editing to edit handlers, or guard
+load setters for direct-edit opening only. View → Edit does not replay load. Keep any existing
+readonly field population during editable sessions separate from whole-record readonly permission.
+
+Do not automatically rewrite stored schemas, introduce authenticated web drafts or treat a viewed
+record as newly edited. Preserve selected unsaved work after failed callbacks and keep record plus
+freshness restoration coordinated. Upgrade core and binding ranges together; old core lacks mode
+control and cannot provide the new binding contract. See ACCEPTED_VIEW_VERIFICATION.md for package
+evidence; production Reform migration remains separate and unimplemented here.
