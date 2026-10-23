@@ -19,7 +19,7 @@ Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
 - Portable private coordination owns one record evaluator per session, accepted/draft editor overlays,
   save-hook-once/revalidation, all-or-none review, immutable captured proposal selection, paged change
   reports, stale decision/acknowledgement guards and disposal. It never persists the record itself.
-  Changes during asynchronous serialization cannot deliver a stale payload. Changed host policy invalidates reviews. Root ID zero now survives
+  Changes during asynchronous serialization cannot deliver a stale payload. Changed host policy invalidates reviews. Switching records with the same schema uses the current controller, and failed Native draft saves release reports without acknowledging pending freshness. Root ID zero now survives
   the existing structured-record serializer, including deprecated fallback-ID handling.
 - React main-thread/actual worker, Native and CLI preview use shared preparation even with managed
   lifecycle disabled. Managed opt-out still disables custom validation/lifecycle. Closed-row lifecycle
@@ -53,17 +53,17 @@ were corrected without product workarounds. Archived evidence keeps its original
 | Surface               | Evidence and result                                                                                                                                                                                                                                                                                                       |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Core                  | Full formatting/lint/tests/security and package gates; new scoped TRUSTED/SAFE matrices and 22-level uneven nesting; existing full evaluator and complex-schema suites retained.                                                                                                                                          |
-| React                 | 77 tests; build, formatting, production/full audit thresholds and package checks pass. Full audit reports two moderate development-tool entries, not a clean all-dependency audit.                                                                                                                                        |
+| React                 | 78 tests; build, formatting, production/full audit thresholds and package checks pass. Full audit reports two moderate development-tool entries, not a clean all-dependency audit.                                                                                                                                        |
 | Actual browser worker | 14 main-thread/worker cases: TRUSTED/SAFE automatic/retained totals, abort, pending editor protection, child save/cancel isolation, callback failure/retry and unmount. Zero page errors.                                                                                                                                 |
-| Native                | 54 Node tests and 15 adapter cases, including automatic/retain/failure/draft renderer cases under TRUSTED/SAFE. Adapter evidence is not Hermes acceptance.                                                                                                                                                                |
+| Native                | 54 Node tests and 17 adapter cases, including automatic/retain/failure/draft renderer cases under TRUSTED/SAFE. Positive/negative public controller TypeScript usage also compiles against the packed Native declarations. Adapter evidence is not Hermes acceptance.                                                     |
 | CLI                   | 168 tests plus actual Chromium interactions for retain 330, persisted pending reopening, failed refresh persistence and successful retry at 360. Full release gates pass; production audit has zero findings.                                                                                                             |
 | Builder               | 175 maintained test files / 774 tests; typecheck, affected-file lint/format and four-locale catalog gates pass. Earlier 850-test output included a historical standalone harness fixture; it is excluded from the final maintained-source run. Unrelated existing working-tree tests ran but are not part of this commit. |
 | Documentation         | EN/ES/FR/IT source formatting, localization, navigation/links, parity (128 substantive documents), 23 tests and lint pass. No local production/rendered build; docs CI owns rendered validation.                                                                                                                          |
 | Native security       | Existing targeted Metro/braces exception remains unpatched and expires 7 November 2026. Its separate remediation is not part of Plan 3.                                                                                                                                                                                   |
 
 Exact commands, machine-readable gate exits and outputs are preserved under the active `logs/` folder:
-`final-gates.json`, `core-complete.log`, `react-release-check.log`, `native-node-last.log`,
-`native-ui-last.log`, `cli-release-check.log`, `browser-record.json`, `cli-browser.json`,
+`final-gates.json`, `core-complete.log`, `react-session-edges.log`, `native-node-last.log`,
+`native-session-edges.log`, `cli-release-check.log`, `browser-record.json`, `cli-browser.json`,
 `builder-final-gates.json`, `docs-final-gates.json`, and the Native audit/package outputs.
 The three device walkthroughs live in
 `../form0-react-native/analyses/PLAN_3_ANDROID_ACCEPTANCE.md` relative to core.
@@ -141,8 +141,8 @@ from the recorded archives. Compare SHA-256 when reproducing, not version labels
 | Package            | Candidate                      | SHA-256                                                            |
 | ------------------ | ------------------------------ | ------------------------------------------------------------------ |
 | form0-core         | `form0-core-0.7.0.tgz`         | `17d2b279a5363b3d927cc76fed28f95b6516fb79bf0ed87e62b891dfb9248f45` |
-| form0-react        | `form0-react-0.4.0.tgz`        | `8de26c2b90c4b32b1f83a52e92ecb29304417ae327c08a884f835e1da472cb2c` |
-| form0-react-native | `form0-react-native-0.5.0.tgz` | `1456c4956439ccd1c5d9ecf50566ac29ed362f05abe7a94462272d954aa3c772` |
+| form0-react        | `form0-react-0.4.0.tgz`        | `a0d0379d494b228bde9c2ed47cd175fc8e3ce29a05cac6177813ab1fd41f3773` |
+| form0-react-native | `form0-react-native-0.5.0.tgz` | `f393c7956e85bbe6e20680d83f11b1dbd86f8af9204499341b40c656f00ed4a3` |
 | form0-cli          | `form0-cli-0.7.0.tgz`          | `1a72d8d2942c3c59edd809a65660e21c884d60b64c584d52e142f64612485cb7` |
 
 Publish the coordinated additive core capability before publishing dependent consumers, then update
