@@ -758,3 +758,20 @@ The updated core/Native archives are installed in the retained SDK 58 device har
 source-byte parity and unchanged SDK dependency versions. Android acceptance may resume using the
 three updated walkthroughs; actual results and iOS acceptance are not claimed. The new core
 capabilities must be released before dependent consumers; maintainer release ownership is unchanged.
+
+## Android feedback and open performance investigation — 23 October 2026
+
+The maintainer reports walkthroughs 1 and 2 passing on Pixel 8a / Android 17, with DevTools closed.
+The remaining walkthrough 3 functional checks pass, but 200 / 2,000 rows take 9.714 / 97.889 seconds;
+observed JS gaps reach 148 / 970 ms. Performance acceptance remains open. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for the exact workload, corrected desktop
+comparison and targeted device diagnostic. Earlier browser timings had managed lifecycle/custom
+validation disabled; the Android harness enables it. A matched desktop run confirms extra cost but
+does not explain the full Android gap. Do not declare this development-mode overhead without evidence.
+
+Native review buttons now share the header's private themed action component, and existing child
+Edit uses the same Pencil icon as root Edit. This changes presentation only. The installed independent
+device harness includes a non-persisting 200-row diagnostic separating computation, timer wait,
+managed validation and cold/warm setup. No core runtime contract, dependency or schema policy changed
+in this feedback pass; the accepted-view core candidate remains in place. Preserve functional
+acceptance provenance while investigating performance before completing Plan 3.

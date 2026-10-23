@@ -135,3 +135,13 @@ was performed. Maintainer dependency/funding edits and unrelated Builder/Reform 
 Core #99/#104 and React #73 retain the existing acceptance mapping; these checks add the selected
 view/load policy. Actual Android acceptance, release operations and issue closure remain maintainer
 owned. Production Reform persistence/load-handler migration stays in the separate follow-up.
+
+## Subsequent Android results
+
+The maintainer reports walkthroughs 1 and 2 passing on Pixel 8a / Android 17, no DevTools open, and
+walkthrough 3's remaining functional checks passing. The 200 / 2,000-row preparation timings are
+9,714 / 97,889 ms with JS gaps of 148 / 970 ms. Android performance is not accepted. The earlier
+desktop controller benchmark disabled managed lifecycle/custom validation; a matched run now
+records its additional cost. See [the open investigation](ANDROID_PREPARATION_INVESTIGATION.md).
+Native's updated button styling/Pencil icon and diagnostic harness candidate are recorded there;
+core and React runtime candidates remain unchanged. Prior evidence above applies to its named bytes.
