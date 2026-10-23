@@ -614,3 +614,26 @@ acceptance harness because the matching SDK 57 Expo Go client could not be insta
 migration checks pass; the three actual-device walkthroughs remain pending. The same packed form0
 candidates are retained, and this host-runtime migration does not raise binding peer requirements
 or include production Reform adoption. See the SDK 58 section of the verification report.
+
+## Opening controls and view evaluation — 23 October 2026
+
+The maintainer selected aligning opening controls before the separate view-evaluation policy.
+Both renderers expose `repeatableEntryMode: 'readonly' | 'edit'`, defaulting existing rows to
+`readonly` at every nesting level. New rows start editing. This renderer option is independent of
+root `mode` and introduces no schema or saved-record attribute. Read-only parents permit browsing
+rows while preventing descendant Edit/Add/Remove; direct-edit opening cannot bypass that policy.
+Web already defaulted existing rows to view mode; Native now follows it with an explicit Edit
+transition. Existing web edit-toggle restrictions remain effective.
+
+This patch preserves calculation, condition and intrinsic validation evaluation on opening.
+Managed load runs when a record/row opens; new/edit runs on entering editing. Both bindings already
+support root `new-record` and `edit-record` when lifecycle is enabled and the host supplies the
+required root `recordKind`; these are not future-only repeatable capabilities.
+
+The maintainer agrees that a view showing root 330 while children display 120/240 is confusing.
+Viewing accepted root/child values (110/220, root 330), then evaluating on Edit, is the selected
+follow-up direction. Its exact condition, intrinsic/submission-validation, load-handler writes,
+working-versus-persisted snapshot and compatibility policies require discussion before another
+implementation. Do not silently change those semantics as part of opening controls. Final Android
+acceptance should follow that discussion so the maintainer tests the intended behavior once;
+walkthrough 1's earlier successful report is preserved as evidence of the previous candidate.
