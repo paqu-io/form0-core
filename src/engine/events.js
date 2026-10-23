@@ -3,6 +3,7 @@ import { eventBuiltins } from '../builtins/registry.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 import { createEventSourceRegistry } from './event-source.js';
+import { eventOperationIssue, reportEventOperationIssue } from './event-policy.js';
 import {
   bindEventBuiltins,
   closeEventOperationScope,
@@ -306,8 +307,11 @@ export class EventManager {
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
     const functionCall = `(${callbackCode})(event)`;
+    // Retain nested ON callbacks created during a handler without depending on toString (Hermes).
+    const prepared = this.callbackSources.prepare(functionCall, contextWithEvent);
     return runInEventOperationScope(scope, () =>
-      runExpression(functionCall, contextWithEvent, this.securityConfig, true, this.schema, {
+      runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
+        sourceExpression: functionCall,
         compileCache: this.compilationCache,
         evaluateAsExpression: true,
         ...(managed?.reporting || {}),
@@ -487,8 +491,10 @@ export class EventManager {
    * @param {Object} eventMetadata - Additional event metadata
    * @returns {Array} Array of operation descriptors
    */
-  trigger(eventType, fieldKey, eventMetadata) {
+  trigger(eventType, fieldKey, eventMetadata, mode = 'edit') {
     const operations = [];
+    const registrations = [];
+    let rejectedBatch = false;
     const eventMap = this.listeners.get(eventType);
 
     if (!eventMap) return operations;
@@ -500,6 +506,7 @@ export class EventManager {
       timestamp: Date.now(),
       // TODO: Add more metadata as needed
       ...eventMetadata,
+      mode,
     };
 
     // Create execution context for operation validation
@@ -521,35 +528,51 @@ export class EventManager {
       try {
         // Execute the callback with current form context
         // This ensures EVAL() and other builtins have access to field values
-        result = this.executeHandlerWithContext(callback, event, scope);
+        result = this.executeHandlerWithContext(callback, { ...event, mode }, scope);
       } catch (error) {
         // Simple error message for now
         console.warn(`[form0] Event listener failed: ${error.message}`);
       } finally {
         collectedOps = closeEventOperationScope(scope);
-        const runtimeOps = collectedOps.filter(
-          (operation) => operation?.type !== 'EVENT_OPERATION'
-        );
+        const runtimeOps = [];
+        for (const operation of collectedOps) {
+          const rejected = eventOperationIssue(operation, mode, eventType);
+          if (rejected) {
+            rejectedBatch = true;
+            reportEventOperationIssue(this.warningSystem, rejected, eventType);
+          } else if (operation.type === 'EVENT_OPERATION') registrations.push(operation);
+          else runtimeOps.push(operation);
+        }
 
         // Validate operations against context restrictions before adding them
         const validOps = this.validateOperations(runtimeOps, executionContext);
         operations.push(...validOps);
 
-        // EVENT_OPERATION processing is initialization-only. ON/OFF calls inside a handler neither
-        // mutate the listener registry nor leak internal registration descriptors to the host.
+        // Listener updates are committed after the entire permitted dispatch, never sent to hosts.
       }
 
       try {
         this.reportAsyncHandlerResult(result, executionContext, handlerName);
         // For backward compatibility, still handle returned operations
-        if (result && result.type === 'UI_OPERATION' && !collectedOps.includes(result)) {
-          operations.push(result);
+        if (
+          typeof result?.type === 'string' &&
+          result.type.endsWith('_OPERATION') &&
+          !collectedOps.includes(result)
+        ) {
+          const rejected = eventOperationIssue(result, mode, eventType);
+          if (rejected) {
+            rejectedBatch = true;
+            reportEventOperationIssue(this.warningSystem, rejected, eventType);
+          } else if (result.type === 'EVENT_OPERATION') registrations.push(result);
+          else operations.push(...this.validateOperations([result], executionContext));
         }
       } catch (error) {
         console.warn(`[form0] Event listener failed: ${error.message}`);
       }
     });
 
+    if (rejectedBatch) return [];
+    this.processEventOperations(registrations);
     return operations;
   }
 

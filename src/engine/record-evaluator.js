@@ -144,6 +144,7 @@ function scheduler(options) {
  * @property {Array<'refresh'|'retain'|'cancel'>} [choices]
  *
  * @typedef {Object} RecordScopeEvaluationOptions
+ * @property {'edit'|'readonly'} [interactionMode='edit'] Readonly computes field state from supplied values without calculations or defaults.
  * @property {RecordInstanceSegment[]} [instancePath=[]] Complete record ancestry; an empty path selects root.
  * @property {AbortSignal} [signal]
  * @property {number} [budgetMs=8]
@@ -214,6 +215,13 @@ export function createRecordEvaluator({
     if (!['accepted', 'refresh'].includes(mode))
       throw problem('invalid_request', 'Evaluation mode must be accepted or refresh.');
     const scoped = scopePath !== null;
+    const viewing = scoped && options.interactionMode === 'readonly';
+    if (
+      scoped &&
+      options.interactionMode !== undefined &&
+      !['edit', 'readonly'].includes(options.interactionMode)
+    )
+      throw problem('invalid_request', 'interactionMode must be edit or readonly.');
     const snapshot = scoped ? input : copyRecordData(input);
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
       throw problem('invalid_record_tree', 'A runtime record snapshot is required.');
@@ -264,7 +272,9 @@ export function createRecordEvaluator({
         record.read_only = {};
         for (const field of template.fields)
           if (!Object.hasOwn(record.values, field.data_name))
-            record.values[field.data_name] = copyRecordData(getDefaultValue(field));
+            record.values[field.data_name] = copyRecordData(
+              getDefaultValue(viewing ? { ...field, default_value: null } : field)
+            );
       }
       scope.uid = scopes.length;
       scope.lineage = [...scope.ancestors, scope];
@@ -278,7 +288,10 @@ export function createRecordEvaluator({
       throw problem('invalid_instance_path', 'No record matches this instancePath.');
     const nodes = [];
     for (const scope of scopes) {
-      if (scoped ? scope !== selectedScope : scope.instancePath.length && mode === 'accepted')
+      if (
+        viewing ||
+        (scoped ? scope !== selectedScope : scope.instancePath.length && mode === 'accepted')
+      )
         continue;
       for (const field of scope.template.fields)
         if (field.type === 'CalculatedField' && field.calculate) {
@@ -638,9 +651,13 @@ export function createRecordEvaluator({
         if (context.schema.form.events?.code)
           eventManager.initializeEventCode(context.schema.form.events.code, initialContext);
         eventManager.eventContext = initialContext;
-        const dispatch = createManagedEventDispatcher(eventManager, {
-          instancePath: scope.instancePath,
-        });
+        const dispatch = createManagedEventDispatcher(
+          eventManager,
+          {
+            instancePath: scope.instancePath,
+          },
+          () => 'readonly'
+        );
         const row = scope.instancePath.length > 0;
         const definition = row
           ? context.repeatableByPath.get(JSON.stringify(scope.template.path))

@@ -237,12 +237,8 @@ const recovery = captureConsole(() =>
       setNote('recovered'),
       setNote('continued'),
     ]);
-    assert.deepEqual(engine.trigger('change', 'note'), []);
-    assert.deepEqual(engine.trigger('change', 'input'), [
-      setNote('partial'),
-      setNote('recovered'),
-      setNote('continued'),
-    ]);
+    assert.deepEqual(engine.trigger('change', 'note'), [setNote('unexpected')]);
+    assert.deepEqual(engine.trigger('change', 'input'), []);
   })
 );
 assert.equal(

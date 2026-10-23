@@ -34,13 +34,15 @@ Handlers for the requested `data_name` run in registration order, followed by wi
 Record lifecycle dispatch has no field identifier. Repeatable lifecycle dispatch uses the repeatable
 definition's `data_name`, and field dispatch uses the field's `data_name`. An owning repeatable
 definition may be the target of a membership `change` in its parent scope, but its collection values
-are not readable. `ON`/`OFF` inside a handler remain initialization-only and have no effect.
+are not readable. Synchronous `ON`/`OFF` inside a permitted handler update its engine's listener
+registry after the complete dispatch succeeds. They never become host operations. Nested authored
+callbacks retain source for Hermes; they do not retain the outer handler's local variables.
 
 `change-status` may identify the enabled configured status field by its `data_name`, even when that
 field is outside `form.elements`. Other fields are not valid status targets. Status values supplied
 by the host can be read in managed execution. Programmatic writes still emit no automatic event.
 
-The managed dispatcher owns `event.type`, `fieldKey`, `timestamp`, `instancePath` and `scopeId`.
+The managed dispatcher owns `event.type`, `fieldKey`, `timestamp`, `instancePath`, `scopeId` and `mode`.
 Application metadata cannot replace them. The same metadata snapshot is copied independently for
 each handler. Plain objects, arrays, dates, scalar values and runtime-native File/Blob media handles are portable
 event data; functions,
@@ -87,6 +89,31 @@ different scope. Reading a main field never grants permission to write it. This 
 contract, not a security sandbox against intentionally privileged host helpers.
 
 ## Synchronous custom validation and notifications
+
+`createFormEngine({ schema, mode: 'readonly', initialValues })` preserves supplied calculations and
+does not apply missing schema defaults. `eval()` still computes conditions and intrinsic field
+validation. `mode` defaults to `edit`, retaining normal intrinsic evaluation. `getMode()` reads it;
+the host changes it with `setMode('edit' | 'readonly')`, then evaluates. A mode change never reopens
+the record, replays load, restores database values or persists work. Missing defaults become eligible
+on entering editing; existing supplied values are preserved.
+
+Each handler receives the executing scope's effective `event.mode`, captured at dispatch. A viewed
+child receives `readonly` even if its parent is editing. New/existing classification, draft intent
+and individual field read-only flags are independent. Metadata or handler assignments cannot grant
+write permissions. Headless record-tree custom validation receives `readonly` because it has no
+editable scope; this does not reopen closed records. Explicit editor validation retains the editor's
+mode but is still findings-only.
+
+View-time load can read accepted values, show ALERT and register/remove engine-lifetime listeners.
+Record writes such as SETVALUE fail the entire collected batch, including accompanying alerts and
+listener changes, before delegation. `triggerDetailed()` returns execution issues; `trigger()` returns
+no operations and uses structured warnings. The view remains readable. Guard existing load setters
+with `event.mode` for direct editing, or move initialization to new/edit handlers for View → Edit.
+
+Operation effects are declared in the authoritative builtin catalog. Unknown descriptors and effects
+are rejected. Validation and close phases retain stricter restrictions. Editing does not grant an
+external persistence capability. Trusted host helper side effects are outside descriptor rollback;
+this is not an arbitrary-JavaScript sandbox.
 
 ```js
 ON('validate-record', function (event) {

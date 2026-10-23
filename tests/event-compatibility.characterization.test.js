@@ -89,8 +89,8 @@ captureConsole(() => {
     });
   `);
   assert.deepEqual(engine.trigger('change', 'input'), [setNote('kept')]);
-  assert.deepEqual(engine.trigger('change', 'input'), [setNote('kept')]);
-  assert.deepEqual(engine.trigger('change', 'note'), []);
+  assert.deepEqual(engine.trigger('change', 'input'), []);
+  assert.deepEqual(engine.trigger('change', 'note'), [setNote('nested')]);
 });
 
 const failure = captureConsole(() => {

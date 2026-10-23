@@ -39,6 +39,7 @@ function toFormEventBuiltinDefinition(definition) {
     signature: definition.signature,
     description: definition.description,
     examples: Object.freeze([...definition.examples]),
+    ...(definition.operation ? { operation: definition.operation } : {}),
     status: getFormEventBuiltinStatus(definition.name),
   });
 }
@@ -247,6 +248,9 @@ function cloneCatalogDefinition(definition) {
   return {
     ...definition,
     examples: [...definition.examples],
+    ...(definition.operation
+      ? { operation: { ...definition.operation, effects: [...definition.operation.effects] } }
+      : {}),
   };
 }
 

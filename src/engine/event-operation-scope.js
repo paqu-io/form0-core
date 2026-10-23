@@ -2,8 +2,11 @@ import {
   __invokeBoundEventBuiltin,
   __runWithEventOperationScope,
 } from '../builtins/event/event-operations-collector.js';
+import { EVENT_BUILTIN_DEFINITIONS } from '../builtins/builtin-definitions.js';
 
-const EVENT_OPERATION_BUILTINS = ['ALERT', 'SETVALUE', 'ON', 'OFF', 'INVALID'];
+const EVENT_OPERATION_BUILTINS = EVENT_BUILTIN_DEFINITIONS.filter((entry) => entry.operation).map(
+  (entry) => entry.name
+);
 
 /**
  * Create an operation scope owned by one synchronous event execution.

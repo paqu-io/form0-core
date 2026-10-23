@@ -1,7 +1,7 @@
 import { parse } from 'acorn';
 
 /** Retains authored callback source without depending on engine-specific toString output. */
-export function createEventSourceRegistry(preparationCache = null) {
+export function createEventSourceRegistry(preparationCache = new Map()) {
   const sources = new WeakMap();
 
   function bindPrepared(prepared, context) {
