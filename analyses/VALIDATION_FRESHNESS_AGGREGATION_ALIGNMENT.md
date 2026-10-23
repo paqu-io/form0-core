@@ -637,3 +637,45 @@ working-versus-persisted snapshot and compatibility policies require discussion 
 implementation. Do not silently change those semantics as part of opening controls. Final Android
 acceptance should follow that discussion so the maintainer tests the intended behavior once;
 walkthrough 1's earlier successful report is preserved as evidence of the previous candidate.
+
+## Accepted-snapshot viewing confirmed; load policy proposal — 23 October 2026
+
+The maintainer explicitly accepted this view-evaluation direction for root and repeatable scopes:
+View displays supplied accepted calculated values (line totals 110/220 and root 330) and evaluates
+visibility from those supplied values. Edit evaluates with current permitted ancestor inputs
+(line 1 becomes 120). Saving that child accepts 120 and root 340; cancelling retains 110 and root
+330. Opening controls are already delivered separately. Implementation of view evaluation remains
+pending the load-policy discussion. This must preserve selected unsaved working values after a
+failed persistence callback rather than restoring an older database copy.
+
+The following load/builtin policy is a recommendation for discussion, not an agreed implementation:
+
+- Keep load-record/load-repeatable as once-per-opening notifications in both view and edit modes.
+  Moving from view to edit runs the appropriate new/edit event without replaying load or queuing
+  its rejected writes. Initial direct editing retains editable-load followed by new/edit behavior.
+- Expose a trustworthy execution mode to handlers (for example a proposed event.mode); author guards
+  are a convenience. Actual write permissions come from the active host scope and cannot be granted
+  by caller-supplied event metadata or by the handler changing its event object.
+- In view, allow scoped reads, notifications such as ALERT, and lifetime-scoped ON/OFF registration.
+  Prevent changes to field values, repeatable membership, linked/media data and record timestamps.
+  Move creation defaults to new-record/new-repeatable, and edit initialization to edit-record or
+  edit-repeatable. Do not replace the agreed accepted view with computed preview values.
+- A prohibited write fails the collected operation batch without partial value/UI application.
+  Keep the record view readable and report an actionable configuration/execution issue. This is
+  separate from intrinsic field errors and calculation diagnostics; do not silently ignore writes.
+- Extend the authoritative builtin/operation catalog with effects/capabilities, preserving existing
+  calculation-only/event-only restrictions. A future add-row or attach-media operation is a record
+  write; a UI operation label alone is not permission. Unknown/unclassified operations are rejected
+  until their effects are declared. External effects/persistence require explicit phase permissions;
+  entering edit does not automatically authorize persistence.
+- Enforce through the shared execution contract before host operation delegation, with equivalent
+  legacy/managed, controller, worker and Native behavior. Preserve ancestor reads/local-only writes
+  and existing stricter validation/close rules. Keep schema handlers synchronous. Future platform
+  operations should use validated descriptors rather than execute I/O during schema evaluation.
+- Trusted helper closures and arbitrary external side effects cannot be rolled back by filtering
+  operation descriptors. Hosts must keep helpers consistent with the contract; capability checks
+  are not an arbitrary-JavaScript sandbox.
+
+Compatibility remains a decision: existing load handlers that write would need migration for
+snapshot view mode. Do not add a silent compatibility escape that permits record mutation in view.
+No runtime code or public interface was changed while recording these discussion proposals.
