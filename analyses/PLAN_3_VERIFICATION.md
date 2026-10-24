@@ -207,3 +207,13 @@ actual-browser main/worker view and submission cases, CLI persistence interactio
 release/memory cycles pass. Matched managed desktop preparation now meets the reference 250 ms / 2 s
 fixture targets. Native's updated physical-device profile is still pending; performance and Plan 3
 are not complete. No publication, deployment, push, dependency installation or cleanup was performed.
+
+The subsequent physical Pixel 200-row profile now confirms the expected revision and idle scheduler:
+warm managed preparation is 1,010.3 ms versus the previous 28,102.4 ms. Exact data is in the linked
+investigation and `logs/android-pixel8a-after.json`. Added repeated/rapid live-edit cases pass in
+React and Native under TRUSTED/SAFE; the React target file passes 7 cases, Native's full adapter
+suite passes 31. A real Chromium main/worker live-edit check passes four cases with four workers
+and no page errors. Core dependency/static-EVAL/current-binding/re-entry/scoped tests also pass.
+These additions change tests and evidence only; installed runtime hashes remain unchanged. The
+remaining physical acceptance step is the full-renderer large-form preparation/gap/cancellation
+check in walkthrough 3, preserving walkthroughs 1 and 2 as accepted.

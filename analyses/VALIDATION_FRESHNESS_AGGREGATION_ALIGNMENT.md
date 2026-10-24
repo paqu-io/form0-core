@@ -791,3 +791,12 @@ React/Native/CLI conformance and release-memory checks pass. See
 [the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for provenance, limitations and installed
 archives. The updated Pixel profile (`native-idle-layout-cache`, `idle-callback`) is still required;
 do not mark performance or Plan 3 complete on desktop evidence alone.
+
+The subsequent physical Pixel profile confirms the targeted improvement: 200-row warm preparation
+with managed validation falls from 28,102.4 to 1,010.3 ms (yield waiting 19,719.5 → 64.8 ms;
+outside yields 8,382.8 → 945.6 ms). Core caching retains no values/results; current inputs and the
+existing dependency order still drive every execution. Added repeated/rapid input-edit regressions
+pass in React, Native adapter and actual browser-worker modes, in TRUSTED and SAFE, including child
+acceptance and root aggregation. Exact results and limits are in the investigation. The remaining
+physical performance boundary is full-controller large-form preparation, scheduling gaps and
+cancellation in walkthrough 3; the 200-row headless diagnostic is now verified, not the whole plan.

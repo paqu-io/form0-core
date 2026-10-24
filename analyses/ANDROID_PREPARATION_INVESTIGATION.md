@@ -1,7 +1,8 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (24 October): targeted fixes are verified and installed; the updated Pixel profile
-is pending. Functional acceptance is reported; performance investigation remains open. Do not substitute
+Current status (24 October): the updated physical Pixel 200-row core profile confirms the improvement.
+Full-renderer large-form preparation and responsiveness/cancellation still need a device retest.
+Functional acceptance is reported; performance investigation remains open. Do not substitute
 desktop, adapter or compiler results for actual Android/Hermes acceptance.
 
 ## Maintainer device observations
@@ -204,3 +205,61 @@ The updated report must identify `revision: "native-idle-layout-cache"` and, on 
 `scheduler: "idle-callback"`. Copy its JSON. It now times the same scheduler as the actual renderer;
 the twenty-timer calibration remains as the old-path comparison. Do not request another 2,000-row
 run before this confirms the scheduling reduction and quantifies the remaining compute cost.
+
+## Updated physical Pixel result and live-calculation verification — 24 October
+
+The maintainer supplied the updated report with the expected `native-idle-layout-cache` revision
+and `idle-callback` scheduler. Same Pixel 8a, Expo Go 58.0.5, API 37, RN 0.88.0, Hermes,
+development mode and SAFE off. Exact JSON is retained in `logs/android-pixel8a-after.json`.
+
+| Managed validation | Sample | Preparation before → after (ms) | Outside yields after (ms) | Yield waiting after (ms) | Yields after | Maximum work interval after (ms) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Disabled | Cold | 24,020.1 → 909.5 | 906.3 | 3.2 | 88 | 53.7 |
+| Disabled | Warm | 20,343.7 → 677.0 | 648.7 | 28.3 | 65 | 52.2 |
+| Enabled | Cold | 29,931.9 → 1,356.3 | 1,277.5 | 78.7 | 128 | 56.8 |
+| Enabled | Warm | 28,102.4 → 1,010.3 | 945.6 | 64.8 | 99 | 59.9 |
+
+The warm managed run is approximately 27.8 times faster. Explicit waiting drops from 19,719.5 ms
+to 64.8 ms; time outside yields drops from 8,382.8 ms to 945.6 ms. Zero-timer calibration remains
+slow (mean 33.5 ms, maximum 36.2 ms), supporting the scheduling-path diagnosis. Factory setup is
+unchanged in scale (159.8 / 94.1 ms, outside preparation). Metro's 8,630 ms bundle is separate.
+The maximum work interval remains above one display frame. The report is a core-only 200-row
+diagnostic, not a full renderer, 2,000-row or release-build responsiveness result.
+
+### Live values are recomputed
+
+The maintainer asked whether the optimization could regress older live-calculation fixes.
+The diff against `de1667d`'s parent confirms calculation dependency planning/order, stabilization
+and record scheduling algorithms were not changed by that core performance commit. Source history
+contains dependency-order/cycle/static-EVAL fixes on 26 March; the description alone does not
+identify which older incident the maintainer remembers. No claim is made that it is that exact fix.
+
+The cache stores compiled functions and argument-name layouts; every invocation maps its arguments
+from the current context. It stores no field values or results. `attachRecordEngine` still starts
+a new scoped evaluation on input changes and rejects superseded results by sequence. Field editing
+and Save/Cancel ownership are unchanged. View still shows accepted values; opening Edit evaluates
+current ancestor inputs, and closed children retain accepted calculations until the agreed selection.
+
+New maintained regression cases in React and Native exercise actual input handlers repeatedly and
+rapidly, under TRUSTED and SAFE:
+
+- Root tax changes 0.2 → 0.3 → 0.4 → 0.5 → 0.6; a root calculation displays 20 → 30 → 40 → 60,
+  including two rapid final changes. Accepted root aggregate stays 330.
+- View shows child total 110; entering Edit with current tax shows 160.
+- Child amount changes 100 → 150 → 200 → 300; its calculation shows 160 → 240 → 480,
+  including rapid final edits. Closed accepted children remain [110,220] until child Save.
+- Saving that child accepts [480,220] and updates root aggregate to 700. Caller inputs stay immutable.
+
+The React target file passes all seven cases; Native's complete adapter suite passes all 31 cases
+(two new live-input cases). Core dependency-order/static-EVAL, compilation-cache, evaluator re-entry
+and scoped-evaluation scripts also pass. A real Chromium check repeats those edits in main-thread
+and actual-worker modes, in TRUSTED and SAFE: four cases, four workers, no page errors. Its first
+attempt read the worker field before its initial state arrived; the fixture was corrected to wait
+for the expected value. No runtime code was changed. Reports are `logs/pixel-live-*.json`; the actual
+browser driver/fixture is `pixel-live-browser.mjs` and `react/live-cache-browser.*` in the active harness.
+
+Runtime archives and installed bytes remain those listed above. Only tests and evidence changed in
+this verification pass. Next use the existing walkthrough 3's full-controller 200 / 2,000-row
+**Programmatic prepare** measurements and large-form cancellation check; report `elapsedMs` and
+`maxObservedJsGapMs`. Preserve walkthroughs 1 and 2 as accepted. Do not infer the full renderer's
+JS scheduling gap from this core diagnostic's `maxWorkSliceMs`, or close Plan 3 on this profile alone.
