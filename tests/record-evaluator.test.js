@@ -1224,4 +1224,61 @@ await test('a newer preparation supersedes a result while its delivery is yieldi
   assert.equal((await newer).eligible, true);
 });
 
+for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+  await test(`${security?.mode || 'trusted'} validation contexts and registrations stay fresh across rows and attempts`, async () => {
+    const observations = [];
+    const schema = formSchema(
+      [
+        numericField('factor'),
+        repeatableSection('rows', [
+          numericField('amount'),
+          calculatedField('total', 'SETRESULT($amount * $factor)'),
+        ]),
+      ],
+      {
+        events: {
+          code: `
+      observe('initialize');
+      ON('validate-record', function(event) { observe(event.type, $factor, event.mode); });
+      ON('validate-repeatable', 'rows', function(event) {
+        observe(event.type, $amount, $factor, $total, event.mode);
+        if ($total !== $amount * $factor) INVALID('Old calculation context');
+        if ($amount === 0) INVALID('Zero amount');
+      });
+    `,
+        },
+      }
+    );
+    const source = {
+      values: { factor: 2 },
+      repeatable: { rows: [row(0, { amount: 0 }), row('B', { amount: 3 })] },
+    };
+    const instance = evaluator(schema, {
+      security,
+      helpers: { observe: (...args) => observations.push(args) },
+    });
+    for (const factor of [2, 4, 5]) {
+      source.values.factor = factor;
+      const original = structuredClone(source);
+      const before = observations.length;
+      const result = await instance.prepareSubmission(source, { managedEvents: true });
+      assert.equal(result.status, 'blocked');
+      assert.deepEqual(result.issues, []);
+      const findings = result.validationSummary.scopeIssues.filter(
+        (item) => item.message === 'Zero amount'
+      );
+      assert.equal(findings.length, 1);
+      assert.equal(findings[0].instancePath[0].instanceId, 0);
+      assert.deepEqual(observations.slice(before), [
+        ['initialize'],
+        ['validate-record', factor, 'readonly'],
+        ['initialize'],
+        ['validate-repeatable', 0, factor, 0, 'readonly'],
+        ['initialize'],
+        ['validate-repeatable', 3, factor, 3 * factor, 'readonly'],
+      ]);
+      assert.deepEqual(source, original);
+    }
+  });
+}
 console.log(`Record evaluator: ${count} scenarios passed.`);

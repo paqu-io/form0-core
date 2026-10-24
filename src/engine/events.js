@@ -64,7 +64,7 @@ export class EventManager {
 
     try {
       // Execute the code to register event listeners (same security as calculated fields).
-      const prepared = this.callbackSources.prepare(code, scopedContext);
+      const prepared = this.callbackSources.prepare(code, scopedContext, true);
       const result = runInEventOperationScope(scope, () =>
         runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
           sourceExpression: code,
@@ -302,13 +302,14 @@ export class EventManager {
       };
     }
 
-    contextWithEvent = bindEventBuiltins(contextWithEvent, eventBuiltins, scope);
+    // Each branch above supplies a private execution context; the manager base stays untouched.
+    contextWithEvent = bindEventBuiltins(contextWithEvent, eventBuiltins, scope, true);
 
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
     const functionCall = `(${callbackCode})(event)`;
     // Retain nested ON callbacks created during a handler without depending on toString (Hermes).
-    const prepared = this.callbackSources.prepare(functionCall, contextWithEvent);
+    const prepared = this.callbackSources.prepare(functionCall, contextWithEvent, true);
     return runInEventOperationScope(scope, () =>
       runExpression(prepared.code, prepared.context, this.securityConfig, true, this.schema, {
         sourceExpression: functionCall,

@@ -366,3 +366,41 @@ captureConsole(() =>
 );
 
 console.log('Hermes event tests passed.');
+
+// Only explicit private context ownership can eliminate an extra event context copy.
+{
+  const { createEventSourceRegistry } = await import('../src/engine/event-source.js');
+  const { bindEventBuiltins, createEventOperationScope, closeEventOperationScope } = await import(
+    '../src/engine/event-operation-scope.js'
+  );
+  const { eventBuiltins } = await import('../src/builtins/registry.js');
+  const source = "ON('change', function named() { return 1; });";
+  const registry = createEventSourceRegistry();
+  const original = { ...eventBuiltins, $input: 10 };
+  const defensive = registry.prepare(source, original);
+  assert.notEqual(defensive.context, original);
+  assert.equal(
+    Object.keys(original).some((key) => key.startsWith('__form0Capture')),
+    false
+  );
+  const owned = { ...original };
+  assert.equal(registry.prepare(source, owned, true).context, owned);
+  const scope = createEventOperationScope(() => {});
+  const bound = bindEventBuiltins(original, eventBuiltins, scope);
+  assert.notEqual(bound, original);
+  assert.equal(original.SETVALUE, eventBuiltins.SETVALUE);
+  const privateContext = { ...original };
+  assert.equal(bindEventBuiltins(privateContext, eventBuiltins, scope, true), privateContext);
+  assert.notEqual(privateContext.SETVALUE, eventBuiltins.SETVALUE);
+  privateContext.SETVALUE('note', 'owned');
+  assert.equal(closeEventOperationScope(scope).length, 1);
+  const override = () => 'custom';
+  const custom = { SETVALUE: override };
+  bindEventBuiltins(
+    custom,
+    eventBuiltins,
+    createEventOperationScope(() => {}),
+    true
+  );
+  assert.equal(custom.SETVALUE, override);
+}

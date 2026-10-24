@@ -39,9 +39,10 @@ export function createEventOperationScope(onLateOperation) {
 /**
  * Bind canonical event operation builtins to their originating scope.
  * Intentional helper overrides are left untouched.
+ * ownsContext is private: only a fresh context owned by this execution may be modified.
  */
-export function bindEventBuiltins(context, canonicalBuiltins, scope) {
-  const boundContext = { ...context };
+export function bindEventBuiltins(context, canonicalBuiltins, scope, ownsContext = false) {
+  const boundContext = ownsContext ? context : { ...context };
 
   for (const name of EVENT_OPERATION_BUILTINS) {
     const builtin = canonicalBuiltins[name];
