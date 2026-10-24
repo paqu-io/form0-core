@@ -1,9 +1,11 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (24 October): physical Pixel core and full-renderer measurements confirm the improvement.
-Full-renderer cancellation passes; the 2,000-row preparation still takes 11.2 seconds with a 949 ms
-observed JS gap. Functional acceptance is reported; performance investigation remains open. Do not substitute
-desktop, adapter or compiler results for actual Android/Hermes acceptance.
+Current status (24 October): Pixel functional walkthroughs and prompt cancellation pass. The
+`native-responsive-serialization` physical retest reduces the 2,000-row observed JS gap from
+949 to 325 ms; elapsed time is 12,457 ms. A subsequent owned-collection signature optimization
+passes automated consumer checks and awaits one focused Pixel timing check. See the latest
+section below; earlier measurements retain their original provenance. Plan 3 performance sign-off
+remains open. Desktop, adapter and compiler results are not actual Android/Hermes acceptance.
 
 ## Maintainer device observations
 
@@ -317,3 +319,130 @@ Headless factories capture their schema at construction. Hosts changing schemas 
 evaluator; mutation of a previously supplied object is not a supported live-update API. Binding
 hosts supply a new schema object, as the normal watch/reload path already does. Cache invalidation
 does not authorize refreshing accepted closed rows or replaying their lifecycle handlers.
+
+
+## Bounded preparation, serialization and owned-tree signatures — 24 October
+
+### Physical result received
+
+The maintainer ran the installed `native-responsive-serialization` candidate on the same Pixel,
+SAFE off and DevTools closed. No cold/warm classification or repeated sample set was supplied.
+Raw report: `logs/android-pixel8a-responsive-serialization.json` in the active harness.
+
+| Total rows | Elapsed (ms) | Maximum observed JS gap (ms) | Result |
+| --- | --- | --- | --- |
+| 200 | 1,682 | 152 | Completed, eligible, no execution issues. |
+| 2,000 | 12,457 | 325 | Completed, eligible, no execution issues. |
+
+The maintainer separately confirms that Cancel responds promptly during a fresh 2,000-row attempt
+and returns cancelled. Preserve this and walkthroughs 1/2 as accepted. Compared with the preceding
+full-controller result, the large JS gap improves 949 → 325 ms (66%), while elapsed time increases
+11,213 → 12,457 ms (11%). This is a responsiveness improvement, not an elapsed-time improvement.
+It does not establish a one-frame bound. The phone's Metro inspector endpoint was unavailable
+when resuming; no actual Hermes CPU profile was obtained.
+
+### Measured causes and implementation
+
+The Native renderer's real controller was reproduced through the existing HTML platform adapter,
+production Chromium 151.0.7922.34 with CPU throttle 4. A baseline has warmed 2,000-row gaps
+537–613 ms and elapsed 9.5–9.8 seconds. This is a reproducible comparator, not a simulated Hermes
+claim. Phase/CPU profiles identify unbudgeted setup, complete result copies, repeated full-tree
+signatures and synchronous serialization in consecutive preparation phases.
+
+- Core captures live inputs atomically before yielding, then budgets traversal, dependency setup,
+  evaluation and change reporting on its private capture. Private output/review copies checkpoint
+  in bounded property batches. Cancellation and superseding preparations prevent output or review
+  resurrection, including during final delivery. An already-aborted attempt performs no input copy.
+- Additive `createStructuredRecordAsync(state, fields, options, scheduling)` uses the exact same
+  transformation generator as the unchanged synchronous API. It yields between completed rows,
+  preserves record/media/ID-zero/order/timestamp behavior and rejects cancellation without partial
+  output. Scheduling is a separate fourth argument, never saved metadata. The caller supplies stable
+  evaluated inputs until completion. Expressions and individual field formatters stay synchronous.
+- React/Native root preparation uses cooperative serialization and guarded checkpoints around
+  selection, the save hook and final payload delivery. The existing hook still runs once. CLI gains
+  equivalent guards and release-generation protection, while its server serializer stays synchronous.
+- Applying selected values no longer triggers a redundant root calculation or internal render-time
+  full collection clone. Public snapshot callbacks remain defensive. TRUSTED/SAFE regressions prove
+  exactly one root calculation on selection and continued live changes/save/cancel behavior.
+- The latest optimization shares an immutable collection-tree signature between renderer adapters
+  and UI bookkeeping. It is weakly keyed by the owned tree; accepted row updates replace that tree.
+  Mutable engine values, metadata and host policy remain freshly checked. Generic/headless adapters
+  retain full checks, including in-place child mutation detection. This caches no calculated values,
+  compiled events or executable proposals. Schema replacement still creates new preparation.
+
+The signature regression fails with the former full-scan control and passes with the new adapter;
+the generic mutation regression also passes. Current-value/media/policy/row tests and the full
+renderer cases guard the optimization. Bundle-only phase instrumentation stays in explicitly named
+ignored diagnostic harness files; maintained runtime sources contain no diagnostic hooks.
+
+### Final automated measurements for the new candidate
+
+Uninstrumented Native-adapter CPU-4 controller: cold 10,980.5 ms / 139.6 ms gap; three warmed samples
+8,182.5 / 8,210.4 / 8,813.5 ms, with gaps 107.4 / 110.5 / 143.8 ms. The maximum warmed observed
+synchronous long task is 72 ms. Raw data: `logs/responsiveness-final.json`. Individual host tasks
+and interval gaps are different measurements. The original diagnostic stretch target of a 100 ms
+interval gap was not reached; its failing historical logs remain. Manual benchmark gates require
+no warmed individual task >=100 ms at fixed CPU4 and at least 50% reduction from the recorded
+613 ms warmed gap. Both pass. These are outside ordinary unit tests, not a new phone acceptance
+threshold. The latest phase probe reports signature checks below 1 ms after the one-time new-tree
+scan, compared with repeated 35–42 ms scans (`responsiveness-shared-owned-signatures.json`).
+
+Matched warmed production browser controller, managed lifecycle/custom validation enabled, two
+warm-ups then two retained samples (settling, selection, signatures, serialization included):
+
+| Rows | Main thread (ms) | Actual browser worker (ms) |
+| --- | --- | --- |
+| 200 | 206.3, 211.2 | 192.1, 184.9 |
+| 2,000 | 1,756.9, 1,763.4 | 1,397.2, 1,445.1 |
+
+Reference targets of 250 ms / 2 seconds pass. Complete 2,000-row prepared controller replies remain
+4,169,642 / 4,163,362 bytes, including existing payload and callback metadata. No new durable
+record storage is introduced; grouped freshness remains unchanged. Eight Node actual-worker
+prepare/review/release cycles leave zero report entries; retained heaps are 14.9–16.3 MB and sampled
+peak heap is 122,385,640 bytes. This is not a Hermes or frontend-cache heap measurement. The new
+cache uses weak ownership; it retains signature strings while their accepted trees remain reachable.
+
+### Verification and limits
+
+- Core full release gates: formatting/lint/full tests, 48 record-evaluator scenarios, complex/deep
+  fixtures, security/audit and 96-file package check pass (`responsiveness-core-release-final.log`).
+- React full check/build: 100 tests; Native: 35 adapter cases and 69 Node tests. Package/audit gates
+  pass in independent dependency trees. Existing development dependency findings/exceptions are
+  unchanged. CLI: 168 tests and package check.
+- Actual browser: 14 submission cases/9 workers; 12 accepted-view cases/10 workers; four live-edit
+  and four schema-reload cases each/4 workers, no page errors. CLI retained/reopen/failure/retry and
+  real schema-watch reload checks pass. `responsiveness-conformance.json` records all gate results.
+- Four-locale docs formatting, localization, navigation, page parity, 23 tests and lint pass.
+  No local production docs build or deployment/security-policy change was made.
+- Packed Builder integration and Native declaration checks are rerun against the final candidates;
+  exact manifests are `logs/responsiveness-owned-tree-candidates.json` and
+  `logs/responsiveness-owned-tree-device-candidates.json`. Earlier Pixel archives remain in
+  `responsiveness/`; the new set is separate in `responsiveness-owned-tree/`.
+
+The installed harness's new full-controller revision is `native-owned-tree-signatures`. Restart the
+existing Metro process with its usual clear-cache command and reload the app; do not regenerate or
+reinstall dependencies. With SAFE off and DevTools closed, run **Large 2,000 → Programmatic prepare**
+once and share its JSON/revision and whether the remaining pause is noticeable. Walkthroughs 1/2,
+the core-only Profile diagnostic and the already-confirmed physical cancellation need no repetition.
+Keep performance and Plan 3 sign-off open until that targeted result. iOS remains deferred.
+
+
+### Committed source and installed archives
+
+All commits are on the existing `development` branches: core `ee43cf7`, React `854f79d`, Native
+`f2bced7`, CLI `eabac90`, localized docs `b46fb44`. Maintainer package/lock edits stay unstaged.
+The device installer verified exact maintained/installed core and Native source bytes and unchanged
+Expo 58.0.17 / RN 0.88.0 / React 19.3.0. Core plus Native archives total 551,844 bytes.
+
+| Package | Archive bytes | SHA-256 |
+| --- | --- | --- |
+| form0-core | 129133 | `170ed1feb1fe728ce1ffeddb4f064be428a20e59198c6fe9fe9baee735db3cde` |
+| form0-react | 372417 | `4a7f850905ef4ba3b90d074ec4a22a9f533287eb6b810fb02e631cc8096b7459` |
+| form0-react-native | 422711 | `25f61e36d20860bd3a3053f900969ac0cff125e2909aa9ee02de19af7607a308` |
+
+Candidate version labels are unpublished; no registry release is claimed. Archives live in
+`responsiveness-owned-tree/` in the retained active harness. The older physical candidate archives
+remain separately preserved. Active harness allocation is 5,021,536 KiB (about 4.79 GiB); no folder
+was removed. Device dependencies, SDK verification and npm cache together are future reviewed
+cleanup candidates of about 1.45 GiB after acceptance, with evidence preserved first. Linux
+allocation is not evidence of current Windows backing-volume free space.

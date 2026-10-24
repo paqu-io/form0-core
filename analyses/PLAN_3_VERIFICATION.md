@@ -7,8 +7,8 @@ pass according to the maintainer. Large-form performance remains open: see
 [the current Pixel investigation](ANDROID_PREPARATION_INVESTIGATION.md).
 
 
-Implementation and automated verification are complete. Actual Android/Expo Go/Hermes acceptance is
-pending the three maintained walkthroughs; iOS remains deferred. This document does not authorize
+Current implementation and automated verification pass. Android functional walkthroughs and prompt
+cancellation pass; the remaining targeted check concerns large-form responsiveness. iOS remains deferred. This document does not authorize
 publication, deployment, issue closure or production reform persistence adoption.
 
 Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
@@ -219,3 +219,39 @@ and no page errors. Core dependency/static-EVAL/current-binding/re-entry/scoped 
 These additions change tests and evidence only; installed runtime hashes remain unchanged. The
 remaining physical acceptance step is the full-renderer large-form preparation/gap/cancellation
 check in walkthrough 3, preserving walkthroughs 1 and 2 as accepted.
+
+
+## Responsiveness and exact candidate follow-up — 24 October 2026
+
+See [the current investigation](ANDROID_PREPARATION_INVESTIGATION.md#bounded-preparation-serialization-and-owned-tree-signatures--24-october)
+for measured causes, bounded capture/output/serialization ownership and the full verification record.
+Core adds `createStructuredRecordAsync` with separate scheduling and stable-input ownership; it
+shares exact formatting with the synchronous API. React/Native use it for root submission, retaining
+save-hook-once, validation, cancellation and late-edit/disposal guards. CLI keeps its synchronous
+server serializer and gains equivalent guards/release protection. No public record schema changes.
+
+The physical `native-responsive-serialization` Pixel result is 1,682 / 12,457 ms for 200 / 2,000 rows,
+with gaps 152 / 325 ms, eligible/no issues; prompt cancellation is separately confirmed. The newer
+`native-owned-tree-signatures` candidate shares immutable accepted-tree signatures across renderer
+checks; all mutable values/metadata/policy remain fresh. One targeted large Pixel timing check remains.
+Walkthroughs 1/2 and cancellation retain acceptance; there is no new broad manual checklist.
+
+Full checks now cover core 48 evaluator scenarios and all release gates; React 100 tests; Native
+69 Node tests/35 adapter cases; CLI 168 tests; actual browser main/worker submission/view/live/reload;
+CLI persistence/reload; Builder 10 cases; Native declaration checks; four-locales source/parity/lint
+and 23 docs tests. Reference browser controller 200/2,000 rows meets 250 ms / 2 s with managed
+validation; complete 2,000-row result bytes remain 4,169,642 main / 4,163,362 worker. Node-worker
+release cycles retain zero report entries, without claiming actual Hermes/frontend peak memory.
+
+Final new archives live in the separate active-harness `responsiveness-owned-tree/` directory.
+Exact sizes, SHA-256/integrities and installed source parity are in
+`logs/responsiveness-owned-tree-candidates.json` and
+`logs/responsiveness-owned-tree-device-candidates.json`; earlier Pixel archives are preserved.
+No dependency installation, SDK migration, release, deployment, push or issue closure occurred.
+No cleanup was performed; active device/review trees remain protected pending final acceptance.
+
+
+Responsiveness implementation commits: core `ee43cf7`, React `854f79d`, Native `f2bced7`, CLI
+`eabac90`; localized API docs `b46fb44`. All use existing development history; maintainer funding
+and dependency edits remain outside these commits. No publication or device performance completion
+is implied. Exact archive hashes are also copied into the current investigation for durable review.

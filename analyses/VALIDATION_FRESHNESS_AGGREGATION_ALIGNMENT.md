@@ -1,9 +1,10 @@
 # Validation, repeatable freshness and aggregation: alignment
 
-Updated: 23 October 2026.
+Updated: 24 October 2026.
 
 Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is published in core 0.7.0.
-Plan 3 implementation and automated verification are complete; actual Android acceptance is pending. It covers the consumers and Builder; production Reform
+Plan 3 implementation and automated verification pass. Android functional walkthroughs and cancellation
+pass; a targeted large-form responsiveness check remains. It covers the consumers and Builder; production Reform
 record persistence remains the separately documented follow-up. See
 [the core contract](RECORD_EVALUATION_CONTRACT.md) and
 [verification evidence](RECORD_EVALUATION_VERIFICATION.md).
@@ -14,7 +15,7 @@ record persistence remains the separately documented follow-up. See
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
 | 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                                  |
 | 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                                              |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Implementation/automated checks complete; Android acceptance pending. |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Automated checks/Android functionality pass; responsiveness check pending. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -812,3 +813,29 @@ changed collection targets and replaced load/change event code take effect; old 
 accumulate. Caches retain compiled code/layouts, not values; schema-bound preparation is recreated
 on normal reload. Headless hosts recreate their evaluator when replacing the schema. See the
 investigation for exact reports; these additional tests changed no installed runtime bytes.
+
+
+## Bounded submission work and signature ownership — 24 October 2026
+
+The approved responsiveness follow-up adds cooperative setup/output copying and an asynchronous
+serializer sharing the existing synchronous transformation. The additive public
+`createStructuredRecordAsync(state, fields, options, scheduling)` takes scheduling separately;
+inputs must remain stable until completion. Consumers serialize their selected captured result.
+No partial record is delivered on cancellation. Atomic live capture, record shape, validation,
+security, save-once/revalidation and persistence acknowledgement contracts are preserved.
+
+Renderer-owned accepted child trees are replaced on row changes and may share a weakly owned
+signature. Mutable engine values, record metadata and host policy remain freshly checked; generic
+headless adapters retain complete checks. This does not cache calculation results or change live
+updates, accepted View semantics, child Save/Cancel, schema-watch replacement or event registration.
+New prepared selections avoid one redundant root evaluation; public snapshots remain defensive.
+Release/disposal cannot repopulate reviews or reports through a late async completion.
+
+The Pixel confirms prompt cancellation and a reduction in the large observed JS gap from 949 to
+325 ms, at 12,457 ms elapsed. The subsequent signature optimization passes full core/consumer,
+actual-worker, CLI, Builder/type and localized documentation gates. Matched browser targets pass;
+Native-adapter warmed gaps are 107–144 ms at CPU4, not Hermes acceptance. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for exact source/archive provenance and
+the one remaining targeted Pixel check. No additional broad manual walkthrough is required now.
+Coordinated core publication still precedes dependent consumers; all release actions remain
+maintainer-owned. Production Reform persistence and dependency-exception remediation stay separate.
