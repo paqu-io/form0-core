@@ -1,11 +1,12 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (24 October): Pixel functional walkthroughs and prompt cancellation pass. The
-`native-responsive-serialization` physical retest reduces the 2,000-row observed JS gap from
-949 to 325 ms; elapsed time is 12,457 ms. A subsequent owned-collection signature optimization
-passes automated consumer checks and awaits one focused Pixel timing check. See the latest
-section below; earlier measurements retain their original provenance. Plan 3 performance sign-off
-remains open. Desktop, adapter and compiler results are not actual Android/Hermes acceptance.
+Current status (24 October): the latest physical Pixel sample completes 2,000 rows in 12,400 ms,
+with a 294 ms observed scheduling gap and no execution issues. Functional walkthroughs and prompt
+cancellation pass. A subsequent bounded throughput optimization passes full automated checks,
+reduces the matched managed core workload by 27%, and awaits one focused Pixel comparison.
+The installed revision is now `native-throughput-bindings`. See the latest section below;
+earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
+Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
 ## Maintainer device observations
 
@@ -446,3 +447,140 @@ remain separately preserved. Active harness allocation is 5,021,536 KiB (about 4
 was removed. Device dependencies, SDK verification and npm cache together are future reviewed
 cleanup candidates of about 1.45 GiB after acceptance, with evidence preserved first. Linux
 allocation is not evidence of current Windows backing-volume free space.
+
+
+## Throughput checkpoint — scalar bindings and private event contexts, 24 October
+
+### Scope and stopping rule
+
+The maintainer authorized further investigation while preserving current calculations/events, and
+asked for a clear stopping point. The previous Pixel result is retained in
+`logs/android-pixel8a-owned-tree-signatures.json`: 12,400 ms, gap 294 ms, completed/eligible/no issues.
+Its manually transcribed revision omits a trailing s; the installed archive/source proof retains the
+exact expected revision. No cold/warm classification was supplied. Elapsed time is essentially
+unchanged from 12,457 ms; it does not establish a controlled comparative speedup.
+
+The selected checkpoint requires a repeatable improvement of approximately 20% for the complete
+managed 2,000-row benchmark, preserved output/input hashes, complete behavior/security gates, and
+no deliberate responsiveness regression. This is a bounded investigation criterion, not a universal
+SLA. Stop optimization changes at the verified candidate and request one physical comparison.
+Do not broaden into result caching, incremental invalidation or Native execution architecture on
+benchmark evidence alone. If the Pixel gain is absent or insufficient, obtain a discriminating
+Hermes measurement before further edits. Finishing this checkpoint does not finalize Plan 3.
+
+### Hypotheses and selected implementation
+
+The ranked hypotheses were excess calculation bindings, repeated closed-row validation setup, then
+copies/scheduling. The existing CPU profile showed context construction and validation dominating.
+The new direct paired comparator separates managed validation on/off. A broader scratch prototype
+improved calculations substantially but was narrowed before delivery to give stronger semantic
+boundaries. Intermediate reports are annotated in `logs/throughput-provenance.json`.
+
+1. Schema-bound record evaluation now prepares a conservative scalar binding plan. A calculation
+   such as `$amount * (1 + $tax)` reads the same current inputs without rebinding every unrelated
+   permitted ancestor/local field or helper. Only primitive operators and the canonical IF/SETRESULT
+   calls qualify. Every referenced field must be accessible, present and primitive at that execution.
+   Overrides, object values, unresolved/restricted names, other calls, EVAL, arguments, member access,
+   arrays, locals and complex JavaScript retain the complete prior context. Runtime layout changes
+   remain supported. The ordinary scalar engine path is unchanged. Metadata is cached; values,
+   results, permissions checks and expression security validation stay current.
+2. Event execution avoids copying a context twice when that context is already privately owned by
+   this one initialization/handler execution. Base engine/host contexts remain untouched, and the
+   default internal helper calls still copy defensively. Each row/attempt still initializes its
+   authored registrations and executes applicable handlers with fresh field values and operation
+   scopes. No bound callback, mutable context or validation result is shared across records.
+
+No calculation is skipped, dependency order changed, or closed-row lifecycle replay added. Saved
+record/freshness shapes, security, view/edit policy, load ordering, save-once/revalidation and
+persistence acknowledgement remain unchanged. No public API, authoring metadata or dependency
+version changes are introduced in this throughput pass.
+
+### Paired core measurement and behavior evidence
+
+`node throughput-comparison.mjs final 3 200,2000 --gate` runs in the retained active harness. It
+compares maintained source with an independent immutable source copy of the preceding owned-tree
+archive (SHA-256 `170ed1feb1fe728ce1ffeddb4f064be428a20e59198c6fe9fe9baee735db3cde`). Source/archive
+parity is verified. Two warm-ups precede three retained samples per variant, alternating their order.
+Every complete prepared-result hash matches and caller input hashes stay unchanged. Managed events
+are enabled/disabled explicitly. Scheduling gives the host control; there are no timing assertions
+in ordinary unit tests. Results: `logs/throughput-comparison-final.json`.
+
+| Rows | Managed validation | Baseline median (ms) | Candidate median (ms) | Improvement |
+| --- | --- | --- | --- | --- |
+| 200 | Disabled | 89.4 | 70.8 | 20.8% |
+| 200 | Enabled | 199.8 | 151.4 | 24.2% |
+| 2,000 | Disabled | 751.3 | 519.2 | 30.9% |
+| 2,000 | Enabled | 1,789.6 | 1,306.3 | 27.0% |
+
+The baseline comparator failed the improvement gate before optimization. Deterministic tests also
+failed before the fixes: simple expressions declared unrelated parameters; owned event contexts
+were recopied. Final tests cover live 0/false/null/object/primitive layout changes, canonical helper
+overrides, EVAL and aliases, custom helpers, arguments, existing unresolved host names, and security
+validation on every invocation. TRUSTED/SAFE row checks prove fresh registrations and field values
+across multiple attempts, complete scope-level findings with ID zero, and immutable caller data.
+
+### Actual browser and Native-adapter results
+
+Actual production Chromium 151.0.7922.34, full React controller, managed validation enabled, two
+warm-ups and two retained samples (no persistence):
+
+| Rows | Main thread (ms) | Actual browser worker (ms) |
+| --- | --- | --- |
+| 200 | 125.6, 132.9 | 125.2, 139.0 |
+| 2,000 | 1,109.8, 1,133.4 | 1,052.1, 1,047.7 |
+
+The previous matched browser candidate recorded 1,756.9/1,763.4 ms main and 1,397.2/1,445.1 ms worker
+for 2,000 rows. These are real browser runs automated with Playwright, not just Node/jsdom tests.
+They are desktop Chromium evidence, not mobile-browser, Safari or Hermes measurements. Reference
+250 ms / 2 s targets pass. Prepared 2,000-row controller sizes stay exactly 4,169,642 / 4,163,362 bytes.
+
+The production Native HTML adapter at fixed CPU throttle 4 records cold 7,483 ms/gap 147 ms; warmed
+4,933 / 5,353 / 5,376 ms, gaps 136 / 129 / 136 ms and maximum individual warmed host task 66 ms.
+The preceding candidate's warmed times were 8,183 / 8,210 / 8,814 ms. This is not Hermes. One initial
+run observed a 110 ms task and failed the existing 100 ms diagnostic gate; that failure is retained
+in `logs/throughput-native-controller-first.log` and `throughput-controller-first.json`. The final
+candidate passes the unchanged gate; do not treat this noisy host-task limit as a universal bound.
+
+The accepted-view browser driver initially checked the edit marker as soon as the calculation
+changed. A focused actual-worker probe confirms the same brief intermediate rendering with both
+baseline and candidate, followed by correct settled events. The final driver awaits the marker
+itself, retaining all final-value assertions. No renderer runtime change was needed. Probe logs and
+the original failure are preserved. This does not weaken event completion or snapshot contracts.
+
+### Gates, archives and next physical step
+
+- Full core release gates pass: formatting, lint, all tests including 50 evaluator scenarios,
+  complex/deep/SAFE/TRUSTED/security/re-entry checks, zero production audit findings and 97-file package.
+- React 100 tests; Native 69 Node tests/35 adapter cases; CLI 168 tests, package and audit gates pass
+  in independent trees. Actual browser submission/view/live/schema-reload, actual CLI persistence
+  and watcher reload, Builder 10 cases and Native declaration checks pass.
+- Eight actual Node-worker prepare/review/release cycles retain no report entries. Retained heap
+  ranges 14,758,352–16,139,168 bytes; sampled peak 116,816,112 bytes. These are not Hermes heap data.
+- Four-locale docs source/localization/navigation/parity/lint and 23 tests pass. No reader-facing API
+  changed, so localized product pages are unchanged. No local production docs build or policy change.
+- Final gates: `logs/throughput-final-gates.json`, `throughput-gates.json`, `throughput-conformance.json`.
+  Node-comparison/controller JSON files are separate; their initial filename collision was recovered
+  from complete logs and fixed in the scripts. Source provenance is explicit in the companion report.
+
+The new archives are separate in `throughput/`; candidate and installed-device manifests are
+`logs/throughput-candidates.json` and `logs/throughput-device-candidates.json`. The core archive is
+130,561 bytes, SHA-256 `d2eec93bf76e746825c06448af1f274fdb3ab73670f1ac954d99227d642cd651`.
+React/Native archive source bytes remain unchanged from the preceding candidate; Native's fixture
+App alone changes its displayed revision. Core plus Native archives total 553,272 bytes. Installed
+source parity is verified with Expo 58.0.17 / RN 0.88.0 / React 19.3.0 unchanged. The new packed core
+also compiles to Hermes bytecode; compilation is not runtime acceptance.
+
+Restart the usual Metro process with cache clearing, reload, leave SAFE off/DevTools closed, and
+run **Large 2,000 → Programmatic prepare** once. Expect `native-throughput-bindings`. Share the JSON
+and whether the pause is noticeable. Do not repeat walkthroughs 1/2, the core-only diagnostic or
+cancellation solely for this checkpoint. Preserve those accepted results. Review the phone gain
+before deciding whether another contained optimization is worthwhile; do not silently accept 12 s
+as a production target. iOS and production Reform persistence remain separate.
+
+
+Throughput implementation commit: core `ea9adf0` on the existing development branch. The final
+candidate source matches this commit. Maintainer package/funding edits remain outside the commit;
+no push, publication, merge, deployment or issue closure was performed. No dependency installation,
+SDK change or deletion was needed; previous candidate archives and accepted evidence stay intact.
+
+Native fixture revision commit: `15ac0a1` on development. Its consumer runtime archive is unchanged.

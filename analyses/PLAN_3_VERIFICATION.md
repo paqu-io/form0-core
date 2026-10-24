@@ -255,3 +255,30 @@ Responsiveness implementation commits: core `ee43cf7`, React `854f79d`, Native `
 `eabac90`; localized API docs `b46fb44`. All use existing development history; maintainer funding
 and dependency edits remain outside these commits. No publication or device performance completion
 is implied. Exact archive hashes are also copied into the current investigation for durable review.
+
+
+## Bounded throughput follow-up — 24 October 2026
+
+The latest [investigation](ANDROID_PREPARATION_INVESTIGATION.md) records a conservative primitive
+binding specialization and removal of redundant private event-context copies. Dynamic expressions,
+EVAL, helpers/overrides, object values, unresolved names and arguments retain full context. Every
+calculation/security check and row validation still executes with current values; no callback or
+result is shared across records. No public interface or record/freshness shape changed.
+
+Final core release gates pass with 50 evaluator scenarios and 97 package files. React 100, Native
+69 Node/35 adapter, CLI 168, actual browser worker/live/reload/view/submission, CLI persistence/reload,
+Builder 10, Native declaration and four-locale/23 docs tests all pass against packed candidates.
+The paired managed 2,000-row Node workload improves 27% with matching complete output/input hashes.
+Production desktop Chromium controller: 200 rows 125.6/132.9 ms main and 125.2/139.0 ms worker;
+2,000 rows 1,109.8/1,133.4 ms main and 1,052.1/1,047.7 ms actual worker. Reply sizes are unchanged.
+The final Native-adapter CPU4 gate passes, with preserved earlier noisy-task failure evidence.
+
+Exact archives and installed source parity: active-harness `logs/throughput-candidates.json` and
+`throughput-device-candidates.json`. The new core SHA-256 is
+`d2eec93bf76e746825c06448af1f274fdb3ab73670f1ac954d99227d642cd651`; consumer source archives are unchanged.
+Metro's fixture revision becomes `native-throughput-bindings`. No dependency install/SDK change,
+cleanup, push, publication, deployment or issue closure occurred. Stop further optimization edits
+until the one focused Pixel comparison; previous 12,400 ms/gap294 ms remains the physical evidence.
+No new broad manual walkthrough or core-only profile is required. Plan 3 performance remains open.
+
+Core throughput implementation: `ea9adf0` on development. Maintainer package/lock changes are preserved outside the implementation commit.

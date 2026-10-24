@@ -839,3 +839,27 @@ Native-adapter warmed gaps are 107–144 ms at CPU4, not Hermes acceptance. See
 the one remaining targeted Pixel check. No additional broad manual walkthrough is required now.
 Coordinated core publication still precedes dependent consumers; all release actions remain
 maintainer-owned. Production Reform persistence and dependency-exception remediation stay separate.
+
+
+## Throughput checkpoint and behavior preservation — 24 October 2026
+
+The maintainer authorized further throughput work with explicit protection of calculation/event
+semantics and a bounded stopping decision. The selected implementation specializes only proven
+primitive expressions with canonical IF/SETRESULT, using current captured values and existing scope
+checks. Everything dynamic, object-valued, overridden, unresolved or introspective retains complete
+bindings. The ordinary scalar engine path and execution/security validation frequency stay unchanged.
+Fresh private event contexts avoid redundant copies, while callbacks, registrations and operation
+scopes remain per execution. No results/validation findings are cached or closed rows skipped.
+
+The complete paired managed 2,000-row Node benchmark improves 27%, with identical output and input
+hashes. Real desktop Chromium root preparation improves to 1.11–1.13 s main-thread / 1.05 s actual
+worker; Native-adapter throughput and all functional gates pass. The previous physical sample was
+12.4 s/gap 294 ms. The new physical result is pending; see the latest
+[investigation](ANDROID_PREPARATION_INVESTIGATION.md) and Native guide.
+
+Stop optimization changes at this tested candidate and measure its actual Pixel effect. A roughly
+20% repeatable improvement was the checkpoint criterion, not a universal SLA. Further work must
+identify a specific measured cost and preserve these semantics; incremental results, caching handler
+outputs or moving Native execution require separate design if needed. No Plan 3 performance sign-off,
+release or issue closure is inferred from this checkpoint. Source/API/schema/dependency policies and
+maintainer release ownership are preserved.
