@@ -1,8 +1,8 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (24 October): the updated physical Pixel 200-row core profile confirms the improvement.
-Full-renderer large-form preparation and responsiveness/cancellation still need a device retest.
-Functional acceptance is reported; performance investigation remains open. Do not substitute
+Current status (24 October): physical Pixel core and full-renderer measurements confirm the improvement.
+Full-renderer cancellation passes; the 2,000-row preparation still takes 11.2 seconds with a 949 ms
+observed JS gap. Functional acceptance is reported; performance investigation remains open. Do not substitute
 desktop, adapter or compiler results for actual Android/Hermes acceptance.
 
 ## Maintainer device observations
@@ -263,3 +263,57 @@ this verification pass. Next use the existing walkthrough 3's full-controller 20
 **Programmatic prepare** measurements and large-form cancellation check; report `elapsedMs` and
 `maxObservedJsGapMs`. Preserve walkthroughs 1 and 2 as accepted. Do not infer the full renderer's
 JS scheduling gap from this core diagnostic's `maxWorkSliceMs`, or close Plan 3 on this profile alone.
+
+## Full-renderer Pixel retest and schema reload — 24 October
+
+The maintainer's subsequent walkthrough 3 results use the same installed runtime candidate. Raw
+reported measurements are retained in `logs/android-pixel8a-controller-after.json`. No warm-up or
+cold/warm classification was supplied; do not present these as controlled warmed samples.
+
+| Total rows | Previous controller elapsed (ms) | Current elapsed (ms) | Current maximum observed JS gap (ms) | Result |
+| --- | --- | --- | --- | --- |
+| 200 | 9,714 | 1,516 | 182 | Completed, eligible, no execution issues. |
+| 2,000 | 97,889 | 11,213 | 949 | Completed, eligible, no execution issues. |
+
+The maintainer also confirms cancellation works. Elapsed time improves approximately 6.4x / 8.7x;
+the nearly one-second large-form JS gap remains. Retain walkthroughs 1 and 2 and cancellation as
+accepted functional evidence, while keeping performance and Plan 3 sign-off open. No additional
+phone rerun is requested until a targeted probe or change is ready.
+
+Next investigate full preparation in phases: capture/signatures, evaluator setup/tasks and managed
+validation, applying selected editor state, and serialization. The previous core-only timing does
+not identify which phase produces the controller's longest stall. Whole-tree copies/signatures,
+unbudgeted preparation/finalization, and renderer synchronization are candidates to measure, not
+established causes. Preserve stale-review/input guards and exact output shapes during optimization.
+Do not attribute this to development mode or require an SDK upgrade without new evidence.
+
+### Schema replacement does not reuse stale code
+
+The compilation layout key contains execution mode and complete source code; argument values are
+read from the current context at every invocation. New schema objects rebuild binding preparation
+and coordinator lifetimes. CLI file watching reloads/validates the schema, broadcasts it, disposes
+the old preview session and starts a new session. Server session fingerprints also reject old
+commands after schema changes. Form events receive new registrations rather than accumulating
+callbacks from an earlier schema. Existing lifecycle/mode policies remain in force.
+
+Maintained React and Native regressions replace a schema while the renderer stays mounted, under
+TRUSTED and SAFE. They change a calculation, add a dependent calculation, change a collection target
+from `total` to `amount`, and replace an event handler. The new calculations produce 400 / 401,
+the aggregate becomes 300, and only the new change handler appends its marker, once. React's target
+file passes nine tests; Native's full adapter suite passes 33 tests. Core's compilation regression
+also passes. An actual Chromium main-thread/worker check repeats the four security/execution
+combinations, creates four worker instances across initialization/replacement, and records no page
+errors (`logs/schema-reload-browser.json`).
+
+`schema-reload-cli-browser.mjs` additionally starts the actual CLI server/file watcher, edits a
+fixture schema on disk and waits for the WebSocket update. With input 4, edited `* 3` produces 12,
+the added `$total + 1` produces 13, and event marker `newB` proves replacement of both load and
+change handlers. Two schema messages and zero page errors are recorded in
+`logs/schema-reload-cli-browser.json`. Its first attempt used the wrong DOM attribute in the test
+selector; correcting it required no runtime change. The fixture and driver remain reproducible in
+the active harness. Renderer source tests are committed; no runtime archive bytes changed.
+
+Headless factories capture their schema at construction. Hosts changing schemas recreate the
+evaluator; mutation of a previously supplied object is not a supported live-update API. Binding
+hosts supply a new schema object, as the normal watch/reload path already does. Cache invalidation
+does not authorize refreshing accepted closed rows or replaying their lifecycle handlers.

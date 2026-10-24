@@ -2,7 +2,9 @@
 
 Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
 [the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
-below retain their original candidate provenance. Actual Android acceptance remains pending.
+below retain their original candidate provenance. Android functional walkthroughs and cancellation
+pass according to the maintainer. Large-form performance remains open: see
+[the current Pixel investigation](ANDROID_PREPARATION_INVESTIGATION.md).
 
 
 Implementation and automated verification are complete. Actual Android/Expo Go/Hermes acceptance is

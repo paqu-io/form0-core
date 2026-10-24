@@ -800,3 +800,15 @@ pass in React, Native adapter and actual browser-worker modes, in TRUSTED and SA
 acceptance and root aggregation. Exact results and limits are in the investigation. The remaining
 physical performance boundary is full-controller large-form preparation, scheduling gaps and
 cancellation in walkthrough 3; the 200-row headless diagnostic is now verified, not the whole plan.
+
+The subsequent full-controller Pixel retest completes eligible without execution issues in
+1,516 / 11,213 ms for 200 / 2,000 rows; cancellation passes. Observed JS gaps remain 182 / 949 ms.
+Keep functional acceptance and investigate the full preparation/selection/serialization phases
+before performance sign-off. Do not request repeated long device runs without a targeted change.
+
+Schema replacement is verified in maintained React/Native tests (TRUSTED/SAFE), real main-thread
+and worker browser runs, and an actual CLI file-watcher/WebSocket reload. Edited/new calculations,
+changed collection targets and replaced load/change event code take effect; old handlers do not
+accumulate. Caches retain compiled code/layouts, not values; schema-bound preparation is recreated
+on normal reload. Headless hosts recreate their evaluator when replacing the schema. See the
+investigation for exact reports; these additional tests changed no installed runtime bytes.
