@@ -1,6 +1,9 @@
 export { createFormEngine } from './engine/form-engine.js';
 export { WarningSystem } from './engine/warning-system.js';
-export { createStructuredRecord } from './utilities/record-transformer.js';
+export {
+  createStructuredRecord,
+  createStructuredRecordAsync,
+} from './utilities/record-transformer.js';
 export {
   normalizeStructuredRecord,
   buildFormRecordSnapshot,

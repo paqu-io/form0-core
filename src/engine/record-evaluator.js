@@ -1,4 +1,4 @@
-import { prepareRecordContext, visitRecordScopes } from './record-context.js';
+import { prepareRecordContext, visitRecordScopes, iterateRecordScopes } from './record-context.js';
 import {
   validateSubmissionWithContext,
   validateScope,
@@ -14,7 +14,7 @@ import { WarningSystem } from './warning-system.js';
 import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
 import { validateFieldValue } from '../schema/field-value-registry.js';
-import { copyRecordData } from '../utilities/record-data.js';
+import { copyRecordData, copyRecordDataCooperatively } from '../utilities/record-data.js';
 import { areStructuredValuesEqual } from '../utilities/value-equality.js';
 import { projectCollectionValue } from '../utilities/repeatable-collections.js';
 import { getFormSchemaRevision } from '../utilities/schema-revision.js';
@@ -222,6 +222,7 @@ export function createRecordEvaluator({
       !['edit', 'readonly'].includes(options.interactionMode)
     )
       throw problem('invalid_request', 'interactionMode must be edit or readonly.');
+    if (options.signal?.aborted) throw problem('cancelled', 'Record evaluation was cancelled.');
     const snapshot = scoped ? input : copyRecordData(input);
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
       throw problem('invalid_record_tree', 'A runtime record snapshot is required.');
@@ -232,7 +233,7 @@ export function createRecordEvaluator({
     const scopes = [];
     const byDefinition = new Map();
     let selectedScope = null;
-    visitRecordScopes(snapshot, context, (scope) => {
+    const prepareScope = (scope) => {
       let { record } = scope;
       const { template } = scope;
       scope.sourceRecord = record;
@@ -283,7 +284,15 @@ export function createRecordEvaluator({
       const key = JSON.stringify(template.path);
       if (!byDefinition.has(key)) byDefinition.set(key, []);
       byDefinition.get(key).push(scope);
-    });
+    };
+    // Live scoped reads must all be captured before the first yield. Full runs already own
+    // their captured input, so scope preparation can give the host control between rows.
+    if (scoped) visitRecordScopes(snapshot, context, prepareScope);
+    else
+      for (const scope of iterateRecordScopes(snapshot, context)) {
+        prepareScope(scope);
+        await pause();
+      }
     if (scoped && !selectedScope)
       throw problem('invalid_instance_path', 'No record matches this instancePath.');
     const nodes = [];
@@ -307,6 +316,7 @@ export function createRecordEvaluator({
           scope.nodes.set(field.data_name, node);
           nodes.push(node);
         }
+      if (!scoped) await pause();
     }
     const ownerScope = (scope, name) => {
       const info = context.resolver.fieldOwnership.get(name);
@@ -364,6 +374,7 @@ export function createRecordEvaluator({
             const dependency = row.nodes.get(call.target);
             if (dependency) node.dependencies.add(dependency);
           }
+      await pause();
     }
     const ordered = [];
     const visiting = [];
@@ -576,6 +587,7 @@ export function createRecordEvaluator({
               after: copyRecordData(after),
             });
         }
+      await pause();
     }
     if (scoped) {
       // A scoped caller need not carry cached ancestor visibility maps. Resolve participation
@@ -747,6 +759,7 @@ export function createRecordEvaluator({
         allowRetain: options.allowRetain === true,
         managedEvents: options.managedEvents === true,
       };
+      if (options.signal?.aborted) throw problem('cancelled', 'Record evaluation was cancelled.');
       let fresh, retained, selected;
       if (options.decision) {
         const decision = options.decision;
@@ -799,20 +812,32 @@ export function createRecordEvaluator({
           );
         if (intent === 'submit' && mode === 'confirm' && childChanges.length) {
           const id = `${evaluatorId}:${attempt}`;
-          review = { id, source, settings, fresh, retained };
-          return {
-            status: 'requires_decision',
-            eligible: false,
-            snapshot: null,
-            proposal: copyRecordData(fresh.snapshot),
-            reviewId: id,
-            changes: copyRecordData(fresh.changes),
-            validationSummary: validateSubmissionWithContext(fresh.snapshot, context),
-            diagnostics: copyRecordData(fresh.diagnostics),
-            issues: [],
-            freshness: createRecordFreshness(schemaRevision, childChanges),
-            choices: settings.allowRetain ? ['refresh', 'retain', 'cancel'] : ['refresh', 'cancel'],
-          };
+          const pendingReview = { id, source, settings, fresh, retained };
+          const result = await copyRecordDataCooperatively(
+            {
+              status: 'requires_decision',
+              eligible: false,
+              snapshot: null,
+              proposal: fresh.snapshot,
+              reviewId: id,
+              changes: fresh.changes,
+              validationSummary: validateSubmissionWithContext(fresh.snapshot, context),
+              diagnostics: fresh.diagnostics,
+              issues: [],
+              freshness: createRecordFreshness(schemaRevision, childChanges),
+              choices: settings.allowRetain
+                ? ['refresh', 'retain', 'cancel']
+                : ['refresh', 'cancel'],
+            },
+            scheduler(options)
+          );
+          if (attempt !== generation)
+            throw problem(
+              'stale_preparation',
+              'A newer submission preparation superseded this attempt.'
+            );
+          review = pendingReview;
+          return result;
         }
         selected = intent === 'draft' ? retained : fresh;
       }
@@ -824,11 +849,20 @@ export function createRecordEvaluator({
           'stale_preparation',
           'A newer submission preparation superseded this attempt.'
         );
-      return copyRecordData({
-        ...prepared,
-        changes: fresh.changes,
-        freshness: createRecordFreshness(schemaRevision, pending ? childChanges : []),
-      });
+      const result = await copyRecordDataCooperatively(
+        {
+          ...prepared,
+          changes: fresh.changes,
+          freshness: createRecordFreshness(schemaRevision, pending ? childChanges : []),
+        },
+        scheduler(options)
+      );
+      if (attempt !== generation)
+        throw problem(
+          'stale_preparation',
+          'A newer submission preparation superseded this attempt.'
+        );
+      return result;
     } catch (error) {
       return failure(error);
     }

@@ -1,5 +1,6 @@
 import { ContextResolver } from '../src/engine/context-resolver.js';
 import assert from 'node:assert/strict';
+import { copyRecordData, copyRecordDataCooperatively } from '../src/utilities/record-data.js';
 import {
   createRecordEvaluator,
   createFormEngine,
@@ -1116,4 +1117,111 @@ await test('grouped freshness preserves identities, row order, review isolation 
     assert.deepEqual(refreshed.freshness.affected, []);
   }
 });
+await test('already cancelled preparation releases its review without copying the record', async () => {
+  const instance = evaluator(lineSchema());
+  const abort = new AbortController();
+  abort.abort();
+  let reads = 0;
+  const snapshot = {
+    get values() {
+      reads++;
+      return {};
+    },
+  };
+  const result = await instance.prepareSubmission(snapshot, { signal: abort.signal });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(reads, 0);
+});
+
+await test('cooperative result copies preserve portable shapes and detach all mutable aliases', async () => {
+  const shared = { nested: [0, false, undefined, NaN, Infinity] };
+  const data = {
+    id: 0,
+    first: shared,
+    second: shared,
+    date: new Date('2026-10-24T00:00:00.000Z'),
+    media: new Blob(['immutable'], { type: 'text/plain' }),
+    rows: Array.from({ length: 200 }, (_, id) => ({ id, values: { amount: id } })),
+  };
+  Object.defineProperty(data, '__proto__', { value: { harmless: true }, enumerable: true });
+  let checkpoints = 0;
+  const result = await copyRecordDataCooperatively(data, async () => {
+    checkpoints++;
+  });
+  assert.ok(checkpoints > 1);
+  assert.deepEqual(result, copyRecordData(data));
+  assert.equal(Object.getPrototypeOf(result), Object.prototype);
+  assert.equal(Object.hasOwn(result, '__proto__'), true);
+  assert.notEqual(result.first, data.first);
+  assert.notEqual(result.first, result.second);
+  assert.notEqual(result.date, data.date);
+  assert.equal(result.media, data.media);
+  result.rows[0].values.amount = 999;
+  assert.equal(data.rows[0].values.amount, 0);
+  const cyclic = {};
+  cyclic.self = cyclic;
+  for (const invalid of [cyclic, { value: () => 1 }, { value: Symbol('invalid') }, new Map()])
+    await assert.rejects(
+      copyRecordDataCooperatively(invalid, async () => {}),
+      /Record data/
+    );
+});
+
+await test('large result delivery yields and can be cancelled after managed validation', async () => {
+  for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+    const schema = formSchema([repeatableSection('rows', [numericField('amount')])]);
+    schema.form.events = {
+      code: "ON('validate-repeatable', 'rows', function() { if ($amount === 99) finished(); });",
+    };
+    let validated = false,
+      afterValidation = 0;
+    const abort = new AbortController();
+    const instance = evaluator(schema, {
+      security,
+      helpers: { finished: () => (validated = true) },
+    });
+    const snapshot = {
+      values: {},
+      repeatable: { rows: Array.from({ length: 100 }, (_, id) => row(id, { amount: id })) },
+    };
+    const original = structuredClone(snapshot);
+    const result = await instance.prepareSubmission(snapshot, {
+      managedEvents: true,
+      budgetMs: 0,
+      signal: abort.signal,
+      yieldToHost() {
+        if (validated && ++afterValidation === 3) abort.abort();
+      },
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.snapshot, null);
+    assert.deepEqual(snapshot, original);
+  }
+});
+
+await test('a newer preparation supersedes a result while its delivery is yielding', async () => {
+  const schema = formSchema([repeatableSection('rows', [numericField('amount')])]);
+  schema.form.events = {
+    code: "ON('validate-repeatable', 'rows', function() { if ($amount === 99) finished(); });",
+  };
+  let validated = false,
+    afterValidation = 0,
+    newer;
+  const instance = evaluator(schema, { helpers: { finished: () => (validated = true) } });
+  const snapshot = {
+    values: {},
+    repeatable: { rows: Array.from({ length: 100 }, (_, id) => row(id, { amount: id })) },
+  };
+  const old = await instance.prepareSubmission(snapshot, {
+    managedEvents: true,
+    budgetMs: 0,
+    yieldToHost() {
+      if (validated && ++afterValidation === 3) newer = instance.prepareSubmission(snapshot);
+    },
+  });
+  assert.ok(newer, 'Result delivery must offer a scheduling opportunity.');
+  assert.equal(old.issues[0].code, 'stale_preparation');
+  assert.equal((await newer).eligible, true);
+});
+
 console.log(`Record evaluator: ${count} scenarios passed.`);
