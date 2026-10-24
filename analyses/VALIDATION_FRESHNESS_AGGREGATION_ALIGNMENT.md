@@ -775,3 +775,19 @@ device harness includes a non-persisting 200-row diagnostic separating computati
 managed validation and cold/warm setup. No core runtime contract, dependency or schema policy changed
 in this feedback pass; the accepted-view core candidate remains in place. Preserve functional
 acceptance provenance while investigating performance before completing Plan 3.
+
+## Pixel profile and targeted performance fixes — 24 October 2026
+
+The maintainer supplied the 200-row diagnostic on Pixel 8a, Android API 37, Expo Go 58.0.5,
+RN 0.88.0 / Hermes, development mode, SAFE off and no DevTools. The warm managed preparation
+spends 19.7 s waiting at host yields and 8.4 s outside them. Native now selects the host idle-task
+queue with cancellation; core reuses expression parameter layouts and immutable builtin-name sets.
+The 8 ms work budget, per-execution security checks, calculation/event semantics and saved record
+shape remain unchanged. No public API or schema attribute was added.
+
+Matched managed-validation desktop preparations improve to 208–213 ms / 1.81–1.84 s for
+200 / 2,000 rows on the main thread and 161–163 ms / 1.44–1.46 s in an actual worker. Full core,
+React/Native/CLI conformance and release-memory checks pass. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for provenance, limitations and installed
+archives. The updated Pixel profile (`native-idle-layout-cache`, `idle-callback`) is still required;
+do not mark performance or Plan 3 complete on desktop evidence alone.

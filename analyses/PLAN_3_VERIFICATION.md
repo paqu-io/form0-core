@@ -190,3 +190,20 @@ advisory expansion. Native's separate peer exception is unchanged. See the
 [migration evidence](../../form0-mobile-tmpl-react-native-expo/analyses/SDK_58_MIGRATION.md) and updated
 Native Android guide for commands, limits, storage and remaining work. No local docs production build
 or actual device acceptance is claimed.
+
+
+## Pixel profile and performance candidate — 24 October 2026
+
+The maintainer's Pixel 8a / Android API 37 / Expo Go 58.0.5 / RN 0.88.0 Hermes diagnostic
+identifies approximately 70% explicit yield waiting in the warm managed run (19.7 of 28.1 seconds).
+Core now reuses expression argument layouts and immutable builtin-name sets; Native selects host
+idle tasks with cancellation while preserving the 8 ms work budget. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for exact baseline data, new packed archive
+hashes, regression evidence and matched desktop improvements. Core implementation: `de1667d`;
+Native implementation: `e7a7e7c`; Native acceptance guide: `42bf03a`.
+
+All core release gates, 93 React tests, 61 Native Node tests, 29 Native adapter cases, 168 CLI tests,
+actual-browser main/worker view and submission cases, CLI persistence interactions and eight worker
+release/memory cycles pass. Matched managed desktop preparation now meets the reference 250 ms / 2 s
+fixture targets. Native's updated physical-device profile is still pending; performance and Plan 3
+are not complete. No publication, deployment, push, dependency installation or cleanup was performed.

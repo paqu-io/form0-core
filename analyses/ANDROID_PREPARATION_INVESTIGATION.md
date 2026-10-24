@@ -1,12 +1,14 @@
 # Android preparation investigation — 23 October 2026
 
-Status: functional acceptance reported; performance investigation remains open. Do not substitute
+Current status (24 October): targeted fixes are verified and installed; the updated Pixel profile
+is pending. Functional acceptance is reported; performance investigation remains open. Do not substitute
 desktop, adapter or compiler results for actual Android/Hermes acceptance.
 
 ## Maintainer device observations
 
 Pixel 8a, Android 17; no React Native DevTools open and no profiling/recording during the runs.
-Expo Go build and displayed runtime details still need recording. The installed harness uses SDK 58.
+The subsequent profile confirms Expo Go 58.0.5, Android API 37, RN 0.88.0, Hermes and development
+mode; SAFE is off. The installed harness uses SDK 58.
 
 | Walkthrough | Report |
 | --- | --- |
@@ -109,3 +111,96 @@ these changes. Maintainer dependency/funding edits are preserved. No production 
 release, merge, publication, issue state or deployment was changed. No cleanup/deletion or large
 installation was performed; this pass adds small diagnostic artifacts and one approximately 0.4 MB
 archive. Keep the active harness until the performance investigation is complete.
+
+## Pixel diagnostic and targeted fixes — 24 October
+
+The maintainer supplied the requested diagnostic from the same Pixel, without DevTools open.
+The complete original report is retained in `logs/android-pixel8a-baseline.json` in the active harness.
+The timer calibration averages 33.3 ms (maximum 35.5 ms). All times below are milliseconds.
+
+| Managed validation | Sample | Preparation | Outside explicit yields | Yield waiting | Yields | Maximum work interval |
+| --- | --- | --- | --- | --- | --- | --- |
+| Disabled | Cold | 24,020.1 | 7,261.2 | 16,758.8 | 678 | 92.1 |
+| Disabled | Warm | 20,343.7 | 5,863.2 | 14,480.5 | 590 | 90.1 |
+| Enabled | Cold | 29,931.9 | 9,125.1 | 20,806.8 | 824 | 89.7 |
+| Enabled | Warm | 28,102.4 | 8,382.8 | 19,719.5 | 792 | 88.4 |
+
+About 70% of the warm managed run is time waiting at explicit host yields. Computation remains
+substantial, including an approximately 2.5-second increment with managed validation. These are
+wall-clock buckets, not hardware CPU counters. Factory setup is separate: 159 / 95.2 ms for the
+two configurations. Metro's reported 8,065 ms bundling precedes these samples and is separate.
+These diagnostic runs are not controlled comparisons with the earlier controller timings.
+
+Two targeted changes follow that evidence and the existing computation profile:
+
+1. Native's coordinator uses `requestIdleCallback` when available, after the existing browser
+   `scheduler.postTask` preference; older hosts keep the timer fallback. Its 8 ms work budget is
+   unchanged. Abort resolves a pending idle wait and cancels its handle so core can report cancellation
+   immediately. Completed, failed and cancelled waits detach their listeners. No `setImmediate` or
+   microtask-only continuation is used: installed RN 0.88 implements immediates through microtasks.
+   Native input must retain a scheduling opportunity. The
+   [RN guidance](https://reactnative.dev/docs/timers) and installed NativeIdleCallbacksCxx/runtime
+   scheduler source support this choice; the actual Pixel improvement remains to be measured.
+2. Core's existing compilation cache gains an internal weakly owned parameter-layout index.
+   Previously every row calculation sorted and JSON-serialized the complete parameter list even
+   when reusing a compiled function. The regression reproduces 4,020 argument-signature constructions
+   across two 200-row preparations; the fixed path constructs 90, with no further warm constructions.
+   Layouts retain parameter names/functions only, reuse current argument values, respect key changes,
+   sorted-argument semantics and explicit cache clearing. Security checks still run for every execution.
+   Immutable builtin-name sets also move from per-expression construction to catalog initialization.
+
+The Native backend regression failed before the fix because it never selected the available host
+idle-task queue; it now passes. Five scheduling cases cover actual backend preparation and scoped
+evaluation, input-driven cancellation (including idle handle zero), late callbacks, listener release,
+host errors, caller override and timer fallback. Core regression checks current/reordered/added
+bindings, cache clearing, TRUSTED/SAFE/custom restrictions and exact broad-fixture results. Existing
+re-entry, event-mode, EVAL, condition-scope, readonly and saved-record preservation checks also pass.
+
+### Matched desktop comparison after the fixes
+
+Same production browser driver/settings as above, two warm-ups and two retained samples, managed
+custom validation enabled. It includes controller settling, selection, signatures and serialization.
+
+| Rows | Execution | Before | After |
+| --- | --- | --- | --- |
+| 200 | Main thread | 252.3, 248.6 | 213.1, 207.8 |
+| 200 | Actual worker | 214.5, 216.2 | 160.8, 162.9 |
+| 2,000 | Main thread | 2,408.9, 2,594.6 | 1,808.5, 1,839.1 |
+| 2,000 | Actual worker | 1,967.4, 2,014.4 | 1,458.7, 1,438.0 |
+
+These new reference measurements satisfy 250 ms / 2 s for this fixture; they do not establish
+Android acceptance. The 2,000-row main-thread/worker reply sizes remain 4,169,642 / 4,163,362 bytes.
+An eight-cycle GC-enabled Node worker prepare/review/release check finds no retained reports;
+tail retained heaps range from 14,845,344 to 14,904,872 bytes. It is not a Hermes heap measurement.
+
+### Verification and next device step
+
+- Full core release gates: formatting, lint, complete tests including the new regression, zero
+  production audit findings, 96-file package check.
+- React: build, 93 tests, 14-file package check. Actual Chromium: 12 accepted-view cases with 10
+  worker instances and 14 submission cases with 9 workers; no page errors.
+- Native: 61 Node tests, 29 adapter cases, focused scheduling cases including scoped evaluation,
+  69-file package check, production/all dependency audit gates.
+- CLI: 168 tests and retained/reopen/persistence-failure/retry browser checks; no page errors.
+
+Logs have the `android-performance-` prefix, preserving the original evidence. No reader-facing API,
+schema, output shape or UI text changed; no localized product documentation or production docs build
+was needed for this internal optimization. Existing security/dependency exceptions remain separate.
+
+New installed archives (unpublished version labels):
+
+| Package | Archive under active harness | Bytes | SHA-256 |
+| --- | --- | --- | --- |
+| Core | `android-performance/form0-core-0.7.0.tgz` | 127,798 | `8bc0415d248f86190b6b645f5abe89984923fa2f892258a19cca600088e39763` |
+| Native | `android-performance/form0-react-native-0.5.0.tgz` | 421,271 | `9cf84ca32f60bc179881357225819324bdbc392d71b0001008ca838c27f2f19e` |
+
+The archives total 549,069 bytes. Installed core/Native source matches maintained source; installed
+profile/scheduler fixture bytes match their sources with the generator's relative-import adjustment.
+No SDK/dependency installation or cleanup was performed. The Native guide and current-work checkpoint
+point to this investigation. Maintainer dependency/funding edits remain untouched.
+
+Reload the app, reset with **Nested editing**, keep SAFE off and run **Profile preparation (200)**.
+The updated report must identify `revision: "native-idle-layout-cache"` and, on this Native runtime,
+`scheduler: "idle-callback"`. Copy its JSON. It now times the same scheduler as the actual renderer;
+the twenty-timer calibration remains as the old-path comparison. Do not request another 2,000-row
+run before this confirms the scheduling reduction and quantifies the remaining compute cost.
