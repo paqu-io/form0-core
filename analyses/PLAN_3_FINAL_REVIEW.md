@@ -1,5 +1,10 @@
 # Plan 3 final review — 26 October 2026
 
+Latest behavior checkpoint: the authorized [broader compatibility audit](CONSUMER_COMPATIBILITY_AUDIT.md)
+passes with 115 React tests, 89 Native Node / 50 adapter cases, 188 CLI tests and fresh actual-worker
+and CLI browser evidence. It fixes pre-existing Other/media UI gaps without changing executors or
+public contracts. Earlier review/security/device evidence below retains its original provenance.
+
 The maintainer selected ending the bounded tuning pass and proceeding with final review, retaining
 the explicit Pixel large-record limitation. Implementation and functional verification are reviewed;
 this is not authorization for publication, deployment or issue closure. The maintainer subsequently

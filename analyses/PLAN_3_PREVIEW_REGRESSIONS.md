@@ -122,19 +122,20 @@ Evidence in the active harness: `signature-immediate-{red,green}.log`,
 `signature-feedback-cli-{persistence,watcher}.log`, `signature-feedback-legacy-form.log` and
 `signature-context-gates.json`. Earlier failed diagnostic runs keep their original provenance.
 
-## Recommended broader compatibility audit
+## Broader compatibility audit — completed
 
 The authoritative catalog currently contains **32 builtins and 18 field types**; the inventory is
-`logs/consumer-compatibility-catalog.json`. A complete compatibility audit is recommended as the next
-stabilization pass. The inventory and passing targeted suites do not claim that audit is finished.
+`logs/consumer-compatibility-catalog.json`. The authorized broader audit is now complete; see
+[Consumer compatibility audit](CONSUMER_COMPATIBILITY_AUDIT.md) for fresh checks, fixes and limits.
+The preceding entries retain their original, earlier verification counts.
 
 Prioritize the consumer boundary that produced these regressions:
 
 | Area | Concrete regression case |
 | --- | --- |
 | Event operations and registration | ON/OFF and schema reload must not leave stale handlers; one edit produces one ALERT; INVALID remains attached to its field or record scope; a later queued edit preserves a previous SETVALUE result. |
-| Scalar and choice input | SETVALUE age to 0 preserves zero; a Boolean selection with value false remains selected; single/multiple choice helpers read predefined and Other selections after editing, clearing and saving. |
-| Media and linked records | Signature/photo/video clear required feedback and retain IDs, timestamps and attachment metadata; FormLink selections retain record IDs, including zero. Distinguish documented setter support from the broader #101 normalization proposal. |
+| Scalar and choice input | SETVALUE age to 0 preserves zero; existing string-valued Boolean choices and false calculation results are preserved; single/multiple choice helpers read predefined and Other selections after editing, clearing and saving. |
+| Media and linked records | Signature/photo/video clear required feedback and retain IDs, timestamps and attachment metadata; FormLink selections retain string record IDs, including '0'; repeatable row IDs preserve numeric zero. Distinguish documented setter support from the broader #101 normalization proposal. |
 | Date, time and derived values | Preserve date/time formats through edit, calculation and serialization; calculations depending on changed input update before selected submission serialization. |
 | Context-dependent builtins | Exercise EVAL, FORM, DATANAMES, SETRESULT and repeatable collection builtins at root and in nested records, including permitted ancestor reads, rejected unrelated reads and calculation/event restrictions. |
 | Containers and special fields | Check effective hidden/read-only/required participation, Sections, expanded BuildingPlan nesting, labels and derived titles/status under their existing ownership rules. |
