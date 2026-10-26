@@ -1,12 +1,12 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (26 October): the latest physical Pixel sample completes 2,000 rows in 9,933 ms,
-with a 293 ms observed scheduling gap and no execution issues. Functional walkthroughs and prompt
-cancellation retain their earlier acceptance. The bounded throughput optimization passes full
-automated checks; the new physical sample is approximately 20% faster than the preceding sample.
-That physical report used `native-throughput-bindings`; the installed measurement fixture now says
-`native-production-baseline` for the authorized production-mode investigation, with package runtime
-bytes unchanged. See the latest section below;
+Current status (26 October): production JavaScript on the Pixel/Hermes completes 200/2,000 rows in
+1,373/9,897 ms with maximum observed JS gaps 96/336 ms, eligible and no execution issues. The large
+sample is essentially unchanged from the previous individual 9,933 ms development sample. Earlier
+functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader's separate
+production chunk error is now corrected; only the 200-row phase profile needs repeating. Its revision
+is `native-production-phases-bundled`; controller revision stays `native-production-baseline`, with
+package runtime bytes unchanged. See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
@@ -692,3 +692,40 @@ byte-identical production bundle content to the single-origin control. The Node 
 82 tests. Report: `logs/production-metro-header-conformance.json`; the original failing request and
 local server logs are preserved. A retry of the same maintainer command is requested. Physical
 tunnel recovery/performance remain pending; no SDK upgrade or actual-phone diagnosis is claimed.
+
+## Production Pixel reports and native profiler loading — 26 October 2026
+
+The maintainer reports `native-production-baseline`, `dev:false`, `hermes:true`, SAFE off,
+completed/eligible and no issues: 200 rows 1,373 ms/gap 96 ms, 2,000 rows **9,897 ms/gap 336 ms**.
+The initial 19,897 ms large-row transcription was explicitly corrected; it is not a valid sample.
+Raw report: `logs/android-pixel8a-production-baseline.json`. The form remains responsive. Startup
+after the Metro retry is confirmed; original forwarded headers were not captured. No controlled
+repeat set/warm-up classification was supplied. The large result is essentially unchanged from
+9,933 ms in development mode; do not claim a production-mode gain or a 19.9-second regression.
+
+The phase profile failed before measurements because the diagnostic dynamic import took Expo's
+native production chunk-URL path without a global `location`. The prior export/HTTP verification
+did not reproduce the Expo Go manifest's `lazy=true` seam. A purpose-built loop now loads the actual
+Metro Android production module graph without `location`, using the installed SDK's native chunk
+URL resolver. `node phase-loader-production.mjs before-lazy` fails with the exact reported message;
+the unsplit control passes. This is a discriminating loader regression, not Hermes runtime timing.
+
+Only the diagnostic entry generator changes: a statically resolved `require()` keeps its module in
+the bundle and defers initialization until the Profile button. There is no `location` shim or chunk
+host configuration, and no SDK/dependency or shipped runtime change. The same loop passes after
+restarting the agent-owned CI Metro server, with zero chunk network loads, complete 200-row
+TRUSTED/SAFE result equality and immutable inputs. The first post-edit probe hit the CI server's
+unchanged cached graph; that failure is retained, then the restarted-graph result is recorded.
+The diagnostic source itself stays byte-identical (hash recorded above). Native Node tests: 83 pass.
+
+Reports: `logs/phase-loader-before.json` (unsplit control), `phase-loader-before-lazy.json` (decisive
+failure), `phase-loader-after-bundled.json` (stale CI graph),
+`phase-loader-after-bundled-restarted.json` (corrected graph), `phase-loader-native-tests-final.log`.
+The agent's localhost diagnostic Metro was stopped; the maintainer's process was not stopped.
+No additional package archive or dependency tree was created.
+
+The maintainer is asked to restart the same production Metro command and repeat **only Profile
+preparation (200)**. Expect revision `native-production-phases-bundled` and
+`diagnosticLoading: bundled-require`, with eight control samples and a separate phaseProbe.
+Retain the supplied controller reports. Actual phase proportions remain pending, so do not choose
+a further runtime optimization, infer a CPU profile or finalize Plan 3 performance acceptance yet.

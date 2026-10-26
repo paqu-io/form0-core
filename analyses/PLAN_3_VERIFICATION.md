@@ -321,3 +321,22 @@ Detailed results, limits and the excluded legacy diagnostic probe are recorded i
 [investigation](ANDROID_PREPARATION_INVESTIGATION.md). Three focused physical reports are requested
 in the latest Native guide; they remain pending. No additional runtime optimization or performance
 acceptance is implied.
+
+## First production-mode physical reports — 26 October 2026
+
+Pixel/Hermes with `dev:false`, SAFE off: 200 rows 1,373 ms/gap 96 ms; 2,000 rows 9,897 ms/gap
+336 ms. Both completed/eligible/no issues and the form remains responsive. The maintainer corrected
+an initial large-row transcription; do not use 19,897 ms. These are individual observations without
+supplied warm-up/repeat classification. The large sample is essentially unchanged from the previous
+9,933 ms development report. The measurement bottleneck remains unresolved.
+
+The phase profile failed in Expo's native production async-chunk loader. A new actual Metro
+`lazy=true` compiled-graph test without global `location` reproduces the exact failure, whereas the
+earlier unsplit export did not. The diagnostic entry now uses a bundled require with initialization
+deferred to Profile; no shipped runtime, schema or dependency changes. Corrected graph: zero chunk
+network loads, identical complete 200-row TRUSTED/SAFE results and immutable inputs. Native Node
+suite: 83 tests pass. This is loader/conformance evidence, not physical Hermes phase timing.
+
+See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for report provenance. Only the 200-row
+phase profile is requested again; controller results and previous functional/cancellation acceptance
+are preserved. No further runtime optimization or performance sign-off is inferred.

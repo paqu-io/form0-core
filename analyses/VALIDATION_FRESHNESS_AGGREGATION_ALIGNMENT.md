@@ -896,3 +896,10 @@ See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md) and Native accepta
 commands and limits. Physical reports are pending; no new runtime optimization, release or Plan 3
 completion is claimed. Reference targets remain unchanged and do not become a guarantee for arbitrary
 schema JavaScript on every device.
+
+Production-mode Pixel follow-up (26 October): the corrected 2,000-row sample is 9,897 ms/gap
+336 ms; 200 rows is 1,373 ms/gap 96 ms, both eligible/no issues. The form is responsive, but a
+production-mode speedup is not established. A harness dynamic import prevented phase data; its
+loader is corrected and tested against the actual Metro `lazy=true` production graph without a
+browser `location` global. Only the 200-row diagnostic needs repeating. Existing runtime logic and
+optimization/maintenance criteria remain unchanged; wait for phase evidence before another fix.
