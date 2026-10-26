@@ -4,8 +4,10 @@ Current status (26 October): production JavaScript on the Pixel/Hermes completes
 1,373/9,897 ms with maximum observed JS gaps 96/336 ms, eligible and no execution issues. The large
 sample is essentially unchanged from the previous individual 9,933 ms development sample. Earlier
 functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader passes
-compiled production checks, but the phone still reports its earlier chunk error; its loaded build
-was not visible. The versioned retry is `phase-profile-v3`; only the 200-row phase profile is requested.
+compiled production checks, but the phone still shows the older UI. SDK 58 source and a live-manifest
+cache model expose a fixed production launch-asset key collision; a harness-only session-key adapter
+passes automated checks and awaits phone confirmation. The retry is `phase-profile-v3`; only the
+200-row phase profile is requested.
 Controller revision stays `native-production-baseline`, with
 package runtime bytes unchanged. See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
@@ -771,3 +773,41 @@ production graph passes with zero chunk loads, immutable full TRUSTED/SAFE 200-r
 `phase-loader-versioned-launch.json`, `phase-launch-native-tests.log`. No SDK or product-runtime
 change, installation or new dependency tree. Phone recovery remains pending: open the project from
 Expo Go's home using the current QR, verify the v3 button and repeat only the 200-row profile.
+
+## SDK 58 production asset-key collision — 26 October
+
+The maintainer transcribes the old UI after the latest restart: dev:false, no build marker and
+Profile preparation (200). Direct localhost and the exact reported tunnel serve the current v3
+bundle. The previous source/URL checks proved HTTP delivery but missed native asset-cache identity.
+
+SDK 58 Android `ExpoUpdatesUpdate` builds a launch AssetEntity from the manifest's key. The live
+CLI still sets that key to `bundle`. `Loader.downloadAllAssets` finds a cached entity by key,
+`AssetDao.mergeAndUpdateAsset` updates a changed URL without clearing the existing relative path,
+and the loader reuses that local file. Development mode skips the asset download/cache path.
+This source path matches the observed production-only persistence of old UI, but exact handset
+causality remains pending. A successful Windows ADB device listing reports no attached devices;
+the agent did not alter phone configuration or storage.
+
+Primary sources: [loader](https://github.com/expo/expo/blob/sdk-58/packages/expo-updates/android/src/main/java/expo/modules/updates/loader/Loader.kt),
+[asset merge](https://github.com/expo/expo/blob/sdk-58/packages/expo-updates/android/src/main/java/expo/modules/updates/db/dao/AssetDao.kt),
+[Expo Go launcher](https://github.com/expo/expo/blob/sdk-58/apps/expo-go/android/expoview/src/main/java/host/exp/exponent/ExpoUpdatesAppLoader.kt).
+Copied primary source is retained under `logs/expo-sdk58-loader-source/` for the narrow probe.
+
+Only the private diagnostic launcher changes: it loads the installed CLI manifest module with a
+fresh session asset key in memory, before the existing serialization/signing code. Installed SDK
+files, dependencies, package archives, form runtime, schema, records and SQLite fixtures are unchanged.
+The single source anchor and safe filename format are guarded; source drift fails explicitly.
+
+`node production-asset-cache-probe.mjs before 8081` fails: both actual JSON and native multipart
+manifests contain the constant key and a source-guided cache model selects the older UI despite
+current bundle source. `after 8108` passes with the new key and current UI. This model is not Android
+execution. Independent Native tests: 86 pass, including pre-signing key injection and source drift.
+Reports: `logs/production-asset-cache-before.json`, `production-asset-cache-after.json`,
+`production-asset-key-native-tests.log`. The agent stopped its 8108 server, leaving the maintainer's
+8081 server untouched. No new dependency tree or installation; no SDK source was edited on disk.
+
+Next physical action: restart the same production command; startup must report
+production-launch-asset-key/session-key-enabled. Force stop/reopen Expo Go, scan the current QR,
+verify Profile phases v3 (200), then run only that profile with SAFE off. No large controller rerun.
+The former filename-only attempt did not address the key collision; retain its evidence as an
+unsuccessful workaround. No additional product optimization until actual phase data is available.
