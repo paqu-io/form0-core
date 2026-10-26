@@ -863,3 +863,19 @@ identify a specific measured cost and preserve these semantics; incremental resu
 outputs or moving Native execution require separate design if needed. No Plan 3 performance sign-off,
 release or issue closure is inferred from this checkpoint. Source/API/schema/dependency policies and
 maintainer release ownership are preserved.
+
+## Pixel throughput checkpoint and extensibility — 26 October 2026
+
+The physical `native-throughput-bindings` result is completed/eligible/no issues, 9,933 ms for
+2,000 rows and maximum observed JS gap 293 ms. Compared with the previous individual 12,400 ms /
+294 ms sample, elapsed time falls approximately 19.9% while the longest observed gap is unchanged.
+Warm-up/repeated phone measurements were not supplied. Preserve prior cancellation and functional
+walkthrough acceptance. The investigation records the raw report and its limits.
+
+The recommendation is to stop this contained optimization pass with an explicit remaining
+large-record latency limitation; Plan 3 performance acceptance is not inferred. No broader runtime
+change or new phone test is requested here. New builtin calls and complex expressions default to
+the existing full-context execution path. Future builtin registration needs no optimizer extension
+to work correctly. Reassess the specialization only when changing its existing operation/context
+semantics or deliberately extending optimized coverage. Current values/security and normal
+calculation/event behavior remain the governing contracts.

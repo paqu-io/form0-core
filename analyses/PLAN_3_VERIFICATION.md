@@ -282,3 +282,23 @@ until the one focused Pixel comparison; previous 12,400 ms/gap294 ms remains the
 No new broad manual walkthrough or core-only profile is required. Plan 3 performance remains open.
 
 Core throughput implementation: `ea9adf0` on development. Maintainer package/lock changes are preserved outside the implementation commit.
+
+## Physical throughput follow-up — 26 October 2026
+
+The maintainer's Pixel 8a result for `native-throughput-bindings` is completed/eligible/no issues,
+9,933 ms elapsed and 293 ms maximum observed JS gap for 2,000 rows. This is approximately 19.9%
+less elapsed time than the previous 12,400 ms sample; the 294 ms previous gap is essentially
+unchanged. Both are individual transcriptions with unspecified warm-up, not repeated controlled
+phone measurements. Raw report: active-harness `logs/android-pixel8a-throughput-bindings.json`.
+
+No code/archive/tree changes or new runtime tests accompany this evidence update. Earlier full
+gates, walkthroughs 1/2 and prompt cancellation remain accepted with their original provenance.
+The source review confirms unknown calls/complex syntax use full context; only current primitive
+expressions with canonical IF/SETRESULT specialize. New builtins therefore do not need optimizer
+changes for correctness. Revisit it if extending the whitelist or changing existing semantics.
+
+Recommendation: stop the contained optimization pass and make the remaining large-record latency
+an explicit Plan 3 performance acceptance decision. Approximately ten seconds for the stress
+submission remains a limitation; this observation alone does not finalize Plan 3, issue acceptance
+or release readiness. No additional broad manual retest is requested. iOS and production Reform
+persistence remain separate.

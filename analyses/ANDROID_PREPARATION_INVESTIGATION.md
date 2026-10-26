@@ -1,10 +1,10 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (24 October): the latest physical Pixel sample completes 2,000 rows in 12,400 ms,
-with a 294 ms observed scheduling gap and no execution issues. Functional walkthroughs and prompt
-cancellation pass. A subsequent bounded throughput optimization passes full automated checks,
-reduces the matched managed core workload by 27%, and awaits one focused Pixel comparison.
-The installed revision is now `native-throughput-bindings`. See the latest section below;
+Current status (26 October): the latest physical Pixel sample completes 2,000 rows in 9,933 ms,
+with a 293 ms observed scheduling gap and no execution issues. Functional walkthroughs and prompt
+cancellation retain their earlier acceptance. The bounded throughput optimization passes full
+automated checks; the new physical sample is approximately 20% faster than the preceding sample.
+The installed revision is `native-throughput-bindings`. See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
@@ -584,3 +584,36 @@ no push, publication, merge, deployment or issue closure was performed. No depen
 SDK change or deletion was needed; previous candidate archives and accepted evidence stay intact.
 
 Native fixture revision commit: `15ac0a1` on development. Its consumer runtime archive is unchanged.
+
+## Physical throughput result and extension boundary — 26 October 2026
+
+The maintainer reports `native-throughput-bindings`, completed/eligible with no issues, in
+9,933 ms with a maximum observed JS gap of 293 ms. The preceding owned-tree sample was
+12,400 ms/gap 294 ms: 2,467 ms less elapsed time, approximately 19.9%. These are individual
+transcribed observations with unspecified warm-up, not a controlled repeated phone benchmark.
+The longest observed gap is essentially unchanged. The raw transcription and normalized values
+are retained in active-harness `logs/android-pixel8a-throughput-bindings.json` alongside the earlier
+report. Cancellation and walkthroughs 1/2 were not rerun for this sample; their acceptance stands.
+
+Recommendation: stop this contained optimization pass rather than widen the specialized language.
+The observed gain supports the selected implementation, but approximately ten seconds for this
+377-element, 2,000-row managed submission remains a large-record latency limitation. It is not
+the cost of each live scalar edit: those use selected-scope evaluation. Performance sign-off for
+Plan 3 remains an explicit acceptance decision, separate from functional acceptance. Further work
+should start from a discriminating measurement of a remaining phase and an agreed benefit target.
+No additional device rerun or runtime change is required solely to record this result.
+
+The private optimizer caches syntax/binding metadata, not values or results. It recognizes a single
+primitive expression, its operators/conditionals and canonical IF/SETRESULT calls. It checks current
+accessible primitive values and function identities on each execution. Unknown AST nodes, calls,
+parse failures, helper overrides, object inputs, EVAL and complex JavaScript use the original full
+context. For example, `$amount * (1 + $tax)` can specialize; `ROUND($amount, 2)` already works via
+full context. A newly registered `NEWBUILTIN($amount)` also uses full context automatically, without
+an optimizer change. A function still needs ordinary catalog/runtime/security support and tests.
+
+Review this optimization when changing the semantics of currently specialized operations or their
+context contracts, or deliberately adding another operation to its whitelist. Adding an unrelated
+builtin or a more complex expression does not require that extension for correctness. Existing
+regression evidence covers these fallback boundaries; it does not imply immunity to future bugs.
+This checkpoint changes documentation/evidence only, leaving candidate bytes and installed trees
+unchanged. No new full runtime suite is necessary for these prose/report updates.
