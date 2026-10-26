@@ -4,7 +4,9 @@ Current status (26 October): the latest physical Pixel sample completes 2,000 ro
 with a 293 ms observed scheduling gap and no execution issues. Functional walkthroughs and prompt
 cancellation retain their earlier acceptance. The bounded throughput optimization passes full
 automated checks; the new physical sample is approximately 20% faster than the preceding sample.
-The installed revision is `native-throughput-bindings`. See the latest section below;
+That physical report used `native-throughput-bindings`; the installed measurement fixture now says
+`native-production-baseline` for the authorized production-mode investigation, with package runtime
+bytes unchanged. See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
@@ -617,3 +619,60 @@ builtin or a more complex expression does not require that extension for correct
 regression evidence covers these fallback boundaries; it does not imply immunity to future bugs.
 This checkpoint changes documentation/evidence only, leaving candidate bytes and installed trees
 unchanged. No new full runtime suite is necessary for these prose/report updates.
+
+## Production-mode investigation prepared — 26 October 2026
+
+The maintainer authorized the proposed investigation. Preserve current calculation, event and form
+logic. Judge optimization benefit against complexity and edge cases; do not retain another layer
+merely because a microbenchmark improves. Keep the existing binding optimization unchanged until
+new evidence justifies a different choice. No further runtime optimization has been implemented.
+
+The ranked predictions are: (1) development overhead will show a material decrease with production
+JavaScript; (2) event setup/validation overhead will remain concentrated in managed validation and
+grow when managed validation is enabled; (3) copying/scheduling will appear in the remaining phase
+durations or explicit yield waits. Measure these before choosing a fix. An actual Hermes trace is
+still needed if boundary timings cannot discriminate the remaining cost; Chromium is a comparator.
+
+The existing device harness now displays JS development mode in the header and reports environment
+flags for full controller preparation, revision `native-production-baseline`. Baseline controller
+checks use fresh accepted fixtures; a repeated preparation on the same editor applies a different
+change-report workload after the first selection. This observation does not invalidate the earlier
+reported timings, but it must remain explicit when comparing them.
+
+The 200-row diagnostic separately evaluates the same captured input for one cold and three warm
+samples per managed-events setting. It can load a boundary-instrumented copy of installed core for
+one separate warmed phase probe (after a warm-up). Only that ignored source copy has phase hooks;
+the normal controller still uses unchanged packed core/Native. The source generator is retained in
+Native for reproducibility and fails if its exact candidate-source anchors change. It installs no
+dependencies. Phase wall/active timing is not CPU time; active time subtracts explicit scheduler
+waits only. Managed context/registration and dispatch are nested within managed validation, and
+must not be summed as independent work. Instrumented and uninstrumented samples stay separate.
+
+Source SHA-256 before instrumentation:
+`5b3147e4f1efb1c77fed277e69614a6dcd7d5255fc926943d65a2c708babcfc4`.
+The installed package/archive bytes remain the preceding candidate. Production Android JavaScript
+exports successfully (no APK build), with `__DEV__=false` verified in the bundle. Size 3,584,406 bytes,
+SHA-256 `1705f0cc87cc3167742fa88642eef1c2f4b465eba7c884ec4ae5410561238ce1`.
+
+Automated checks pass in the independent candidate tree: 77 Native Node tests, including complete
+instrumented/control equality for valid and invalid custom validation, ID/media/metadata preservation,
+and cancellation; a separate conformance run matches complete prepared results and immutable inputs
+for 200/2,000 rows under TRUSTED/SAFE with managed validation on/off. No maintained dependency tree
+was replaced. Production-mode startup and reporting follow
+[Expo guidance](https://docs.expo.dev/workflow/development-mode/); production JS in Expo Go does not
+establish final compiled-release performance.
+
+The actual Native browser adapter at CPU throttle 4 remains a reproducible slow comparator: current
+unprofiled warmed samples 5,079.9/5,813 ms; first sample 7,815.1 ms. The manual two-second diagnostic
+assertion fails as expected, outside ordinary unit tests. Existing responsiveness assertions pass.
+An initial profiling invocation selected the legacy diagnostic bundle; its report is retained but
+excluded from current-candidate comparisons. Current uninstrumented runtime was then rerun, with
+source features and asset hashes matching the previous final candidate. These are not Hermes data.
+
+Reports live in the active harness: `production-phase-conformance.json`,
+`production-baseline-native-tests-final.log`, `production-mode-bundle.log`,
+`throughput-production-investigation-current.json`, and the provenance/manifest companion.
+The Native acceptance guide contains three focused actions: fresh 200/2,000-row controller timings,
+then the single 200-row diagnostic, with production mode confirmed on-screen. Earlier walkthroughs
+and cancellation retain acceptance. Physical production reports are pending; do not infer speedup,
+performance sign-off or a need to change execution architecture. No publication or issue closure.

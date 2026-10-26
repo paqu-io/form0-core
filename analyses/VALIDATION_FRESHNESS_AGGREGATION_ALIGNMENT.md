@@ -879,3 +879,20 @@ the existing full-context execution path. Future builtin registration needs no o
 to work correctly. Reassess the specialization only when changing its existing operation/context
 semantics or deliberately extending optimized coverage. Current values/security and normal
 calculation/event behavior remain the governing contracts.
+
+## Authorized production-performance investigation — 26 October 2026
+
+The maintainer approved production-mode measurement, then phase-based investigation, before accepting
+the remaining large-record latency. Preserve calculations, events, validation, scope/security and form
+logic. Require enough measured benefit to justify maintenance cost and edge cases for any additional
+optimization; do not automatically accumulate changes. The current binding optimization is unchanged.
+
+The next physical measurement uses production JavaScript in the existing Expo Go harness, explicitly
+verified with `dev: false`; final compiled-release acceptance is separate. Fresh full-controller runs
+are distinguished from repeated core runs on the same captured accepted input. A separate diagnostic
+source copy provides phase timings without changing shipped runtime APIs or package bytes. Its
+instrumentation/control parity is verified under TRUSTED/SAFE, including validation and cancellation.
+See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md) and Native acceptance guide for hashes,
+commands and limits. Physical reports are pending; no new runtime optimization, release or Plan 3
+completion is claimed. Reference targets remain unchanged and do not become a guarantee for arbitrary
+schema JavaScript on every device.

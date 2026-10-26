@@ -302,3 +302,22 @@ an explicit Plan 3 performance acceptance decision. Approximately ten seconds fo
 submission remains a limitation; this observation alone does not finalize Plan 3, issue acceptance
 or release readiness. No additional broad manual retest is requested. iOS and production Reform
 persistence remain separate.
+
+## Production-mode measurement readiness — 26 October 2026
+
+The maintainer authorized a bounded follow-up with behavior preservation and benefit/maintenance
+tradeoffs explicit. Device fixture revision `native-production-baseline` displays `dev` and Hermes
+flags. Fresh controller runs are separate from repeated unchanged-input core runs; a diagnostic-only
+source copy supplies phase timings. Product runtime/package bytes are unchanged.
+
+The independent candidate tree passes 77 Native Node tests. Eight wide-fixture cases (200/2,000 rows,
+TRUSTED/SAFE, managed on/off) match complete instrumented/control results and preserve input hashes;
+pre-cancellation also matches. The production Android JS bundle exports successfully with
+`__DEV__=false` verified. No APK build, dependency install or replacement was needed. Earlier runtime,
+browser/worker, CLI and localized-doc gates retain provenance; they were not rerun for fixture-only
+changes. Current Native browser CPU4 timings remain above two seconds and are not Hermes evidence.
+
+Detailed results, limits and the excluded legacy diagnostic probe are recorded in the
+[investigation](ANDROID_PREPARATION_INVESTIGATION.md). Three focused physical reports are requested
+in the latest Native guide; they remain pending. No additional runtime optimization or performance
+acceptance is implied.
