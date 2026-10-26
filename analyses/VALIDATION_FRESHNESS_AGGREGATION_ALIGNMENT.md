@@ -957,3 +957,31 @@ is a non-blocking maintenance follow-up, not a reason for a broad extraction now
 Preserve all source evidence, existing development branches and unrelated working-tree edits. Core
 publication and actual minimum-range updates still precede dependent consumers. No merge, push,
 bump, publication, deployment, issue closure or new durable Reform persistence was performed.
+
+## Security pass and selected release sequence — 26 October 2026
+
+The maintainer selected **hold CLI publication; proceed with other packages**. Core/React/Native
+production audits pass. Compatible CLI parser patches and the React Vitest 4.1.12 security patch
+are committed; the latter passes all 100 tests and clean production/all-dependency audits. CLI
+passes 174 tests, formatting/smoke/package checks and actual browser choice synchronization, but
+its audit retains one high Undici entry and one inherited moderate Pi entry. Current upstream Pi
+still pins the affected version. Root overrides and bundling probes are not shipped. No audit or
+deployment policy was weakened, and no Native/mobile exception was extended.
+
+The reported older-schema default-values failure is installed core 0.7.0 lacking evaluateScope(),
+not a schema defect. The endpoint now returns the existing explicit upgrade guard. A separate
+Boolean/MultiChoice scoped-setter shadowing bug is fixed with red/green regressions and actual
+browser verification. Authored welcome ALERTs remain expected; no user schema was changed.
+
+Recommend core **0.8.0** first, then update core minimums to **^0.8.0** and locks in consumers and
+authoring/starter integrations. Recommend React **0.5.0** and Native **0.6.0** for the additive
+public consumer contracts. CLI may adopt core for local development but remains unpublished until
+the security blocker is resolved; its eventual new preview contracts warrant a minor release too.
+
+Plan 3 implementation, review and agreed functional/device acceptance are complete with the accepted
+8.454-second large Pixel limitation. Release integration and the CLI blocker remain outstanding.
+Live issue reconciliation shows core #99/#104 and React #73 open, #103 closed. Their implementation
+acceptance is complete; the maintainer owns closure after the corresponding coordinated deliveries.
+The CLI dependency hold is separate from core/React issue closure. See
+[security and release evidence](PLAN_3_SECURITY_REVIEW.md) and the updated
+[final review](PLAN_3_FINAL_REVIEW.md). All release operations remain maintainer-owned.

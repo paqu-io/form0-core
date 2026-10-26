@@ -2,8 +2,10 @@
 
 The maintainer selected ending the bounded tuning pass and proceeding with final review, retaining
 the explicit Pixel large-record limitation. Implementation and functional verification are reviewed;
-this is not authorization for publication, deployment or issue closure. The fresh CLI production
-audit fails and requires separate dependency remediation before CLI release.
+this is not authorization for publication, deployment or issue closure. The maintainer subsequently
+selected holding CLI publication for its upstream Pi/Undici pin while proceeding with core, React
+and Native. See [the security checkpoint](PLAN_3_SECURITY_REVIEW.md) for the compatible fixes,
+reported preview defects, fresh audits and coordinated version recommendations.
 
 References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
@@ -30,9 +32,10 @@ preserved. Exact pinned heads, bases and nonempty diff statistics are retained i
 | Documentation | `205af87` |
 | Mobile starter | `118d5cf` |
 
-The one CLI correction described below was reviewed in addition to those pinned diffs. Source bytes
-match the independent verified core, React, Native, CLI and installed device candidates; the parity
-report is `logs/plan3-final-source-parity.json`. Historical test/build evidence retains its original
+The CLI corrections described below were reviewed in addition to those pinned diffs. Source bytes
+match the independent verified core, React, Native, CLI and installed device candidates; the original
+parity report is `logs/plan3-final-source-parity.json`, with the later CLI correction covered by
+`logs/cli-security-selected-candidate.json`. Historical test/build evidence retains its original
 candidate provenance; it is not presented as a fresh execution of every suite during this review.
 
 ## Standards
@@ -62,7 +65,16 @@ retain, persist and reopen, checking payload ID, stored key, retained total 330,
 three pass afterwards. Existing singleton adapters that ignored the lookup key could not expose it.
 No schema, callback, record shape or adapter interface changes.
 
-No additional concrete Spec findings were identified. Review covered selected-scope evaluation,
+The independent review identified no other concrete Spec findings. Subsequent maintainer preview
+testing exposed a separate CLI choice-setter collision: legacy same-named methods shadowed the
+field-instance setters, causing the BooleanField `[object Object]` lookup warning and affecting
+MultiChoiceField too. Commit `f0d52d4` corrects this with two red/green instance-isolation regressions
+and an actual browser input → managed SETVALUE → control-update check. The default-values endpoint
+now uses the existing coordinated-core guard. Its failure with installed core 0.7.0 is a package
+capability mismatch; consumers must adopt the new core release. No schema correction is needed for
+these two reported failures. Full details and exact evidence are in the security checkpoint.
+
+Review covered selected-scope evaluation,
 fresh current values and fallback paths, save-hook-once/revalidation, proposal selection/release,
 stale acknowledgements, worker transport/cancellation, findings navigation, Native integration,
 server-owned CLI policy and Builder record-aware preview. Source review and the retained tests do
@@ -73,14 +85,15 @@ not establish a universal performance bound or substitute for deferred iOS accep
 | Surface | Current evidence |
 | --- | --- |
 | Core | Full release checks pass for the current runtime candidate; 55 record-evaluator scenarios, complex and deep scoped matrices retained. |
-| React | 100 tests and actual main-thread/worker submission, live-edit, accepted-view and schema/event-reload checks pass. |
+| React | 100 tests and actual main-thread/worker submission, live-edit, accepted-view and schema/event-reload checks pass. Full release gates pass again after the bounded Vitest security patch. |
 | Native | 86 Node tests, prior adapter/declaration checks and actual Pixel walkthroughs/cancellation retained. |
-| CLI correction | Fresh formatting, all 171 tests, smoke, package checks and actual browser persistence interaction pass against the packed correction. |
-| CLI production audit | Fresh check fails: 2 high and 1 moderate findings. Maintained and independent locks both contain body-parser 2.3.0 and nested undici 8.10.2. No dependency upgrade performed. |
+| CLI correction | Fresh formatting, all 174 tests, smoke, package checks and actual browser choice synchronization pass against identical packaged runtime bytes. Earlier browser persistence acceptance remains retained. |
+| CLI production audit | Body-parser is patched to 2.4.0. The fresh selected audit still fails: 1 high Undici entry and 1 inherited moderate Pi entry. CLI publication is held by the maintainer's explicit decision. |
+| Other package audits | Core, React and Native production audits report zero. Core/Native all-dependency audits report zero; React also reports zero after Vitest 4.1.12. No audit policy or Native exception deadline was changed. |
 | Builder | Retained maintained-suite/type/localization and actual wrapper preview evidence; no new Builder source change in this review. |
 | Public documentation | Retained EN/ES/FR/IT source/navigation/parity/lint and 23-test evidence; no public API changed by the CLI correction or private performance optimizations. Rendered validation stays CI-owned. |
 
-CLI packed correction: `final-review/form0-cli-0.7.0.tgz`, 318,455 bytes, SHA256
+Earlier CLI identity correction: `final-review/form0-cli-0.7.0.tgz`, 318,455 bytes, SHA256
 `a04ff4e174c56df98c8a344afe80c2fd84330d534cd95479b735222ea715b211`.
 Candidate labels preserve the old package version and do not claim a registry release.
 Reports: `logs/plan3-final-cli-identity-red.log`, `plan3-final-cli-identity-green.log`,
@@ -88,7 +101,8 @@ Reports: `logs/plan3-final-cli-identity-red.log`, `plan3-final-cli-identity-gree
 `plan3-final-cli-gates.json`, `final-review-cli-browser.json` and
 `plan3-final-cli-candidate.json`. The release command stops at its production audit, so package
 checking was run separately and passed. Earlier clean audits are dated evidence, not current claims.
-The existing audit policy was not changed. These production dependency findings are distinct from
+The later CLI candidate and all fresh security reports are in the security checkpoint. The existing
+audit policy was not changed. These production dependency findings are distinct from
 the docs informational build-dependency audit and the separate Native/mobile exception.
 
 ## Performance acceptance boundary
@@ -113,15 +127,19 @@ performance and iOS acceptance are not claimed from Expo Go production JavaScrip
 
 | Issue | Reviewed implementation / evidence | Maintainer-owned remaining work |
 | --- | --- | --- |
-| Core #99 | Shared submission participation, type-aware emptiness, hidden ancestors, required/read-only policy, closed-row custom validation and drafts. | Review for closure after coordinated delivery; no automatic closure. |
-| Core #104 | Selected snapshot validation/serialization, scope findings, separate diagnostics/execution issues and save-hook-once conditional revalidation. | Coordinated release and manual issue closure. |
+| Core #99 | Public submission-validation contract separate from engine.eval, type-aware emptiness, nested findings, closed-row custom validation and drafts. | Implementation acceptance complete; core/documentation delivery and manual issue closure. |
+| Core #104 | Hidden required fields and hidden descendants do not block; visible required/read-only empty inputs do block; populated inputs and conditional transitions have cross-consumer coverage. | Implementation acceptance complete; core/documentation delivery and manual issue closure. |
 | React #73 | Automatic/confirm/retain freshness, nested acceptance/cancel isolation, exact selected totals, persistence failure/retry, worker parity and Native device acceptance with documented limits. | Publish dependent consumers against the new core capability; manual issue closure. |
 
-Publish the additive core interfaces before consumers, then update actual consumer/Builder minimum
-ranges and lockfiles to the releases containing those interfaces. Published core 0.7.0 alone does
+Recommend core 0.8.0 first, then React 0.5.0 and Native 0.6.0, updating actual consumer/Builder/starter
+minimum ranges and lockfiles to the releases containing the interfaces. Published core 0.7.0 alone does
 not provide all Plan 3 interfaces; current candidate filenames are not a compatible-version promise.
-Resolve the fresh CLI production audit before publishing CLI. Version bumps, pushes, promotion
-merges, publication, deployment and issue closure remain maintainer-owned.
+The maintainer selected holding CLI publication until its upstream pin is fixed. Core #99/#104 and
+React #73 remain open in the fresh read-only issue check; #103 is already closed. The CLI hold does
+not block closing those core/React issues after their releases. Version bumps, pushes, promotion
+merges, publication, deployment and issue closure remain maintainer-owned. Plan 3 implementation,
+review and agreed acceptance are complete with the documented phone limitation; release/version
+integration and the CLI security blocker remain outstanding.
 
 Production Reform record/companion persistence, public-share/autosave, offline drafts/outbox and
 backend compatibility remain the documented separate delivery. Native/mobile dependency exceptions
