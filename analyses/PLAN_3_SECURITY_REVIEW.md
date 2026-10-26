@@ -6,6 +6,11 @@ deployment or issue closure was performed. Existing development branches and unr
 are preserved. See [the final review](PLAN_3_FINAL_REVIEW.md) for functional acceptance and the
 explicit remaining Pixel performance limit.
 
+Later interaction testing and binding parity corrections are recorded in
+[the preview regression verification](PLAN_3_PREVIEW_REGRESSIONS.md). They change no dependencies
+and do not remove the CLI publication hold. The installed-core mismatch below describes the start
+of the security pass; the later local development link now resolves the core checkout.
+
 ## Dependency findings and bounded fixes
 
 | Surface | Result |

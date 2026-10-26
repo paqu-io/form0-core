@@ -14,6 +14,10 @@ References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 [performance investigation](ANDROID_PREPARATION_INVESTIGATION.md), and
 [Reform persistence follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
 
+Subsequent older-form interaction testing exposed additional CLI synchronization and binding
+choice-operation gaps. See [the corrections and current verification](PLAN_3_PREVIEW_REGRESSIONS.md);
+its 178 CLI / 108 React / 86 Native plus 43 adapter results supersede the earlier counts below.
+
 ## Review scope
 
 Two independent read-only reviews covered Standards and Spec. Fixed bases are the parents of the
