@@ -16,7 +16,8 @@ References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 
 Subsequent older-form interaction testing exposed additional CLI synchronization and binding
 choice-operation gaps. See [the corrections and current verification](PLAN_3_PREVIEW_REGRESSIONS.md);
-its 178 CLI / 108 React / 86 Native plus 43 adapter results supersede the earlier counts below.
+its latest CLI 181-test / 48 browser-case feedback follow-up and the 108 React / 86 Native plus
+43 adapter results supersede the earlier counts below.
 
 ## Review scope
 

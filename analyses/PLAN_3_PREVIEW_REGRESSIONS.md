@@ -23,10 +23,11 @@ React root normalization is unchanged. Normal calculation execution, current rea
 row coordination, managed opt-out, local-only writes and submission preparation keep their contracts.
 The broader core setters/normalization proposal (#101) remains separate.
 
-The maintainer's existing `my-form-sexies/form.schema.json` is not edited. Its age handler still needs
-the same sample correction: read `$age` in that handler and adjust its message to
-`ALERT('Warning!', 'Age changed to ' + $age)`. Age 12 continues to fail its authored minimum of 16.
-A real-browser check deliberately retains and verifies the old handler's scope rejection.
+The first reproduction left the maintainer's existing `my-form-sexies/form.schema.json` untouched
+and verified the invalid `$email` read. During the signature follow-up the current schema already
+contains `ALERT('Warning!', 'Age changed to ' + $age)`. The browser check now respects that authored
+correction and expects no scope issue. Age 12 continues to fail its authored minimum of 16; core's
+separate illegal-reference checks remain in place.
 
 ## Automated evidence
 
@@ -71,9 +72,78 @@ deferred. Public localized documentation does not need an interface change for t
 
 Restart the CLI preview process to reload server modules, then refresh the browser. Verify the city
 handler selects banana and pasta/focaccia, Other accepts text, and drawing a required signature clears
-its inline message. Correct the existing sample age handler as described above. There is no need to
+its inline message. The sample age handler is now corrected as described above. There is no need to
 repeat the large Android performance fixtures for these operation-adapter corrections.
 
 Commits belong on the existing development branches. Package/lockfile edits already present in the
 maintained worktrees are left to the maintainer. No publication, version bump, merge, push, deployment
 or issue closure is performed by this follow-up.
+
+## Immediate signature feedback follow-up
+
+A subsequent manual check correctly identified that the message cleared only after server evaluation,
+which felt slower than the earlier immediate feedback. The browser regression now holds update
+requests pending while drawing. Before the correction, the required message remains; afterwards it
+clears without a server reply. Root and active child-record signatures are covered.
+
+The CLI now reuses its existing field-presence rule immediately with the last supplied required flag.
+Each rendered control retains only that flag and its last intrinsic error. Intrinsic errors remain
+visible until authoritative reevaluation; ordinary submission eligibility and custom validation remain
+server-owned. This adds no stored record metadata or record-tree copy. Server updates replace those
+flags, and rerendering a schema replaces the controls.
+
+The same check exposed duplicate processing: six signature notifications generated twelve managed
+updates because the compatibility native input event also entered the generic input handler. That
+event remains available to DOM listeners; the coordinator consumes signaturefield-change once. Every
+stroke notification still reaches the engine, preserving live updates and authored handlers.
+
+A delayed-network event-counter case also exposed stale sibling values: six queued edits could end
+with a handler counter of 1 rather than 6 because each captured complete form resent its old counter.
+Field edits now send only the changed field, retaining current values written by earlier handlers.
+Explicit batch updates retain their existing behavior. A real UI-adapter → HTTP → engine regression
+covers successive handler writes and the batch path.
+
+Fresh verification: formatting, all **181 CLI Node tests**, smoke and package checks pass. All **24
+browser scenarios pass in TRUSTED and the same 24 in SAFE**, including blocked replies, root/child
+presence, retained intrinsic errors, one handler update per signature notification and current handler
+values. Prior choice, Other and signature-clear tests remain included. Actual older-form interaction,
+persistence and schema-watcher checks also pass in separate runs. The core builtin catalog examples,
+metadata, date builtins, managed events and calculation dependency suites also pass. The older-form probe initially retained its historical expectation of an illegal email read; the
+maintainer had already corrected that handler. That stale harness expectation is updated without
+changing the user schema. These core checks
+are targeted evidence, not a newly complete cross-consumer builtin audit. React/Native source and
+core runtime are unchanged by this follow-up.
+
+Evidence in the active harness: `signature-immediate-{red,green}.log`,
+`signature-duplicate-red.log`, `signature-current-values-red.log`,
+`signature-feedback-controls-{trusted,safe}.log`, `signature-feedback-cli-check.log`,
+`signature-feedback-cli-package.log`, `signature-feedback-focused-node.log`,
+`signature-feedback-candidate.json` (archive/runtime source parity),
+`signature-feedback-cli-{persistence,watcher}.log`, `signature-feedback-legacy-form.log` and
+`signature-context-gates.json`. Earlier failed diagnostic runs keep their original provenance.
+
+## Recommended broader compatibility audit
+
+The authoritative catalog currently contains **32 builtins and 18 field types**; the inventory is
+`logs/consumer-compatibility-catalog.json`. A complete compatibility audit is recommended as the next
+stabilization pass. The inventory and passing targeted suites do not claim that audit is finished.
+
+Prioritize the consumer boundary that produced these regressions:
+
+| Area | Concrete regression case |
+| --- | --- |
+| Event operations and registration | ON/OFF and schema reload must not leave stale handlers; one edit produces one ALERT; INVALID remains attached to its field or record scope; a later queued edit preserves a previous SETVALUE result. |
+| Scalar and choice input | SETVALUE age to 0 preserves zero; a Boolean selection with value false remains selected; single/multiple choice helpers read predefined and Other selections after editing, clearing and saving. |
+| Media and linked records | Signature/photo/video clear required feedback and retain IDs, timestamps and attachment metadata; FormLink selections retain record IDs, including zero. Distinguish documented setter support from the broader #101 normalization proposal. |
+| Date, time and derived values | Preserve date/time formats through edit, calculation and serialization; calculations depending on changed input update before selected submission serialization. |
+| Context-dependent builtins | Exercise EVAL, FORM, DATANAMES, SETRESULT and repeatable collection builtins at root and in nested records, including permitted ancestor reads, rejected unrelated reads and calculation/event restrictions. |
+| Containers and special fields | Check effective hidden/read-only/required participation, Sections, expanded BuildingPlan nesting, labels and derived titles/status under their existing ownership rules. |
+
+Use a catalog coverage manifest so new builtins or field types cannot silently miss a test category.
+Pure functions need engine-level execution cases in both security modes plus representative consumer
+transport cases; the full 32-by-18 cross-product would add little signal. Run operation, rendering and
+serialization cases through CLI, React main-thread, actual browser-worker and the Native adapter.
+Add device checks only for interactions the adapter cannot represent. Every failed case should be
+compared with the existing contract and prior behavior before changing implementation; record
+intentional unsupported combinations explicitly. Preserve the calculation/event executor rather than
+using this audit to introduce a general normalization refactor.
