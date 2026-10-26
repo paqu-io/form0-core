@@ -903,3 +903,23 @@ production-mode speedup is not established. A harness dynamic import prevented p
 loader is corrected and tested against the actual Metro `lazy=true` production graph without a
 browser `location` global. Only the 200-row diagnostic needs repeating. Existing runtime logic and
 optimization/maintenance criteria remain unchanged; wait for phase evidence before another fix.
+
+## Physical phases and bounded validation registration — 26 October 2026
+
+The Pixel now runs the production v3 profiler successfully. Managed validation accounts for 46.4%
+of active warm 200-row preparation, including 29.2% context/registration work; calculations account
+for 30.2%. Two lower-benefit allocation/layout prototypes were rejected rather than accumulated.
+
+The selected private optimization recognizes only canonical literal `ON(...)` registration scripts
+and omits schema-wide default-field bindings while creating their handlers. Fresh permitted current
+values are supplied for every ordinary dispatch. Conditional/dynamic initialization and custom `ON`
+retain the full original path. Handler bodies, including future builtins and dynamic `EVAL`, use the
+existing executor/security. No calculation results, registrations or validation results are cached.
+
+Paired Node 2,000-row preparations reduce active work by 29.7% TRUSTED / 23.6% SAFE with identical
+complete results. Full core/consumer checks, actual browser/worker and CLI interactions pass. Reference
+browser preparation targets and release/memory checks pass. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for provenance and excluded stale adapter
+measurements. The next physical candidate is `native-literal-registration`; actual Pixel speedup,
+performance sign-off and Plan 3 completion remain pending. Preserve accepted functional walkthroughs,
+the current draft/freshness/persistence contracts and maintainer-owned release actions.

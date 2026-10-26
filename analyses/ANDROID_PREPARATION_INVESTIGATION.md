@@ -4,12 +4,12 @@ Current status (26 October): production JavaScript on the Pixel/Hermes completes
 1,373/9,897 ms with maximum observed JS gaps 96/336 ms, eligible and no execution issues. The large
 sample is essentially unchanged from the previous individual 9,933 ms development sample. Earlier
 functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader passes
-compiled production checks, but the phone still shows the older UI. SDK 58 source and a live-manifest
-cache model expose a fixed production launch-asset key collision; a harness-only session-key adapter
-passes automated checks and awaits phone confirmation. The retry is `phase-profile-v3`; only the
-200-row phase profile is requested.
-Controller revision stays `native-production-baseline`, with
-package runtime bytes unchanged. See the latest section below;
+compiled production checks. The maintainer now confirms the session-key cache workaround loads the
+current v3 UI and supplies the complete 200-row production/Hermes phase profile. Managed validation
+is 46.4% of active preparation, calculations 30.2%; explicit scheduler waiting is 4.2% of elapsed.
+The selected literal-registration candidate passes paired core and independent consumer checks.
+The next controller revision is `native-literal-registration`; its physical timings remain pending.
+See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
@@ -811,3 +811,110 @@ production-launch-asset-key/session-key-enabled. Force stop/reopen Expo Go, scan
 verify Profile phases v3 (200), then run only that profile with SAFE off. No large controller rerun.
 The former filename-only attempt did not address the key collision; retain its evidence as an
 unsuccessful workaround. No additional product optimization until actual phase data is available.
+
+## Physical production phase profile received — 26 October
+
+The maintainer confirms the fresh-session asset-key workaround works and copies the entire on-screen
+`phase-profile-v3` report. It identifies dev:false, Hermes, Android API37, RN0.88.0, SAFE off,
+idle-callback scheduling, bundled-require and both v3 bootstrap markers. Diagnostic source SHA256
+is the expected `5b3147e4f1efb1c77fed277e69614a6dcd7d5255fc926943d65a2c708babcfc4`.
+Raw report: `logs/android-pixel8a-production-phases-v3.json`; computed summary:
+`android-pixel8a-production-phases-v3-summary.json`. The launcher fix is physically confirmed;
+no further cache/profile-loader retry is needed.
+
+Three warm uninstrumented samples have elapsed medians 520.4 ms without managed events and 844.0 ms
+with them, using the same captured 200-row input every time. Factory setup is separately reported
+(155.5/95.1 ms per factory), not repeated work within every sample. The separate instrumented warm
+probe takes 828.2 ms with 35.1 ms explicit scheduler waiting, leaving 793.1 ms active wall time.
+
+| Phase | Active ms | Share of active wall time |
+| --- | ---: | ---: |
+| Managed validation, inclusive | 367.8 | 46.4% |
+| ↳ Context construction/registration (201 scopes) | 231.4 | 29.2% |
+| ↳ Managed dispatch (201 scopes) | 133.1 | 16.8% |
+| Calculations | 239.7 | 30.2% |
+| Public result copy/freshness | 67.3 | 8.5% |
+| Scope/dependency setup | 50.1 | 6.3% |
+| Conditions/intrinsic fields | 48.7 | 6.1% |
+
+Nested managed phases overlap their inclusive parent and must not be added twice. Active timing
+means wall time less explicit waits, not a sampled CPU profile. This is one instrumented 200-row
+warm probe, not a new 2,000-row controller measurement. Retain the previous 1,373/9,897 ms controller
+observations; these different workloads must not be pooled. Waiting is only 4.2% of elapsed time;
+further timer tweaks cannot account for most remaining work.
+
+First controlled Node experiments preserve complete result hashes and immutable inputs but show
+only 2.4%/4.1%/6.4% median active improvement for copy-traversal reuse, precomputed default-binding
+layout and their combination on 2,000 rows. The 200-row medians regress by 8–12%. These variants
+are rejected and not applied to maintained source or installed candidates. Evidence:
+`logs/validation-context-experiment.json`; source-only probe `validation-context-experiment.mjs`.
+A scratch source-rewrite error was caught by its result assertion and corrected before measurement.
+
+The next bounded prototype examines literal `ON(...)`-only registration. Registration itself cannot
+read fields in that syntax, while actual handler dispatch must retain fresh scoped values and its
+existing executor/security. Conditional initialization and custom `ON` need the complete old path.
+No handler result, registration outcome or field value may be cached. Unknown/future calls inside
+handler bodies continue through the ordinary executor. The following checks select this candidate.
+
+## Literal registration candidate — 26 October
+
+The private classifier accepts only complete scripts of canonical `ON` calls with literal route
+strings and function/arrow callbacks. It classifies registration syntax once per evaluator, without
+inspecting or restricting callback bodies. Such registration needs builtins/helpers but no field
+defaults. Immediately before ordinary managed dispatch, the evaluator supplies fresh copied current
+ancestor/local values. Registration and dispatch still happen for every participating record scope.
+
+Conditional/top-level executable initialization, aliases, dynamic routes, unsupported syntax and
+an overridden `ON` retain the original complete initialization context. New builtins or complex code
+inside handlers require no optimizer changes. This caches no results, field values or registrations;
+it changes neither `engine.eval()` nor the calculation executor, permissions, lifecycle, schemas,
+saved shapes or submission policy. The regression first fails on unnecessary initialization bindings,
+then passes with current-value, dynamic `EVAL`, arbitrary helper and overridden-`ON` coverage in
+TRUSTED/SAFE. Core now has 55 record-evaluator scenarios; the full core release check passes,
+including formatting, lint, security/package checks and the wide/deep suites.
+
+Five-sample alternating Node comparisons use the same accepted captured input, two warm-ups and
+identical complete result hashes with immutable inputs:
+
+| Rows | Security | Baseline active ms | Candidate active ms | Reduction |
+| --- | --- | ---: | ---: | ---: |
+| 200 | TRUSTED | 158.36 | 104.35 | 34.1% |
+| 200 | SAFE | 187.13 | 145.38 | 22.3% |
+| 2,000 | TRUSTED | 1,348.62 | 948.37 | 29.7% |
+| 2,000 | SAFE | 1,854.67 | 1,417.55 | 23.6% |
+
+Evidence: `logs/literal-registration-comparison.json`, `literal-registration-core-release.log`.
+Packed core: `validation-registration/form0-core-0.7.0.tgz`, 131,100 bytes, SHA256
+`407bd5fe839202b9c0d5a707b12a5857e13eaeb1dfd8058c15dbd3712c682b8d`.
+This is an unpublished candidate, without a version bump. Original throughput archives are retained.
+Only the core package is replaced in existing independent consumer trees; no dependency installation.
+
+Consumer suites pass: React 100, Native 86, CLI 168. A React test initially observed handler entry
+before queued `SETVALUE` publication finished; it now awaits the published value. The focused
+candidate and accepted-core control pass, and the corrected full candidate suite passes. This is a
+test synchronization change, not a renderer behavior change. Actual browser tests cover main-thread,
+worker, live root/row calculations, accepted Save/Cancel, schema replacement and CLI persistence/watch.
+No page errors or mismatched outputs. Reports: `logs/literal-registration-consumer-gates.json` and
+`literal-registration-browser-gates.json`.
+
+Production Chromium 151 warmed full-controller samples (selected values applied between attempts):
+200 rows main 150/110 ms, worker 106.8/98.4 ms; 2,000 main 914.4/912.4 ms, worker 787.3/754.9 ms.
+Reference targets pass. The initial Native proxy accidentally reused an older generated bundle;
+its timing is excluded and retained with the `stale-generated-bundle` suffix. The corrected driver
+rebuilds and asserts the candidate implementation before bundling, using a static adapter entry.
+At CPU throttle 4, unprofiled warm attempts take 4,762.4/4,688.5 ms, maximum observed gaps
+141.7/118.9 ms; the additional profiled attempt is 4,642.4 ms/gap 136.1 ms. All responsiveness gates
+pass. This is an HTML adapter on Chromium, not Hermes, and is not a paired phone speedup estimate.
+
+Eight actual Node-worker prepare/review/release cycles pass report-release assertions; retained
+heap after explicit GC is approximately 14.2–15.5 MiB, with no accumulating proposal/report tail.
+RSS and transient allocation remain distinct from retained heap and database size. Reports:
+`logs/literal-registration-android-performance-controller-managed.json`,
+`literal-registration-native-proxy.json`,
+`literal-registration-android-performance-accepted-view-worker-memory.json`.
+
+Stop new optimization changes at this candidate and measure its actual Pixel effect. Repeat only
+fresh 200/2,000-row controller preparation and prompt cancellation under the same production/SAFE-off
+conditions. Earlier functional walkthroughs remain accepted. A meaningful measured reduction justifies
+this bounded change; a universal two-second mobile preparation guarantee is not established. Further
+work needs a new measured dominant cost and an explicit maintenance/behavior tradeoff.
