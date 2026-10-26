@@ -14,6 +14,12 @@ import { getBuiltinDefinitions } from '../src/index.js';
   assert.deepEqual(definitionsByName.get('SETRESULT')?.contexts, ['calculation']);
   assert.equal(definitionsByName.get('COUNT')?.signature, 'COUNT(values)');
   assert.equal(definitionsByName.get('FORM')?.signature, 'FORM()');
+  assert.deepEqual(definitionsByName.get('SETVALUE').operation.effects, ['record-write']);
+  definitionsByName.get('SETVALUE').operation.effects.push('presentation');
+  assert.deepEqual(
+    getBuiltinDefinitions().find((entry) => entry.name === 'SETVALUE').operation.effects,
+    ['record-write']
+  );
 })();
 
 (() => {

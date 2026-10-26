@@ -364,7 +364,7 @@ const schema = {
           code: `
             ON('change', 'first_name', function () {
               ON('change', 'status_message', function () {
-                ALERT('Nested handler should not run');
+                ALERT('Nested handler registered');
               });
               OFF('change', 'first_name');
               SETVALUE('status_message', 'kept');
@@ -385,6 +385,9 @@ const schema = {
       },
     },
   ]);
-  assert.deepEqual(engine.trigger('change', 'status_message'), []);
-  assert.equal(engine.trigger('change', 'first_name').length, 1);
+  assert.equal(
+    engine.trigger('change', 'status_message')[0].params.title,
+    'Nested handler registered'
+  );
+  assert.equal(engine.trigger('change', 'first_name').length, 0);
 })();

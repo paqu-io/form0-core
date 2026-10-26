@@ -1,3 +1,4 @@
+import { prepareScalarBindings, selectScalarBindings } from './calculation-bindings.js';
 import { analyzeRepeatableCollections } from '../utilities/repeatable-collections.js';
 import { runExpression } from './evaluator.js';
 import { ContextResolver } from './context-resolver.js';
@@ -111,7 +112,7 @@ function buildScopedContext(
   diagnostics,
   preparation = null
 ) {
-  const ctx = { ...helpers };
+  let ctx;
 
   const referencedFields = preparation?.references ?? extractStaticFieldReferences(expressionCode);
   const access = (fieldName) => {
@@ -136,9 +137,20 @@ function buildScopedContext(
     preparation.bindings ??= [...contextResolver.fieldOwnership.keys()]
       .filter((name) => access(name) === 'accessible')
       .map((name) => [name, `$${name}`]);
-    for (const [name, identifier] of preparation.bindings)
+    // Use fewer parameters only when syntax and current primitive bindings prove it safe.
+    // Keep the full context for dynamic expressions, helper overrides and object inputs.
+    const scalar = selectScalarBindings(preparation, values, helpers);
+    ctx = scalar
+      ? Object.fromEntries(
+          [...scalar.names]
+            .filter((name) => Object.hasOwn(helpers, name))
+            .map((name) => [name, helpers[name]])
+        )
+      : { ...helpers };
+    for (const [name, identifier] of scalar?.bindings ?? preparation.bindings)
       if (Object.hasOwn(values, name)) ctx[identifier] = values[name];
   } else {
+    ctx = { ...helpers };
     for (const [fieldName, value] of Object.entries(values)) {
       const accessLevel = access(fieldName);
 
@@ -308,6 +320,7 @@ export function evaluateCalculatedField(
         context: buildCalculationExecutionContext(schema, field.data_name, resolver),
         references: extractStaticFieldReferences(field.calculate),
         access: new Map(),
+        scalar: prepareScalarBindings(field.calculate),
       };
       execution.preparationCache.set(field.data_name, preparation);
     }

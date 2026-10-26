@@ -8,6 +8,7 @@
  * @property {string} description
  * @property {string[]} examples
  * @property {BuiltinContext[]} contexts
+ * @property {{type: string, effects: string[]}} [operation] Declared descriptor effects.
  */
 
 export const BUILTIN_CONTEXTS = Object.freeze({
@@ -26,6 +27,14 @@ export function defineBuiltinMetadata(definition) {
     ...definition,
     examples: Object.freeze([...(definition.examples ?? [])]),
     contexts: Object.freeze([...(definition.contexts ?? [])]),
+    ...(definition.operation
+      ? {
+          operation: Object.freeze({
+            ...definition.operation,
+            effects: Object.freeze([...definition.operation.effects]),
+          }),
+        }
+      : {}),
   });
 }
 
@@ -40,5 +49,8 @@ export function cloneBuiltinMetadata(definition) {
     ...definition,
     examples: [...definition.examples],
     contexts: [...definition.contexts],
+    ...(definition.operation
+      ? { operation: { ...definition.operation, effects: [...definition.operation.effects] } }
+      : {}),
   };
 }

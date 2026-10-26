@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   buildFormRecordSnapshot,
   createStructuredRecord,
+  createStructuredRecordAsync,
   flattenFields,
   normalizeStructuredRecord,
 } from '../src/index.js';
+import { complexRecordFixture } from './helpers/complex-record-fixture.js';
 
 function createNumericField({ key, data_name, label = data_name, default_value = null }) {
   return {
@@ -434,5 +436,64 @@ const rendererAliasRecord = {
     other_value: [],
   });
 })();
+
+for (const fieldKeyMode of ['prefer-key', 'data-name']) {
+  const { schema, snapshot } = complexRecordFixture(200);
+  snapshot.id = 0;
+  snapshot.values.photo = [{ media_id: 'photo-1', uri: 'file://photo.jpg', caption: 'Retained' }];
+  schema.form.elements.push({ type: 'PhotoField', key: 'photo-key', data_name: 'photo' });
+  const fields = flattenFields(schema.form.elements);
+  const before = structuredClone(snapshot);
+  const options = {
+    mainRecordId: 0,
+    originalElements: schema.form.elements,
+    created_at_client: '2026-10-24T00:00:00.000Z',
+    updated_at_client: '2026-10-24T00:00:00.000Z',
+    fieldKeyMode,
+  };
+  let yields = 0;
+  const result = await createStructuredRecordAsync(snapshot, fields, options, {
+    budgetMs: 0,
+    yieldToHost: async () => {
+      yields++;
+    },
+  });
+  assert.deepEqual(result, createStructuredRecord(snapshot, fields, options));
+  assert.equal(result.id, 0);
+  assert.ok(yields > 200, 'Serialization must offer host work between nested rows.');
+  assert.deepEqual(snapshot, before);
+  for (const name of ['signal', 'budgetMs', 'yieldToHost'])
+    assert.equal(Object.hasOwn(result, name), false);
+  const controller = new AbortController();
+  let delivered = false,
+    checkpoints = 0;
+  await assert.rejects(
+    createStructuredRecordAsync(snapshot, fields, options, {
+      signal: controller.signal,
+      budgetMs: 0,
+      yieldToHost: async () => {
+        if (++checkpoints === 3) controller.abort();
+      },
+    }).then(() => {
+      delivered = true;
+    }),
+    (error) => error.name === 'AbortError' && error.code === 'cancelled'
+  );
+  assert.equal(delivered, false);
+}
+
+await assert.rejects(
+  createStructuredRecordAsync(
+    { values: {} },
+    [],
+    {},
+    {
+      yieldToHost: () => {
+        throw new Error('Host task failed');
+      },
+    }
+  ),
+  (error) => error.code === 'record_scheduling_failed' && error.message === 'Host task failed'
+);
 
 console.log('structured-record tests passed');

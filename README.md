@@ -289,3 +289,20 @@ ordinary validation failures. Persist the returned `freshness` companion separat
 and supply it to the host on reopening; do not clear stored pending status before persistence succeeds.
 `managedEvents: true` enables root and participating closed-row custom validation only. No save or
 closed-row lifecycle hooks are replayed. Renderer/worker/Native/CLI UI adoption is separate work.
+
+For an open editor, `await evaluator.evaluateScope(snapshot, { instancePath: [] })` evaluates only
+that record. Use complete ancestry to target a child. It reads current supplied ancestors and accepted
+other rows, returning the selected `state`, built-in validation summary, changes and separate
+execution issues/diagnostics without another complete tree. It leaves caller inputs and closed-row
+calculations unchanged. See [the record evaluation contract](analyses/RECORD_EVALUATION_CONTRACT.md).
+
+For accepted-snapshot viewing, supply `{ interactionMode: 'readonly' }` to `evaluateScope()`. It
+computes field state and intrinsic/submission findings from supplied values without running
+calculations or applying missing schema defaults. Editing is the default. Whole-tree evaluation and
+submission preparation retain their accepted/refresh policies.
+
+Scalar engines accept `mode: 'readonly' | 'edit'` (default `edit`) and expose `getMode()`/`setMode()`.
+Call `eval()` after a host mode change. Events receive authoritative `event.mode`; view-time data
+writes fail before host delegation. Load remains available for reads, alerts and scoped ON/OFF
+registration. Move writable initialization to new/edit handlers when it must run after View → Edit.
+See [the event contract](EVENT_CONTRACT.md) for permissions, lifecycle order and migration guidance.

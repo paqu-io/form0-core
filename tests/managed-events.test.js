@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './view-mode.test.js';
 import {
   createFormEngine,
   INVALID,

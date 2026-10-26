@@ -3,6 +3,7 @@ import { __setEvalContext } from '../builtins/control/eval.js';
 import { __setDataNamesContext } from '../builtins/schema/datanames.js';
 import { validateExpression, createSecureContext, withTimeout } from '../security/validation.js';
 import { DEFAULT_SECURITY_CONFIG } from '../security/config.js';
+import { compileExpression } from './expression-compilation.js';
 import {
   isMultilineCalculationExpression,
   normalizeInlineCalculationExpression,
@@ -54,10 +55,6 @@ export function runExpression(
 
     // Create secure context based on security mode
     const secureContext = createSecureContext(context, securityConfig);
-    const keys = options.compileCache
-      ? Object.keys(secureContext).sort()
-      : Object.keys(secureContext);
-    const values = keys.map((key) => secureContext[key]);
 
     // Execute expression
     const executeExpression = () => {
@@ -74,9 +71,8 @@ export function runExpression(
         if (isMultiLine) {
           // Reuse a factory-owned compilation cache when supplied; values stay per evaluation.
           phase = 'syntax';
-          const cacheKey = JSON.stringify(['body', keys, expr]);
-          const fn = options.compileCache?.get(cacheKey) ?? new Function(...keys, expr);
-          options.compileCache?.set(cacheKey, fn);
+          const { fn, keys } = compileExpression(expr, secureContext, 'body', options.compileCache);
+          const values = keys.map((key) => secureContext[key]);
           phase = 'runtime';
           const result = fn(...values);
           // Check for consumed result from SETRESULT() calls in multiline code
@@ -89,11 +85,13 @@ export function runExpression(
           // Execute as expression (existing behavior)
           const inlineExpression = normalizeInlineCalculationExpression(expr);
           phase = 'syntax';
-          const cacheKey = JSON.stringify(['expression', keys, inlineExpression]);
-          const fn =
-            options.compileCache?.get(cacheKey) ??
-            new Function(...keys, `return (${inlineExpression});`);
-          options.compileCache?.set(cacheKey, fn);
+          const { fn, keys } = compileExpression(
+            inlineExpression,
+            secureContext,
+            'expression',
+            options.compileCache
+          );
+          const values = keys.map((key) => secureContext[key]);
           phase = 'runtime';
           const result = fn(...values);
           const consumed = __consumeResult();

@@ -1,5 +1,9 @@
 import { ContextResolver } from '../src/engine/context-resolver.js';
+import { EventManager } from '../src/engine/events.js';
+import { isLiteralEventRegistration } from '../src/engine/event-registration.js';
+import { ON, EVAL } from '../src/builtins/registry.js';
 import assert from 'node:assert/strict';
+import { copyRecordData, copyRecordDataCooperatively } from '../src/utilities/record-data.js';
 import {
   createRecordEvaluator,
   createFormEngine,
@@ -1116,4 +1120,277 @@ await test('grouped freshness preserves identities, row order, review isolation 
     assert.deepEqual(refreshed.freshness.affected, []);
   }
 });
+await test('already cancelled preparation releases its review without copying the record', async () => {
+  const instance = evaluator(lineSchema());
+  const abort = new AbortController();
+  abort.abort();
+  let reads = 0;
+  const snapshot = {
+    get values() {
+      reads++;
+      return {};
+    },
+  };
+  const result = await instance.prepareSubmission(snapshot, { signal: abort.signal });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(reads, 0);
+});
+
+await test('cooperative result copies preserve portable shapes and detach all mutable aliases', async () => {
+  const shared = { nested: [0, false, undefined, NaN, Infinity] };
+  const data = {
+    id: 0,
+    first: shared,
+    second: shared,
+    date: new Date('2026-10-24T00:00:00.000Z'),
+    media: new Blob(['immutable'], { type: 'text/plain' }),
+    rows: Array.from({ length: 200 }, (_, id) => ({ id, values: { amount: id } })),
+  };
+  Object.defineProperty(data, '__proto__', { value: { harmless: true }, enumerable: true });
+  let checkpoints = 0;
+  const result = await copyRecordDataCooperatively(data, async () => {
+    checkpoints++;
+  });
+  assert.ok(checkpoints > 1);
+  assert.deepEqual(result, copyRecordData(data));
+  assert.equal(Object.getPrototypeOf(result), Object.prototype);
+  assert.equal(Object.hasOwn(result, '__proto__'), true);
+  assert.notEqual(result.first, data.first);
+  assert.notEqual(result.first, result.second);
+  assert.notEqual(result.date, data.date);
+  assert.equal(result.media, data.media);
+  result.rows[0].values.amount = 999;
+  assert.equal(data.rows[0].values.amount, 0);
+  const cyclic = {};
+  cyclic.self = cyclic;
+  for (const invalid of [cyclic, { value: () => 1 }, { value: Symbol('invalid') }, new Map()])
+    await assert.rejects(
+      copyRecordDataCooperatively(invalid, async () => {}),
+      /Record data/
+    );
+});
+
+await test('large result delivery yields and can be cancelled after managed validation', async () => {
+  for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+    const schema = formSchema([repeatableSection('rows', [numericField('amount')])]);
+    schema.form.events = {
+      code: "ON('validate-repeatable', 'rows', function() { if ($amount === 99) finished(); });",
+    };
+    let validated = false,
+      afterValidation = 0;
+    const abort = new AbortController();
+    const instance = evaluator(schema, {
+      security,
+      helpers: { finished: () => (validated = true) },
+    });
+    const snapshot = {
+      values: {},
+      repeatable: { rows: Array.from({ length: 100 }, (_, id) => row(id, { amount: id })) },
+    };
+    const original = structuredClone(snapshot);
+    const result = await instance.prepareSubmission(snapshot, {
+      managedEvents: true,
+      budgetMs: 0,
+      signal: abort.signal,
+      yieldToHost() {
+        if (validated && ++afterValidation === 3) abort.abort();
+      },
+    });
+    assert.equal(result.status, 'cancelled');
+    assert.equal(result.snapshot, null);
+    assert.deepEqual(snapshot, original);
+  }
+});
+
+await test('a newer preparation supersedes a result while its delivery is yielding', async () => {
+  const schema = formSchema([repeatableSection('rows', [numericField('amount')])]);
+  schema.form.events = {
+    code: "ON('validate-repeatable', 'rows', function() { if ($amount === 99) finished(); });",
+  };
+  let validated = false,
+    afterValidation = 0,
+    newer;
+  const instance = evaluator(schema, { helpers: { finished: () => (validated = true) } });
+  const snapshot = {
+    values: {},
+    repeatable: { rows: Array.from({ length: 100 }, (_, id) => row(id, { amount: id })) },
+  };
+  const old = await instance.prepareSubmission(snapshot, {
+    managedEvents: true,
+    budgetMs: 0,
+    yieldToHost() {
+      if (validated && ++afterValidation === 3) newer = instance.prepareSubmission(snapshot);
+    },
+  });
+  assert.ok(newer, 'Result delivery must offer a scheduling opportunity.');
+  assert.equal(old.issues[0].code, 'stale_preparation');
+  assert.equal((await newer).eligible, true);
+});
+
+for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+  await test(`${security?.mode || 'trusted'} validation contexts and registrations stay fresh across rows and attempts`, async () => {
+    const observations = [];
+    const schema = formSchema(
+      [
+        numericField('factor'),
+        repeatableSection('rows', [
+          numericField('amount'),
+          calculatedField('total', 'SETRESULT($amount * $factor)'),
+        ]),
+      ],
+      {
+        events: {
+          code: `
+      observe('initialize');
+      ON('validate-record', function(event) { observe(event.type, $factor, event.mode); });
+      ON('validate-repeatable', 'rows', function(event) {
+        observe(event.type, $amount, $factor, $total, event.mode);
+        if ($total !== $amount * $factor) INVALID('Old calculation context');
+        if ($amount === 0) INVALID('Zero amount');
+      });
+    `,
+        },
+      }
+    );
+    const source = {
+      values: { factor: 2 },
+      repeatable: { rows: [row(0, { amount: 0 }), row('B', { amount: 3 })] },
+    };
+    const instance = evaluator(schema, {
+      security,
+      helpers: { observe: (...args) => observations.push(args) },
+    });
+    for (const factor of [2, 4, 5]) {
+      source.values.factor = factor;
+      const original = structuredClone(source);
+      const before = observations.length;
+      const result = await instance.prepareSubmission(source, { managedEvents: true });
+      assert.equal(result.status, 'blocked');
+      assert.deepEqual(result.issues, []);
+      const findings = result.validationSummary.scopeIssues.filter(
+        (item) => item.message === 'Zero amount'
+      );
+      assert.equal(findings.length, 1);
+      assert.equal(findings[0].instancePath[0].instanceId, 0);
+      assert.deepEqual(observations.slice(before), [
+        ['initialize'],
+        ['validate-record', factor, 'readonly'],
+        ['initialize'],
+        ['validate-repeatable', 0, factor, 0, 'readonly'],
+        ['initialize'],
+        ['validate-repeatable', 3, factor, 3 * factor, 'readonly'],
+      ]);
+      assert.deepEqual(source, original);
+    }
+  });
+}
+await test('literal registration metadata accepts arbitrary handler bodies but rejects executable initialization', () => {
+  for (const code of [
+    "ON('validate-record', function(event) { arbitraryFutureBuiltin(EVAL('$' + event.fieldKey)); });",
+    "ON('validate-repeatable', 'rows', (event) => { if ($amount === 0) INVALID('Zero'); });",
+    "ON('validate-record', async function(event) { await futureHelper(); });",
+  ])
+    assert.equal(isLiteralEventRegistration(code, ON), true, code);
+  for (const code of [
+    '',
+    ';',
+    "if ($amount > 0) ON('validate-record', function() {});",
+    "const handler = function() {}; ON('validate-record', handler);",
+    'ON(eventName, function() {});',
+    "ON('validate-record', helper());",
+    "ON?.('validate-record', function() {});",
+    'ON(...routes);',
+    "ON('validate-record', function() {}); observe();",
+    "ON('validate-record', function() {});;",
+    "ON('validate-record', function( {)",
+  ])
+    assert.equal(isLiteralEventRegistration(code, ON), false, code);
+  assert.equal(
+    isLiteralEventRegistration("ON('validate-record', function() {});", () => {}),
+    false
+  );
+});
+
+for (const security of [undefined, SAFE_SECURITY_CONFIG]) {
+  await test(`${security?.mode || 'trusted'} literal registration avoids field bindings and keeps live handler context`, async () => {
+    const originalInitialize = EventManager.prototype.initializeEventCode;
+    const initializationFields = [];
+    const observations = [];
+    EventManager.prototype.initializeEventCode = function (code, context) {
+      initializationFields.push(Object.keys(context).filter((key) => key.startsWith('$')));
+      return originalInitialize.call(this, code, context);
+    };
+    try {
+      const schema = lineSchema({
+        events: {
+          code: `ON('validate-record', function(event) {
+            observe('root', EVAL('$' + 'tax'), $grand_total, event.mode);
+          });
+          ON('validate-repeatable', 'lines', function(event) {
+            const current = futureHelper(EVAL('$' + 'amount'), $tax, $total);
+            observe(event.instancePath[0].instanceId, current, event.mode);
+            if ($amount === 0) INVALID('Zero amount');
+          });`,
+        },
+      });
+      const instance = evaluator(schema, {
+        security,
+        helpers: {
+          observe: (...args) => observations.push(args),
+          futureHelper: (amount, tax, total) => ({ amount, tax, total }),
+        },
+      });
+      const source = input();
+      for (const tax of [0.2, 0.3]) {
+        source.values.tax = tax;
+        const before = structuredClone(source);
+        const result = await instance.prepareSubmission(source, { managedEvents: true });
+        assert.equal(result.status, 'ready');
+        assert.deepEqual(source, before);
+      }
+      assert.deepEqual(
+        initializationFields,
+        Array.from({ length: 6 }, () => [])
+      );
+      assert.deepEqual(observations, [
+        ['root', 0.2, 360, 'readonly'],
+        [0, { amount: 100, tax: 0.2, total: 120 }, 'readonly'],
+        ['B', { amount: 200, tax: 0.2, total: 240 }, 'readonly'],
+        ['root', 0.3, 390, 'readonly'],
+        [0, { amount: 100, tax: 0.3, total: 130 }, 'readonly'],
+        ['B', { amount: 200, tax: 0.3, total: 260 }, 'readonly'],
+      ]);
+    } finally {
+      EventManager.prototype.initializeEventCode = originalInitialize;
+    }
+  });
+
+  await test(`${security?.mode || 'trusted'} overridden ON retains complete initialization defaults`, async () => {
+    const registrations = [];
+    const schema = formSchema(
+      [
+        numericField('factor'),
+        repeatableSection('rows', [numericField('amount', { default_value: 7 })]),
+      ],
+      { events: { code: "ON('validate-record', function(event) {});" } }
+    );
+    const result = await evaluator(schema, {
+      security,
+      helpers: {
+        ON: (...args) => {
+          registrations.push([EVAL('$factor'), EVAL('$amount')]);
+          return ON(...args);
+        },
+      },
+    }).prepareSubmission(
+      { values: { factor: 2 }, repeatable: { rows: [row(0, { amount: 10 })] } },
+      { managedEvents: true }
+    );
+    assert.equal(result.status, 'ready');
+    assert.deepEqual(registrations, [
+      [2, 7],
+      [2, 10],
+    ]);
+  });
+}
 console.log(`Record evaluator: ${count} scenarios passed.`);

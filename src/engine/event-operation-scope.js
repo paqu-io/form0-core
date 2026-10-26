@@ -2,8 +2,11 @@ import {
   __invokeBoundEventBuiltin,
   __runWithEventOperationScope,
 } from '../builtins/event/event-operations-collector.js';
+import { EVENT_BUILTIN_DEFINITIONS } from '../builtins/builtin-definitions.js';
 
-const EVENT_OPERATION_BUILTINS = ['ALERT', 'SETVALUE', 'ON', 'OFF', 'INVALID'];
+const EVENT_OPERATION_BUILTINS = EVENT_BUILTIN_DEFINITIONS.filter((entry) => entry.operation).map(
+  (entry) => entry.name
+);
 
 /**
  * Create an operation scope owned by one synchronous event execution.
@@ -36,9 +39,10 @@ export function createEventOperationScope(onLateOperation) {
 /**
  * Bind canonical event operation builtins to their originating scope.
  * Intentional helper overrides are left untouched.
+ * ownsContext is private: only a fresh context owned by this execution may be modified.
  */
-export function bindEventBuiltins(context, canonicalBuiltins, scope) {
-  const boundContext = { ...context };
+export function bindEventBuiltins(context, canonicalBuiltins, scope, ownsContext = false) {
+  const boundContext = ownsContext ? context : { ...context };
 
   for (const name of EVENT_OPERATION_BUILTINS) {
     const builtin = canonicalBuiltins[name];

@@ -77,10 +77,15 @@ export function prepareRecordContext(inputSchema, warningSystem = null) {
 }
 
 export function visitRecordScopes(snapshot, context, visit) {
-  function walk(record, path, instancePath, ancestors, participating) {
+  for (const scope of iterateRecordScopes(snapshot, context)) visit(scope);
+}
+
+/** Same traversal for synchronous validation and budgeted private-tree preparation. */
+export function* iterateRecordScopes(snapshot, context) {
+  function* walk(record, path, instancePath, ancestors, participating) {
     const template = context.templates.get(JSON.stringify(path));
     const scope = { record, template, instancePath, ancestors, participating };
-    visit(scope);
+    yield scope;
     for (const field of template.fields) {
       if (field.type !== 'RepeatableSection') continue;
       const info = context.resolver.repeatableSectionTree.get(field.data_name);
@@ -88,7 +93,9 @@ export function visitRecordScopes(snapshot, context, visit) {
       if (!Array.isArray(rows))
         throw new Error(`RepeatableSection '${field.data_name}' must contain an array of rows.`);
       const identities = new Set();
-      rows.forEach((row, index) => {
+      for (let index = 0; index < rows.length; index++) {
+        if (!(index in rows)) continue;
+        const row = rows[index];
         if (!row || typeof row !== 'object' || Array.isArray(row))
           throw new Error('Repeatable rows must be record objects.');
         const id = row.id ?? row.record_id;
@@ -112,15 +119,15 @@ export function visitRecordScopes(snapshot, context, visit) {
           (template.chains.get(field.data_name) || []).every(
             (name) => record.visible?.[name] !== false
           );
-        walk(
+        yield* walk(
           row,
           info.currentPath,
           [...instancePath, segment],
           [...ancestors, scope],
           participating && visible
         );
-      });
+      }
     }
   }
-  walk(snapshot, [], [], [], true);
+  yield* walk(snapshot, [], [], [], true);
 }

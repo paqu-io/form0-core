@@ -238,6 +238,7 @@ export const SETRESULT_METADATA = defineBuiltinMetadata({
 
 export const ALERT_METADATA = defineBuiltinMetadata({
   name: 'ALERT',
+  operation: { type: 'UI_OPERATION', effects: ['presentation'] },
   category: 'event',
   signature: "ALERT(title, message = '')",
   description: 'Display an alert from a form event handler.',
@@ -247,6 +248,7 @@ export const ALERT_METADATA = defineBuiltinMetadata({
 
 export const SETVALUE_METADATA = defineBuiltinMetadata({
   name: 'SETVALUE',
+  operation: { type: 'FIELD_OPERATION', effects: ['record-write'] },
   category: 'event',
   signature: 'SETVALUE(fieldDataName, valueToSet)',
   description: 'Set a field value from a form event handler.',
@@ -256,6 +258,7 @@ export const SETVALUE_METADATA = defineBuiltinMetadata({
 
 export const ON_METADATA = defineBuiltinMetadata({
   name: 'ON',
+  operation: { type: 'EVENT_OPERATION', effects: ['listeners'] },
   category: 'event',
   signature: 'ON(eventType, fieldKeyOrCallback, callback)',
   description: 'Register an event handler within form event code.',
@@ -265,6 +268,7 @@ export const ON_METADATA = defineBuiltinMetadata({
 
 export const OFF_METADATA = defineBuiltinMetadata({
   name: 'OFF',
+  operation: { type: 'EVENT_OPERATION', effects: ['listeners'] },
   category: 'event',
   signature: 'OFF(eventType, fieldKeyOrCallback, callback)',
   description: 'Remove event handlers within form event code.',
@@ -274,6 +278,7 @@ export const OFF_METADATA = defineBuiltinMetadata({
 
 export const INVALID_METADATA = defineBuiltinMetadata({
   name: 'INVALID',
+  operation: { type: 'VALIDATION_OPERATION', effects: ['validation'] },
   category: 'event',
   signature: 'INVALID(message)',
   description:

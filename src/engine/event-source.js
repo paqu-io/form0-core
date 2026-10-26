@@ -1,10 +1,10 @@
 import { parse } from 'acorn';
 
 /** Retains authored callback source without depending on engine-specific toString output. */
-export function createEventSourceRegistry(preparationCache = null) {
+export function createEventSourceRegistry(preparationCache = new Map()) {
   const sources = new WeakMap();
 
-  function bindPrepared(prepared, context) {
+  function bindPrepared(prepared, context, ownsContext) {
     const propertyNames = new Map();
     const capture = (callback, source, name) => {
       sources.set(callback, source);
@@ -26,18 +26,21 @@ export function createEventSourceRegistry(preparationCache = null) {
     };
     capture.nameFor = (id) => propertyNames.get(id);
 
-    return {
-      code: prepared.code,
-      context: {
-        ...context,
-        [prepared.captureName]: capture,
-      },
-    };
+    const captured = ownsContext ? context : { ...context };
+    Object.defineProperty(captured, prepared.captureName, {
+      value: capture,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return { code: prepared.code, context: captured };
   }
 
-  function prepare(code, context) {
+  // Metadata may be attached in place only to an execution-owned context, never host/engine state.
+  function prepare(code, context, ownsContext = false) {
     const cached = preparationCache?.get(code);
-    if (cached && !Object.hasOwn(context, cached.captureName)) return bindPrepared(cached, context);
+    if (cached && !Object.hasOwn(context, cached.captureName))
+      return bindPrepared(cached, context, ownsContext);
     let tree;
     try {
       // Event scripts are Function bodies, rather than modules or global scripts.
@@ -154,7 +157,7 @@ export function createEventSourceRegistry(preparationCache = null) {
 
     const result = { code: prepared, captureName };
     preparationCache?.set(code, result);
-    return bindPrepared(result, context);
+    return bindPrepared(result, context, ownsContext);
   }
 
   function getSource(callback) {

@@ -45,8 +45,8 @@ function warningHarness(enableConsoleWarnings = false) {
   return { warningSystem, warnings };
 }
 
-// Synchronous ordering, partial operations, wildcard handlers, ignored in-handler ON/OFF,
-// returned UI operations, and metadata remain unchanged.
+// Synchronous ordering, partial operations, wildcard handlers, returned UI operations and metadata
+// retain their compatibility behavior. In-handler ON/OFF updates apply after dispatch.
 {
   const engine = engineFor(`
     ON('change', 'input', function named(event) {
@@ -61,7 +61,7 @@ function warningHarness(enableConsoleWarnings = false) {
     setNote('first:7'),
     alert('wildcard'),
   ]);
-  assert.deepEqual(engine.trigger('change', 'note'), [alert('wildcard')]);
+  assert.deepEqual(engine.trigger('change', 'note'), [setNote('unexpected'), alert('wildcard')]);
   assert.equal(engine.getState().values.note, null, 'The host still owns operation application');
   assert.deepEqual(engine.getDiagnostics(), [], 'Events remain separate from calculations');
 }

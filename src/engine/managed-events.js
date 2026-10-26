@@ -1,6 +1,7 @@
 import { getEventInfo, isValidEventType } from './event-registry.js';
 import { closeEventOperationScope, createEventOperationScope } from './event-operation-scope.js';
 import { getEventFieldReferences } from './event-field-references.js';
+import { eventOperationIssue, reportEventOperationIssue } from './event-policy.js';
 
 // Portable defensive copies also work in runtimes without structuredClone (including Hermes).
 function copy(value, seen = new Map()) {
@@ -35,7 +36,7 @@ const managedFieldCaches = new WeakMap();
 const managedRepeatableCaches = new WeakMap();
 
 /** Internal adapter; the public synchronous API is engine.triggerDetailed(). */
-export function createManagedEventDispatcher(manager, constructionScope) {
+export function createManagedEventDispatcher(manager, constructionScope, getMode = () => 'edit') {
   const instancePath = copy(constructionScope?.instancePath);
   const scopeId = constructionScope?.scopeId;
   if (scopeId !== undefined && (typeof scopeId !== 'string' || !scopeId.trim()))
@@ -86,6 +87,7 @@ export function createManagedEventDispatcher(manager, constructionScope) {
   if (!managedReferenceCaches.has(manager)) managedReferenceCaches.set(manager, new WeakMap());
   const referenceCache = managedReferenceCaches.get(manager);
   return function dispatch(eventType, fieldKey, metadata = {}) {
+    const mode = getMode();
     const result = { operations: [], validationIssues: [], issues: [] };
     const issue = (code, message) =>
       result.issues.push({
@@ -136,13 +138,13 @@ export function createManagedEventDispatcher(manager, constructionScope) {
         timestamp: Date.now(),
         instancePath: copy(instancePath),
         scopeId,
+        mode,
       };
     } catch {
       issue('invalid_request', 'Event metadata must contain portable data.');
       return result;
     }
-    const validation = eventType === 'validate-record' || eventType === 'validate-repeatable';
-    const closing = /^(cancel|unload)-/.test(eventType);
+    const registrations = [];
     const eventMap = manager.listeners.get(eventType);
     const listeners = [...(eventMap?.get(fieldKey) || []), ...(eventMap?.get('*') || [])];
     for (const callback of listeners) {
@@ -212,26 +214,31 @@ export function createManagedEventDispatcher(manager, constructionScope) {
         collected = closeEventOperationScope(scope);
       }
       try {
-        if (returned?.type === 'UI_OPERATION' && !collected.includes(returned))
+        if (
+          typeof returned?.type === 'string' &&
+          returned.type.endsWith('_OPERATION') &&
+          !collected.includes(returned)
+        )
           collected.push(copy(returned));
       } catch {
         issue('invalid_operation', 'The returned event operation must contain portable data.');
       }
       for (const operation of collected) {
-        if (operation?.type === 'EVENT_OPERATION') continue;
-        if (operation?.operation === 'INVALID') {
-          if (!validation)
-            issue('invalid_context', 'INVALID() is only available during managed validation.');
-          else
-            result.validationIssues.push({
-              message: operation.params.message,
-              instancePath: copy(instancePath),
-            });
-        } else if (validation || closing) {
-          issue(
-            'operation_not_allowed',
-            'Validation and close handlers cannot perform value or UI operations.'
-          );
+        const rejected = eventOperationIssue(operation, mode, eventType);
+        if (rejected) {
+          issue(rejected.code, rejected.message);
+          if (
+            rejected.code === 'readonly_operation_not_allowed' ||
+            rejected.code === 'invalid_operation'
+          )
+            reportEventOperationIssue(manager.warningSystem, rejected, eventType);
+        } else if (operation.type === 'EVENT_OPERATION') {
+          registrations.push(operation);
+        } else if (operation.operation === 'INVALID') {
+          result.validationIssues.push({
+            message: operation.params.message,
+            instancePath: copy(instancePath),
+          });
         } else if (operation?.type === 'FIELD_OPERATION' && operation.operation === 'SETVALUE') {
           const field = fields.get(operation.params?.fieldDataName);
           if (!field || !same(field.parentPath))
@@ -257,6 +264,7 @@ export function createManagedEventDispatcher(manager, constructionScope) {
     }
     // A failed managed dispatch is not a partially applicable operation batch.
     if (result.issues.length) result.operations = [];
+    else manager.processEventOperations(registrations);
     return copy(result);
   };
 }

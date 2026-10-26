@@ -1,20 +1,21 @@
 # Validation, repeatable freshness and aggregation: alignment
 
-Updated: 22 October 2026.
+Updated: 24 October 2026.
 
-Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is implemented as an unpublished
-core candidate with automated evidence. Plan 3 remains separate consumer-adoption planning; renderer,
-Builder and persistence integration changes are not included in Plan 2. See
+Status: Plan 1 is released in core 0.6.0 and #103 is closed. Plan 2 is published in core 0.7.0.
+Plan 3 implementation and automated verification pass. Android functional walkthroughs and cancellation
+pass; a targeted large-form responsiveness check remains. It covers the consumers and Builder; production Reform
+record persistence remains the separately documented follow-up. See
 [the core contract](RECORD_EVALUATION_CONTRACT.md) and
 [verification evidence](RECORD_EVALUATION_VERIFICATION.md).
 
 ### Approved delivery sequence
 
-| Plan                       | Delivery                                                                                                                                   | Status                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                  |
-| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Implemented and verified; unpublished core candidate. |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Plan separately against this alignment.               |
+| Plan                       | Delivery                                                                                                                                   | Status                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                                  |
+| 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                                              |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Automated checks/Android functionality pass; responsiveness check pending. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -32,14 +33,14 @@ superseded by this clarification.
 
 Design these concerns together, with separately reviewable delivery surfaces:
 
-| Concern                                                                                                                  | Direction                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Core [#99](https://github.com/paqu-io/form0-core/issues/99) and [#104](https://github.com/paqu-io/form0-core/issues/104) | Shared submission-validation rules and field participation.                                               |
-| React [#73](https://github.com/paqu-io/form0-react/issues/73) and equivalent Native behavior                             | Current closed-child state before validation and serialization.                                           |
-| `REPEATABLEVALUES` and `REPEATABLESUM`                                                                                   | Include aggregation in the next delivery; this expands #73's original non-aggregation scope.              |
-| Core [#103](https://github.com/paqu-io/form0-core/issues/103)                                                            | Separately reviewable condition-scope correctness, required before complete nested-validity claims.       |
-| Core [#101](https://github.com/paqu-io/form0-core/issues/101)                                                            | Keep setters and input normalization separate unless a concrete dependency emerges.                       |
-| Reform Builder                                                                                                           | Identify the authoring integration for portable form settings; implementation scope remains to be agreed. |
+| Concern                                                                                                                  | Direction                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core [#99](https://github.com/paqu-io/form0-core/issues/99) and [#104](https://github.com/paqu-io/form0-core/issues/104) | Shared submission-validation rules and field participation.                                                                                                                                 |
+| React [#73](https://github.com/paqu-io/form0-react/issues/73) and equivalent Native behavior                             | Current closed-child state before validation and serialization.                                                                                                                             |
+| `REPEATABLEVALUES` and `REPEATABLESUM`                                                                                   | Include aggregation in the next delivery; this expands #73's original non-aggregation scope.                                                                                                |
+| Core [#103](https://github.com/paqu-io/form0-core/issues/103)                                                            | Separately reviewable condition-scope correctness, required before complete nested-validity claims.                                                                                         |
+| Core [#101](https://github.com/paqu-io/form0-core/issues/101)                                                            | Keep setters and input normalization separate unless a concrete dependency emerges.                                                                                                         |
+| Reform Builder                                                                                                           | Identify the authoring integration for portable form settings; root recalculation control, authoritative collection metadata and unsaved full-form preview shortcut are included in Plan 3. |
 
 Core should own shared domain evaluation and validation rules. Hosts own editor interaction,
 settling pending updates, presenting decisions and persistence. This does not settle whether a
@@ -517,7 +518,7 @@ avoid local docs production builds and secret-file reads, and keep device steps 
 acceptance remains deferred. Separate Native/mobile dependency exceptions expire 7 November 2026.
 
 Plan 1 execution evidence is recorded separately in
-[`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/form0-condition-scope-20261022/CHECKS.md).
+[`form0-condition-scope-20261022/CHECKS.md`](../../.local-test-harnesses/_archive/form0-condition-scope-20261022/CHECKS.md).
 Earlier observations above retain their original provenance and are not retroactively new test runs.
 
 ## 13. Plan 2 implementation agreement
@@ -587,3 +588,400 @@ remain unchanged. The earlier flat metadata was never published; no maintained c
 it. Tests cover serialization/reopening, same-ID rows in different branches, positional rows and
 defensive review isolation. Peak memory, confirmation lifetime and worker transport remain explicit
 Plan 3 acceptance inputs. See the follow-up verification's payload breakdown.
+
+## Plan 3 implementation checkpoint — 23 October 2026
+
+The selected editor/submission contracts are implemented in core, React main-thread/actual worker,
+Native, CLI preview and Builder. See [verification and issue acceptance mapping](PLAN_3_VERIFICATION.md).
+The implementation preserves the selected all-or-none review, host-enabled retention, durable
+companion, callback success acknowledgement and unsaved selected values after failure. Private
+reports are paged and released; routine worker replies carry selected data once. The root serializer
+preserves numeric ID zero. Authored confirmation and managed-event opt-out keep their agreed meaning.
+
+Automated source, package, security-policy, cross-consumer, wide/deep performance and four-locale
+documentation gates pass. Actual Android/Expo Go/Hermes acceptance remains the three focused
+walkthroughs in the Native repository. iOS remains deferred. Production reform persistence and
+Native/mobile dependency-exception remediation remain separate follow-ups. The new additive scoped
+core API must be published before dependent consumer releases; the maintainer owns version edits,
+minimum dependency ranges, publication, merges, deployment and issue closure. No issue is closed here.
+
+Storage cleanup preserved older evidence under the harness root archive and updated active repository
+references. Continue from `.local-test-harnesses/CURRENT_WORK.md`, not a historical handoff. Flag future
+large allocations before creating/installing dependency trees, and retain the active device harness
+until actual acceptance is complete.
+
+On 23 October, the maintainer selected an SDK 58 migration for the form0 mobile starter and Android
+acceptance harness because the matching SDK 57 Expo Go client could not be installed. Automated
+migration checks pass; the three actual-device walkthroughs remain pending. The same packed form0
+candidates are retained, and this host-runtime migration does not raise binding peer requirements
+or include production Reform adoption. See the SDK 58 section of the verification report.
+
+## Opening controls and view evaluation — 23 October 2026
+
+The maintainer selected aligning opening controls before the separate view-evaluation policy.
+Both renderers expose `repeatableEntryMode: 'readonly' | 'edit'`, defaulting existing rows to
+`readonly` at every nesting level. New rows start editing. This renderer option is independent of
+root `mode` and introduces no schema or saved-record attribute. Read-only parents permit browsing
+rows while preventing descendant Edit/Add/Remove; direct-edit opening cannot bypass that policy.
+Web already defaulted existing rows to view mode; Native now follows it with an explicit Edit
+transition. Existing web edit-toggle restrictions remain effective.
+
+This patch preserves calculation, condition and intrinsic validation evaluation on opening.
+Managed load runs when a record/row opens; new/edit runs on entering editing. Both bindings already
+support root `new-record` and `edit-record` when lifecycle is enabled and the host supplies the
+required root `recordKind`; these are not future-only repeatable capabilities.
+
+The maintainer agrees that a view showing root 330 while children display 120/240 is confusing.
+Viewing accepted root/child values (110/220, root 330), then evaluating on Edit, is the selected
+follow-up direction. Its exact condition, intrinsic/submission-validation, load-handler writes,
+working-versus-persisted snapshot and compatibility policies require discussion before another
+implementation. Do not silently change those semantics as part of opening controls. Final Android
+acceptance should follow that discussion so the maintainer tests the intended behavior once;
+walkthrough 1's earlier successful report is preserved as evidence of the previous candidate.
+
+## Accepted-snapshot viewing confirmed; load policy proposal — 23 October 2026
+
+The maintainer explicitly accepted this view-evaluation direction for root and repeatable scopes:
+View displays supplied accepted calculated values (line totals 110/220 and root 330) and evaluates
+visibility from those supplied values. Edit evaluates with current permitted ancestor inputs
+(line 1 becomes 120). Saving that child accepts 120 and root 340; cancelling retains 110 and root
+330. Opening controls are already delivered separately. Implementation of view evaluation remains
+pending the load-policy discussion. This must preserve selected unsaved working values after a
+failed persistence callback rather than restoring an older database copy.
+
+The following load/builtin policy is a recommendation for discussion, not an agreed implementation:
+
+- Keep load-record/load-repeatable as once-per-opening notifications in both view and edit modes.
+  Moving from view to edit runs the appropriate new/edit event without replaying load or queuing
+  its rejected writes. Initial direct editing retains editable-load followed by new/edit behavior.
+- Expose a trustworthy execution mode to handlers (for example a proposed event.mode); author guards
+  are a convenience. Actual write permissions come from the active host scope and cannot be granted
+  by caller-supplied event metadata or by the handler changing its event object.
+- In view, allow scoped reads, notifications such as ALERT, and lifetime-scoped ON/OFF registration.
+  Prevent changes to field values, repeatable membership, linked/media data and record timestamps.
+  Move creation defaults to new-record/new-repeatable, and edit initialization to edit-record or
+  edit-repeatable. Do not replace the agreed accepted view with computed preview values.
+- A prohibited write fails the collected operation batch without partial value/UI application.
+  Keep the record view readable and report an actionable configuration/execution issue. This is
+  separate from intrinsic field errors and calculation diagnostics; do not silently ignore writes.
+- Extend the authoritative builtin/operation catalog with effects/capabilities, preserving existing
+  calculation-only/event-only restrictions. A future add-row or attach-media operation is a record
+  write; a UI operation label alone is not permission. Unknown/unclassified operations are rejected
+  until their effects are declared. External effects/persistence require explicit phase permissions;
+  entering edit does not automatically authorize persistence.
+- Enforce through the shared execution contract before host operation delegation, with equivalent
+  legacy/managed, controller, worker and Native behavior. Preserve ancestor reads/local-only writes
+  and existing stricter validation/close rules. Keep schema handlers synchronous. Future platform
+  operations should use validated descriptors rather than execute I/O during schema evaluation.
+- Trusted helper closures and arbitrary external side effects cannot be rolled back by filtering
+  operation descriptors. Hosts must keep helpers consistent with the contract; capability checks
+  are not an arbitrary-JavaScript sandbox.
+
+Compatibility remains a decision: existing load handlers that write would need migration for
+snapshot view mode. Do not add a silent compatibility escape that permits record mutation in view.
+No runtime code or public interface was changed while recording these discussion proposals.
+
+## Fulcrum comparison and event.mode explanation — 23 October 2026
+
+The maintainer asked for an independent review of Fulcrum before deciding the load policy.
+See [the official-source comparison](FULCRUM_LOAD_VIEW_POLICY_RESEARCH.md). Public documentation
+confirms load-record in both edit and view-only modes, distinguishes new/edit hooks, and includes
+load handlers using SETVALUE. An example with SETVALUE in load is not evidence that a view-only
+host applies or persists that write. Exact read-only write and calculation behavior must remain
+unconfirmed where the public sources do not specify it. Our proposed write restrictions are an
+explicit form0 contract rather than a claim of identical Fulcrum behavior.
+
+For discussion, event.mode would describe the executing record scope's effective interaction mode
+at dispatch: 'readonly' or 'edit', matching the renderer's existing vocabulary. The root can be
+editing while a viewed child receives readonly. New/existing classification, draft intent, record
+status and individual field read_only flags are separate concepts. Runtime scope state is the
+permission authority; a handler or programmatic caller cannot upgrade permissions by changing
+metadata. Each dispatch captures its mode; switching to Edit starts the edit lifecycle rather than
+mutating a previously delivered load event. Stricter validation and close restrictions still apply.
+Headless validation metadata needs an explicit definition before implementation; mode must not
+pretend closed records were reopened or enable writes in validators.
+
+Load remains useful under the proposal for scoped reads, one-time setup of handlers and allowed
+view UI such as ALERT, while preserving accepted values. Conditional load code could inspect the
+proposed mode, but a guarded write on an editable load would run only when initially opened in edit.
+It would not run later after a readonly opening; initialization that must occur on entering editing
+belongs in new-record/edit-record or the equivalent repeatable events. This explanation adds no
+implemented public property and settles no unapproved load-policy or compatibility choice.
+
+## Load policy approved and lifecycle order verified — 23 October 2026
+
+The maintainer approved the recommended accepted-snapshot/load policy above and the addition of
+`event.mode: 'readonly' | 'edit'`. This supersedes the discussion-only status of those choices;
+the runtime implementation remains pending. Preserve readable views, reject prohibited write
+batches with execution issues, and keep permissions independent of mutable handler metadata.
+Editable load handlers may still write. Existing setters that also execute on view-time load need
+author guards or migration to the appropriate new/edit event; no writable-view escape is selected.
+
+Source inspection confirms that the managed lifecycle in both bindings already awaits load before
+dispatching the applicable new/edit event. The shared scheduling utility completes accepted
+operation processing before that dispatch resolves. Core registers/dispatches events but does not
+automatically open records or choose their lifecycle sequence; the bindings or a headless host own
+that orchestration. Preserve this ordering rather than changing it to introduce mode metadata.
+
+| Opening or transition | Selected managed sequence |
+| --- | --- |
+| Open existing root directly in Edit | `load-record(edit)` then `edit-record(edit)` |
+| Create root | `load-record(edit)` then `new-record(edit)` |
+| Open existing root in View, then press Edit | `load-record(readonly)` at opening; `edit-record(edit)` on entering editing, with no second load |
+| Open existing child directly in Edit | `load-repeatable(edit)` then `edit-repeatable(edit)` |
+| Create child | `load-repeatable(edit)` then `new-repeatable(edit)` |
+| Open existing child in View, then press Edit | `load-repeatable(readonly)` at opening; `edit-repeatable(edit)` on entering editing, with no second load |
+
+Here the parenthesized value denotes the proposed `event.mode`, not a new event name. Each
+sequence applies to the executing record's effective mode. Direct editable load can set amount
+100 and new/edit can subsequently read 100. A view-time load can display an alert while accepted
+total 110 remains unchanged; entering Edit can then calculate 120 using the current ancestor tax.
+
+The existing managed lifecycle remains opt-in and uses explicit root new/existing classification.
+Legacy automatic root load/edit dispatch must remain compatible in routing and ordering, while
+receiving the agreed view-write protection and mode context. This verification adds no runtime
+property, changes no saved record, and does not resume Android acceptance before the new policy is
+implemented and automatically verified.
+
+## Accepted view and event.mode implemented — 23 October 2026
+
+The approved policy is implemented and automatically verified in core, React main-thread/actual
+worker, Native and CLI conformance. See [current verification](ACCEPTED_VIEW_VERIFICATION.md) for
+exact candidates, checks, timings, storage and limitations. Scalar engines default to edit and add
+getMode/setMode; evaluateScope adds interactionMode readonly. Event mode is engine-owned; view-time
+write batches are rejected before delegation. Missing defaults wait for editing, including choices.
+Load order is preserved; View → Edit does not replay load. Intrinsic field state still evaluates
+from accepted values in View. Failed persistence selections remain unsaved work when returning to
+View. No form schema/output attribute, record metadata migration or closed-row lifecycle replay
+was added. Headless closed-scope validation uses readonly execution context without reopening rows.
+
+The updated core/Native archives are installed in the retained SDK 58 device harness with exact
+source-byte parity and unchanged SDK dependency versions. Android acceptance may resume using the
+three updated walkthroughs; actual results and iOS acceptance are not claimed. The new core
+capabilities must be released before dependent consumers; maintainer release ownership is unchanged.
+
+## Android feedback and open performance investigation — 23 October 2026
+
+The maintainer reports walkthroughs 1 and 2 passing on Pixel 8a / Android 17, with DevTools closed.
+The remaining walkthrough 3 functional checks pass, but 200 / 2,000 rows take 9.714 / 97.889 seconds;
+observed JS gaps reach 148 / 970 ms. Performance acceptance remains open. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for the exact workload, corrected desktop
+comparison and targeted device diagnostic. Earlier browser timings had managed lifecycle/custom
+validation disabled; the Android harness enables it. A matched desktop run confirms extra cost but
+does not explain the full Android gap. Do not declare this development-mode overhead without evidence.
+
+Native review buttons now share the header's private themed action component, and existing child
+Edit uses the same Pencil icon as root Edit. This changes presentation only. The installed independent
+device harness includes a non-persisting 200-row diagnostic separating computation, timer wait,
+managed validation and cold/warm setup. No core runtime contract, dependency or schema policy changed
+in this feedback pass; the accepted-view core candidate remains in place. Preserve functional
+acceptance provenance while investigating performance before completing Plan 3.
+
+## Pixel profile and targeted performance fixes — 24 October 2026
+
+The maintainer supplied the 200-row diagnostic on Pixel 8a, Android API 37, Expo Go 58.0.5,
+RN 0.88.0 / Hermes, development mode, SAFE off and no DevTools. The warm managed preparation
+spends 19.7 s waiting at host yields and 8.4 s outside them. Native now selects the host idle-task
+queue with cancellation; core reuses expression parameter layouts and immutable builtin-name sets.
+The 8 ms work budget, per-execution security checks, calculation/event semantics and saved record
+shape remain unchanged. No public API or schema attribute was added.
+
+Matched managed-validation desktop preparations improve to 208–213 ms / 1.81–1.84 s for
+200 / 2,000 rows on the main thread and 161–163 ms / 1.44–1.46 s in an actual worker. Full core,
+React/Native/CLI conformance and release-memory checks pass. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for provenance, limitations and installed
+archives. The updated Pixel profile (`native-idle-layout-cache`, `idle-callback`) is still required;
+do not mark performance or Plan 3 complete on desktop evidence alone.
+
+The subsequent physical Pixel profile confirms the targeted improvement: 200-row warm preparation
+with managed validation falls from 28,102.4 to 1,010.3 ms (yield waiting 19,719.5 → 64.8 ms;
+outside yields 8,382.8 → 945.6 ms). Core caching retains no values/results; current inputs and the
+existing dependency order still drive every execution. Added repeated/rapid input-edit regressions
+pass in React, Native adapter and actual browser-worker modes, in TRUSTED and SAFE, including child
+acceptance and root aggregation. Exact results and limits are in the investigation. The remaining
+physical performance boundary is full-controller large-form preparation, scheduling gaps and
+cancellation in walkthrough 3; the 200-row headless diagnostic is now verified, not the whole plan.
+
+The subsequent full-controller Pixel retest completes eligible without execution issues in
+1,516 / 11,213 ms for 200 / 2,000 rows; cancellation passes. Observed JS gaps remain 182 / 949 ms.
+Keep functional acceptance and investigate the full preparation/selection/serialization phases
+before performance sign-off. Do not request repeated long device runs without a targeted change.
+
+Schema replacement is verified in maintained React/Native tests (TRUSTED/SAFE), real main-thread
+and worker browser runs, and an actual CLI file-watcher/WebSocket reload. Edited/new calculations,
+changed collection targets and replaced load/change event code take effect; old handlers do not
+accumulate. Caches retain compiled code/layouts, not values; schema-bound preparation is recreated
+on normal reload. Headless hosts recreate their evaluator when replacing the schema. See the
+investigation for exact reports; these additional tests changed no installed runtime bytes.
+
+
+## Bounded submission work and signature ownership — 24 October 2026
+
+The approved responsiveness follow-up adds cooperative setup/output copying and an asynchronous
+serializer sharing the existing synchronous transformation. The additive public
+`createStructuredRecordAsync(state, fields, options, scheduling)` takes scheduling separately;
+inputs must remain stable until completion. Consumers serialize their selected captured result.
+No partial record is delivered on cancellation. Atomic live capture, record shape, validation,
+security, save-once/revalidation and persistence acknowledgement contracts are preserved.
+
+Renderer-owned accepted child trees are replaced on row changes and may share a weakly owned
+signature. Mutable engine values, record metadata and host policy remain freshly checked; generic
+headless adapters retain complete checks. This does not cache calculation results or change live
+updates, accepted View semantics, child Save/Cancel, schema-watch replacement or event registration.
+New prepared selections avoid one redundant root evaluation; public snapshots remain defensive.
+Release/disposal cannot repopulate reviews or reports through a late async completion.
+
+The Pixel confirms prompt cancellation and a reduction in the large observed JS gap from 949 to
+325 ms, at 12,457 ms elapsed. The subsequent signature optimization passes full core/consumer,
+actual-worker, CLI, Builder/type and localized documentation gates. Matched browser targets pass;
+Native-adapter warmed gaps are 107–144 ms at CPU4, not Hermes acceptance. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for exact source/archive provenance and
+the one remaining targeted Pixel check. No additional broad manual walkthrough is required now.
+Coordinated core publication still precedes dependent consumers; all release actions remain
+maintainer-owned. Production Reform persistence and dependency-exception remediation stay separate.
+
+
+## Throughput checkpoint and behavior preservation — 24 October 2026
+
+The maintainer authorized further throughput work with explicit protection of calculation/event
+semantics and a bounded stopping decision. The selected implementation specializes only proven
+primitive expressions with canonical IF/SETRESULT, using current captured values and existing scope
+checks. Everything dynamic, object-valued, overridden, unresolved or introspective retains complete
+bindings. The ordinary scalar engine path and execution/security validation frequency stay unchanged.
+Fresh private event contexts avoid redundant copies, while callbacks, registrations and operation
+scopes remain per execution. No results/validation findings are cached or closed rows skipped.
+
+The complete paired managed 2,000-row Node benchmark improves 27%, with identical output and input
+hashes. Real desktop Chromium root preparation improves to 1.11–1.13 s main-thread / 1.05 s actual
+worker; Native-adapter throughput and all functional gates pass. The previous physical sample was
+12.4 s/gap 294 ms. The new physical result is pending; see the latest
+[investigation](ANDROID_PREPARATION_INVESTIGATION.md) and Native guide.
+
+Stop optimization changes at this tested candidate and measure its actual Pixel effect. A roughly
+20% repeatable improvement was the checkpoint criterion, not a universal SLA. Further work must
+identify a specific measured cost and preserve these semantics; incremental results, caching handler
+outputs or moving Native execution require separate design if needed. No Plan 3 performance sign-off,
+release or issue closure is inferred from this checkpoint. Source/API/schema/dependency policies and
+maintainer release ownership are preserved.
+
+## Pixel throughput checkpoint and extensibility — 26 October 2026
+
+The physical `native-throughput-bindings` result is completed/eligible/no issues, 9,933 ms for
+2,000 rows and maximum observed JS gap 293 ms. Compared with the previous individual 12,400 ms /
+294 ms sample, elapsed time falls approximately 19.9% while the longest observed gap is unchanged.
+Warm-up/repeated phone measurements were not supplied. Preserve prior cancellation and functional
+walkthrough acceptance. The investigation records the raw report and its limits.
+
+The recommendation is to stop this contained optimization pass with an explicit remaining
+large-record latency limitation; Plan 3 performance acceptance is not inferred. No broader runtime
+change or new phone test is requested here. New builtin calls and complex expressions default to
+the existing full-context execution path. Future builtin registration needs no optimizer extension
+to work correctly. Reassess the specialization only when changing its existing operation/context
+semantics or deliberately extending optimized coverage. Current values/security and normal
+calculation/event behavior remain the governing contracts.
+
+## Authorized production-performance investigation — 26 October 2026
+
+The maintainer approved production-mode measurement, then phase-based investigation, before accepting
+the remaining large-record latency. Preserve calculations, events, validation, scope/security and form
+logic. Require enough measured benefit to justify maintenance cost and edge cases for any additional
+optimization; do not automatically accumulate changes. The current binding optimization is unchanged.
+
+The next physical measurement uses production JavaScript in the existing Expo Go harness, explicitly
+verified with `dev: false`; final compiled-release acceptance is separate. Fresh full-controller runs
+are distinguished from repeated core runs on the same captured accepted input. A separate diagnostic
+source copy provides phase timings without changing shipped runtime APIs or package bytes. Its
+instrumentation/control parity is verified under TRUSTED/SAFE, including validation and cancellation.
+See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md) and Native acceptance guide for hashes,
+commands and limits. Physical reports are pending; no new runtime optimization, release or Plan 3
+completion is claimed. Reference targets remain unchanged and do not become a guarantee for arbitrary
+schema JavaScript on every device.
+
+Production-mode Pixel follow-up (26 October): the corrected 2,000-row sample is 9,897 ms/gap
+336 ms; 200 rows is 1,373 ms/gap 96 ms, both eligible/no issues. The form is responsive, but a
+production-mode speedup is not established. A harness dynamic import prevented phase data; its
+loader is corrected and tested against the actual Metro `lazy=true` production graph without a
+browser `location` global. Only the 200-row diagnostic needs repeating. Existing runtime logic and
+optimization/maintenance criteria remain unchanged; wait for phase evidence before another fix.
+
+## Physical phases and bounded validation registration — 26 October 2026
+
+The Pixel now runs the production v3 profiler successfully. Managed validation accounts for 46.4%
+of active warm 200-row preparation, including 29.2% context/registration work; calculations account
+for 30.2%. Two lower-benefit allocation/layout prototypes were rejected rather than accumulated.
+
+The selected private optimization recognizes only canonical literal `ON(...)` registration scripts
+and omits schema-wide default-field bindings while creating their handlers. Fresh permitted current
+values are supplied for every ordinary dispatch. Conditional/dynamic initialization and custom `ON`
+retain the full original path. Handler bodies, including future builtins and dynamic `EVAL`, use the
+existing executor/security. No calculation results, registrations or validation results are cached.
+
+Paired Node 2,000-row preparations reduce active work by 29.7% TRUSTED / 23.6% SAFE with identical
+complete results. Full core/consumer checks, actual browser/worker and CLI interactions pass. Reference
+browser preparation targets and release/memory checks pass. See
+[the investigation](ANDROID_PREPARATION_INVESTIGATION.md) for provenance and excluded stale adapter
+measurements. The next physical candidate is `native-literal-registration`; actual Pixel speedup,
+performance sign-off and Plan 3 completion remain pending. Preserve accepted functional walkthroughs,
+the current draft/freshness/persistence contracts and maintainer-owned release actions.
+
+## Physical registration outcome and final review boundary — 26 October 2026
+
+The Pixel `native-literal-registration` candidate completes fresh 200/2,000-row full-controller
+preparation in 1,333/8,454 ms, observed JS gaps 90/323 ms, dev:false, Hermes:true, SAFE:false,
+eligible and without execution issues. Prompt cancellation is reconfirmed. The observed large
+reduction from 9,897 ms is 14.6%; these are individual observations, not warmed repeated medians.
+Keep the existing regression-tested optimization and all prior functional acceptance.
+
+Recommend ending this bounded optimization pass and reviewing Plan 3 with the remaining large-phone
+latency explicitly documented. Reference browser targets pass; actual phone two-second performance
+and a universal scheduling-gap bound are not established. No further optimization, manual run,
+release or issue closure is requested by this result. Maintainer acceptance of the residual latency
+and final Plan 3 sign-off remain open. See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md)
+for the raw report, workload size, execution boundary and recommendation.
+
+## Final review decision and release boundary — 26 October 2026
+
+The maintainer selected ending the tuning pass and proceeding to final review, with the 8.454-second
+large Pixel preparation and 323 ms maximum observed gap explicitly documented. Follow-up measurement
+candidates include calculation context construction, repeated built-in submission validation,
+full-controller copies/serialization and task-loop overhead; no new optimization is authorized by
+recording them. Normal scoped live calculations and event behavior remain preserved.
+
+The [final review](PLAN_3_FINAL_REVIEW.md) separates Standards and Spec. One CLI generated-ID storage
+mismatch is corrected and covered by failing-before/passing-after create/persist/reopen regressions;
+all 171 CLI tests plus package and browser persistence checks pass. A fresh CLI production audit
+fails on existing dependency versions (2 high, 1 moderate), so CLI publication requires separate
+security remediation. No dependency or deployment policy was changed. The coordinator duplication
+is a non-blocking maintenance follow-up, not a reason for a broad extraction now.
+
+Preserve all source evidence, existing development branches and unrelated working-tree edits. Core
+publication and actual minimum-range updates still precede dependent consumers. No merge, push,
+bump, publication, deployment, issue closure or new durable Reform persistence was performed.
+
+## Security pass and selected release sequence — 26 October 2026
+
+The maintainer selected **hold CLI publication; proceed with other packages**. Core/React/Native
+production audits pass. Compatible CLI parser patches and the React Vitest 4.1.12 security patch
+are committed; the latter passes all 100 tests and clean production/all-dependency audits. CLI
+passes 174 tests, formatting/smoke/package checks and actual browser choice synchronization, but
+its audit retains one high Undici entry and one inherited moderate Pi entry. Current upstream Pi
+still pins the affected version. Root overrides and bundling probes are not shipped. No audit or
+deployment policy was weakened, and no Native/mobile exception was extended.
+
+The reported older-schema default-values failure is installed core 0.7.0 lacking evaluateScope(),
+not a schema defect. The endpoint now returns the existing explicit upgrade guard. A separate
+Boolean/MultiChoice scoped-setter shadowing bug is fixed with red/green regressions and actual
+browser verification. Authored welcome ALERTs remain expected; no user schema was changed.
+
+Recommend core **0.8.0** first, then update core minimums to **^0.8.0** and locks in consumers and
+authoring/starter integrations. Recommend React **0.5.0** and Native **0.6.0** for the additive
+public consumer contracts. CLI may adopt core for local development but remains unpublished until
+the security blocker is resolved; its eventual new preview contracts warrant a minor release too.
+
+Plan 3 implementation, review and agreed functional/device acceptance are complete with the accepted
+8.454-second large Pixel limitation. Release integration and the CLI blocker remain outstanding.
+Live issue reconciliation shows core #99/#104 and React #73 open, #103 closed. Their implementation
+acceptance is complete; the maintainer owns closure after the corresponding coordinated deliveries.
+The CLI dependency hold is separate from core/React issue closure. See
+[security and release evidence](PLAN_3_SECURITY_REVIEW.md) and the updated
+[final review](PLAN_3_FINAL_REVIEW.md). All release operations remain maintainer-owned.

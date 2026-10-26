@@ -8,6 +8,9 @@ import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
 import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
 
+const resolveRecordId = (primary, fallback) =>
+  primary === 0 ? 0 : primary || (fallback === 0 ? 0 : fallback || null);
+
 const hasMeaningfulValue = (value) => {
   if (value === null || value === undefined) {
     return false;
@@ -45,40 +48,8 @@ const hasMeaningfulRecord = (record) => {
   return false;
 };
 
-/**
- * Create structured record from form engine state with support for unlimited RepeatableSection nesting
- * @param {Object} state - Form engine state {values, errors, visible, required, read_only}
- * @param {Array} [fields] - Optional flattened fields array from schema (for key mapping)
- * @param {Object} options - Additional options for record creation
- *   - mainRecordId: UUID for the main record
- *   - childRecordIds: Nested object structure for RepeatableSection child record UUIDs
- *   - originalElements: Original nested form elements (for proper RepeatableSection nesting)
- * @param {string} [id] - DEPRECATED: Use options.mainRecordId instead
- * @returns {Object} Structured record ready for submission
- *
- * @example
- * // Simple RepeatableSection:
- * options = {
- *   mainRecordId: "main-uuid",
- *   childRecordIds: {
- *     "repA": ["child-1", "child-2", "child-3"]
- *   }
- * }
- *
- * // Nested RepeatableSections:
- * options = {
- *   mainRecordId: "main-uuid",
- *   childRecordIds: {
- *     "repA": {
- *       _records: ["repA-record-1", "repA-record-2"],
- *       "repA-record-1": {
- *         "repB": ["repB-child-1", "repB-child-2"]
- *       }
- *     }
- *   }
- * }
- */
-export function createStructuredRecord(state, fields = null, options = {}, id = null) {
+/** Shared transformation steps; yielding does not change formatting or record metadata. */
+function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
   // Compute final version values
   const finalVersion = options.version || 1;
   const finalChildVersion = options.childVersion || 1;
@@ -276,7 +247,11 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   }
 
   // Enhanced recursive function to process nested RepeatableSections
-  const processRepeatableSection = (repInfo, currentPath = [], structuredInstances = null) => {
+  const processRepeatableSection = function* (
+    repInfo,
+    currentPath = [],
+    structuredInstances = null
+  ) {
     const pathKey = repInfo.preferredKey;
 
     // Get child record IDs from options using the full path
@@ -389,7 +364,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
             ? instanceRepeatable[childRepInfo.preferredKey]
             : [];
           const nestedInstances = Array.isArray(rawNestedInstances) ? rawNestedInstances : [];
-          const childRepeatableArray = processRepeatableSection(
+          const childRepeatableArray = yield* processRepeatableSection(
             childRepInfo,
             [...currentPath, pathKey],
             nestedInstances
@@ -405,6 +380,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         if (hasMeaningfulRecord(childRecord)) {
           childRecords.push(childRecord);
         }
+        yield;
       }
 
       return childRecords;
@@ -499,7 +475,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
 
         // Recursively process child RepeatableSections
         for (const [childDataName, childRepInfo] of repInfo.children) {
-          const childRepeatableArray = processRepeatableSection(childRepInfo, [
+          const childRepeatableArray = yield* processRepeatableSection(childRepInfo, [
             ...currentPath,
             pathKey,
           ]);
@@ -526,6 +502,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
         if (hasMeaningfulRecord(childRecord)) {
           childRecords.push(childRecord);
         }
+        yield;
       }
 
       return childRecords;
@@ -549,7 +526,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
           : []
         : null;
 
-      const childRecords = processRepeatableSection(repInfo, [], structuredInstances);
+      const childRecords = yield* processRepeatableSection(repInfo, [], structuredInstances);
       const repeatableOutputKey = resolveRepeatableOutputKey(repInfo);
       if (hasStructuredRepeatableState) {
         // In structured mode keep explicit repeatable keys, even when empty.
@@ -614,7 +591,7 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
     ),
 
     // Ensure our specific handling isn't overridden (always set last)
-    id: options.mainRecordId || id || null,
+    id: resolveRecordId(options.mainRecordId, id),
     changeset_id: options.changeset_id || null, // Ensure changeset_id isn't overridden
     created_at: clientCreatedAt, // Ensure canonical created_at isn't overridden
     updated_at: serverUpdatedAt, // Ensure canonical updated_at isn't overridden
@@ -647,4 +624,98 @@ export function createStructuredRecord(state, fields = null, options = {}, id = 
   }
 
   return record;
+}
+
+/**
+ * Create structured record from form engine state with support for unlimited RepeatableSection nesting
+ * @param {Object} state - Form engine state {values, errors, visible, required, read_only}
+ * @param {Array} [fields] - Optional flattened fields array from schema (for key mapping)
+ * @param {Object} options - Additional options for record creation
+ *   - mainRecordId: UUID for the main record
+ *   - childRecordIds: Nested object structure for RepeatableSection child record UUIDs
+ *   - originalElements: Original nested form elements (for proper RepeatableSection nesting)
+ * @param {string} [id] - DEPRECATED: Use options.mainRecordId instead
+ * @returns {Object} Structured record ready for submission
+ *
+ * @example
+ * // Simple RepeatableSection:
+ * options = {
+ *   mainRecordId: "main-uuid",
+ *   childRecordIds: {
+ *     "repA": ["child-1", "child-2", "child-3"]
+ *   }
+ * }
+ *
+ * // Nested RepeatableSections:
+ * options = {
+ *   mainRecordId: "main-uuid",
+ *   childRecordIds: {
+ *     "repA": {
+ *       _records: ["repA-record-1", "repA-record-2"],
+ *       "repA-record-1": {
+ *         "repB": ["repB-child-1", "repB-child-2"]
+ *       }
+ *     }
+ *   }
+ * }
+ */
+export function createStructuredRecord(state, fields = null, options = {}, id = null) {
+  const work = structuredRecordSteps(state, fields, options, id);
+  let next;
+  do {
+    next = work.next();
+  } while (!next.done);
+  return next.value;
+}
+
+/**
+ * Create the same structured record with host scheduling between rows.
+ * Supply a stable evaluated snapshot; this function never evaluates or mutates it.
+ * @param {Object} state
+ * @param {Object[]} [fields]
+ * @param {Object} [options] The synchronous serializer's options; use mainRecordId for identity.
+ * @param {{signal?: AbortSignal, budgetMs?: number, yieldToHost?: Function}} [scheduling]
+ * @returns {Promise<Object>} Cancellation rejects with an AbortError; no partial record is returned.
+ */
+export async function createStructuredRecordAsync(
+  state,
+  fields = null,
+  options = {},
+  scheduling = {}
+) {
+  const clock = () => globalThis.performance?.now?.() ?? Date.now();
+  const check = () => {
+    if (scheduling.signal?.aborted)
+      throw Object.assign(new Error('Record serialization was cancelled.'), {
+        name: 'AbortError',
+        code: 'cancelled',
+      });
+  };
+  const yieldToHost =
+    scheduling.yieldToHost || (() => new Promise((resolve) => setTimeout(resolve, 0)));
+  const pause = async () => {
+    try {
+      await yieldToHost();
+    } catch (error) {
+      throw Object.assign(new Error(error?.message || 'Record serialization scheduling failed.'), {
+        code: 'record_scheduling_failed',
+      });
+    }
+  };
+  check();
+  // Finish prior editor/signature work before beginning this separate phase.
+  await pause();
+  check();
+  let started = clock();
+  const work = structuredRecordSteps(state, fields, options);
+  for (;;) {
+    const next = work.next();
+    check();
+    if (next.done) return next.value;
+    if (clock() - started >= (scheduling.budgetMs ?? 8)) {
+      await pause();
+      check();
+      started = clock();
+    }
+  }
 }

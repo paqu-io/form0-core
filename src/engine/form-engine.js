@@ -17,6 +17,9 @@ import { buildCalculationDependencyPlan } from '../utilities/calculation-depende
 import { createCalculationDiagnostics } from './calculation-diagnostics.js';
 import { formatLocalDate } from '../utilities/date-utils.js';
 import { createManagedEventDispatcher } from './managed-events.js';
+import { validateInteractionMode } from './event-policy.js';
+import { copyRecordData } from '../utilities/record-data.js';
+import { areStructuredValuesEqual } from '../utilities/value-equality.js';
 
 /**
  * @typedef {Object} CalculationDiagnostic
@@ -53,6 +56,7 @@ import { createManagedEventDispatcher } from './managed-events.js';
  * @param {Object} [options.initialValues]
  * @param {Object} [options.helpers]
  * @param {Object} [options.security]
+ * @param {'edit'|'readonly'} [options.mode='edit'] View preserves supplied calculations/defaults.
  * @param {WarningSystem} [options.warningSystem]
  * @param {Array} [options.runtimeDiagnostics] Deprecated append-only compatibility adapter.
  * Use getDiagnostics() for the latest snapshot or onDiagnostics for evaluation notifications.
@@ -75,15 +79,18 @@ export function createFormEngine({
   diagnostics = {},
   onDiagnostics = null,
   eventScope = { instancePath: [] },
+  mode = 'edit',
 }) {
+  let interactionMode = validateInteractionMode(mode);
   const { schema: preparedSchema, buildingPlanMeta } = expandBuildingPlanSchema(schema);
 
   const contextResolver = new ContextResolver(preparedSchema.form);
   validateSchemaWithContext(preparedSchema.form, contextResolver);
 
   const { form } = preparedSchema;
-  const values = { ...initialValues };
+  const values = copyRecordData(initialValues);
   const allFields = flattenFields(form.elements);
+  const pendingDefaults = new Map();
 
   // Create a lookup map for choice fields
   const choiceFieldMap = new Map();
@@ -104,7 +111,11 @@ export function createFormEngine({
   for (const field of allFields) {
     if (!(field.data_name in values)) {
       // Initialize field with default value if specified
-      values[field.data_name] = getDefaultValue(field);
+      values[field.data_name] = getDefaultValue(
+        interactionMode === 'readonly' ? { ...field, default_value: null } : field
+      );
+      if (interactionMode === 'readonly')
+        pendingDefaults.set(field, copyRecordData(values[field.data_name]));
     } else if (field.type === 'SingleChoiceField' || field.type === 'BooleanField') {
       // Enrich SingleChoiceField and BooleanField values with labels from schema
       const fieldValue = values[field.data_name];
@@ -163,11 +174,16 @@ export function createFormEngine({
   const eventManager = new EventManager(form, contextResolver, sharedWarningSystem);
   eventManager.securityConfig = security; // Pass security config
   const eventHelpers = { ...eventBuiltins, ...helpers };
-  const dispatchManagedEvent = createManagedEventDispatcher(eventManager, eventScope);
+  const getMode = () => interactionMode;
+  const dispatchManagedEvent = createManagedEventDispatcher(eventManager, eventScope, getMode);
 
   // Initialize event code if present
   if (form.events && form.events.code) {
-    const eventContext = buildEventContext(values, eventHelpers, {});
+    const eventContext = buildEventContext(
+      interactionMode === 'readonly' ? copyRecordData(values) : values,
+      eventHelpers,
+      {}
+    );
     eventManager.initializeEventCode(form.events.code, eventContext);
   }
 
@@ -187,17 +203,18 @@ export function createFormEngine({
   function evalForm() {
     const frame = calculationDiagnostics.begin();
     try {
-      evaluateCalculatedFields(
-        form,
-        values,
-        allHelpers,
-        security,
-        contextResolver,
-        sharedWarningSystem,
-        runtimeDiagnostics,
-        calculationPlan,
-        calculationDiagnostics
-      );
+      if (interactionMode === 'edit')
+        evaluateCalculatedFields(
+          form,
+          values,
+          allHelpers,
+          security,
+          contextResolver,
+          sharedWarningSystem,
+          runtimeDiagnostics,
+          calculationPlan,
+          calculationDiagnostics
+        );
       evaluateRequirement(form, values, required, conditionContext);
       evaluateVisibility(form, values, visible, conditionContext);
       evaluateReadOnly(form, values, read_only, conditionContext);
@@ -211,17 +228,33 @@ export function createFormEngine({
 
   function trigger(eventType, fieldKey, metadata = {}) {
     // Update event context with current values for event execution
-    const eventContext = buildEventContext(values, eventHelpers, {
-      eventType,
-      fieldKey,
-      ...metadata,
-    });
+    const eventContext = buildEventContext(
+      interactionMode === 'readonly' ? copyRecordData(values) : values,
+      eventHelpers,
+      {
+        eventType,
+        fieldKey,
+        ...metadata,
+      }
+    );
     eventManager.eventContext = eventContext; // Update the event context
-    return eventManager.trigger(eventType, fieldKey, metadata);
+    return eventManager.trigger(eventType, fieldKey, metadata, interactionMode);
   }
 
   function getState() {
     return { values, errors, visible, required, read_only };
+  }
+
+  /** Host-owned mode changes do not replay events, restore a record or evaluate implicitly. */
+  function setMode(nextMode) {
+    interactionMode = validateInteractionMode(nextMode);
+    if (interactionMode === 'edit') {
+      for (const [field, placeholder] of pendingDefaults) {
+        if (areStructuredValuesEqual(values[field.data_name], placeholder))
+          values[field.data_name] = copyRecordData(getDefaultValue(field));
+      }
+      pendingDefaults.clear();
+    }
   }
 
   /**
@@ -238,6 +271,8 @@ export function createFormEngine({
 
   return {
     eval: evalForm,
+    getMode,
+    setMode,
     trigger,
     triggerDetailed,
     getState,

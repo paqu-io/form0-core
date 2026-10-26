@@ -106,6 +106,11 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
       for (const custom of issuesByScope.get(JSON.stringify(scope.instancePath)) || [])
         orderedIssues.push({ ...custom, instancePath: scope.instancePath, kind: 'custom' });
   });
+  return summarizeSubmissionFindings(orderedIssues);
+}
+
+/** Shared ordering/classification for a complete tree or a selected editor scope. */
+export function summarizeSubmissionFindings(orderedIssues) {
   return {
     hasErrors: orderedIssues.length > 0,
     requiredFieldErrors: orderedIssues.filter((issue) => issue.kind === 'required'),
