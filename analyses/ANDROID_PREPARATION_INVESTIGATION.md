@@ -3,9 +3,10 @@
 Current status (26 October): production JavaScript on the Pixel/Hermes completes 200/2,000 rows in
 1,373/9,897 ms with maximum observed JS gaps 96/336 ms, eligible and no execution issues. The large
 sample is essentially unchanged from the previous individual 9,933 ms development sample. Earlier
-functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader's separate
-production chunk error is now corrected; only the 200-row phase profile needs repeating. Its revision
-is `native-production-phases-bundled`; controller revision stays `native-production-baseline`, with
+functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader passes
+compiled production checks, but the phone still reports its earlier chunk error; its loaded build
+was not visible. The versioned retry is `phase-profile-v3`; only the 200-row phase profile is requested.
+Controller revision stays `native-production-baseline`, with
 package runtime bytes unchanged. See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
@@ -729,3 +730,32 @@ preparation (200)**. Expect revision `native-production-phases-bundled` and
 `diagnosticLoading: bundled-require`, with eight control samples and a separate phaseProbe.
 Retain the supplied controller reports. Actual phase proportions remain pending, so do not choose
 a further runtime optimization, infer a CPU profile or finalize Plan 3 performance acceptance yet.
+
+### Repeated phone loader error; versioned bootstrap verification
+
+The maintainer still sees the same message after restarting Metro and closing/reopening Expo Go.
+No actual phase timings arrived. The running maintainer Metro serves the bundled loader; testing
+its full main-index graph (not only the standalone diagnostic entry) passes without location or
+chunk requests and preserves complete 200-row TRUSTED/SAFE results. The source bundle contains the
+updated profiler revision. That proves server-side delivery, not which code the handset executed.
+
+The device fixture now shows a shared **phase-profile-v3** marker for both UI and bootstrap, with
+an explicitly versioned button. A stale/missing bootstrap is rejected before its loader runs; a
+failure in a current build reports stage, revision, loader metadata and URL-redacted stack frames.
+No evaluator, event, dependency or runtime package changes. Independent Native tests: 84 pass.
+
+Only the physical build/profile checkpoint remains: force stop Expo Go, scan the current Metro QR,
+check both v3 markers and press Profile phases v3 (200). Stop on mismatched markers. No controller
+or large-form rerun. Stale handset code is unconfirmed until that observation arrives. Live graph
+reports: `logs/phase-loader-maintainer-index-graph.json` and
+`phase-loader-maintainer-index-graph-v3.json`; test log `phase-loader-v3-native-tests.log`.
+The maintainer Metro process was inspected read-only and was not stopped. No additional diagnostic
+server or dependency tree was started for the marker follow-up.
+
+The maintainer cannot see the new header. A read-only request through both localhost and the
+advertised public tunnel returns the v3 header, button and guard; neither response has the former
+dynamic-import descriptor. Report `logs/phase-loader-local-tunnel-parity.json` retains safe metadata
+and marker booleans, not tunnel URLs. This rules out an outdated response at those endpoints during
+the probe, but does not prove what the phone executes. The next requested observation is the visible
+profiler button label, with no test rerun or application-data deletion. Physical phase data and the
+cause of the repeated handset message remain unresolved.
