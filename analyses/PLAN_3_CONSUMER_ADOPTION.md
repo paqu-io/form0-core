@@ -4,8 +4,12 @@ Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
 [the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
 below retain their original candidate provenance. Android functional walkthroughs and prompt
 cancellation pass. Latest production Pixel full preparations are 1,333/8,454 ms for 200/2,000 rows;
-final acceptance of the remaining large-record latency is pending. See
+the maintainer selected ending the tuning pass and final review with this explicit limit. See
 [the current investigation](ANDROID_PREPARATION_INVESTIGATION.md).
+
+The [final review](PLAN_3_FINAL_REVIEW.md) records one corrected CLI generated-identity persistence
+defect and no other concrete Spec findings. CLI functional/package/browser gates pass, but its fresh
+production audit has 2 high / 1 moderate findings, requiring separate remediation before publication.
 
 
 Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md). Core 0.7.0 is published.

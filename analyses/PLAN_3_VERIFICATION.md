@@ -4,8 +4,15 @@ Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
 [the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
 below retain their original candidate provenance. Android functional walkthroughs and cancellation
 pass according to the maintainer. The latest production Pixel preparation is 1,333/8,454 ms for
-200/2,000 rows, gaps 90/323 ms, with prompt cancellation. Final performance acceptance remains open: see
+200/2,000 rows, gaps 90/323 ms, with prompt cancellation. The maintainer selected ending the tuning
+pass and proceeding with final review. See
 [the current Pixel investigation](ANDROID_PREPARATION_INVESTIGATION.md).
+
+Final review: [scope, resolved CLI identity finding and current release gates](PLAN_3_FINAL_REVIEW.md).
+The CLI correction passes 171 tests, formatting/smoke/package and browser persistence checks.
+Its fresh production audit fails with 2 high and 1 moderate findings also present in the maintained
+lockfile. Do not reuse earlier clean-audit statements as current release readiness. No dependency
+upgrade was made in this pass; CLI security remediation remains a separate release prerequisite.
 
 
 Current implementation and automated verification pass. Android functional walkthroughs and prompt

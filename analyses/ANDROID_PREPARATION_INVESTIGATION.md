@@ -11,7 +11,8 @@ is 46.4% of active preparation, calculations 30.2%; explicit scheduler waiting i
 The selected literal-registration candidate passes paired core and independent consumer checks.
 The measured controller revision is `native-literal-registration`.
 See the latest section below;
-earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
+earlier measurements retain their original provenance. The maintainer selected ending this tuning
+pass and proceeding to final review with the residual latency documented; no universal SLA is implied.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
 
 ## Maintainer device observations
@@ -957,3 +958,36 @@ the evidence/maintenance justification required by the maintainer. Further perfo
 start as a separately scoped, measured investigation, preserving calculation, event and validation
 semantics. The maintainer has not yet accepted the remaining latency, so performance sign-off and
 Plan 3 completion remain pending. No release or issue closure is implied.
+
+## Follow-up opportunities after the agreed stopping point
+
+The maintainer accepts ending this tuning pass and asks which further areas could reasonably be
+investigated. There are concrete candidates. A measured target means timing a cost in the current
+full controller, then demonstrating that removing repeated work improves the complete attempt while
+preserving outputs, security, cancellation and existing calculation/event semantics. It does not
+mean that no useful opportunities remain. None below is an implemented or promised improvement.
+
+The last physical phase profile was the preceding 200-row core candidate, not the current 2,000-row
+full controller. Its calculations were 30.2% of active time and managed validation 46.4%, including
+context/registration 29.2% and dispatch 16.8%. Registration has since changed, so those shares are
+directional clues, not a current cost attribution. Nested phase shares overlap. A fresh investigation
+should instrument the full controller and its atomic work rather than assume those shares persist.
+
+| Candidate | Concrete current work / potential change | Required evidence and preserved behavior |
+| --- | --- | --- |
+| Calculation setup | `record-evaluator.js` merges readable lineage values and builds helper/execution context for each node. The large fixture runs 20,010 calculations. Investigate reusable immutable layout and avoidable per-node allocation, not cached answers. | Tax 0.2 and amount 100 must still yield 120, immediately become 130 at tax 0.3, and remain isolated to the correct row. Dynamic helpers/EVAL and arbitrary complex code retain their full path. Earlier low-gain layout prototypes were rejected; a new variant needs a distinct measured advantage. |
+| Repeated validation work | `validate()` calls `validateScope()` to supply each event's isValid, then `validateSubmissionWithContext()` visits scopes and checks them again. Reuse built-in findings for the exact unchanged selected snapshot if material. | Preserve event order/isValid, complete ordered findings, scope-level INVALID, hidden participation and fresh validation after save-hook input changes. This may be a small saving; measure before changing the contract. |
+| Full-controller copying/serialization | Native `structuredSubmissionSteps()` still clones repeatable data synchronously before the async structured transformer. Core public delivery and consumer selection/signatures also have different ownership/copy boundaries. Identify which cost causes the current longest task or contributes materially to elapsed time. | A single captured selected tree must produce the same IDs including zero, media, unknown metadata, row order and timestamps. Preserve defensive public copies and stale-preparation guards. Cooperative copying might improve gaps even if total time barely changes. |
+| Task-loop overhead | The scheduler checks budget/cancellation for each task and its async checkpoints create microtask work even when no host yield is due. Measure overhead before considering batching. | Do not remove cancellation checks, alter global operation-scope isolation or weaken fairness. A shorter elapsed time with worse interaction/cancellation would fail acceptance. |
+
+The clearest next investigation would compare current full-controller calculation, validation and
+serialization phases, and attribute the largest atomic JS task. Choose one cause from that profile
+and use a paired unchanged-input comparison with complete result parity. Retain only a material
+full-attempt gain or scheduling-gap reduction that justifies the added maintenance cost. Do not infer
+another 76% reduction (8.454 seconds to two seconds) from several small theoretical savings.
+
+Moving execution away from the UI thread or skipping work based on changed dependencies would be
+separate architectural designs. The former can improve responsiveness without reducing total work;
+the latter must account for arbitrary helpers/events and could otherwise return stale results.
+Neither is part of Plan 3 completion. Final review:
+[review outcome and remaining release gates](PLAN_3_FINAL_REVIEW.md).

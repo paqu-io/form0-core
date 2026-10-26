@@ -938,3 +938,22 @@ and a universal scheduling-gap bound are not established. No further optimizatio
 release or issue closure is requested by this result. Maintainer acceptance of the residual latency
 and final Plan 3 sign-off remain open. See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md)
 for the raw report, workload size, execution boundary and recommendation.
+
+## Final review decision and release boundary — 26 October 2026
+
+The maintainer selected ending the tuning pass and proceeding to final review, with the 8.454-second
+large Pixel preparation and 323 ms maximum observed gap explicitly documented. Follow-up measurement
+candidates include calculation context construction, repeated built-in submission validation,
+full-controller copies/serialization and task-loop overhead; no new optimization is authorized by
+recording them. Normal scoped live calculations and event behavior remain preserved.
+
+The [final review](PLAN_3_FINAL_REVIEW.md) separates Standards and Spec. One CLI generated-ID storage
+mismatch is corrected and covered by failing-before/passing-after create/persist/reopen regressions;
+all 171 CLI tests plus package and browser persistence checks pass. A fresh CLI production audit
+fails on existing dependency versions (2 high, 1 moderate), so CLI publication requires separate
+security remediation. No dependency or deployment policy was changed. The coordinator duplication
+is a non-blocking maintenance follow-up, not a reason for a broad extraction now.
+
+Preserve all source evidence, existing development branches and unrelated working-tree edits. Core
+publication and actual minimum-range updates still precede dependent consumers. No merge, push,
+bump, publication, deployment, issue closure or new durable Reform persistence was performed.
