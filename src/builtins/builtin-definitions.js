@@ -46,7 +46,7 @@ export const COUNTA_METADATA = defineBuiltinMetadata({
   name: 'COUNTA',
   category: 'logical',
   signature: 'COUNTA(values)',
-  description: 'Count non-empty values.',
+  description: 'Count all items in an array.',
   examples: ['COUNTA(ARRAY($first_name, $last_name, $email))'],
   contexts: [BUILTIN_CONTEXTS.CALCULATION, BUILTIN_CONTEXTS.EVENT],
 });

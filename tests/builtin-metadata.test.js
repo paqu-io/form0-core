@@ -37,3 +37,9 @@ import { getBuiltinDefinitions } from '../src/index.js';
   assert.equal(freshEvalDefinition.examples.includes('mutated'), false);
   assert.deepEqual(freshEvalDefinition.contexts, ['calculation', 'event']);
 })();
+
+// COUNTA retains its established all-items behavior, including blank entries.
+assert.equal(
+  getBuiltinDefinitions().find(({ name }) => name === 'COUNTA').description,
+  'Count all items in an array.'
+);
