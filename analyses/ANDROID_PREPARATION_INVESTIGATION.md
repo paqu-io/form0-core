@@ -759,3 +759,15 @@ and marker booleans, not tunnel URLs. This rules out an outdated response at tho
 the probe, but does not prove what the phone executes. The next requested observation is the visible
 profiler button label, with no test rerun or application-data deletion. Physical phase data and the
 cause of the repeated handset message remain unresolved.
+
+The maintainer then confirms the older **Profile preparation (200)** button. Terminal `r` reports
+no connected app; it does not reload this session or settle cache/connection causality. A minimal
+harness-only change gives the diagnostic a distinct launch filename, phase-profile-v3.js, by
+updating its ignored package main while preserving the Expo slug and stored fixtures. The live
+manifest now advertises /phase-profile-v3.bundle; both local and public responses have the current
+markers. The manifest-path check fails before and passes after this change. The actual versioned
+production graph passes with zero chunk loads, immutable full TRUSTED/SAFE 200-row parity and
+84 Native tests. Reports: `logs/phase-launch-before.json`, `phase-launch-after.json`,
+`phase-loader-versioned-launch.json`, `phase-launch-native-tests.log`. No SDK or product-runtime
+change, installation or new dependency tree. Phone recovery remains pending: open the project from
+Expo Go's home using the current QR, verify the v3 button and repeat only the 200-row profile.
