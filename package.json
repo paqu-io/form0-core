@@ -52,6 +52,7 @@
     }
   ],
   "license": "MIT",
+  "funding": "https://opencollective.com/form0",
   "bugs": {
     "url": "https://github.com/paqu-io/form0-core/issues"
   },
