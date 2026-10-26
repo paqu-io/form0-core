@@ -2,7 +2,10 @@
 
 Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
 [the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
-below retain their original candidate provenance. Actual Android acceptance remains pending.
+below retain their original candidate provenance. Android functional walkthroughs and prompt
+cancellation pass. Latest production Pixel full preparations are 1,333/8,454 ms for 200/2,000 rows;
+final acceptance of the remaining large-record latency is pending. See
+[the current investigation](ANDROID_PREPARATION_INVESTIGATION.md).
 
 
 Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md). Core 0.7.0 is published.

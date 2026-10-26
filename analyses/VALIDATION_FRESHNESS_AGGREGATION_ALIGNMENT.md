@@ -923,3 +923,18 @@ browser preparation targets and release/memory checks pass. See
 measurements. The next physical candidate is `native-literal-registration`; actual Pixel speedup,
 performance sign-off and Plan 3 completion remain pending. Preserve accepted functional walkthroughs,
 the current draft/freshness/persistence contracts and maintainer-owned release actions.
+
+## Physical registration outcome and final review boundary — 26 October 2026
+
+The Pixel `native-literal-registration` candidate completes fresh 200/2,000-row full-controller
+preparation in 1,333/8,454 ms, observed JS gaps 90/323 ms, dev:false, Hermes:true, SAFE:false,
+eligible and without execution issues. Prompt cancellation is reconfirmed. The observed large
+reduction from 9,897 ms is 14.6%; these are individual observations, not warmed repeated medians.
+Keep the existing regression-tested optimization and all prior functional acceptance.
+
+Recommend ending this bounded optimization pass and reviewing Plan 3 with the remaining large-phone
+latency explicitly documented. Reference browser targets pass; actual phone two-second performance
+and a universal scheduling-gap bound are not established. No further optimization, manual run,
+release or issue closure is requested by this result. Maintainer acceptance of the residual latency
+and final Plan 3 sign-off remain open. See [the investigation](ANDROID_PREPARATION_INVESTIGATION.md)
+for the raw report, workload size, execution boundary and recommendation.

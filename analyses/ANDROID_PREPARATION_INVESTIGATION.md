@@ -1,14 +1,15 @@
 # Android preparation investigation — 23 October 2026
 
-Current status (26 October): production JavaScript on the Pixel/Hermes completes 200/2,000 rows in
-1,373/9,897 ms with maximum observed JS gaps 96/336 ms, eligible and no execution issues. The large
-sample is essentially unchanged from the previous individual 9,933 ms development sample. Earlier
-functional walkthroughs and prompt cancellation retain acceptance. The diagnostic loader passes
+Current status (26 October): the literal-registration candidate on the Pixel/Hermes completes
+200/2,000 rows in 1,333/8,454 ms with maximum observed JS gaps 90/323 ms, eligible and no execution
+issues. Against the preceding production observations (1,373/9,897 ms), the observed reductions are
+2.9%/14.6%; these are single fresh controller samples, not repeated medians. Earlier functional
+walkthroughs and newly reconfirmed prompt cancellation retain acceptance. The diagnostic loader passes
 compiled production checks. The maintainer now confirms the session-key cache workaround loads the
 current v3 UI and supplies the complete 200-row production/Hermes phase profile. Managed validation
 is 46.4% of active preparation, calculations 30.2%; explicit scheduler waiting is 4.2% of elapsed.
 The selected literal-registration candidate passes paired core and independent consumer checks.
-The next controller revision is `native-literal-registration`; its physical timings remain pending.
+The measured controller revision is `native-literal-registration`.
 See the latest section below;
 earlier measurements retain their original provenance. Plan 3 performance sign-off remains open.
 Desktop, adapter and compiler measurements are not actual Android/Hermes acceptance.
@@ -918,3 +919,41 @@ fresh 200/2,000-row controller preparation and prompt cancellation under the sam
 conditions. Earlier functional walkthroughs remain accepted. A meaningful measured reduction justifies
 this bounded change; a universal two-second mobile preparation guarantee is not established. Further
 work needs a new measured dominant cost and an explicit maintenance/behavior tradeoff.
+
+## Pixel candidate received and stopping recommendation — 26 October
+
+The maintainer supplies both complete fresh controller reports for `native-literal-registration`,
+dev:false, Hermes:true, SAFE:false, completed/eligible with no issues. Cancellation during a fresh
+large preparation responds promptly and returns cancelled. Retain the previous functional acceptance;
+no repeated walkthrough or phase profile is needed for this checkpoint.
+
+| Total rows | Prior production elapsed ms | Candidate elapsed ms | Observed reduction | Prior / candidate maximum JS gap ms |
+| --- | ---: | ---: | ---: | ---: |
+| 200 | 1,373 | 1,333 | 2.9% | 96 / 90 |
+| 2,000 | 9,897 | 8,454 | 14.6% | 336 / 323 |
+
+Raw on-screen JSON and the separate manual cancellation observation:
+`logs/android-pixel8a-literal-registration.json`; arithmetic summary:
+`android-pixel8a-literal-registration-summary.json`. Candidate provenance is linked from that report.
+No new source, package, SDK or configuration change accompanies these observations. The recorded
+device details remain Pixel 8a, Android API37, Expo Go58.0.5 and RN0.88.0 from the preceding report.
+
+This supports retaining the bounded registration optimization alongside its paired Node parity and
+benefit checks. It does not establish a universal 14.6% speedup: each production controller result
+is one fresh observation, unlike the repeated constant-input core benchmark. The maximum observed
+323 ms JS gap is still a responsiveness limitation, despite successful prompt cancellation.
+
+The large workload remains 377 schema elements, six uneven populated levels, 2,000 accepted rows,
+80,040 value cells and 20,010 refreshed calculations, plus participating custom validations and
+result selection/serialization. Ordinary live editor changes use scoped evaluation; they do not
+perform this complete submission preparation on every keystroke. A full submit/programmatic prepare
+can expose the reported wait; no database persistence time is included here.
+
+Recommendation: stop adding optimizations to this implementation pass and review final Plan 3
+acceptance with the large-phone latency explicitly documented. Desktop reference targets pass;
+8.454 seconds on this phone is not the two-second result. No new dominant cost is established for
+the remaining full-controller path after this change. More speculative special cases would lack
+the evidence/maintenance justification required by the maintainer. Further performance work should
+start as a separately scoped, measured investigation, preserving calculation, event and validation
+semantics. The maintainer has not yet accepted the remaining latency, so performance sign-off and
+Plan 3 completion remain pending. No release or issue closure is implied.

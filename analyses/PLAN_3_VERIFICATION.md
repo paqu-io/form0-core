@@ -3,7 +3,8 @@
 Current follow-up: accepted-snapshot viewing and event.mode are implemented. See
 [the current verification and Android handoff](ACCEPTED_VIEW_VERIFICATION.md). Earlier results
 below retain their original candidate provenance. Android functional walkthroughs and cancellation
-pass according to the maintainer. Large-form performance remains open: see
+pass according to the maintainer. The latest production Pixel preparation is 1,333/8,454 ms for
+200/2,000 rows, gaps 90/323 ms, with prompt cancellation. Final performance acceptance remains open: see
 [the current Pixel investigation](ANDROID_PREPARATION_INVESTIGATION.md).
 
 
