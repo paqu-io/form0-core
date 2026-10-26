@@ -676,3 +676,19 @@ The Native acceptance guide contains three focused actions: fresh 200/2,000-row 
 then the single 200-row diagnostic, with production mode confirmed on-screen. Earlier walkthroughs
 and cancellation retain acceptance. Physical production reports are pending; do not infer speedup,
 performance sign-off or a need to change execution architecture. No publication or issue closure.
+
+### Tunnel transport blocker during the first production attempt
+
+The first physical launch reported Metro `Server._processRequest` throwing `TypeError: Invalid URL`.
+It did not reach form preparation. Installed Metro uses forwarded protocol/host values directly in
+`new URL()`. Local real HTTP requests reproduce that error with comma-separated forwarding chains;
+the phone's actual headers were not captured, so this remains a likely class of cause.
+
+A device-harness-only middleware now normalizes a valid HTTP(S) forwarding chain only when its
+unmodified origin is invalid. Default Expo configuration and ordinary requests stay unchanged;
+other malformed origins stay untouched, with redacted counts/status for further diagnosis. No
+package dependency or runtime/form logic changed. Actual corrected HTTP requests return 200 and
+byte-identical production bundle content to the single-origin control. The Node suite now passes
+82 tests. Report: `logs/production-metro-header-conformance.json`; the original failing request and
+local server logs are preserved. A retry of the same maintainer command is requested. Physical
+tunnel recovery/performance remain pending; no SDK upgrade or actual-phone diagnosis is claimed.
