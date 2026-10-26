@@ -9,6 +9,7 @@ import { evaluateCalculatedField } from './calculation.js';
 import { evaluateVisibility, evaluateRequirement, evaluateReadOnly } from './conditions.js';
 import { createCalculationDiagnostics } from './calculation-diagnostics.js';
 import { createManagedEventDispatcher } from './managed-events.js';
+import { isLiteralEventRegistration } from './event-registration.js';
 import { EventManager } from './events.js';
 import { WarningSystem } from './warning-system.js';
 import { calculationBuiltins, eventBuiltins } from '../builtins/registry.js';
@@ -206,6 +207,10 @@ export function createRecordEvaluator({
   const calculationPreparationCache = new Map();
   const eventSourceCache = new Map();
   const eventReferenceCache = new Map();
+  const literalEventRegistration = isLiteralEventRegistration(
+    context.schema.form.events?.code,
+    Object.hasOwn(fixedHelpers, 'ON') ? fixedHelpers.ON : eventBuiltins.ON
+  );
   const evaluatorId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   let generation = 0;
   let review = null;
@@ -656,12 +661,19 @@ export function createRecordEvaluator({
         );
         eventManager.securityConfig = fixedSecurity;
         const initialContext = { ...eventBuiltins, ...fixedHelpers };
-        for (const [name, info] of context.resolver.fieldOwnership)
-          initialContext[`$${name}`] = copyRecordData(getDefaultValue(info.field));
-        for (const [name, value] of Object.entries(values))
-          initialContext[`$${name}`] = copyRecordData(value);
-        if (context.schema.form.events?.code)
+        if (literalEventRegistration) {
+          // These calls only register functions. Handlers still execute with fresh scoped values.
           eventManager.initializeEventCode(context.schema.form.events.code, initialContext);
+          for (const [name, value] of Object.entries(values))
+            initialContext[`$${name}`] = copyRecordData(value);
+        } else {
+          for (const [name, info] of context.resolver.fieldOwnership)
+            initialContext[`$${name}`] = copyRecordData(getDefaultValue(info.field));
+          for (const [name, value] of Object.entries(values))
+            initialContext[`$${name}`] = copyRecordData(value);
+          if (context.schema.form.events?.code)
+            eventManager.initializeEventCode(context.schema.form.events.code, initialContext);
+        }
         eventManager.eventContext = initialContext;
         const dispatch = createManagedEventDispatcher(
           eventManager,
