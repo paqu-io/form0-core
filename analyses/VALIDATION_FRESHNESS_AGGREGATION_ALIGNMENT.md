@@ -1014,7 +1014,7 @@ values, view/edit mode and record identifiers inside snapshots do not determine 
 ReformForm merges this into existing engine options, preserving explicit lifecycle settings and
 callbacks. This bridge is owned by Reform rather than the copied template renderer, so template
 synchronization does not remove it. No binding default/dependency or production persistence
-integration changes in this pass. See [the adoption follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+integration changes in this pass. The application repository owns its production adoption follow-up.
 
 
 ## Default-on adoption approved — 27 October 2026
@@ -1049,3 +1049,17 @@ input interactions. Old Native callbacks without preparationId consume rejection
 those releases ignore promises; new prepared callbacks still reject on cancellation/failure.
 See [implementation and release evidence](LIFECYCLE_DEFAULTS_ADOPTION.md) for the verified matrix,
 independent harness provenance, production adoption boundary and CLI next-release policy.
+
+## Interaction eligibility and application documentation — 27 October 2026
+
+The maintainer refined the preceding default-interaction decision: text/numeric inputs emit focus
+and blur, and choices emit change. Automatic click belongs to explicitly supported activation
+fields such as a future HyperlinkField; the current core catalog has no such field. Remove the
+input click/press wiring in CLI/React/Native, preserving explicit controller dispatch and existing
+event subscription options. This supersedes the earlier input-click policy, without changing
+calculation execution, managed lifecycle or schema/output shape.
+
+Product-specific rollout and persistence checklists belong in the application repositories. Relocate
+the prior application follow-up and repair links; preserve generic core contracts and historical
+package evidence. Template classification and truthful persistence callbacks are already implemented;
+update their dependency ranges/locks after the coordinated binding publication, then verify them.

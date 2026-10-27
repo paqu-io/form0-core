@@ -151,8 +151,10 @@ adoption. It must not be presented as already available in the currently release
 `engineOptions.events.lifecycle` defaults to `true` in the current bindings. It requires explicit
 `events.recordKind: 'new' | 'existing'`. Do not infer classification from populated values.
 `events.fieldInteractions` defaults to `['focus', 'blur', 'click']`. Set it to `[]` to disable
-automatic interactions; an explicit subset is supported. Built-in text/numeric inputs emit focus,
-blur and input click/press; this does not introduce a HyperlinkField or claim Fulcrum click parity. Lifecycle configuration is fixed for an editor session; remount to change it.
+automatic interactions; an explicit subset is supported. Built-in text/numeric inputs emit focus
+and blur; choices use change. Automatic click is reserved for supported activation fields. There is
+currently no HyperlinkField and no built-in control automatically emits click. Explicit host controller
+dispatch remains available. Lifecycle configuration is fixed for an editor session; remount to change it.
 Callback replacements stay live without engine reconstruction or initialization replay.
 
 `engineOptions.onEventController(controller | null)` receives a generation-bound controller after

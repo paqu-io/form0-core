@@ -16,8 +16,8 @@ References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
 [verification history](PLAN_3_VERIFICATION.md),
 [accepted viewing](ACCEPTED_VIEW_VERIFICATION.md),
-[performance investigation](ANDROID_PREPARATION_INVESTIGATION.md), and
-[Reform persistence follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+[performance investigation](ANDROID_PREPARATION_INVESTIGATION.md).
+Product-specific persistence and rollout checklists are maintained in the host application's repository.
 
 Subsequent older-form interaction testing exposed additional CLI synchronization and binding
 choice-operation gaps. See [the corrections and current verification](PLAN_3_PREVIEW_REGRESSIONS.md);

@@ -25,13 +25,15 @@ registry releases bearing those labels.
   the new packed binding. Existing unrelated message/account-deletion work is preserved.
 - Reform Mobile's current staging branch receives explicit route classification and truthful save
   callbacks. Declined saves reject without an error alert; failed writes alert and reject. Its SDK
-  and dependency versions remain unchanged. Production adoption is still the separate work in
-  REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md; passing classification alone is not that complete upgrade.
+  and dependency versions remain unchanged. Production adoption is tracked in the application's
+  repository; passing classification alone is not that complete upgrade.
 
-Fulcrum's reference defines focus/blur for text/numeric inputs and click for hyperlinks. form0
-already supports focus/blur and input click/press for its built-in text/numeric controls, plus custom
-controller dispatch. This change enables those existing capabilities; it does not add HyperlinkField
-or claim identical field support: https://docs.fulcrumapp.com/docs/data-events-reference.
+The initial implementation enabled existing text/numeric click dispatch. The maintainer subsequently
+selected narrower automatic UI eligibility: text/numeric focus/blur, choice change, and click reserved
+for explicitly supported activation fields. Current core has no HyperlinkField. The correction removes
+input click/press dispatch while retaining the underlying explicit controller event capability.
+Earlier test results below retain their original revision provenance; see the correction checkpoint
+at the end of this document for current checks.
 
 ## Automated evidence
 
@@ -73,3 +75,34 @@ after their default-on changes are reviewed. Upgrade host package ranges togethe
 CLI 0.8.0 is already published, so its new default interactions need a later release. The approved
 Pi exception is publication-specific to 0.8.0 and is not permission to publish a new version. Resolve
 that dependency or review the next release's policy separately; do not change the exception here.
+
+## Input interaction correction and documentation ownership — 27 October 2026
+
+Automatic field click dispatch is removed from React/Native text and numeric inputs and CLI preview.
+Text/numeric focus/blur, user change events, lifecycle defaults, explicit interaction opt-outs and
+controller dispatch remain supported. Choice controls continue to use change. No built-in field emits
+click until an eligible activation field is implemented; no HyperlinkField is introduced here.
+
+The product-specific production adoption checklist has moved to its application's repository.
+Core retains generic contracts and package evidence. All 87 local links in the affected core/host
+documents resolve. Existing dated inspection and package evidence remains available.
+
+Fresh correction verification in reused independent trees:
+
+- React: full release gates, 117 tests, formatting, audits and package contents pass.
+- Native: 90 Node tests and 56 adapter/catalog cases, package and both audit gates pass. Text/numeric
+  press does not dispatch click; focus/blur and explicit controller dispatch remain covered.
+- CLI: 222 tests and full CI gates pass under the unchanged approved Pi/Undici exception. Ten real
+  browser scenarios pass in each of TRUSTED and SAFE, including actual text/numeric pointer clicks
+  with no automatic click event. The exception does not authorize publication of a later CLI version.
+- React main-thread and actual browser-worker: ten scenarios pass across TRUSTED/SAFE, new/existing
+  lifecycle, default/disabled interactions, live calculations, nested row cancellation and save hooks.
+- Choice UI compatibility checks in both bindings retain change behavior without click/focus/blur.
+- Four-locale documentation formatting/source, localization, navigation, parity, 23 tests and lint pass.
+- Ten template callback tests pass; no template runtime or dependency change is required in this pass.
+
+Reproducers: active harness `interaction-scope-gates.py` and `interaction-scope-browser.mjs`;
+results `logs/interaction-scope-gates.json` and `logs/interaction-scope-candidates.json`.
+All 173 runtime files across the three packed consumer candidates match the verified trees; archives
+total approximately 1.12 MB. No dependency installation, new large tree, local production docs build,
+device rerun, core runtime change, security-policy extension, version bump or publication.

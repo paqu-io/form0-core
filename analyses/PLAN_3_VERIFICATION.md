@@ -20,8 +20,8 @@ cancellation pass; the remaining targeted check concerns large-form responsivene
 publication, deployment, issue closure or production reform persistence adoption.
 
 Reference: [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
-[approved plan](PLAN_3_CONSUMER_ADOPTION.md), [core contract](RECORD_EVALUATION_CONTRACT.md), and
-[production reform follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+[approved plan](PLAN_3_CONSUMER_ADOPTION.md) and [core contract](RECORD_EVALUATION_CONTRACT.md).
+Production application persistence and rollout follow-ups are owned by the host repositories.
 
 ## Implemented contracts
 
