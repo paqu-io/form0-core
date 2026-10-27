@@ -94,6 +94,38 @@ for (const security of [undefined, { mode: 'safe' }]) {
   assert.equal(saved.form_values.signature.signature_id, 'sig');
   assert.equal(saved.form_values.photos[0].asset_id, 'asset-photo');
   assert.deepEqual(saved.form_values.links, [{ record_id: '0' }]);
+  const eventFields = fieldFixture(FIELD_SPECS);
+  const literalText = '</script><script>"\'\\\n\r\t\b\f\0\u2028\u2029😀';
+  eventFields.snapshot.values.text = literalText;
+  eventFields.snapshot.values.photos[0][literalText] = literalText;
+  attachAuditEvents(FIELD_SPECS, eventFields);
+  assert.doesNotMatch(eventFields.schema.form.events.code, /[<>\u2028\u2029]/u);
+  const fieldEvents = createFormEngine({
+    schema: eventFields.schema,
+    initialValues: eventFields.snapshot.values,
+    security,
+    diagnostics: { console: false },
+  });
+  for (const [stage, values] of [
+    [1, eventFields.changed],
+    [2, eventFields.cleared],
+    [0, eventFields.snapshot.values],
+  ]) {
+    fieldEvents.getState().values.stage = stage;
+    const result = fieldEvents.triggerDetailed('change', 'stage');
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.operations,
+      Object.entries(values)
+        .filter(([name]) => !['section_note', 'stage'].includes(name))
+        .map(([fieldDataName, valueToSet]) => ({
+          type: 'FIELD_OPERATION',
+          operation: 'SETVALUE',
+          params: { fieldDataName, valueToSet },
+        })),
+      'Generated field events preserve literal values at stage ' + stage
+    );
+  }
   assert.equal(
     isFieldValueEmpty({ type: 'SingleChoiceField' }, { choice: [], other: [{ label: '' }] }),
     true
