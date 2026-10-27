@@ -15,7 +15,7 @@ record persistence remains the separately documented follow-up. See
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
 | 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                                  |
 | 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                                              |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Automated checks/Android functionality pass; responsiveness check pending. |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Android/performance acceptance recorded below; default-on host compatibility in progress. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -1015,3 +1015,37 @@ ReformForm merges this into existing engine options, preserving explicit lifecyc
 callbacks. This bridge is owned by Reform rather than the copied template renderer, so template
 synchronization does not remove it. No binding default/dependency or production persistence
 integration changes in this pass. See [the adoption follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+
+
+## Default-on adoption approved — 27 October 2026
+
+The maintainer reports CLI 0.8.0 publication and imported core ^0.8.1 into both bindings.
+Default-on lifecycle with explicit new/existing classification is authorized for implementation.
+The maintainer additionally selected default-on focus/blur/click subscriptions in CLI and bindings;
+`fieldInteractions: []` remains the explicit interaction opt-out, independent of lifecycle:false.
+These events already exist. Preserve their established text/numeric input behavior and custom
+controller dispatch; no new HyperlinkField or automatic calculation-change cascade is introduced.
+Fulcrum defines focus/blur for text/numeric inputs and click for hyperlinks, so do not claim exact
+field-support parity (https://docs.fulcrumapp.com/docs/data-events-reference).
+
+Both starter hosts must provide classification and reject persistence failures after logging them.
+Reform web classification is already integrated. Reform Mobile classification and callback fixes
+are authorized on its current staging branch; preserve its SDK/dependency versions in this pass.
+New-record routes remain new even with prefilled/resumed values; saved-record routes are existing.
+Cancellation must reject save without showing an error alert, while storage errors remain visible
+and rejected. Neither path acknowledges persistence. Existing host console messages stay in place;
+reusable bindings do not add unconditional full-record logging.
+
+Reform Mobile's broader adoption means shared draft-readiness evaluation, versioned freshness
+companion persistence/restoration and draft/outbox/backend compatibility. Expo modernization is
+separate: the current binding's declared peers do not require Expo 58. Classification alone must
+not be presented as complete production freshness adoption. See the adoption follow-up for scope.
+
+
+Default-on implementation and automated acceptance are complete for this pass. The CLI browser
+regression also corrected its unsupported HyperlinkField-only click guard: actual text/numeric
+input clicks now reach the existing dispatcher, matching the bindings. Field buttons do not emit
+input interactions. Old Native callbacks without preparationId consume rejection locally because
+those releases ignore promises; new prepared callbacks still reject on cancellation/failure.
+See [implementation and release evidence](LIFECYCLE_DEFAULTS_ADOPTION.md) for the verified matrix,
+independent harness provenance, production adoption boundary and CLI next-release policy.

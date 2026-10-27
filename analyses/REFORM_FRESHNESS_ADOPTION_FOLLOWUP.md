@@ -174,3 +174,35 @@ new/existing handlers. An existing record in View preserves its supplied value; 
 edit-record rather than the new-record initializer. Builder collection preview remains covered.
 This does not implement freshness companion persistence, enable lifecycle in production by itself,
 upgrade Reform Mobile, or complete the outstanding production adoption work above.
+
+## Default-on host prerequisites — 27 October 2026
+
+The default-on binding implementation requires explicit recordKind; supported focus/blur/click
+interactions also default on, with an explicit empty list as the opt-out. Reform web's existing
+classification bridge is verified against the packed candidate. Its dependency versions and
+production record-plus-companion integration are not changed by that verification.
+
+On the maintainer-selected mobile staging branch, the new-record route now supplies `new`, and the
+saved-record route supplies `existing`. The common RecordEditorScreen forwards classification to
+engineOptions.events. A declined host confirmation rejects without an error alert; a failed storage
+write remains visible and rejects. Successful callbacks await local persistence. These are host
+prerequisites, tested with the app's SDK 55 Jest dependencies, not a completed SDK migration or
+production freshness integration.
+
+Before importing the new packages into production Reform, still coordinate core versions across
+web/mobile/backend/shared client, migrate mobile draft-readiness to shared record-tree evaluation,
+and persist/restore the companion through snapshots, drafts, outbox and server round trips. For
+example, a draft with retained child totals `[110,220]` must reopen with root `330` and pending
+freshness. Merely passing recordKind does not preserve that companion. Automatic ordinary submission
+and explicit retention permissions do not remove this draft requirement.
+
+The binding's peer ranges do not require an Expo 58 migration. Verify the intended app runtime with
+the candidate before rollout; the existing physical acceptance is Expo 58/Hermes and does not certify
+this production SDK 55 app. A later SDK upgrade remains independently scoped native work.
+
+
+The mobile transition preserves the installed binding's behavior: old callbacks without a
+preparationId do not return an unobserved rejected promise. New prepared-save callbacks return their
+promise and rejection to the binding. This uses the public preparation metadata, not inferred record
+identity or an SDK/version guess. Both paths have focused host tests. See
+[LIFECYCLE_DEFAULTS_ADOPTION.md](LIFECYCLE_DEFAULTS_ADOPTION.md) for current evidence.

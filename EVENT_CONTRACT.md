@@ -148,10 +148,11 @@ Registered record events are `load-record`, `new-record`, `edit-record`, `valida
 This section specifies the subsequent React main-thread, React worker and React Native/Hermes
 adoption. It must not be presented as already available in the currently released bindings.
 
-`engineOptions.events.lifecycle` defaults to `false`. Enabling it requires explicit
+`engineOptions.events.lifecycle` defaults to `true` in the current bindings. It requires explicit
 `events.recordKind: 'new' | 'existing'`. Do not infer classification from populated values.
-`events.fieldInteractions` defaults to `[]` and opts into additional `focus`, `blur` and supported
-`click` interactions. Lifecycle configuration is fixed for an editor session; remount to change it.
+`events.fieldInteractions` defaults to `['focus', 'blur', 'click']`. Set it to `[]` to disable
+automatic interactions; an explicit subset is supported. Built-in text/numeric inputs emit focus,
+blur and input click/press; this does not introduce a HyperlinkField or claim Fulcrum click parity. Lifecycle configuration is fixed for an editor session; remount to change it.
 Callback replacements stay live without engine reconstruction or initialization replay.
 
 `engineOptions.onEventController(controller | null)` receives a generation-bound controller after
@@ -167,8 +168,8 @@ generations, closed editors and deleted rows are rejected. Managed requests are 
 duplicate save attempts are prevented. Workers transport cloneable data only; callbacks and operation
 presentation remain on the host, and each reply is consumed once.
 
-Without opt-in, existing automatic root `load-record`, `edit-record` and root-field `change` behavior
-continues. With opt-in, evaluate effective values, dispatch load, then the applicable new/edit event
+With explicit `lifecycle: false`, existing automatic root `load-record`, `edit-record` and root-field `change` behavior
+continues. With managed lifecycle, evaluate effective values, dispatch load, then the applicable new/edit event
 when entering editing. Readonly opening dispatches load only. Row editors use their own actual
 classification and `*-repeatable` sequence, never main-record lifecycle events.
 
@@ -213,8 +214,8 @@ styling remain separate.
 ## Delivery and acceptance
 
 Deliver and publish core first, then adopt the actual released minimum in bindings and CLI tooling.
-CLI tooling recognizes the new builtin. The follow-up built-in browser preview adopts opt-in
-lifecycle, scoped dispatch and save preparation; standalone CLI commands keep their existing
+CLI tooling recognizes the new builtin. The built-in browser preview defaults lifecycle and
+supported interactions on, with scoped dispatch and save preparation; standalone CLI commands keep their existing
 reporting/outcome contract. Preview connector persistence remains host-owned. Use independent dependency
 trees, real engine/worker conformance tests, package/packed-consumer checks and explicit CodeQL
 finding review. Fresh browser main-thread, actual browser-worker and Android/Hermes manual acceptance
