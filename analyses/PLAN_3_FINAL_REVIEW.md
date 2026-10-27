@@ -1,5 +1,10 @@
 # Plan 3 final review — 26 October 2026
 
+Latest behavior checkpoint: the authorized [broader compatibility audit](CONSUMER_COMPATIBILITY_AUDIT.md)
+passes with 115 React tests, 89 Native Node / 50 adapter cases, 188 CLI tests and fresh actual-worker
+and CLI browser evidence. It fixes pre-existing Other/media UI gaps without changing executors or
+public contracts. Earlier review/security/device evidence below retains its original provenance.
+
 The maintainer selected ending the bounded tuning pass and proceeding with final review, retaining
 the explicit Pixel large-record limitation. Implementation and functional verification are reviewed;
 this is not authorization for publication, deployment or issue closure. The maintainer subsequently
@@ -13,6 +18,11 @@ References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 [accepted viewing](ACCEPTED_VIEW_VERIFICATION.md),
 [performance investigation](ANDROID_PREPARATION_INVESTIGATION.md), and
 [Reform persistence follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+
+Subsequent older-form interaction testing exposed additional CLI synchronization and binding
+choice-operation gaps. See [the corrections and current verification](PLAN_3_PREVIEW_REGRESSIONS.md);
+its latest CLI 181-test / 48 browser-case feedback follow-up and the 108 React / 86 Native plus
+43 adapter results supersede the earlier counts below.
 
 ## Review scope
 
