@@ -985,3 +985,33 @@ acceptance is complete; the maintainer owns closure after the corresponding coor
 The CLI dependency hold is separate from core/React issue closure. See
 [security and release evidence](PLAN_3_SECURITY_REVIEW.md) and the updated
 [final review](PLAN_3_FINAL_REVIEW.md). All release operations remain maintainer-owned.
+
+## Lifecycle defaults and host classification — 27 October 2026
+
+Core 0.8.1 is published and the maintained CLI now requires `^0.8.1`. The CLI's fresh browser preview
+defaults managed lifecycle on; an explicit stored opt-out remains supported. Its headless API keeps
+the existing default. The maintainer approved a narrowly bounded Pi/Undici security exception for
+CLI 0.8.0 only, expiring 3 November 2026 at 00:00 UTC; it accepts known risk without fixing the
+dependency. See form0-cli/analyses/PI_SECURITY_EXCEPTION_ACTIVATION.md. Separate Native/mobile
+exceptions and docs deployment policy are unchanged.
+
+For React/Native default-on lifecycle, the maintainer selected **explicit host classification**:
+`engineOptions.events.recordKind` must be `new` or `existing`; missing classification must be a
+clear configuration error. Binding default changes remain an alignment decision, not implemented
+by this host-integration pass. Explicit `lifecycle: false` remains the compatibility opt-out.
+
+This is broader than changing load/new handlers: managed validation, pre-save, cancel/unload and
+repeatable lifecycle hooks also become automatic. Existing schema syntax can remain valid while
+behavior changes. For example, an authored `validate-record` with `INVALID` can begin blocking
+submission; a `save-record` setter can change its final values. Existing root load/change behavior,
+calculation execution, optional interaction subscriptions and the prohibition on replaying closed-row
+edit lifecycle events must be preserved. Do not promise all old forms behave identically.
+
+Reform web previously passed no classification. It now supplies the host operation explicitly:
+create and Builder preview are `new`; loaded authenticated records and public edit links are
+`existing`; public base/resume flows are `new` because submission creates the record. Prefilled
+values, view/edit mode and record identifiers inside snapshots do not determine classification.
+ReformForm merges this into existing engine options, preserving explicit lifecycle settings and
+callbacks. This bridge is owned by Reform rather than the copied template renderer, so template
+synchronization does not remove it. No binding default/dependency or production persistence
+integration changes in this pass. See [the adoption follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).

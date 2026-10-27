@@ -147,3 +147,30 @@ record as newly edited. Preserve selected unsaved work after failed callbacks an
 freshness restoration coordinated. Upgrade core and binding ranges together; old core lacks mode
 control and cannot provide the new binding contract. See ACCEPTED_VIEW_VERIFICATION.md for package
 evidence; production Reform migration remains separate and unimplemented here.
+
+## Web classification prerequisite — 27 October 2026
+
+The maintainer agreed that default-on binding lifecycle requires explicit host `recordKind: 'new' |
+'existing'`; missing classification must fail clearly. Inspection found no classification in the
+existing Reform web call sites. This prerequisite is now addressed without changing binding defaults
+or upgrading dependencies:
+
+| Host operation | Explicit kind | Concrete example |
+| --- | --- | --- |
+| Authenticated create page/modal | `new` | Prefilled project/team values still create a new inspection. |
+| Authenticated existing page/modal | `existing` | A saved inspection opens in View, then Edit runs edit-record. |
+| Public base response/local draft | `new` | Restoring unsent browser values still creates a record on submit. |
+| Public resume link | `new` | The backend creates a pinned public record when the draft response is submitted. |
+| Public edit link | `existing` | The backend patches the previously submitted record. |
+| Builder full-form preview | `new` | Previewing an unsaved schema exercises new-record handlers. |
+
+The common ReformForm bridge merges `recordKind` into `engineOptions.events` and preserves existing
+options, including an explicit lifecycle opt-out. Classification stays stable across View → Edit;
+it is not inferred from values or snapshot IDs, including zero. The adapter lives outside the copied
+template directory. The existing renderer receives its established engineOptions contract.
+
+Focused automated checks cover the forwarding chain, options/input immutability and real-renderer
+new/existing handlers. An existing record in View preserves its supplied value; editing it selects
+edit-record rather than the new-record initializer. Builder collection preview remains covered.
+This does not implement freshness companion persistence, enable lifecycle in production by itself,
+upgrade Reform Mobile, or complete the outstanding production adoption work above.
