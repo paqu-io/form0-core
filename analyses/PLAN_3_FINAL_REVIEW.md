@@ -16,8 +16,8 @@ References: [approved contracts](PLAN_3_CONSUMER_ADOPTION.md),
 [alignment](VALIDATION_FRESHNESS_AGGREGATION_ALIGNMENT.md),
 [verification history](PLAN_3_VERIFICATION.md),
 [accepted viewing](ACCEPTED_VIEW_VERIFICATION.md),
-[performance investigation](ANDROID_PREPARATION_INVESTIGATION.md), and
-[Reform persistence follow-up](REFORM_FRESHNESS_ADOPTION_FOLLOWUP.md).
+[performance investigation](ANDROID_PREPARATION_INVESTIGATION.md).
+Product-specific persistence and rollout checklists are maintained in the host application's repository.
 
 Subsequent older-form interaction testing exposed additional CLI synchronization and binding
 choice-operation gaps. See [the corrections and current verification](PLAN_3_PREVIEW_REGRESSIONS.md);
@@ -141,15 +141,19 @@ performance and iOS acceptance are not claimed from Expo Go production JavaScrip
 | Core #104 | Hidden required fields and hidden descendants do not block; visible required/read-only empty inputs do block; populated inputs and conditional transitions have cross-consumer coverage. | Implementation acceptance complete; core/documentation delivery and manual issue closure. |
 | React #73 | Automatic/confirm/retain freshness, nested acceptance/cancel isolation, exact selected totals, persistence failure/retry, worker parity and Native device acceptance with documented limits. | Publish dependent consumers against the new core capability; manual issue closure. |
 
-Recommend core 0.8.0 first, then React 0.5.0 and Native 0.6.0, updating actual consumer/Builder/starter
-minimum ranges and lockfiles to the releases containing the interfaces. Published core 0.7.0 alone does
-not provide all Plan 3 interfaces; current candidate filenames are not a compatible-version promise.
-The maintainer selected holding CLI publication until its upstream pin is fixed. Core #99/#104 and
-React #73 remain open in the fresh read-only issue check; #103 is already closed. The CLI hold does
-not block closing those core/React issues after their releases. Version bumps, pushes, promotion
-merges, publication, deployment and issue closure remain maintainer-owned. Plan 3 implementation,
-review and agreed acceptance are complete with the documented phone limitation; release/version
-integration and the CLI security blocker remain outstanding.
+The maintainer has now published core 0.8.1 and CLI 0.8.0. The former CLI publication hold was
+superseded by the explicitly approved, version-specific Pi/Undici exception, expiring 3 November
+2026 at 00:00 UTC. It does not authorize a later CLI release or fix the vulnerable dependency.
+React 0.5.0 and Native 0.6.0 remain the recommended next binding releases, requiring core ^0.8.1.
+Default-on lifecycle, explicit new/existing classification and supported default interactions are
+implemented and verified; see [the adoption evidence](LIFECYCLE_DEFAULTS_ADOPTION.md). Actual host
+package ranges and lockfiles must be coordinated with the resulting releases.
+
+The issue acceptance mapping above remains implementation evidence, not a fresh assertion about
+GitHub issue state. The maintainer retains issue closure, version bumps, pushes, merges, publication
+and deployment. Plan 3 package implementation, review and agreed acceptance are complete with the
+documented phone limitation. Production Reform adoption and the next CLI security/release decision
+remain separately scoped.
 
 Production Reform record/companion persistence, public-share/autosave, offline drafts/outbox and
 backend compatibility remain the documented separate delivery. Native/mobile dependency exceptions

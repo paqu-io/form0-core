@@ -87,6 +87,30 @@ Schema event callbacks retain their authored source, so ordinary functions and a
 runs once. Local initialization variables are not captured. Callbacks supplied by host helpers still
 require executable `toString()` output; unavailable source produces an event warning.
 
+## Updating values
+
+Use `engine.setValue(dataName, value)` or atomic `engine.setValues(updates)`. Nonempty batches
+evaluate once and return the current engine state; setters never dispatch events automatically.
+
+```js
+engine.setValues({ name: 'Grace' });
+```
+
+Choice input uses string IDs: SingleChoice/Boolean accept a string or `{ choice, other }`, while
+MultiChoice accepts an array of strings or `{ choices, other }`. Labels and metadata in explicit
+objects are preserved; missing labels come from the schema. Null/undefined clears a choice.
+Unknown IDs remain invalid selections, not Other values. Schema defaults and submitted
+`choice_value`/`choices_value` and `other_value` formats do not change.
+
+Malformed calls, unknown/unowned names, calculated/display/container targets and writes in record
+readonly mode throw `TypeError` before applying any part of a batch. Ordinary inputs marked
+`read_only` can still be updated by programmatic code. Initialization accepts shorthand and retains
+malformed loaded drafts for validation. Existing direct state mutation remains compatible.
+
+Adapters can use pure `normalizeFieldValue(field, value)` before their own coordinated evaluation.
+See [value updates and normalization](https://docs.form0.dev/core/engine/value-updates) for scope,
+loading, event operations and the deliberate removal of input aliases and choice-ID coercion.
+
 ## Managed events and custom validation
 
 Use synchronous `engine.triggerDetailed(eventType, fieldDataName, metadata)` to receive defensive

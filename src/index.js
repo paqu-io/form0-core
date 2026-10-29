@@ -1,4 +1,5 @@
 export { createFormEngine } from './engine/form-engine.js';
+export { normalizeFieldValue } from './utilities/field-value-normalization.js';
 export { WarningSystem } from './engine/warning-system.js';
 export {
   createStructuredRecord,

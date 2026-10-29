@@ -20,6 +20,10 @@ import { createManagedEventDispatcher } from './managed-events.js';
 import { validateInteractionMode } from './event-policy.js';
 import { copyRecordData } from '../utilities/record-data.js';
 import { areStructuredValuesEqual } from '../utilities/value-equality.js';
+import {
+  normalizeLoadedFieldValue,
+  prepareValueUpdates,
+} from '../utilities/field-value-normalization.js';
 
 /**
  * @typedef {Object} CalculationDiagnostic
@@ -92,22 +96,6 @@ export function createFormEngine({
   const allFields = flattenFields(form.elements);
   const pendingDefaults = new Map();
 
-  // Create a lookup map for choice fields
-  const choiceFieldMap = new Map();
-  for (const field of allFields) {
-    if (
-      field.type === 'SingleChoiceField' ||
-      field.type === 'MultiChoiceField' ||
-      field.type === 'BooleanField'
-    ) {
-      const valueToLabelMap = new Map();
-      field.choices.forEach((choice) => {
-        valueToLabelMap.set(choice.value, choice.label);
-      });
-      choiceFieldMap.set(field.data_name, valueToLabelMap);
-    }
-  }
-
   for (const field of allFields) {
     if (!(field.data_name in values)) {
       // Initialize field with default value if specified
@@ -116,42 +104,11 @@ export function createFormEngine({
       );
       if (interactionMode === 'readonly')
         pendingDefaults.set(field, copyRecordData(values[field.data_name]));
-    } else if (field.type === 'SingleChoiceField' || field.type === 'BooleanField') {
-      // Enrich SingleChoiceField and BooleanField values with labels from schema
-      const fieldValue = values[field.data_name];
-      if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choice)) {
-        const labelMap = choiceFieldMap.get(field.data_name);
-        fieldValue.choice = fieldValue.choice.map((choice) => {
-          if (choice && choice.value && !choice.label) {
-            // Auto-populate label from schema
-            const label = labelMap.get(choice.value);
-            return {
-              ...choice,
-              label: label || choice.value, // fallback to value if label not found
-            };
-          }
-          return choice;
-        });
-      }
-    } else if (field.type === 'MultiChoiceField') {
-      // Enrich MultiChoiceField values with labels from schema
-      const fieldValue = values[field.data_name];
-      if (fieldValue && typeof fieldValue === 'object' && Array.isArray(fieldValue.choices)) {
-        const labelMap = choiceFieldMap.get(field.data_name);
-        fieldValue.choices = fieldValue.choices.map((choice) => {
-          if (choice && choice.value && !choice.label) {
-            // Auto-populate label from schema
-            const label = labelMap.get(choice.value);
-            return {
-              ...choice,
-              label: label || choice.value, // fallback to value if label not found
-            };
-          }
-          return choice;
-        });
-      }
+    } else {
+      values[field.data_name] = normalizeLoadedFieldValue(field, values[field.data_name]);
     }
   }
+
   const errors = {};
   const visible = {};
   const required = {};
@@ -245,6 +202,24 @@ export function createFormEngine({
     return { values, errors, visible, required, read_only };
   }
 
+  /** Apply one input update and evaluate once; event dispatch stays host-owned. */
+  function setValue(dataName, value) {
+    if (typeof dataName !== 'string' || !dataName)
+      throw new TypeError('A value-update field must be a nonempty data_name string.');
+    return engine.setValues({ [dataName]: value });
+  }
+
+  /** Preflight/copy every update before committing the complete batch. */
+  function setValues(updates) {
+    const prepared = prepareValueUpdates(writableScopeFields, updates, interactionMode);
+    if (Object.keys(prepared).length) {
+      Object.defineProperties(values, Object.getOwnPropertyDescriptors(prepared));
+      // Bindings can decorate evaluation with their existing record-scope coordinator.
+      engine.eval();
+    }
+    return getState();
+  }
+
   /** Host-owned mode changes do not replay events, restore a record or evaluate implicitly. */
   function setMode(nextMode) {
     interactionMode = validateInteractionMode(nextMode);
@@ -269,8 +244,25 @@ export function createFormEngine({
     return dispatchManagedEvent(eventType, fieldKey, metadata);
   }
 
-  return {
+  const ownershipPath = eventScope.instancePath.map((part) => part.repeatableKey);
+  const writableScopeFields = new Map(
+    [...contextResolver.elementOwnership]
+      .filter(
+        ([, entry]) =>
+          entry.parentPath.length === ownershipPath.length &&
+          entry.parentPath.every((key, index) => key === ownershipPath[index])
+      )
+      .map(([name, entry]) => [name, entry.field])
+  );
+  if (!ownershipPath.length) {
+    if (form.status_field?.enabled)
+      writableScopeFields.set(form.status_field.data_name, form.status_field);
+    if (form.title_field) writableScopeFields.set(form.title_field.data_name, form.title_field);
+  }
+  const engine = {
     eval: evalForm,
+    setValue,
+    setValues,
     getMode,
     setMode,
     trigger,
@@ -282,6 +274,7 @@ export function createFormEngine({
     getBuildingPlanMeta: () => buildingPlanMeta,
     getPreparedSchema: () => preparedSchema,
   };
+  return engine;
 }
 
 export function getDefaultValue(field) {

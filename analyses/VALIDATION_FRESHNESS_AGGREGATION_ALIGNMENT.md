@@ -15,7 +15,7 @@ record persistence remains the separately documented follow-up. See
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
 | 1 — Condition scope        | Strict schema rejection and defensive runtime scope checks for #103; localized scope documentation and packed-consumer verification.       | Released in core 0.6.0; #103 closed.                                  |
 | 2 — Shared core evaluation | #99/#104, nested freshness, REPEATABLEVALUES, REPEATABLESUM and the headless record-tree contract.                                         | Published in core 0.7.0.                                              |
-| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Automated checks/Android functionality pass; responsiveness check pending. |
+| 3 — Consumer adoption      | React main-thread/worker, Native, CLI preview, automatic/confirmation modes, durable freshness metadata and agreed authoring integrations. | Android/performance acceptance recorded below; default-on host compatibility in progress. |
 
 All work stays on existing development branches. Preserve repeatable-title rendering already present
 in React and Native, including published revisions; no new title feature is part of these plans.
@@ -985,3 +985,81 @@ acceptance is complete; the maintainer owns closure after the corresponding coor
 The CLI dependency hold is separate from core/React issue closure. See
 [security and release evidence](PLAN_3_SECURITY_REVIEW.md) and the updated
 [final review](PLAN_3_FINAL_REVIEW.md). All release operations remain maintainer-owned.
+
+## Lifecycle defaults and host classification — 27 October 2026
+
+Core 0.8.1 is published and the maintained CLI now requires `^0.8.1`. The CLI's fresh browser preview
+defaults managed lifecycle on; an explicit stored opt-out remains supported. Its headless API keeps
+the existing default. The maintainer approved a narrowly bounded Pi/Undici security exception for
+CLI 0.8.0 only, expiring 3 November 2026 at 00:00 UTC; it accepts known risk without fixing the
+dependency. See form0-cli/analyses/PI_SECURITY_EXCEPTION_ACTIVATION.md. Separate Native/mobile
+exceptions and docs deployment policy are unchanged.
+
+For React/Native default-on lifecycle, the maintainer selected **explicit host classification**:
+`engineOptions.events.recordKind` must be `new` or `existing`; missing classification must be a
+clear configuration error. Binding default changes remain an alignment decision, not implemented
+by this host-integration pass. Explicit `lifecycle: false` remains the compatibility opt-out.
+
+This is broader than changing load/new handlers: managed validation, pre-save, cancel/unload and
+repeatable lifecycle hooks also become automatic. Existing schema syntax can remain valid while
+behavior changes. For example, an authored `validate-record` with `INVALID` can begin blocking
+submission; a `save-record` setter can change its final values. Existing root load/change behavior,
+calculation execution, optional interaction subscriptions and the prohibition on replaying closed-row
+edit lifecycle events must be preserved. Do not promise all old forms behave identically.
+
+Reform web previously passed no classification. It now supplies the host operation explicitly:
+create and Builder preview are `new`; loaded authenticated records and public edit links are
+`existing`; public base/resume flows are `new` because submission creates the record. Prefilled
+values, view/edit mode and record identifiers inside snapshots do not determine classification.
+ReformForm merges this into existing engine options, preserving explicit lifecycle settings and
+callbacks. This bridge is owned by Reform rather than the copied template renderer, so template
+synchronization does not remove it. No binding default/dependency or production persistence
+integration changes in this pass. The application repository owns its production adoption follow-up.
+
+
+## Default-on adoption approved — 27 October 2026
+
+The maintainer reports CLI 0.8.0 publication and imported core ^0.8.1 into both bindings.
+Default-on lifecycle with explicit new/existing classification is authorized for implementation.
+The maintainer additionally selected default-on focus/blur/click subscriptions in CLI and bindings;
+`fieldInteractions: []` remains the explicit interaction opt-out, independent of lifecycle:false.
+These events already exist. Preserve their established text/numeric input behavior and custom
+controller dispatch; no new HyperlinkField or automatic calculation-change cascade is introduced.
+Fulcrum defines focus/blur for text/numeric inputs and click for hyperlinks, so do not claim exact
+field-support parity (https://docs.fulcrumapp.com/docs/data-events-reference).
+
+Both starter hosts must provide classification and reject persistence failures after logging them.
+Reform web classification is already integrated. Reform Mobile classification and callback fixes
+are authorized on its current staging branch; preserve its SDK/dependency versions in this pass.
+New-record routes remain new even with prefilled/resumed values; saved-record routes are existing.
+Cancellation must reject save without showing an error alert, while storage errors remain visible
+and rejected. Neither path acknowledges persistence. Existing host console messages stay in place;
+reusable bindings do not add unconditional full-record logging.
+
+Reform Mobile's broader adoption means shared draft-readiness evaluation, versioned freshness
+companion persistence/restoration and draft/outbox/backend compatibility. Expo modernization is
+separate: the current binding's declared peers do not require Expo 58. Classification alone must
+not be presented as complete production freshness adoption. See the adoption follow-up for scope.
+
+
+Default-on implementation and automated acceptance are complete for this pass. The CLI browser
+regression also corrected its unsupported HyperlinkField-only click guard: actual text/numeric
+input clicks now reach the existing dispatcher, matching the bindings. Field buttons do not emit
+input interactions. Old Native callbacks without preparationId consume rejection locally because
+those releases ignore promises; new prepared callbacks still reject on cancellation/failure.
+See [implementation and release evidence](LIFECYCLE_DEFAULTS_ADOPTION.md) for the verified matrix,
+independent harness provenance, production adoption boundary and CLI next-release policy.
+
+## Interaction eligibility and application documentation — 27 October 2026
+
+The maintainer refined the preceding default-interaction decision: text/numeric inputs emit focus
+and blur, and choices emit change. Automatic click belongs to explicitly supported activation
+fields such as a future HyperlinkField; the current core catalog has no such field. Remove the
+input click/press wiring in CLI/React/Native, preserving explicit controller dispatch and existing
+event subscription options. This supersedes the earlier input-click policy, without changing
+calculation execution, managed lifecycle or schema/output shape.
+
+Product-specific rollout and persistence checklists belong in the application repositories. Relocate
+the prior application follow-up and repair links; preserve generic core contracts and historical
+package evidence. Template classification and truthful persistence callbacks are already implemented;
+update their dependency ranges/locks after the coordinated binding publication, then verify them.
