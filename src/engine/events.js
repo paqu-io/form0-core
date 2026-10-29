@@ -547,6 +547,7 @@ export class EventManager {
 
         // Validate operations against context restrictions before adding them
         const validOps = this.validateOperations(runtimeOps, executionContext);
+        if (validOps.length !== runtimeOps.length) rejectedBatch = true;
         operations.push(...validOps);
 
         // Listener updates are committed after the entire permitted dispatch, never sent to hosts.
@@ -565,7 +566,11 @@ export class EventManager {
             rejectedBatch = true;
             reportEventOperationIssue(this.warningSystem, rejected, eventType);
           } else if (result.type === 'EVENT_OPERATION') registrations.push(result);
-          else operations.push(...this.validateOperations([result], executionContext));
+          else {
+            const validOps = this.validateOperations([result], executionContext);
+            if (!validOps.length) rejectedBatch = true;
+            operations.push(...validOps);
+          }
         }
       } catch (error) {
         console.warn(`[form0] Event listener failed: ${error.message}`);

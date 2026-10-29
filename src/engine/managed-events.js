@@ -2,6 +2,7 @@ import { getEventInfo, isValidEventType } from './event-registry.js';
 import { closeEventOperationScope, createEventOperationScope } from './event-operation-scope.js';
 import { getEventFieldReferences } from './event-field-references.js';
 import { eventOperationIssue, reportEventOperationIssue } from './event-policy.js';
+import { assertWritableField } from '../utilities/field-value-normalization.js';
 
 // Portable defensive copies also work in runtimes without structuredClone (including Hermes).
 function copy(value, seen = new Map()) {
@@ -248,9 +249,10 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
             );
           else {
             try {
+              assertWritableField(field.field);
               result.operations.push(copy(operation));
-            } catch {
-              issue('invalid_operation', 'Event operations must contain portable data.');
+            } catch (error) {
+              issue('invalid_operation', error.message);
             }
           }
         } else {

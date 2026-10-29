@@ -159,7 +159,8 @@ const scope = captureConsole(() => {
       },
     }),
   });
-  assert.deepEqual(engine.trigger('change', 'input'), [setNote('allowed')]);
+  // Issue 101: a forbidden legacy target rejects all collected writes atomically.
+  assert.deepEqual(engine.trigger('change', 'input'), []);
 });
 assert.equal(scope.calls.filter(({ method }) => method === 'warn').length, 2);
 
