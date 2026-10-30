@@ -1,3 +1,9 @@
+import {
+  validateTextFieldValue,
+  validateNumericFieldValue,
+  validateDateFieldValue,
+  validateTimeFieldValue,
+} from './scalar-value-validators.js';
 import { validateChoiceFieldChoices } from '../utilities/field-helpers.js';
 import { validateStoredChoiceValue } from '../utilities/choice-value-shapes.js';
 import {
@@ -90,6 +96,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -123,19 +130,7 @@ export const FIELD_SPECS = {
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
     ],
-    valueValidator: (field, value) => {
-      if (field.pattern && value !== null && value !== undefined) {
-        try {
-          const re = new RegExp(field.pattern);
-          if (!re.test(value)) {
-            return `Invalid format for ${field.data_name}`;
-          }
-        } catch (e) {
-          return `Invalid pattern for ${field.data_name}`;
-        }
-      }
-      return null;
-    },
+    valueValidator: validateTextFieldValue,
     defaultProducer: (field) => {
       return field.default_value || null;
     },
@@ -174,6 +169,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -212,20 +208,7 @@ export const FIELD_SPECS = {
         return { isValid: true };
       },
     ],
-    valueValidator: (field, value) => {
-      if (typeof value === 'number') {
-        if (field.format === 'integer' && !Number.isInteger(value)) {
-          return `${field.data_name} must be an integer`;
-        }
-        if (field.min !== null && field.min !== undefined && value < field.min) {
-          return `Must be at least ${field.min}`;
-        }
-        if (field.max !== null && field.max !== undefined && value > field.max) {
-          return `Must be at most ${field.max}`;
-        }
-      }
-      return null;
-    },
+    valueValidator: validateNumericFieldValue,
     defaultProducer: (field) => {
       return field.default_value || null;
     },
@@ -269,6 +252,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -424,6 +408,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -574,6 +559,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -709,6 +695,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -721,9 +708,7 @@ export const FIELD_SPECS = {
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
     ],
-    valueValidator: (field, value) => {
-      return null; // DateField has no runtime validation
-    },
+    valueValidator: validateDateFieldValue,
     defaultProducer: (field) => {
       if (field.default_value === 'now') {
         return formatLocalDate(); // YYYY-MM-DD, local calendar day
@@ -765,6 +750,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -777,9 +763,7 @@ export const FIELD_SPECS = {
     schemaValidators: [
       // No additional validators needed - all validation handled by attributes
     ],
-    valueValidator: (field, value) => {
-      return null; // TimeField has no runtime validation
-    },
+    valueValidator: validateTimeFieldValue,
     defaultProducer: (field) => {
       if (field.default_value === 'now') {
         const now = new Date();
@@ -1133,6 +1117,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -1204,6 +1189,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -1299,6 +1285,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,
@@ -1406,6 +1393,7 @@ export const FIELD_SPECS = {
         notTrueOn: { visible_conditions: (val) => val != null },
       },
       visible_conditions: { type: 'object', required: true, nullable: true },
+      visible_preserve_value: { type: 'boolean', required: false, nullable: false },
       read_only: {
         type: 'boolean',
         required: true,

@@ -246,6 +246,19 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
     form_values[outputKey] = processedValue;
   }
 
+  // Explicit rows must survive clearing their last input. This is output policy only;
+  // callers still supply evaluated values, and legacy schemas keep empty-row filtering.
+  const retentionSections = new Map();
+  const preservesClearedRows = (info) => {
+    if (!retentionSections.has(info))
+      retentionSections.set(
+        info,
+        [...info.fields.values()].some(({ field }) => field.visible_preserve_value === false) ||
+          [...info.children.values()].some(preservesClearedRows)
+      );
+    return retentionSections.get(info);
+  };
+
   // Enhanced recursive function to process nested RepeatableSections
   const processRepeatableSection = function* (
     repInfo,
@@ -377,7 +390,10 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
           childRecord['@title'] = resolveRepeatableTitle(repInfo, instanceValues);
         }
 
-        if (hasMeaningfulRecord(childRecord)) {
+        if (
+          hasMeaningfulRecord(childRecord) ||
+          (i < structuredInstances.length && preservesClearedRows(repInfo))
+        ) {
           childRecords.push(childRecord);
         }
         yield;

@@ -71,46 +71,7 @@ export function getRecordFieldValueValidator(fieldType) {
   return typeof spec.valueValidator === 'function' ? spec.valueValidator : null;
 }
 
-/**
- * Validates TextField value
- * @param {object} field - The field definition
- * @param {any} value - The value to validate
- * @returns {string|null} - Error message if validation fails, or null if valid
- */
-export function validateTextFieldValue(field, value) {
-  if (field.pattern && value !== null && value !== undefined) {
-    try {
-      const re = new RegExp(field.pattern);
-      if (!re.test(value)) {
-        return `Invalid format for ${field.data_name}`;
-      }
-    } catch (e) {
-      return `Invalid pattern for ${field.data_name}`;
-    }
-  }
-  return null;
-}
-
-/**
- * Validates NumericField value
- * @param {object} field - The field definition
- * @param {any} value - The value to validate
- * @returns {string|null} - Error message if validation fails, or null if valid
- */
-export function validateNumericFieldValue(field, value) {
-  if (typeof value === 'number') {
-    if (field.format === 'integer' && !Number.isInteger(value)) {
-      return `${field.data_name} must be an integer`;
-    }
-    if (field.min !== null && field.min !== undefined && value < field.min) {
-      return `Must be at least ${field.min}`;
-    }
-    if (field.max !== null && field.max !== undefined && value > field.max) {
-      return `Must be at most ${field.max}`;
-    }
-  }
-  return null;
-}
+export { validateTextFieldValue, validateNumericFieldValue } from './scalar-value-validators.js';
 
 /**
  * Validates SingleChoiceField value

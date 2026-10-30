@@ -1,3 +1,4 @@
+import { collectHiddenFieldClears, retentionFailure } from './hidden-value-retention.js';
 import { prepareRecordContext, visitRecordScopes, iterateRecordScopes } from './record-context.js';
 import {
   validateSubmissionWithContext,
@@ -125,6 +126,7 @@ function scheduler(options) {
  * @property {'submit'|'draft'} [intent='submit']
  * @property {'automatic'|'confirm'} [mode='automatic'] Cannot weaken schema confirmation.
  * @property {boolean} [allowRetain=false] Explicit host permission on both review calls.
+ * @property {boolean} [validateHiddenValues=false] Include intrinsic hidden-value errors, never hidden requirements.
  * @property {boolean} [managedEvents=false] Synchronous custom validation only.
  * @property {{reviewId: string, action: 'refresh'|'retain'|'cancel'}} [decision]
  * @property {AbortSignal} [signal]
@@ -136,6 +138,7 @@ function scheduler(options) {
  * @property {RecordSnapshot|null} snapshot Null when no selection can be delivered.
  * @property {boolean} [eligible] Submission eligibility, distinct from diagnostics.
  * @property {RecordSnapshot} [proposal] Review only, not a deliverable selection.
+ * @property {Array<{instancePath: RecordInstanceSegment[], fieldName: string, fieldKey: string}>} [clearedFields] Cleared inputs; never contains old values.
  * @property {RecordFieldChange[]} [changes]
  * @property {Object[]} diagnostics Scoped calculation findings, separate from validation.
  * @property {Object[]} issues Execution/configuration failures.
@@ -156,6 +159,7 @@ function scheduler(options) {
  * @property {RecordInstanceSegment[]} [instancePath] Resolved identity and current ordering on success.
  * @property {{values: Object, errors: Object, visible: Object, required: Object, read_only: Object}|null} state
  * @property {import('./submission-validation.js').SubmissionValidationSummary} [validationSummary]
+ * @property {Array<{instancePath: RecordInstanceSegment[], fieldName: string, fieldKey: string}>} [clearedFields] Cleared inputs; never contains old values.
  * @property {RecordFieldChange[]} [changes]
  * @property {Object[]} diagnostics
  * @property {Object[]} issues
@@ -215,7 +219,96 @@ export function createRecordEvaluator({
   let generation = 0;
   let review = null;
 
+  const hasRetention = [...context.templates.values()].some((template) =>
+    template.fields.some((field) => field.visible_preserve_value === false)
+  );
+
+  // Existing scalar/record evaluators still own calculation and condition execution. Only
+  // opted-in schemas repeat that execution, on a private snapshot, after a clearing batch.
   async function run(input, options = {}, scopePath = null) {
+    if (!hasRetention || options.interactionMode === 'readonly')
+      return { ...(await runOnce(input, options, scopePath)), clearedFields: [] };
+    if (options.signal?.aborted) throw problem('cancelled', 'Record evaluation was cancelled.');
+    let snapshot = copyRecordData(input);
+    let remaining = 0;
+    visitRecordScopes(snapshot, context, (scope) => {
+      remaining += scope.template.fields.filter(
+        (field) => field.visible_preserve_value === false
+      ).length;
+    });
+    const cleared = new Map();
+    const changes = new Map();
+    const pause = scheduler(options);
+    while (true) {
+      const result = await runOnce(snapshot, options, scopePath);
+      if (scopePath === null) snapshot = result.snapshot;
+      else
+        visitRecordScopes(snapshot, context, (scope) => {
+          if (sameInstancePath(scope.instancePath, result.instancePath))
+            Object.assign(scope.record, result.state);
+        });
+      for (const change of result.changes) {
+        const key = JSON.stringify([change.instancePath, change.fieldName]);
+        changes.set(key, {
+          ...change,
+          before: changes.has(key) ? changes.get(key).before : change.before,
+        });
+      }
+      const batch = [];
+      const writes = [];
+      // Traversal is parent-first: recompute ancestor visibility before visiting children.
+      // Calculation policy remains selected-scope/accepted/refresh as requested by the host.
+      for (const scope of iterateRecordScopes(snapshot, context)) {
+        evaluateVisibility(
+          scope.template.form,
+          Object.assign(
+            {},
+            ...scope.ancestors.map((entry) => entry.record.values),
+            scope.record.values
+          ),
+          (scope.record.visible ||= {}),
+          scope.template.conditions
+        );
+        const inside =
+          scopePath === null ||
+          (scope.instancePath.length >= result.instancePath.length &&
+            sameInstancePath(
+              scope.instancePath.slice(0, result.instancePath.length),
+              result.instancePath
+            ));
+        if (inside) {
+          const fields = collectHiddenFieldClears({
+            fields: scope.template.fields,
+            values: scope.record.values || {},
+            visible: scope.record.visible,
+            chains: scope.template.chains,
+            participating: scope.participating,
+            instancePath: scope.instancePath,
+          });
+          batch.push(...fields);
+          for (const field of fields)
+            writes.push(() => {
+              scope.record.values[field.fieldName] = null;
+            });
+        }
+        await pause();
+      }
+      if (!batch.length)
+        return {
+          ...result,
+          changes: [...changes.values()].filter(
+            (change) => !areStructuredValuesEqual(change.before, change.after)
+          ),
+          clearedFields: [...cleared.values()],
+        };
+      for (const write of writes) write();
+      for (const field of batch)
+        cleared.set(JSON.stringify([field.instancePath, field.fieldName]), field);
+      if (remaining-- <= 0) throw retentionFailure();
+    }
+  }
+
+  async function runOnce(input, options = {}, scopePath = null) {
     const mode = options.mode ?? 'accepted';
     if (!['accepted', 'refresh'].includes(mode))
       throw problem('invalid_request', 'Evaluation mode must be accepted or refresh.');
@@ -689,14 +782,22 @@ export function createRecordEvaluator({
         const detail = dispatch(
           row ? 'validate-repeatable' : 'validate-record',
           definition?.field.data_name,
-          { isDraft: options.intent === 'draft', isValid: validateScope(scope).length === 0 }
+          {
+            isDraft: options.intent === 'draft',
+            isValid: validateScope(scope, options).length === 0,
+          }
         );
         custom.push(...detail.validationIssues);
         executionIssues.push(...detail.issues);
         await pause();
       }
     }
-    const validationSummary = validateSubmissionWithContext(result.snapshot, context, custom);
+    const validationSummary = validateSubmissionWithContext(
+      result.snapshot,
+      context,
+      custom,
+      options
+    );
     await pause();
     return {
       ...result,
@@ -756,6 +857,11 @@ export function createRecordEvaluator({
     const attempt = ++generation;
     review = null;
     try {
+      if (
+        options.validateHiddenValues !== undefined &&
+        typeof options.validateHiddenValues !== 'boolean'
+      )
+        throw problem('invalid_request', 'validateHiddenValues must be a boolean.');
       const intent = options.intent ?? 'submit';
       if (!['submit', 'draft'].includes(intent))
         throw problem('invalid_request', 'Submission intent must be submit or draft.');
@@ -770,6 +876,7 @@ export function createRecordEvaluator({
         mode,
         allowRetain: options.allowRetain === true,
         managedEvents: options.managedEvents === true,
+        validateHiddenValues: options.validateHiddenValues === true,
       };
       if (options.signal?.aborted) throw problem('cancelled', 'Record evaluation was cancelled.');
       let fresh, retained, selected;
@@ -833,7 +940,12 @@ export function createRecordEvaluator({
               proposal: fresh.snapshot,
               reviewId: id,
               changes: fresh.changes,
-              validationSummary: validateSubmissionWithContext(fresh.snapshot, context),
+              validationSummary: validateSubmissionWithContext(
+                fresh.snapshot,
+                context,
+                [],
+                options
+              ),
               diagnostics: fresh.diagnostics,
               issues: [],
               freshness: createRecordFreshness(schemaRevision, childChanges),

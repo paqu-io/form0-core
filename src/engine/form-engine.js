@@ -1,3 +1,8 @@
+import {
+  createVisibilityChains,
+  clearHiddenFieldValues,
+  retentionFailure,
+} from './hidden-value-retention.js';
 import { evaluateCalculatedFields } from './calculation.js';
 import { evaluateVisibility } from './conditions.js';
 import { evaluateRequirement } from './conditions.js';
@@ -158,23 +163,38 @@ export function createFormEngine({
   }
 
   function evalForm() {
-    const frame = calculationDiagnostics.begin();
+    let frame = calculationDiagnostics.begin();
     try {
-      if (interactionMode === 'edit')
-        evaluateCalculatedFields(
-          form,
+      let remaining = retentionFields.length;
+      while (true) {
+        if (interactionMode === 'edit')
+          evaluateCalculatedFields(
+            form,
+            values,
+            allHelpers,
+            security,
+            contextResolver,
+            sharedWarningSystem,
+            runtimeDiagnostics,
+            calculationPlan,
+            calculationDiagnostics
+          );
+        evaluateRequirement(form, values, required, conditionContext);
+        evaluateVisibility(form, values, visible, conditionContext);
+        evaluateReadOnly(form, values, read_only, conditionContext);
+        if (interactionMode !== 'edit' || !retentionFields.length) break;
+        const cleared = clearHiddenFieldValues({
+          fields: retentionFields,
           values,
-          allHelpers,
-          security,
-          contextResolver,
-          sharedWarningSystem,
-          runtimeDiagnostics,
-          calculationPlan,
-          calculationDiagnostics
-        );
-      evaluateRequirement(form, values, required, conditionContext);
-      evaluateVisibility(form, values, visible, conditionContext);
-      evaluateReadOnly(form, values, read_only, conditionContext);
+          visible,
+          chains: visibilityChains,
+        });
+        if (!cleared.length) break;
+        if (remaining-- <= 0) throw retentionFailure();
+        // Intermediate-round failures must not survive a successful settled evaluation.
+        calculationDiagnostics.abort(frame);
+        frame = calculationDiagnostics.begin();
+      }
       validateFields(form, values, errors);
     } catch (error) {
       calculationDiagnostics.abort(frame);
@@ -259,6 +279,10 @@ export function createFormEngine({
       writableScopeFields.set(form.status_field.data_name, form.status_field);
     if (form.title_field) writableScopeFields.set(form.title_field.data_name, form.title_field);
   }
+  const retentionFields = allFields.filter(
+    (field) => field.visible_preserve_value === false && writableScopeFields.has(field.data_name)
+  );
+  const visibilityChains = retentionFields.length ? createVisibilityChains(form.elements) : null;
   const engine = {
     eval: evalForm,
     setValue,

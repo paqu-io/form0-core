@@ -64,20 +64,20 @@ export function isFieldValueEmpty(field, value) {
   }
 }
 
-export function validateScope(scope) {
+export function validateScope(scope, { validateHiddenValues = false } = {}) {
   const findings = [];
-  if (!scope.participating) return findings;
+  if (!scope.participating && !validateHiddenValues) return findings;
   const { record, template, instancePath } = scope;
   for (const field of template.fields) {
     if (['Section', 'BuildingPlanSection', 'RepeatableSection', 'LabelField'].includes(field.type))
       continue;
-    if (
+    const hidden =
+      !scope.participating ||
       record.visible?.[field.data_name] === false ||
       !(template.chains.get(field.data_name) || []).every(
         (name) => record.visible?.[name] !== false
-      )
-    )
-      continue;
+      );
+    if (hidden && !validateHiddenValues) continue;
     const message = record.errors?.[field.data_name];
     const required = record.required?.[field.data_name] ?? field.required;
     const base = {
@@ -86,13 +86,18 @@ export function validateScope(scope) {
       instancePath,
     };
     if (message) findings.push({ ...base, kind: 'error', message });
-    else if (required && isFieldValueEmpty(field, record.values?.[field.data_name]))
+    else if (!hidden && required && isFieldValueEmpty(field, record.values?.[field.data_name]))
       findings.push({ ...base, kind: 'required', message: 'This field is required' });
   }
   return findings;
 }
 
-export function validateSubmissionWithContext(snapshot, context, customIssues = []) {
+export function validateSubmissionWithContext(snapshot, context, customIssues = [], options = {}) {
+  if (
+    options.validateHiddenValues !== undefined &&
+    typeof options.validateHiddenValues !== 'boolean'
+  )
+    throw new TypeError('validateHiddenValues must be a boolean.');
   const orderedIssues = [];
   const issuesByScope = new Map();
   for (const custom of customIssues) {
@@ -101,7 +106,7 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
     issuesByScope.get(key).push(custom);
   }
   visitRecordScopes(snapshot, context, (scope) => {
-    orderedIssues.push(...validateScope(scope));
+    orderedIssues.push(...validateScope(scope, options));
     if (scope.participating)
       for (const custom of issuesByScope.get(JSON.stringify(scope.instancePath)) || [])
         orderedIssues.push({ ...custom, instancePath: scope.instancePath, kind: 'custom' });
@@ -122,9 +127,16 @@ export function summarizeSubmissionFindings(orderedIssues) {
 
 /**
  * Validate an already evaluated runtime record tree; never evaluates or mutates intrinsic errors.
- * @param {{schema: Object, snapshot: Object, validationIssues?: Object[]}} options
+ * @param {{schema: Object, snapshot: Object, validationIssues?: Object[], validateHiddenValues?: boolean}} options
  * @returns {SubmissionValidationSummary} Ordered field and scope findings; no freshness assertion.
  */
-export function validateSubmission({ schema, snapshot, validationIssues = [] }) {
-  return validateSubmissionWithContext(snapshot, prepareRecordContext(schema), validationIssues);
+export function validateSubmission({
+  schema,
+  snapshot,
+  validationIssues = [],
+  validateHiddenValues = false,
+}) {
+  return validateSubmissionWithContext(snapshot, prepareRecordContext(schema), validationIssues, {
+    validateHiddenValues,
+  });
 }
