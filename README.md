@@ -330,3 +330,21 @@ Call `eval()` after a host mode change. Events receive authoritative `event.mode
 writes fail before host delegation. Load remains available for reads, alerts and scoped ON/OFF
 registration. Move writable initialization to new/edit handlers when it must run after View → Edit.
 See [the event contract](EVENT_CONTRACT.md) for permissions, lifecycle order and migration guidance.
+
+### Runtime value validation and hidden values (unreleased)
+
+Text inputs require strings; numeric inputs require finite numbers; dates require real YYYY-MM-DD
+calendar dates; times require valid HH:MM or HH:MM:SS. Empty scalar values remain separate from required
+validation. Invalid loaded values remain available for correction, without implicit conversion.
+
+Input fields may specify `visible_preserve_value: false` to clear their value when effectively hidden,
+including under hidden containers and in closed rows. Missing/true preserves existing behavior. View
+preserves stored values; editing/submission clears opted-in inputs to null without restoring defaults.
+Containers, calculated fields and generated titles/status do not support the attribute. Clearing a
+reference does not delete a media asset or linked record. Evaluation returns clearedFields markers
+with instancePath/fieldName/fieldKey, containing no old values.
+
+For a server, use `prepareSubmission(snapshot, { validateHiddenValues: true })` to include intrinsic
+errors from retained hidden values. The same option is supported by validateSubmission(). Hidden
+requirements/custom handlers stay excluded; draft eligibility remains separate. Use the same option
+when resuming a review. This is value validation, not unknown-field sanitization or authorization.
