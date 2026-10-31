@@ -20,6 +20,7 @@ import { copyRecordData, copyRecordDataCooperatively } from '../utilities/record
 import { areStructuredValuesEqual } from '../utilities/value-equality.js';
 import { projectCollectionValue } from '../utilities/repeatable-collections.js';
 import { getFormSchemaRevision } from '../utilities/schema-revision.js';
+import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { createRecordFreshness } from './record-freshness.js';
 
 const clock = () => globalThis.performance?.now?.() ?? Date.now();
@@ -168,6 +169,8 @@ function scheduler(options) {
  * @property {(snapshot: RecordSnapshot, options?: RecordEvaluationOptions) => Promise<RecordEvaluationResult>} evaluate
  * @property {(snapshot: RecordSnapshot, options?: RecordScopeEvaluationOptions) => Promise<RecordScopeEvaluationResult>} evaluateScope Evaluates only the selected editor record, without a complete tree response.
  * @property {(snapshot: RecordSnapshot, options?: SubmissionPreparationOptions) => Promise<RecordEvaluationResult>} prepareSubmission
+ * @property {(snapshot: RecordSnapshot, options: Object) => Promise<Object>} inspectHiddenValue Recheck a hidden intrinsic finding and defensively read its current value.
+ * @property {(snapshot: RecordSnapshot, options: Object) => Promise<RecordEvaluationResult>} correctHiddenValue Prepare one valid host-approved replacement without persistence or events.
  */
 
 /**
@@ -991,5 +994,69 @@ export function createRecordEvaluator({
       return failure(error);
     }
   }
-  return { evaluate, evaluateScope, prepareSubmission };
+  async function hiddenValueTarget(snapshot, options) {
+    if (options.interactionMode === 'readonly')
+      throw problem('readonly_scope', 'A read-only record cannot be corrected.');
+    const path = options.instancePath ?? [];
+    validateInstancePath(path);
+    if (typeof options.fieldName !== 'string')
+      throw problem('invalid_request', 'A fieldName is required.');
+    const evaluated = await run(snapshot, { mode: 'accepted', signal: options.signal });
+    const summary = validateSubmissionWithContext(evaluated.snapshot, context, [], {
+      validateHiddenValues: true,
+    });
+    const finding = summary.generalErrors.find(
+      (entry) =>
+        entry.hidden &&
+        entry.fieldName === options.fieldName &&
+        sameInstancePath(entry.instancePath, path)
+    );
+    if (!finding)
+      throw problem('hidden_value_not_invalid', 'This field no longer has a hidden value error.');
+    let selected;
+    visitRecordScopes(evaluated.snapshot, context, (scope) => {
+      if (sameInstancePath(scope.instancePath, path)) selected = scope;
+    });
+    const field = selected.template.fields.find((entry) => entry.data_name === options.fieldName);
+    return { evaluated, selected, field, finding };
+  }
+
+  /** Inspect a current intrinsic hidden error without revealing or changing stored data. */
+  async function inspectHiddenValue(snapshot, options = {}) {
+    try {
+      const { selected, finding } = await hiddenValueTarget(snapshot, options);
+      return {
+        status: 'inspected',
+        finding,
+        value: copyRecordData(selected.record.values[options.fieldName]),
+        issues: [],
+      };
+    } catch (error) {
+      return failure(error);
+    }
+  }
+
+  /** Prepare a host-approved correction; never reveals a field or persists the result. */
+  async function correctHiddenValue(snapshot, options = {}) {
+    try {
+      if (!Object.hasOwn(options, 'value'))
+        throw problem('invalid_request', 'An explicit replacement value is required.');
+      const { evaluated, selected, field } = await hiddenValueTarget(snapshot, options);
+      const replacement = normalizeFieldValue(field, options.value);
+      const error = validateFieldValue(field, replacement);
+      if (error) throw problem('invalid_replacement', error);
+      selected.record.values[options.fieldName] = replacement;
+      const corrected = await run(evaluated.snapshot, { mode: 'accepted', signal: options.signal });
+      return {
+        ...corrected,
+        validationSummary: validateSubmissionWithContext(corrected.snapshot, context, [], {
+          validateHiddenValues: true,
+        }),
+      };
+    } catch (error) {
+      return failure(error);
+    }
+  }
+
+  return { evaluate, evaluateScope, prepareSubmission, inspectHiddenValue, correctHiddenValue };
 }
