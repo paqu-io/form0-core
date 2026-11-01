@@ -1,3 +1,4 @@
+import { validateOtherChoiceLabels } from './choice-label-validation.js';
 import { FIELD_SPECS } from './field-specs.js';
 
 /**
@@ -107,11 +108,8 @@ export function validateSingleChoiceFieldValue(field, value) {
     }
 
     // Validate other selections
-    for (const other of value.other) {
-      if (!other || typeof other !== 'object' || !other.label) {
-        return `${field.data_name}.other must contain objects with 'label' property`;
-      }
-    }
+    const otherError = validateOtherChoiceLabels(field, value.other);
+    if (otherError) return otherError;
 
     // Check if allow_other is false but other array is not empty
     if (!field.allow_other && value.other.length > 0) {
@@ -155,11 +153,8 @@ export function validateMultiChoiceFieldValue(field, value) {
     }
 
     // Validate other selections
-    for (const other of value.other) {
-      if (!other || typeof other !== 'object' || !other.label) {
-        return `${field.data_name}.other must contain objects with 'label' property`;
-      }
-    }
+    const otherError = validateOtherChoiceLabels(field, value.other);
+    if (otherError) return otherError;
 
     // Check if allow_other is false but other array is not empty
     if (!field.allow_other && value.other.length > 0) {

@@ -149,4 +149,21 @@ const createBooleanField = ({ data_name, choices = [] }) => ({
   );
 })();
 
+// Selecting Other is a valid editing shape; its unfinished text needs an actionable message.
+for (const type of ['SingleChoiceField', 'MultiChoiceField']) {
+  const field = { type, data_name: 'habitat', allow_other: true, choices: [] };
+  const selection = type === 'SingleChoiceField' ? 'choice' : 'choices';
+  for (const label of ['', '   '])
+    assert.equal(
+      validateFieldValue(field, { [selection]: [], other: [{ label }] }),
+      "Please specify an 'Other' value."
+    );
+  for (const other of [null, {}, { label: 42 }])
+    assert.equal(
+      validateFieldValue(field, { [selection]: [], other: [other] }),
+      "habitat.other must contain objects with 'label' property"
+    );
+  assert.equal(validateFieldValue(field, { [selection]: [], other: [{ label: 'Wetland' }] }), null);
+}
+
 console.log('field-value-registry tests passed');
