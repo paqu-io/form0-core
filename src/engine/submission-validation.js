@@ -5,6 +5,7 @@
  * @property {Object[]} instancePath Complete row ancestry; [] for root.
  * @property {string} [fieldName] Absent for scope-level custom findings.
  * @property {string} [fieldKey]
+ * @property {true} [hidden] Intrinsic error excluded by ordinary visibility participation.
  *
  * @typedef {Object} SubmissionValidationSummary
  * @property {boolean} hasErrors
@@ -85,7 +86,8 @@ export function validateScope(scope, { validateHiddenValues = false } = {}) {
       fieldKey: field.key || field.data_name,
       instancePath,
     };
-    if (message) findings.push({ ...base, kind: 'error', message });
+    if (message)
+      findings.push({ ...base, kind: 'error', message, ...(hidden ? { hidden: true } : {}) });
     else if (!hidden && required && isFieldValueEmpty(field, record.values?.[field.data_name]))
       findings.push({ ...base, kind: 'required', message: 'This field is required' });
   }

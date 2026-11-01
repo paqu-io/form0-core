@@ -1605,7 +1605,7 @@ assert.ok(
 );
 
 // -----------------------------------------------------------------------------
-// Structured record repeatable filtering
+// Explicit repeatable membership and legacy flattened filtering
 // -----------------------------------------------------------------------------
 
 (() => {
@@ -1688,8 +1688,11 @@ assert.ok(
   );
   const columnsOutput = roomRecords[0].form_values.columns;
   assert.ok(Array.isArray(columnsOutput), 'Columns repeatable should be present');
-  assert.equal(columnsOutput.length, 1, 'Only non-empty column records should be retained');
-  assert.equal(columnsOutput[0].form_values.column_label, 'C1');
+  assert.equal(columnsOutput.length, 2, 'Every explicit column record should be retained');
+  assert.equal(columnsOutput[0].id, 'column-empty');
+  assert.equal(columnsOutput[0].form_values.column_height, null);
+  assert.equal(columnsOutput[1].id, 'column-valid');
+  assert.equal(columnsOutput[1].form_values.column_label, 'C1');
 
   const legacyState = {
     values: {
