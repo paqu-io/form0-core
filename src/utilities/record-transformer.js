@@ -7,6 +7,7 @@ import { FIELD_SPECS } from '../schema/field-specs.js';
 import { recordVersion } from './version-utils.js';
 import { buildRepeatableMetadata } from './repeatable-helpers.js';
 import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
+import { getBuildingPlanProjectionNames } from '../building-plan/metadata.js';
 
 const resolveRecordId = (primary, fallback) =>
   primary === 0 ? 0 : primary || (fallback === 0 ? 0 : fallback || null);
@@ -159,6 +160,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
 
   const { repeatableSectionTree, fieldOwnership, sectionFields } =
     buildRepeatableMetadata(elementsSource);
+  const buildingPlanProjections = getBuildingPlanProjectionNames({ elements: elementsSource });
 
   const titleDatasetDescriptors = buildDatasetDescriptors({
     form: {
@@ -323,6 +325,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
         };
 
         for (const [fieldDataName, fieldInfo] of repInfo.fields) {
+          if (buildingPlanProjections.fields.has(fieldDataName)) continue;
           if (!Object.prototype.hasOwnProperty.call(instanceValues, fieldDataName)) {
             continue;
           }
@@ -357,6 +360,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
         }
 
         for (const [, childRepInfo] of repInfo.children) {
+          if (buildingPlanProjections.repeatables.has(childRepInfo.preferredKey)) continue;
           const rawNestedInstances = Object.prototype.hasOwnProperty.call(
             instanceRepeatable,
             childRepInfo.preferredKey
@@ -436,6 +440,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
 
         // Add direct child field values
         for (const [fieldDataName, fieldInfo] of repInfo.fields) {
+          if (buildingPlanProjections.fields.has(fieldDataName)) continue;
           const fieldValue = state.values[fieldDataName];
           if (fieldValue !== undefined) {
             // Apply output formatting if field spec exists
@@ -476,6 +481,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
 
         // Recursively process child RepeatableSections
         for (const [childDataName, childRepInfo] of repInfo.children) {
+          if (buildingPlanProjections.repeatables.has(childRepInfo.preferredKey)) continue;
           const childRepeatableArray = yield* processRepeatableSection(childRepInfo, [
             ...currentPath,
             pathKey,

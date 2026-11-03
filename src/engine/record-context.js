@@ -5,6 +5,10 @@ import { buildCalculationDependencyPlan } from '../utilities/calculation-depende
 import { analyzeRepeatableCollections } from '../utilities/repeatable-collections.js';
 import { createConditionContext } from './condition-context.js';
 import { copyRecordData } from '../utilities/record-data.js';
+import {
+  getBuildingPlanMetadata,
+  getBuildingPlanProjectionNames,
+} from '../building-plan/metadata.js';
 
 /** Shared immutable schema preparation; never owns live row engines. */
 export function prepareRecordContext(inputSchema, warningSystem = null) {
@@ -73,6 +77,8 @@ export function prepareRecordContext(inputSchema, warningSystem = null) {
     templates,
     calculations,
     repeatableByPath,
+    buildingPlanMeta: getBuildingPlanMetadata(schema),
+    buildingPlanProjections: getBuildingPlanProjectionNames(schema),
   };
 }
 

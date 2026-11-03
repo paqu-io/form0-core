@@ -1,6 +1,7 @@
 import { analyzeRepeatableCollections } from './repeatable-collections.js';
 import { ContextResolver } from '../engine/context-resolver.js';
 import { flattenFields } from './field-helpers.js';
+import { getBuildingPlanProjectionNames } from '../building-plan/metadata.js';
 
 function sortFieldNames(fieldNames, orderByFieldName) {
   return [...fieldNames].sort(
@@ -420,6 +421,7 @@ export function buildCalculationDependencyPlan(schema, contextResolver = null) {
   const form = normalizeCalculationFormSchema(schema);
   const resolver = contextResolver || new ContextResolver(form);
   const fields = flattenFields(form.elements).filter((field) => field && typeof field === 'object');
+  const projectionFields = getBuildingPlanProjectionNames({ form }).fields;
   const fieldsByDataName = new Map(
     fields
       .filter((field) => typeof field.data_name === 'string' && field.data_name.length > 0)
@@ -435,7 +437,11 @@ export function buildCalculationDependencyPlan(schema, contextResolver = null) {
 
   const nodesByDataName = new Map();
   fields.forEach((field) => {
-    if (field.type !== 'CalculatedField' || typeof field.data_name !== 'string') {
+    if (
+      field.type !== 'CalculatedField' ||
+      typeof field.data_name !== 'string' ||
+      projectionFields.has(field.data_name)
+    ) {
       return;
     }
 

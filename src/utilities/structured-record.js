@@ -1,5 +1,6 @@
 import { createFormEngine } from '../engine/form-engine.js';
 import { buildDatasetDescriptors, resolveDatasetRowTitle } from './dataset-descriptors.js';
+import { getBuildingPlanProjectionNames } from '../building-plan/metadata.js';
 import {
   isChoiceFieldLike,
   normalizeStoredChoiceValue,
@@ -77,7 +78,11 @@ const findFirstAliasEntry = (value, aliases) => {
   return null;
 };
 
-const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) => {
+const buildScopeFromElements = (
+  elements,
+  descriptorByRepeatable = new Map(),
+  projections = { fields: new Set(), repeatables: new Set() }
+) => {
   const scope = {
     valueFields: [],
     repeatables: [],
@@ -96,7 +101,8 @@ const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) =>
     if (CONTAINER_TYPES.has(element.type)) {
       const childScope = buildScopeFromElements(
         Array.isArray(element.elements) ? element.elements : [],
-        descriptorByRepeatable
+        descriptorByRepeatable,
+        projections
       );
       scope.valueFields.push(...childScope.valueFields);
       scope.repeatables.push(...childScope.repeatables);
@@ -104,6 +110,7 @@ const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) =>
     }
 
     if (element.type === 'RepeatableSection') {
+      if (projections.repeatables.has(element.key || element.data_name)) continue;
       const outputKey = toOutputKey(element);
       if (!outputKey) {
         continue;
@@ -115,7 +122,8 @@ const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) =>
         repeatableKey: trimString(element.key) ?? trimString(element.data_name) ?? outputKey,
         childScope: buildScopeFromElements(
           Array.isArray(element.elements) ? element.elements : [],
-          descriptorByRepeatable
+          descriptorByRepeatable,
+          projections
         ),
       });
       scope.repeatables[scope.repeatables.length - 1].childScope.datasetDescriptor =
@@ -126,6 +134,7 @@ const buildScopeFromElements = (elements, descriptorByRepeatable = new Map()) =>
     }
 
     const outputKey = toOutputKey(element);
+    if (projections.fields.has(element.data_name)) continue;
     if (!outputKey) {
       continue;
     }
@@ -350,7 +359,11 @@ export function normalizeStructuredRecord(schema, record, options = {}) {
       : Array.isArray(datasetElement?.elements)
         ? datasetElement.elements
         : [];
-  const scope = buildScopeFromElements(scopeElements, descriptorByRepeatable);
+  const scope = buildScopeFromElements(
+    scopeElements,
+    descriptorByRepeatable,
+    getBuildingPlanProjectionNames(schema)
+  );
   scope.datasetDescriptor = datasetDescriptor;
 
   normalizeRecordScope(normalized, scope);
@@ -367,7 +380,11 @@ export function buildFormRecordSnapshot(schema, record, options = {}) {
     mode: 'derived',
   });
   const formNode = isRecordObject(schema?.form) ? schema.form : null;
-  const scope = buildScopeFromElements(Array.isArray(formNode?.elements) ? formNode.elements : []);
+  const scope = buildScopeFromElements(
+    Array.isArray(formNode?.elements) ? formNode.elements : [],
+    new Map(),
+    getBuildingPlanProjectionNames(schema)
+  );
   const { rawValues: extractedRawValues, repeatable } = buildSnapshotState(
     normalizedRecord.form_values,
     scope

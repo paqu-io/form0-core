@@ -13,6 +13,7 @@ import {
   validateFormLinkRecordConditions,
 } from './form-link-validators.js';
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
+import { validateBuildingPlanBindings } from './building-plan-contract.js';
 import { formatLocalDate } from '../utilities/date-utils.js';
 const AI_ATTRIBUTE_DEFINITION = {
   type: 'object',
@@ -983,6 +984,9 @@ export const FIELD_SPECS = {
             error: `BuildingPlanSection "${field.data_name}" node_overrides must be an object`,
           };
         }
+
+        const bindingErrors = validateBuildingPlanBindings(overrides);
+        if (bindingErrors.length) return { isValid: false, error: bindingErrors.join('; ') };
 
         for (const [nodeKey, override] of Object.entries(overrides)) {
           if (!BUILDING_PLAN_BLUEPRINT.nodes[nodeKey]) {

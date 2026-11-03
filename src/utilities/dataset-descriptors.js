@@ -1,4 +1,5 @@
 import { flattenFields } from './field-helpers.js';
+import { getBuildingPlanProjectionNames } from '../building-plan/metadata.js';
 import {
   readStoredChoiceDisplayValues,
   readStoredChoiceSelectionValues,
@@ -458,7 +459,7 @@ const buildDatasetFieldDescriptor = (field, dataset) => {
   };
 };
 
-const collectFieldsForDataset = (elements, dataset) => {
+const collectFieldsForDataset = (elements, dataset, projections) => {
   if (!Array.isArray(elements)) {
     return;
   }
@@ -469,13 +470,15 @@ const collectFieldsForDataset = (elements, dataset) => {
     }
 
     if (CONTAINER_TYPES.has(element.type)) {
-      collectFieldsForDataset(element.elements, dataset);
+      collectFieldsForDataset(element.elements, dataset, projections);
       return;
     }
 
     if (element.type === 'RepeatableSection') {
       return;
     }
+
+    if (projections?.fields.has(element.data_name)) return;
 
     const descriptor = buildDatasetFieldDescriptor(element, dataset);
     if (descriptor) {
@@ -502,6 +505,7 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
     if (element.type !== 'RepeatableSection') {
       return;
     }
+    if (context.projections?.repeatables.has(element.key || element.data_name)) return;
 
     const repeatableFieldId = toFieldId(element);
     const repeatableOutputKey = toOutputKey(element);
@@ -527,7 +531,7 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
       fields: [],
     };
 
-    collectFieldsForDataset(element.elements, descriptor);
+    collectFieldsForDataset(element.elements, descriptor, context.projections);
     datasets.push(descriptor);
 
     collectRepeatableDatasets(
@@ -537,6 +541,7 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
         dataset_labels: descriptor.dataset_labels,
         repeatable_output_path: descriptor.repeatable_output_path,
         parent_dataset_id: descriptor.id,
+        projections: context.projections,
       },
       datasets
     );
@@ -566,7 +571,8 @@ export function buildDatasetDescriptors(schema) {
     fields: [],
   };
 
-  collectFieldsForDataset(formNode.elements, rootDataset);
+  const projections = getBuildingPlanProjectionNames({ form: formNode });
+  collectFieldsForDataset(formNode.elements, rootDataset, projections);
 
   const datasets = [rootDataset];
   collectRepeatableDatasets(
@@ -576,6 +582,7 @@ export function buildDatasetDescriptors(schema) {
       dataset_labels: [],
       repeatable_output_path: [],
       parent_dataset_id: ROOT_DATASET_ID,
+      projections,
     },
     datasets
   );

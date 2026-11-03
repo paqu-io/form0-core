@@ -1,5 +1,11 @@
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
 import { generateKey } from '../utilities/hash.js';
+import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
+import { createBuildingPlanBlueprint } from './building-plan-contract.js';
+import {
+  scopeBuildingPlanConditions,
+  scopeBuildingPlanExpression,
+} from './building-plan-expressions.js';
 
 const DATA_NAME_MAX_LENGTH = 42;
 
@@ -98,6 +104,8 @@ function buildRepeatableTree(
     dataName: repeatable.data_name,
     path: scopePath,
     canvas: mergedNode.canvas || null,
+    role: mergedNode.role || nodeKey,
+    sourceNode: mergedNode.sourceNode || null,
     fields: [],
     fieldsByOriginalDataName: {},
     fieldsByOriginalKey: {},
@@ -122,6 +130,8 @@ function buildRepeatableTree(
         key: cloned.key,
         preferredKey: cloned.key,
         dataName: cloned.data_name,
+        binding: mergedNode.fieldRoles?.[originalFieldDataName] || null,
+        field: cloned,
       });
     }
     fieldCounter += 1;
@@ -145,6 +155,8 @@ function buildRepeatableTree(
         key: cloned.key,
         preferredKey: cloned.key,
         dataName: cloned.data_name,
+        binding: mergedNode.fieldRoles?.[originalFieldDataName] || null,
+        field: cloned,
       });
     }
     fieldCounter += 1;
@@ -179,8 +191,13 @@ function buildRepeatableTree(
 }
 
 function expandBuildingPlanSection(field, buildingPlanMeta) {
-  const blueprint = deepClone(BUILDING_PLAN_BLUEPRINT);
-  const overrides = field.node_overrides || {};
+  if (field.building_plan?.meta && Array.isArray(field.elements)) {
+    buildingPlanMeta.push(field.building_plan.meta);
+    return field;
+  }
+  const contract = createBuildingPlanBlueprint(field.node_overrides || {});
+  const blueprint = contract.blueprint;
+  const overrides = contract.overrides;
   const overridesByNode = {};
 
   Object.entries(overrides).forEach(([nodeKey, override]) => {
@@ -190,11 +207,14 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
   });
 
   const localMeta = {
+    version: 1,
     root: blueprint.root,
     dataName: field.data_name,
     key: field.key,
     repeatables: [],
     repeatablesByNodeKey: {},
+    fieldBindings: {},
+    properties: {},
   };
 
   const rootRepeatable = buildRepeatableTree(
@@ -205,6 +225,58 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
     [field.data_name],
     [field.data_name]
   );
+
+  for (const node of localMeta.repeatables) {
+    const aliases = new Map();
+    const ancestors = localMeta.repeatables
+      .filter(
+        (candidate) =>
+          candidate.path.length <= node.path.length &&
+          candidate.path.every((part, index) => part === node.path[index])
+      )
+      .sort((a, b) => a.path.length - b.path.length);
+    for (const ancestor of ancestors)
+      for (const entry of ancestor.fields || [])
+        aliases.set(entry.originalDataName, entry.dataName);
+    for (const entry of node.fields || []) {
+      const binding = entry.binding;
+      if (binding) {
+        const compiled = {
+          ...binding,
+          nodeKey: node.nodeKey,
+          originalDataName: entry.originalDataName,
+          dataName: entry.dataName,
+          fieldKey: entry.key,
+        };
+        if (binding.sourceNode)
+          compiled.sourceDataName =
+            localMeta.repeatablesByNodeKey[binding.sourceNode]?.fieldsByOriginalDataName?.[
+              binding.sourceOriginalDataName
+            ]?.dataName;
+        entry.binding = compiled;
+        localMeta.fieldBindings[entry.dataName] = compiled;
+        if (binding.role === 'property')
+          localMeta.properties[binding.property] = {
+            scope: binding.scope,
+            inherit: binding.inherit === true,
+            fallback:
+              entry.field.default_value != null
+                ? normalizeFieldValue(entry.field, entry.field.default_value)
+                : binding.property === 'wall_thickness_m'
+                  ? 0.2
+                  : null,
+            field: entry.field,
+            nodeKey: node.nodeKey,
+            dataName: entry.dataName,
+          };
+      }
+      if (typeof entry.field.calculate === 'string')
+        entry.field.calculate = scopeBuildingPlanExpression(entry.field.calculate, aliases);
+      for (const attribute of ['visible_conditions', 'required_conditions', 'read_only_conditions'])
+        if (entry.field[attribute])
+          entry.field[attribute] = scopeBuildingPlanConditions(entry.field[attribute], aliases);
+    }
+  }
 
   buildingPlanMeta.push(localMeta);
 

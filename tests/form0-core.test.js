@@ -1500,7 +1500,9 @@ assert.ok(
   'Floors repeatable should include mandatory elements'
 );
 
-const roomRepeatable = floorRepeatable.elements.find((el) => el.type === 'RepeatableSection');
+const roomRepeatable = floorRepeatable.elements.find(
+  (el) => el.key === buildingPlanMeta[0].repeatablesByNodeKey.rooms.key
+);
 assert.ok(roomRepeatable, 'Floor should generate Rooms repeatable');
 const roomSuffix = generateKey(`${buildingPlanPrototype.data_name}:floors:rooms`);
 assert.equal(roomRepeatable.data_name, `building_plan_rooms_${roomSuffix}`);

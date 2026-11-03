@@ -52,6 +52,39 @@ export {
   applyLinkedRecordSelection,
 } from './utilities/form-link-helpers.js';
 export { expandBuildingPlanSchema } from './schema/building-plan-expander.js';
+export { createBuildingPlanSession } from './building-plan/session.js';
+export { createBuildingPlanEditor } from './building-plan/editor.js';
+export {
+  BuildingPlanCanvasController,
+  buildingPlanCanvasSnapshot,
+} from './building-plan/canvas-controller.js';
+export {
+  BUILDING_PLAN_VERSION,
+  BUILDING_PLAN_PROPERTIES,
+  createBuildingPlanSnapshot,
+  resolveBuildingPlanProperty,
+  resolveBuildingPlanSegmentProperty,
+  validateBuildingPlanSnapshot,
+  buildingPlanFaceSegments,
+} from './building-plan/model.js';
+export { buildingPlanPointFromViewport } from './building-plan/geometry.js';
+export {
+  readBuildingPlanRecord,
+  writeBuildingPlanRecord,
+  refreshBuildingPlanProjections,
+  getBuildingPlanRecordMetadata,
+} from './building-plan/records.js';
+export {
+  getBuildingPlanMetadata,
+  getBuildingPlanFieldBinding,
+  isBuildingPlanInternalCollection,
+} from './building-plan/metadata.js';
+export {
+  createBuildingPlanRecordSession,
+  buildingPlanOperationsForRow,
+  getBuildingPlanFieldState,
+  resolveBuildingPlanRow,
+} from './building-plan/transactions.js';
 export { FIELD_SPECS } from './schema/field-specs.js';
 export { getBuiltinDefinitions } from './builtins/registry.js';
 export {

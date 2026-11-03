@@ -5,6 +5,7 @@
  * @property {Object[]} instancePath Complete row ancestry; [] for root.
  * @property {string} [fieldName] Absent for scope-level custom findings.
  * @property {string} [fieldKey]
+ * @property {Object} [canonical] Physical owner location when navigation uses a room-side projection.
  * @property {true} [hidden] Intrinsic error excluded by ordinary visibility participation.
  *
  * @typedef {Object} SubmissionValidationSummary
@@ -16,6 +17,7 @@
  */
 
 import { prepareRecordContext, visitRecordScopes } from './record-context.js';
+import { getBuildingPlanProjectionLinks } from '../building-plan/records.js';
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0;
 const hasChoice = (entries) =>
@@ -101,6 +103,7 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
   )
     throw new TypeError('validateHiddenValues must be a boolean.');
   const orderedIssues = [];
+  const scopes = [];
   const issuesByScope = new Map();
   for (const custom of customIssues) {
     const key = JSON.stringify(custom.instancePath || []);
@@ -108,12 +111,57 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
     issuesByScope.get(key).push(custom);
   }
   visitRecordScopes(snapshot, context, (scope) => {
+    scopes.push(scope);
     orderedIssues.push(...validateScope(scope, options));
     if (scope.participating)
       for (const custom of issuesByScope.get(JSON.stringify(scope.instancePath)) || [])
         orderedIssues.push({ ...custom, instancePath: scope.instancePath, kind: 'custom' });
   });
-  return summarizeSubmissionFindings(orderedIssues);
+  if (!context.buildingPlanMeta?.some((meta) => meta.version === 1))
+    return summarizeSubmissionFindings(orderedIssues);
+  // Physical records own validation, while their questions are edited through the ordinary
+  // room-side rows. Point navigation at one visible row without duplicating the finding.
+  const preferred = new WeakMap();
+  for (const meta of context.buildingPlanMeta || []) {
+    if (meta.version !== 1) continue;
+    const links = getBuildingPlanProjectionLinks({ meta, record: snapshot });
+    for (const scope of scopes) {
+      if (!scope.participating) continue;
+      for (const [name, canonical] of links.get(scope.record) || []) {
+        if (scope.record.visible?.[name] === false) continue;
+        if (!preferred.has(canonical.record)) preferred.set(canonical.record, new Map());
+        const fields = preferred.get(canonical.record);
+        if (!fields.has(canonical.fieldName))
+          fields.set(canonical.fieldName, {
+            fieldName: name,
+            fieldKey: context.resolver.fieldOwnership.get(name)?.field.key || name,
+            instancePath: scope.instancePath,
+          });
+      }
+    }
+  }
+  const records = new Map(
+    scopes.map((scope) => [JSON.stringify(scope.instancePath), scope.record])
+  );
+  return summarizeSubmissionFindings(
+    orderedIssues.map((finding) => {
+      if (finding.hidden) return finding;
+      const target = preferred
+        .get(records.get(JSON.stringify(finding.instancePath)))
+        ?.get(finding.fieldName);
+      return target
+        ? {
+            ...finding,
+            ...target,
+            canonical: {
+              fieldName: finding.fieldName,
+              fieldKey: finding.fieldKey,
+              instancePath: finding.instancePath,
+            },
+          }
+        : finding;
+    })
+  );
 }
 
 /** Shared ordering/classification for a complete tree or a selected editor scope. */

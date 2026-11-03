@@ -22,6 +22,10 @@ import { projectCollectionValue } from '../utilities/repeatable-collections.js';
 import { getFormSchemaRevision } from '../utilities/schema-revision.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { createRecordFreshness } from './record-freshness.js';
+import {
+  refreshBuildingPlanProjections,
+  getBuildingPlanProjectionLinks,
+} from '../building-plan/records.js';
 
 const clock = () => globalThis.performance?.now?.() ?? Date.now();
 const issue = (code, message, instancePath = []) => ({ code, message, instancePath });
@@ -327,6 +331,11 @@ export function createRecordEvaluator({
     const snapshot = scoped ? input : copyRecordData(input);
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
       throw problem('invalid_record_tree', 'A runtime record snapshot is required.');
+    const planLinks = [];
+    for (const meta of context.buildingPlanMeta) {
+      if (!scoped) refreshBuildingPlanProjections({ meta, record: snapshot });
+      planLinks.push(getBuildingPlanProjectionLinks({ meta, record: snapshot }));
+    }
     const pause = scheduler(options);
     if (!scoped) await pause();
     else if (options.signal?.aborted)
@@ -404,7 +413,11 @@ export function createRecordEvaluator({
       )
         continue;
       for (const field of scope.template.fields)
-        if (field.type === 'CalculatedField' && field.calculate) {
+        if (
+          field.type === 'CalculatedField' &&
+          field.calculate &&
+          !context.buildingPlanProjections.fields.has(field.data_name)
+        ) {
           const definition = context.calculations.get(field.data_name);
           const node = {
             scope,
@@ -426,6 +439,25 @@ export function createRecordEvaluator({
         info.parentPath.every((part, index) => scope.template.path[index] === part)
         ? scope.lineage[info.parentPath.length]
         : null;
+    };
+    const scopeByRecord = new WeakMap(scopes.map((scope) => [scope.sourceRecord, scope]));
+    const boundTarget = (scope, name) => {
+      for (const links of planLinks) {
+        const link = links.get(scope.sourceRecord)?.get(name);
+        if (link) return { owner: scopeByRecord.get(link.record), name: link.fieldName };
+      }
+      return { owner: ownerScope(scope, name), name };
+    };
+    const refreshScopeMirrors = (scope) => {
+      for (const links of planLinks)
+        for (const [name, link] of links.get(scope.sourceRecord) || []) {
+          // A scoped editor may contain a pending answer that its transaction adapter has
+          // not accepted yet. Full refreshes reconcile canonical values; scoped calculation
+          // refreshes must not replace those inputs with the previous physical answer.
+          if (scoped && context.resolver.fieldOwnership.get(name)?.field.type !== 'CalculatedField')
+            continue;
+          scope.record.values[name] = copyRecordData(link.record.values?.[link.fieldName] ?? null);
+        }
     };
     const queryCache = new Map();
     function rows(scope, section) {
@@ -466,13 +498,15 @@ export function createRecordEvaluator({
     }
     for (const node of nodes) {
       for (const name of node.definition.directReferences) {
-        const dependency = ownerScope(node.scope, name)?.nodes.get(name);
+        const target = boundTarget(node.scope, name);
+        const dependency = target.owner?.nodes.get(target.name);
         if (dependency) node.dependencies.add(dependency);
       }
       if (!node.definition.collection.issues.length)
         for (const call of node.definition.collection.calls)
           for (const row of rows(node.scope, call.section)) {
-            const dependency = row.nodes.get(call.target);
+            const target = boundTarget(row, call.target);
+            const dependency = target.owner?.nodes.get(target.name);
             if (dependency) node.dependencies.add(dependency);
           }
       await pause();
@@ -534,8 +568,10 @@ export function createRecordEvaluator({
     }
     for (const node of nodes) node.state = 0;
     const projectionCache = new Map();
-    const readable = (scope) =>
-      Object.assign({}, ...scope.lineage.map((entry) => entry.record.values));
+    const readable = (scope) => {
+      refreshScopeMirrors(scope);
+      return Object.assign({}, ...scope.lineage.map((entry) => entry.record.values));
+    };
     function execute(node) {
       if (node.blocked || node.state === 2) return;
       if (node.state === 1) {
@@ -563,9 +599,12 @@ export function createRecordEvaluator({
               projectionCache.set(
                 key,
                 rows(node.scope, section).map((row) => {
-                  const dependency = row.nodes.get(target);
+                  const bound = boundTarget(row, target);
+                  const dependency = bound.owner?.nodes.get(bound.name);
                   if (dependency) execute(dependency);
-                  return copyRecordData(projectCollectionValue(field, row.record.values?.[target]));
+                  return copyRecordData(
+                    projectCollectionValue(field, bound.owner?.record.values?.[bound.name])
+                  );
                 })
               );
             }
@@ -617,11 +656,12 @@ export function createRecordEvaluator({
               },
               resolveReference: (reference) => {
                 const name = reference.slice(1);
-                const owner = ownerScope(node.scope, name);
+                const target = boundTarget(node.scope, name);
+                const owner = target.owner;
                 if (!owner) return undefined;
-                const dependency = owner.nodes.get(name);
+                const dependency = owner.nodes.get(target.name);
                 if (dependency) execute(dependency);
-                return copyRecordData(owner.record.values[name]);
+                return copyRecordData(owner.record.values[target.name]);
               },
             }
           );
@@ -665,6 +705,10 @@ export function createRecordEvaluator({
         scope.template.conditions
       );
       for (const field of scope.template.fields) {
+        if (!scoped && context.buildingPlanProjections.fields.has(field.data_name)) {
+          scope.record.required[field.data_name] = false;
+          continue;
+        }
         const error = validateFieldValue(field, scope.record.values[field.data_name]);
         if (error) scope.record.errors[field.data_name] = error;
       }
