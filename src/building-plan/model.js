@@ -294,6 +294,12 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
           const high = Math.min(frame.length, Math.max(a.along, b.along));
           if (high - low <= EPS) continue;
           const direction = dot(frame.tangent, edge.tangent) >= 0 ? 1 : -1;
+          if (
+            !face.freePath &&
+            half > EPS &&
+            (a.offset < 0 ? -1 : 1) !== direction * Math.sign(polygonArea(room.vertices))
+          )
+            continue;
           const edgeStart = project(edge, at(frame, low, a.offset)).along;
           const edgeEnd = project(edge, at(frame, high, a.offset)).along;
           const old = previous.find(
@@ -693,6 +699,19 @@ function validateSnapshot(snapshot) {
               planIssue(
                 'invalid_binding_extent',
                 'The facing extent must match its host segment coordinates.',
+                { type: 'room_face', id: face.id }
+              )
+            );
+          if (
+            !face.freePath &&
+            (buildingPlanSegmentThickness(wall, segment) ?? (segment.referenceOffset ?? 0) * 2) >
+              EPS &&
+            binding.side !== binding.direction * Math.sign(polygonArea(room.vertices))
+          )
+            issues.push(
+              planIssue(
+                'invalid_binding_side',
+                'A captured boundary must face the room interior, not the opposite wall face.',
                 { type: 'room_face', id: face.id }
               )
             );

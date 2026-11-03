@@ -386,6 +386,7 @@ function finishBoundaryEdit(floor, before, changedEdges, affectedWalls, operatio
       mergeWalls(floor, reference, other, {}, createId);
     }
   }
+  coalesceAutomaticSegments(floor);
   coalesceFacingRows(floor);
   for (const wall of affectedWalls.filter(
     (wall) => floor.walls.includes(wall) && wall.segments.length > 1
@@ -538,6 +539,102 @@ function mergeWalls(floor, reference, other, resolutions, createId) {
   return reference;
 }
 
+function mergeBoundSegments(floor, reference, other, referenceId, otherId, resolutions, createId) {
+  if (reference.segments.length === 1 && other.segments.length === 1)
+    return mergeWalls(floor, reference, other, resolutions, createId);
+  const a = reference.segments.find((segment) => segment.id === referenceId),
+    b = other.segments.find((segment) => segment.id === otherId);
+  const remaining = [
+    ...reference.segments.filter((segment) => segment !== a),
+    ...other.segments.filter((segment) => segment !== b),
+  ];
+  const hosted = {};
+  for (const collection of ['doors', 'windows']) {
+    hosted[collection] = [
+      ...reference[collection].filter((opening) => opening.segmentId !== a.id),
+      ...other[collection].filter((opening) => opening.segmentId !== b.id),
+    ];
+    reference[collection] = reference[collection].filter((opening) => opening.segmentId === a.id);
+    other[collection] = other[collection].filter((opening) => opening.segmentId === b.id);
+  }
+  reference.segments = [a];
+  other.segments = [b];
+  const merged = mergeWalls(floor, reference, other, resolutions, createId);
+  merged.segments.push(...remaining);
+  for (const collection of ['doors', 'windows']) merged[collection].push(...hosted[collection]);
+  return merged;
+}
+
+/** Rejoin only automatic divisions of the same original straight construction. */
+function coalesceAutomaticSegments(floor) {
+  for (const wall of floor.walls) {
+    if (wall.lineage?.explicitPhysicalSeparation) continue;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const initial of wall.segments) {
+        let a = initial;
+        if (!a.lineage?.segmentId) continue;
+        let frame = segmentFrame(a.start, a.end);
+        let b = wall.segments.find(
+          (segment) =>
+            segment !== a &&
+            segment.lineage?.segmentId === a.lineage.segmentId &&
+            equalValue(segment.overrides || {}, a.overrides || {}) &&
+            Math.abs(dot(frame.normal, segmentFrame(segment.start, segment.end).tangent)) <= EPS &&
+            Math.abs(project(frame, segment.start).offset) <= EPS &&
+            Math.min(
+              frame.length,
+              Math.max(project(frame, segment.start).along, project(frame, segment.end).along)
+            ) >=
+              Math.max(
+                0,
+                Math.min(project(frame, segment.start).along, project(frame, segment.end).along)
+              ) -
+                EPS
+        );
+        if (!b) continue;
+        if (b.id === b.lineage.segmentId && a.id !== a.lineage.segmentId) {
+          [a, b] = [b, a];
+          frame = segmentFrame(a.start, a.end);
+        }
+        const other = segmentFrame(b.start, b.end),
+          positions = [project(frame, b.start).along, project(frame, b.end).along];
+        const from = Math.min(0, ...positions),
+          to = Math.max(frame.length, ...positions);
+        for (const opening of [...wall.doors, ...wall.windows]) {
+          if (opening.segmentId === a.id) opening.offset -= from;
+          else if (opening.segmentId === b.id) {
+            const start = project(frame, at(other, opening.offset)).along,
+              end = project(frame, at(other, opening.offset + opening.width)).along;
+            opening.segmentId = a.id;
+            opening.offset = Math.min(start, end) - from;
+          }
+        }
+        for (const observation of floor.observations) {
+          if (observation.subject?.id === b.id) {
+            observation.sourceSubject ||= copy(observation.subject);
+            observation.subject.id = a.id;
+          }
+          if (observation.relatedSubjects)
+            observation.relatedSubjects = observation.relatedSubjects.map((subject) =>
+              subject.id === b.id ? { ...subject, id: a.id } : subject
+            );
+        }
+        a.start = at(frame, from);
+        a.end = at(frame, to);
+        a.lineage = {
+          ...a.lineage,
+          mergedSegmentIds: [...(a.lineage.mergedSegmentIds || []), b.id],
+        };
+        wall.segments = wall.segments.filter((segment) => segment !== b);
+        changed = true;
+        break;
+      }
+    }
+  }
+}
+
 function bindFaces(floor, operation, createId, specifications) {
   const a = findFace(floor, operation.referenceFaceId);
   const b = findFace(floor, operation.faceId);
@@ -588,21 +685,29 @@ function bindFaces(floor, operation, createId, specifications) {
       );
     translateUnsharedRoom(floor, b.room, multiply(aEdge.normal, expected - actual));
   }
-  const axis = a.wall.segments[0];
+  const axis = a.wall.segments.find((segment) => segment.id === aBinding.segmentId);
   const direction = segmentFrame(axis.start, axis.end);
   const side = aBinding.side;
   const currentHalf = (a.wall.properties.wall_thickness_m ?? thickness) / 2;
   const axisDelta = multiply(direction.normal, side * (currentHalf - thickness / 2));
   axis.start = add(axis.start, axisDelta);
   axis.end = add(axis.end, axisDelta);
-  const bSegment = b.wall.segments[0];
+  const bSegment = b.wall.segments.find((segment) => segment.id === bBinding.segmentId);
   const frameB = segmentFrame(bSegment.start, bSegment.end);
   const target = project(segmentFrame(axis.start, axis.end), bSegment.start).offset;
   bSegment.start = add(bSegment.start, multiply(direction.normal, -target));
   bSegment.end = add(bSegment.end, multiply(direction.normal, -target));
   if (Math.abs(dot(frameB.tangent, direction.tangent)) < 1 - EPS)
     failOperation('unaligned_walls', 'Only parallel wall segments can be bound.');
-  mergeWalls(floor, a.wall, b.wall, operation.resolutions || {}, createId);
+  mergeBoundSegments(
+    floor,
+    a.wall,
+    b.wall,
+    aBinding.segmentId,
+    bBinding.segmentId,
+    operation.resolutions || {},
+    createId
+  );
   const conflicts = reconcileBuildingPlanProperties({ floors: [floor] }, specifications);
   if (conflicts.length) {
     const error = new Error(conflicts[0].message);

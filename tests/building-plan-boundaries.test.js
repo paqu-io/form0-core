@@ -461,3 +461,67 @@ test('confirmed removal cannot discard a separately open opening editor', async 
     'applied'
   );
 });
+
+for (const up of [-0.2, -0.6, -0.8])
+  test(`grouped physical walls bind their selected run and retain coherent corners (${up})`, () => {
+    const f = fixture();
+    f.session.setEditingPolicy({ preserveWallGrouping: true });
+    const right = f.snapshot.floors[0].rooms[0].faces[1].id;
+    for (const [face, distance] of [
+      [f.faceA, 0.6],
+      [right, -0.4],
+      [right, 0.2],
+      [f.faceA, up],
+      [f.faceA, 0.1],
+    ]) {
+      const r = edit(f, face, distance);
+      assert.equal(r.status, 'applied', JSON.stringify(r.issues));
+      const plan = f.session.getSnapshot();
+      coverage(plan);
+      const doors = plan.floors[0].walls.flatMap((wall) => wall.doors);
+      assert.equal(doors.length, 1);
+      assert.equal(doors[0].id, f.snapshot.floors[0].walls.flatMap((wall) => wall.doors)[0].id);
+      assert.equal(doors[0].width, 0.9);
+      const original = f.snapshot.floors[0].rooms[0].faces[2].bindings[0].segmentId;
+      assert.ok(
+        plan.floors[0].walls.some((wall) =>
+          wall.segments.some((segment) => segment.id === original)
+        ),
+        'Straight normalization keeps the surviving original segment identity'
+      );
+      assert.deepEqual(validateBuildingPlanSnapshot(plan), []);
+      for (const room of plan.floors[0].rooms)
+        for (const edge of room.edges) {
+          const intervals = room.faces
+            .flatMap((face) =>
+              face.bindings
+                .filter((binding) => binding.edgeId === edge.id)
+                .map((binding) => binding.roomInterval)
+            )
+            .sort((a, b) => a[0] - b[0]);
+          for (let i = 1; i < intervals.length; i++)
+            assert.ok(
+              intervals[i][0] >= intervals[i - 1][1] - 1e-6,
+              'Automatic segment joins must not duplicate facing coverage'
+            );
+        }
+    }
+    const after = f.session.getSnapshot();
+    f.session.undo();
+    f.session.redo();
+    assert.deepEqual(f.session.getSnapshot(), after);
+  });
+
+test('captured boundaries cannot bind the wrong side of a physical wall', () => {
+  const f = fixture(),
+    plan = f.session.getSnapshot(),
+    room = plan.floors[0].rooms[0],
+    face = room.faces[0];
+  const wall = plan.floors[0].walls.find((w) => w.id === face.wallId);
+  wall.segments[0].start.y += 0.2;
+  wall.segments[0].end.y += 0.2;
+  face.bindings[0].side = -1;
+  assert.ok(
+    validateBuildingPlanSnapshot(plan).some((issue) => issue.code === 'invalid_binding_side')
+  );
+});
