@@ -132,3 +132,8 @@ a boolean or promise. Its default declines; CLI, React and Native supply their e
 mechanism. It is called at gesture completion, never on pointer/touch move previews. An opening
 fully outside the edited room remains on its surviving wall, without a projection in that room.
 These operation options are runtime edit intent, not schema attributes or independent record fields.
+
+The canvas derives physical wall footprints from these segments and effective thicknesses, while
+room-facing rows remain selection/editing targets. A shared wall and its hosted opening are drawn
+once; the two room faces remain separated by the wall thickness. Derived footprints and viewport
+state are not additional fields in either saved JSON example. Unknown thickness stays schematic.

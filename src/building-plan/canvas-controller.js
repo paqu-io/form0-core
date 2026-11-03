@@ -6,6 +6,7 @@ import { buildingPlanFaceSegments, copyBuildingPlanData as copy } from './model.
 import { distance, project, roomBounds, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
+import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -39,6 +40,8 @@ export function buildingPlanCanvasSnapshot({
     beams: [],
     doors: [],
     windows: [],
+    wallFootprints: [],
+    physicalOpenings: [],
   };
   const pixels = (point) => ({ x: point.x * gridSize, y: point.y * gridSize });
   const floorRows = record.repeatable?.[key(meta, 'floors')] || [];
@@ -54,6 +57,7 @@ export function buildingPlanCanvasSnapshot({
       path: floorPath,
     });
     if (floorIndex !== activeFloorIndex) continue;
+    Object.assign(output, buildingPlanFootprints(floor, gridSize));
     const roomRows = floorRow.repeatable[key(meta, 'rooms')] || [];
     for (const room of floor.rooms) {
       const roomIndex = roomRows.findIndex((row) => subjectId(meta, 'rooms', row) === room.id);
@@ -99,6 +103,7 @@ export function buildingPlanCanvasSnapshot({
           index: faceIndex,
           path: wallPath,
           points,
+          axisPoints: buildingPlanFaceAxes(physical, portions, pixels),
           bindings: copy(face.bindings),
           doors: [],
           windows: [],
@@ -145,6 +150,7 @@ export function buildingPlanCanvasSnapshot({
               height: opening.height,
               distanceFromFloor: opening.sillHeight,
               wallReference: physical.id,
+              physical: output.physicalOpenings.find((item) => item.id === opening.id),
               label: opening.values[collection === 'doors' ? 'door_label' : 'window_label'] || '',
               displayLabel: `${collection === 'doors' ? 'D' : 'W'}#${projectedIndex + 1}`,
             };
