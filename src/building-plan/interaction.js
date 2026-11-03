@@ -7,7 +7,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 /** Shared magnetic guides and edge-pan timing in canvas-world/screen coordinates. */
 export function createBuildingPlanInteraction({ scene = () => ({}), policy = () => ({}) } = {}) {
-  let latch = null;
+  let latch = new Set();
   let guides = [];
   let edgeSince = null;
   let lastFrame = null;
@@ -15,24 +15,49 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   const currentScene = () => referenceScene || scene();
   const settings = () => normalizeBuildingPlanEditingPolicy(policy());
   function choose(candidates, zoom) {
-    const previous = candidates.find(
-      (candidate) => candidate.key === latch && candidate.error * zoom <= 13
+    const ranked = candidates
+      .filter((entry) => entry.error * zoom <= (latch.has(entry.key) ? 13 : 8))
+      .sort(
+        (a, b) =>
+          Number(latch.has(b.key)) - Number(latch.has(a.key)) ||
+          a.error - b.error ||
+          a.key.localeCompare(b.key)
+      );
+    const first = ranked[0];
+    if (!first) {
+      latch.clear();
+      guides = [];
+      return null;
+    }
+    let second = ranked.find((entry) => Math.abs(dot(entry.normal, first.normal)) < 0.999999);
+    let delta = first.delta;
+    if (second) {
+      const a = first.normal,
+        b = second.normal;
+      const x = dot(first.delta, a),
+        y = dot(second.delta, b),
+        determinant = a.x * b.y - a.y * b.x;
+      delta = { x: (x * b.y - a.y * y) / determinant, y: (a.x * y - x * b.x) / determinant };
+    }
+    const chosen = second ? [first, second] : [first];
+    latch = new Set(chosen.map((entry) => entry.key));
+    guides = chosen.flatMap((entry) =>
+      entry.guides.map((guide) => ({
+        from: {
+          x: guide.from.x + delta.x - entry.delta.x,
+          y: guide.from.y + delta.y - entry.delta.y,
+        },
+        to: { x: guide.to.x + delta.x - entry.delta.x, y: guide.to.y + delta.y - entry.delta.y },
+      }))
     );
-    const next =
-      previous ||
-      candidates
-        .filter((candidate) => candidate.error * zoom <= 8)
-        .sort((a, b) => a.error - b.error || a.key.localeCompare(b.key))[0];
-    latch = next?.key || null;
-    guides = next?.guides || [];
-    return next;
+    return { delta };
   }
   function snapTranslation(
     points,
     { roomId, physicalWallId, zoom = 1, originalPoints = [], bypass = false } = {}
   ) {
     if (!settings().snapping || bypass || points.length < 2) {
-      latch = null;
+      latch.clear();
       guides = [];
       return points;
     }
@@ -55,21 +80,23 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         )
           continue;
         const other = segmentFrame(wall.points[0], wall.points[1]);
-        if (dot(own.tangent, other.tangent) > -0.999999) continue;
+        const direction = dot(own.tangent, other.tangent);
+        if (Math.abs(direction) < 0.999999) continue;
         const offsets = [project(other, start).along, project(other, end).along];
-        if (
-          Math.min(other.length, Math.max(...offsets)) - Math.max(0, Math.min(...offsets)) <
-          -8 / zoom
-        )
-          continue;
+        const overlap =
+          Math.min(other.length, Math.max(...offsets)) - Math.max(0, Math.min(...offsets));
         const neighbour = view.rooms.find((room) => room.id === wall.roomId);
         const thickness = (wall.thickness ?? 0) * (view.gridSize || 20);
-        const expected = -Math.sign(polygonArea(neighbour.vertices)) * thickness;
+        const expected =
+          direction < 0 && overlap >= -8 / zoom
+            ? -Math.sign(polygonArea(neighbour.vertices)) * thickness
+            : 0;
         const difference = expected - project(other, start).offset;
         const delta = { x: other.normal.x * difference, y: other.normal.y * difference };
         candidates.push({
           key: `face:${index}:${wall.id}`,
           error: Math.abs(difference),
+          normal: other.normal,
           delta,
           guides: [
             {
@@ -87,17 +114,16 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       const delta = { x: originalPoints[0].x - points[0].x, y: originalPoints[0].y - points[0].y };
       if (
         points.every(
-          (point, index) =>
-            Math.abs(point.x + delta.x - originalPoints[index].x) < 1e-6 &&
-            Math.abs(point.y + delta.y - originalPoints[index].y) < 1e-6
-        )
-      )
-        candidates.push({
-          key: 'original',
-          error: Math.hypot(delta.x, delta.y),
-          delta,
-          guides: [{ from: originalPoints[0], to: originalPoints[1] }],
-        });
+          (point, i) =>
+            Math.abs(point.x + delta.x - originalPoints[i].x) < 1e-6 &&
+            Math.abs(point.y + delta.y - originalPoints[i].y) < 1e-6
+        ) &&
+        Math.hypot(delta.x, delta.y) * zoom <= (latch.has('original') ? 13 : 8)
+      ) {
+        latch = new Set(['original']);
+        guides = [{ from: originalPoints[0], to: originalPoints[1] }];
+        return points.map((point) => ({ ...point, x: point.x + delta.x, y: point.y + delta.y }));
+      }
     }
     const chosen = choose(candidates, zoom);
     if (chosen)
@@ -169,7 +195,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     getGuides: () => guides.map((guide) => ({ from: { ...guide.from }, to: { ...guide.to } })),
     reset() {
       referenceScene = null;
-      latch = null;
+      latch.clear();
       guides = [];
       edgeSince = null;
       lastFrame = null;

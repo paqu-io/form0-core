@@ -117,3 +117,18 @@ node examples/building-plan/verify.mjs
 Generation writes only this example's three JSON files. Record timestamps reflect the
 generation run; they are ordinary record metadata. Verify the JSON changes together with
 the matching implementation and localized documentation before accepting them.
+
+## Confirmed opening removal during a geometry edit
+
+An operation that partly cuts a door/window returns `opening_cut_requires_confirmation`, with
+`openingIds`, `openings` (type and label), and `observationIds`. No accepted data changes. After
+explicit confirmation, retry the same operation with `removeOpeningIds` containing exactly the
+reported IDs. Set `allowObservationDeletion: true` only when the associated observation cascade
+was disclosed and confirmed. Stale or unrelated opening IDs are rejected. The entire move/removal
+is one history entry and follows its initiating row checkpoint.
+
+`BuildingPlanCanvasController` accepts an optional `confirmOpeningRemoval(issue)` callback returning
+a boolean or promise. Its default declines; CLI, React and Native supply their existing confirmation
+mechanism. It is called at gesture completion, never on pointer/touch move previews. An opening
+fully outside the edited room remains on its surviving wall, without a projection in that room.
+These operation options are runtime edit intent, not schema attributes or independent record fields.

@@ -221,6 +221,7 @@ export class BuildingPlanCanvasController {
     createId = generateUuidV7,
     scopeId = () => null,
     editingPolicy = {},
+    confirmOpeningRemoval = () => false,
   }) {
     Object.assign(this, {
       meta,
@@ -231,6 +232,7 @@ export class BuildingPlanCanvasController {
       readOnly,
       createId,
       scopeId,
+      confirmOpeningRemoval,
     });
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
     this.interaction = createBuildingPlanInteraction({
@@ -358,7 +360,35 @@ export class BuildingPlanCanvasController {
         operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
     };
     this.previewView = null;
-    const proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+    let proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+    const cut = proposal.issues?.find(
+      (issue) => issue.code === 'opening_cut_requires_confirmation'
+    );
+    if (cut) {
+      const before = JSON.stringify(this.readRecord());
+      this.busy = true;
+      this.emitUpdate();
+      let confirmed;
+      try {
+        confirmed = await this.confirmOpeningRemoval(copy(cut));
+      } finally {
+        this.busy = false;
+        this.emitUpdate();
+      }
+      if (this.disposed || !this.canEdit() || JSON.stringify(this.readRecord()) !== before)
+        return null;
+      if (!confirmed) {
+        this.reportIssues(proposal.issues);
+        return null;
+      }
+      operation = {
+        ...operation,
+        removeOpeningIds: cut.openingIds,
+        allowObservationDeletion: cut.observationIds.length > 0,
+      };
+      proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+    }
+
     if (proposal.status !== 'ready') {
       this.reportIssues(proposal.issues);
       this.emitUpdate();

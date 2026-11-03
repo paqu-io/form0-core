@@ -1,3 +1,4 @@
+import { prepareBuildingPlanEdit } from './opening-edits.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import {
@@ -203,18 +204,18 @@ export function createBuildingPlanSession({
   function preview(operation, { scopeId = null } = {}) {
     if (readOnly) return locked();
     if (!scopeExists(scopeId)) return stale();
-    const candidate = copy(current);
     try {
-      const result = applyBuildingPlanOperation(candidate, copy(operation), {
-        createId,
-        specifications,
-        editingPolicy,
-      });
-      const issues = [
-        ...reconcileBuildingPlanProperties(candidate, specifications),
-        ...validate(candidate),
-      ];
-      if (issues.length) return response('conflict', issues);
+      const { candidate, result } = prepareBuildingPlanEdit(
+        current,
+        copy(operation),
+        (candidate, edit) =>
+          applyBuildingPlanOperation(candidate, edit, { createId, specifications, editingPolicy }),
+        (candidate) => [
+          ...reconcileBuildingPlanProperties(candidate, specifications),
+          ...validate(candidate),
+        ]
+      );
+
       const changes = diffBuildingPlanSnapshots(current, candidate);
       const proposal = response('ready', [], {
         snapshot: copy(candidate),

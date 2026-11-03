@@ -37,6 +37,28 @@ export function createBuildingPlanEditor(options) {
     throw new TypeError(message);
   };
 
+  const openingEditorConflict = (ids) => {
+    const removing = new Set(ids);
+    if (!removing.size) return null;
+    for (const editor of editors.values()) {
+      const target = session.resolveRow(editor.path);
+      if (removing.has(target?.model?.id))
+        return {
+          status: 'conflict',
+          record: session.getRecord(),
+          issues: [
+            {
+              code: 'opening_editor_active',
+              message:
+                'Save or cancel the affected door/window entry, then repeat this move. Its open editor cannot be discarded by another row.',
+              subject: { type: target.model.type, id: target.model.id },
+            },
+          ],
+        };
+    }
+    return null;
+  };
+
   function createOperation(path) {
     const kind = nodeFor(meta, keyOf(path.at(-1)))?.nodeKey;
     if (kind === 'floors') return { type: 'create_floor' };
@@ -253,8 +275,35 @@ export function createBuildingPlanEditor(options) {
       evaluation = { evaluator, stamp, input, promise };
       return promise;
     },
-    apply: (...args) => publish(session.apply(...args)),
-    commit: (...args) => publish(session.commit(...args)),
+    apply(operation, options) {
+      const conflict = openingEditorConflict(
+        Array.isArray(operation?.removeOpeningIds) ? operation.removeOpeningIds : []
+      );
+      return conflict || publish(session.apply(operation, options));
+    },
+    commit(proposal) {
+      if (proposal?.snapshot) {
+        const surviving = new Set(
+          proposal.snapshot.floors.flatMap((floor) =>
+            floor.walls.flatMap((wall) =>
+              [...wall.doors, ...wall.windows].map((opening) => opening.id)
+            )
+          )
+        );
+        const removed = session
+          .getSnapshot()
+          .floors.flatMap((floor) =>
+            floor.walls.flatMap((wall) =>
+              [...wall.doors, ...wall.windows]
+                .filter((opening) => !surviving.has(opening.id))
+                .map((opening) => opening.id)
+            )
+          );
+        const conflict = openingEditorConflict(removed);
+        if (conflict) return conflict;
+      }
+      return publish(session.commit(proposal));
+    },
     undo: (...args) => publish(session.undo(...args)),
     redo: (...args) => publish(session.redo(...args)),
     subscribe(listener) {
