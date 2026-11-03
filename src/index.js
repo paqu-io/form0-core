@@ -69,6 +69,11 @@ export {
 } from './building-plan/model.js';
 export { buildingPlanPointFromViewport } from './building-plan/geometry.js';
 export {
+  normalizeBuildingPlanEditingPolicy,
+  BUILDING_PLAN_EDITING_DEFAULTS,
+} from './building-plan/editing-policy.js';
+export { createBuildingPlanInteraction } from './building-plan/interaction.js';
+export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,
   refreshBuildingPlanProjections,

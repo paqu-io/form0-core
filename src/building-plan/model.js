@@ -634,6 +634,15 @@ function validateSnapshot(snapshot) {
               { type: 'room_face', id: face.id }
             )
           );
+        for (const edge of faceEdges(room, face))
+          if (!face.bindings?.some((binding) => binding.edgeId === edge.id))
+            issues.push(
+              planIssue(
+                'unbound_facing_edge',
+                'A straight facing portion needs a physical wall binding.',
+                { type: 'room_face', id: face.id }
+              )
+            );
         for (const binding of face.bindings || []) {
           register('binding', binding);
           const wall = findWall(floor, face.wallId);
@@ -742,9 +751,12 @@ function validateSnapshot(snapshot) {
   for (const floor of snapshot.floors)
     for (const observation of floor.observations || []) {
       if (
-        !observation.subject ||
-        ids.get(observation.subject.id) !== observation.subject.type ||
-        subjectFloors.get(observation.subject.id) !== floor.id
+        [observation.subject, ...(observation.relatedSubjects || [])].some(
+          (subject) =>
+            !subject ||
+            ids.get(subject.id) !== subject.type ||
+            subjectFloors.get(subject.id) !== floor.id
+        )
       )
         issues.push(
           planIssue('dangling_observation', 'An observation references a missing subject.', {

@@ -4,6 +4,8 @@ import { getBuildingPlanFieldState } from './transactions.js';
 import { readBuildingPlanRecord, writeBuildingPlanRecord } from './records.js';
 import { buildingPlanFaceSegments, copyBuildingPlanData as copy } from './model.js';
 import { distance, project, roomBounds, segmentFrame } from './geometry.js';
+import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
+import { createBuildingPlanInteraction } from './interaction.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -218,6 +220,7 @@ export class BuildingPlanCanvasController {
     readOnly = false,
     createId = generateUuidV7,
     scopeId = () => null,
+    editingPolicy = {},
   }) {
     Object.assign(this, {
       meta,
@@ -228,6 +231,11 @@ export class BuildingPlanCanvasController {
       readOnly,
       createId,
       scopeId,
+    });
+    this.editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
+    this.interaction = createBuildingPlanInteraction({
+      scene: () => ({ ...this.getSnapshot(), gridSize: this.gridSize }),
+      policy: () => this.editingPolicy,
     });
     this.gridSize = 20;
     this.activeFloorIndex = 0;
@@ -296,6 +304,7 @@ export class BuildingPlanCanvasController {
           windows: [],
         }),
       history: this.session?.getState(),
+      guides: this.interaction?.getGuides() || [],
     });
   }
   subscribe(listener) {
@@ -327,6 +336,12 @@ export class BuildingPlanCanvasController {
   dispose() {
     this.disposed = true;
     this.listeners.clear();
+    this.interaction.reset();
+  }
+  setEditingPolicy(policy) {
+    this.editingPolicy = normalizeBuildingPlanEditingPolicy(policy);
+    this.interaction.reset();
+    this.emitUpdate();
   }
   async settleFieldUpdates() {
     return this.pending;
@@ -337,6 +352,11 @@ export class BuildingPlanCanvasController {
   async apply(operation) {
     if (!this.canEdit() || !this.session) return null;
     this.syncFromState();
+    operation = {
+      ...operation,
+      preserveWallGrouping:
+        operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
+    };
     this.previewView = null;
     const proposal = this.session.preview(operation, { scopeId: this.scopeId() });
     if (proposal.status !== 'ready') {
@@ -406,7 +426,14 @@ export class BuildingPlanCanvasController {
   }
   previewOperation(operation) {
     if (!this.canEdit() || !this.session) return { status: 'blocked', issues: [] };
-    const proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+    const proposal = this.session.preview(
+      {
+        ...operation,
+        preserveWallGrouping:
+          operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
+      },
+      { scopeId: this.scopeId() }
+    );
     if (proposal.status === 'ready') {
       const record = writeBuildingPlanRecord({
         meta: this.meta,
@@ -427,6 +454,7 @@ export class BuildingPlanCanvasController {
   }
   clearPreview({ clearIssues = false } = {}) {
     this.previewView = null;
+    this.interaction.reset();
     if (clearIssues) this.reportIssues([]);
     this.emitUpdate();
   }

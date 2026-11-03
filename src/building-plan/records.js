@@ -485,7 +485,9 @@ export function refreshBuildingPlanProjections(options) {
             source === 'observations'
               ? observations.filter((row) => {
                   const model = modelOf(meta, 'observations', row);
-                  return [state.id, state.wallId].includes(model.subject?.id);
+                  return [model.subject, ...(model.relatedSubjects || [])].some((subject) =>
+                    [state.id, state.wallId].includes(subject?.id)
+                  );
                 })
               : rows(meta, source, wall).filter((row) => {
                   const model = modelOf(meta, source, row);

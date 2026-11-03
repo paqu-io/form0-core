@@ -1,4 +1,5 @@
 import { generateUuidV7 } from '../utilities/uuid.js';
+import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import {
   BUILDING_PLAN_PROPERTIES,
   copyBuildingPlanData as copy,
@@ -154,7 +155,7 @@ function validate(snapshot) {
 /**
  * Own immutable candidate operations, accepted history, and nested editor scopes.
  * Hosts own rendering, form lifecycle events, and actual record persistence.
- * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean}} [options]
+ * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {preserveWallGrouping?: boolean, snapping?: boolean, edgeAutoPan?: boolean}}} [options]
  * @returns {Object} Portable building-plan session.
  */
 export function createBuildingPlanSession({
@@ -162,7 +163,9 @@ export function createBuildingPlanSession({
   properties = {},
   createId = generateUuidV7,
   readOnly = false,
+  editingPolicy = {},
 } = {}) {
+  editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
   const specifications = copy({ ...BUILDING_PLAN_PROPERTIES, ...properties });
   let current = copy(snapshot);
   let revision = 0;
@@ -205,6 +208,7 @@ export function createBuildingPlanSession({
       const result = applyBuildingPlanOperation(candidate, copy(operation), {
         createId,
         specifications,
+        editingPolicy,
       });
       const issues = [
         ...reconcileBuildingPlanProperties(candidate, specifications),
@@ -354,6 +358,10 @@ export function createBuildingPlanSession({
 
   return {
     getSnapshot,
+    /** Editor preferences affect future proposals, never the accepted record or history. */
+    setEditingPolicy(policy) {
+      editingPolicy = normalizeBuildingPlanEditingPolicy(policy);
+    },
     preview,
     commit,
     apply,

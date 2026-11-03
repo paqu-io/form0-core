@@ -266,6 +266,7 @@ export function createBuildingPlanRecordSession({
   createId = generateUuidV7,
   createRowId = generateUuidV7,
   readOnly = false,
+  editingPolicy = {},
 }) {
   const meta = getBuildingPlanRecordMetadata({ meta: suppliedMeta, schema, sectionKey });
   let source = copy(record || { values: {}, repeatable: {} });
@@ -275,6 +276,7 @@ export function createBuildingPlanRecordSession({
     properties: meta.properties,
     createId,
     readOnly,
+    editingPolicy,
   });
   source = writeBuildingPlanRecord({
     meta,
@@ -310,6 +312,7 @@ export function createBuildingPlanRecordSession({
   return {
     meta,
     getSnapshot: session.getSnapshot,
+    setEditingPolicy: session.setEditingPolicy,
     getRecord: () => copy(source),
     adoptRowMetadata(record) {
       source = writeBuildingPlanRecord({ meta, record, plan: session.getSnapshot(), createRowId });

@@ -12,6 +12,11 @@ export {
 export { buildingPlanPointFromViewport } from './geometry.js';
 export { isBuildingPlanInternalCollection } from './metadata.js';
 export {
+  normalizeBuildingPlanEditingPolicy,
+  BUILDING_PLAN_EDITING_DEFAULTS,
+} from './editing-policy.js';
+export { createBuildingPlanInteraction } from './interaction.js';
+export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,
   refreshBuildingPlanProjections,

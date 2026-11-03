@@ -78,6 +78,27 @@ copy. Preserve identities, bindings, override intent, and observation provenance
 writing a modified snapshot back through `writeBuildingPlanRecord`. Row identities and
 physical subject identities have different roles. Pan/zoom and unfinished previews are transient.
 
+## Jog edits and editor preferences
+
+A valid shared-face jog exposes six straight wall-facing rows for the second room. By default,
+the two new return runs receive their own physical subjects: this example then has nine physical
+walls. Partial sharing in the unchanged example still uses seven. Pass
+`editingPolicy: { preserveWallGrouping: true }` to a session/editor to keep seven physical walls
+while retaining the six facing rows. `setEditingPolicy()` changes future operations without
+rewriting accepted records or adding history. The `separate_wall` operation can explicitly
+separate selected construction segments with `wallId` and optional `segmentIds`.
+
+Surviving runs keep their identities. New runs carry lineage, and hosted openings keep their IDs
+and widths. A wall observation spanning separated subjects remains one observation; its
+`relatedSubjects` list references the resulting physical subjects while the original
+`sourceSubject`, coverage, evidence, and captured geometry remain available. Copied answers are
+not new measurements. Returning automatic runs to a straight alignment can coalesce redundant
+rows when their answers agree; distinct answers, explicit separations, or occupied returns can
+require an inline resolution instead.
+
+Snapping and edge auto-pan default on and are independently switchable through the editing
+policy. These preferences, alignment guides, and viewport changes are absent from record output.
+
 ## Verify or update
 
 From the `form0-core` repository root:
