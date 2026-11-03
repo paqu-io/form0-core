@@ -1,0 +1,143 @@
+{
+  "form": {
+    "name": "BuildingPlan shared-wall acceptance",
+    "elements": [
+      {
+        "type": "BuildingPlanSection",
+        "key": "plan",
+        "data_name": "plan",
+        "label": "Building plan",
+        "description": null,
+        "description_mode": null,
+        "visible": true,
+        "visible_conditions": null,
+        "read_only": false,
+        "read_only_conditions": null,
+        "node_overrides": {
+          "floors": {
+            "extra_elements": [
+              {
+                "type": "TextField",
+                "key": "floor_note",
+                "data_name": "floor_note",
+                "label": "Floor note",
+                "display": "default",
+                "description": null,
+                "description_mode": null,
+                "required": false,
+                "required_conditions": null,
+                "visible": true,
+                "visible_conditions": null,
+                "read_only": false,
+                "read_only_conditions": null,
+                "default_value": null,
+                "pattern": null,
+                "pattern_description": null,
+                "supporting_image": false,
+                "supporting_image_path": null,
+                "supporting_image_display": null
+              }
+            ]
+          },
+          "rooms": {
+            "extra_elements": [
+              {
+                "type": "TextField",
+                "key": "room_note",
+                "data_name": "room_note",
+                "label": "Room note",
+                "display": "default",
+                "description": null,
+                "description_mode": null,
+                "required": false,
+                "required_conditions": null,
+                "visible": true,
+                "visible_conditions": null,
+                "read_only": false,
+                "read_only_conditions": null,
+                "default_value": null,
+                "pattern": null,
+                "pattern_description": null,
+                "supporting_image": false,
+                "supporting_image_path": null,
+                "supporting_image_display": null
+              }
+            ]
+          },
+          "walls": {
+            "extra_elements": [
+              {
+                "type": "TextField",
+                "key": "finish",
+                "data_name": "finish",
+                "label": "Room-side finish",
+                "display": "default",
+                "description": null,
+                "description_mode": null,
+                "required": false,
+                "required_conditions": null,
+                "visible": true,
+                "visible_conditions": null,
+                "read_only": false,
+                "read_only_conditions": null,
+                "default_value": null,
+                "pattern": null,
+                "pattern_description": null,
+                "supporting_image": false,
+                "supporting_image_path": null,
+                "supporting_image_display": null
+              },
+              {
+                "type": "TextField",
+                "key": "material",
+                "data_name": "material",
+                "label": "Construction material",
+                "display": "default",
+                "description": null,
+                "description_mode": null,
+                "required": false,
+                "required_conditions": null,
+                "visible": true,
+                "visible_conditions": null,
+                "read_only": false,
+                "read_only_conditions": null,
+                "default_value": "Masonry",
+                "pattern": null,
+                "pattern_description": null,
+                "supporting_image": false,
+                "supporting_image_path": null,
+                "supporting_image_display": null
+              },
+              {
+                "type": "NumericField",
+                "key": "measured_thickness",
+                "data_name": "measured_thickness",
+                "label": "Observed thickness (m)",
+                "display": "default",
+                "description": null,
+                "description_mode": null,
+                "required": false,
+                "required_conditions": null,
+                "visible": true,
+                "visible_conditions": null,
+                "read_only": false,
+                "read_only_conditions": null,
+                "default_value": null,
+                "min": null,
+                "max": null,
+                "format": "float",
+                "supporting_image": false,
+                "supporting_image_path": null,
+                "supporting_image_display": null
+              }
+            ],
+            "field_bindings": {
+              "material": { "scope": "physical_wall", "inherit": true },
+              "measured_thickness": { "scope": "observation" }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
