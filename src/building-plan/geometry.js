@@ -168,15 +168,27 @@ export function shiftRoomEdge(room, edgeId, interval, delta, createId) {
   from = Math.max(0, from);
   to = Math.min(edge.length, to);
   const previous = room.edges;
+  const adjacentStart = edges[(index + edges.length - 1) % edges.length];
+  const adjacentEnd = edges[(index + 1) % edges.length];
+  const holdStart =
+    from <= GEOMETRY_EPSILON &&
+    edge.start.editingCutId &&
+    near(dot(adjacentStart.tangent, edge.tangent), 1);
+  const holdEnd =
+    to >= edge.length - GEOMETRY_EPSILON &&
+    edge.end.editingCutId &&
+    near(dot(adjacentEnd.tangent, edge.tangent), 1);
   const start =
-    from <= GEOMETRY_EPSILON
+    from <= GEOMETRY_EPSILON && !holdStart
       ? cleanPoint({ ...edge.start, ...add(edge.start, delta) })
       : edge.start;
   const end =
-    to >= edge.length - GEOMETRY_EPSILON
+    to >= edge.length - GEOMETRY_EPSILON && !holdEnd
       ? cleanPoint({ ...edge.end, ...add(edge.end, delta) })
       : edge.end;
   const inserted = [];
+  if (holdStart)
+    inserted.push(cleanPoint({ ...edge.start, ...add(edge.start, delta), id: createId() }));
   if (from > GEOMETRY_EPSILON) {
     inserted.push(
       { ...at(edge, from), id: createId() },
@@ -189,6 +201,7 @@ export function shiftRoomEdge(room, edgeId, interval, delta, createId) {
       { ...at(edge, to), id: createId() }
     );
   }
+  if (holdEnd) inserted.push(cleanPoint({ ...edge.end, ...add(edge.end, delta), id: createId() }));
   const vertices = room.vertices.map((p) =>
     p.id === edge.start.id ? start : p.id === edge.end.id ? end : p
   );

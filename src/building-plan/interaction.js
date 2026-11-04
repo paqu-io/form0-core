@@ -54,7 +54,15 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   }
   function snapTranslation(
     points,
-    { roomId, physicalWallId, zoom = 1, originalPoints = [], bypass = false } = {}
+    {
+      roomId,
+      physicalWallId,
+      editingGroupId,
+      faceId,
+      zoom = 1,
+      originalPoints = [],
+      bypass = false,
+    } = {}
   ) {
     if (!settings().snapping || bypass || points.length < 2) {
       latch.clear();
@@ -73,10 +81,12 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       const own = segmentFrame(start, end);
       for (const wall of view.walls || []) {
         if (
-          !wall.isBoundary ||
-          wall.roomId === roomId ||
           wall.points.length !== 2 ||
-          (physicalWallId && wall.physicalWallId === physicalWallId)
+          (editingGroupId
+            ? wall.editingGroupId !== editingGroupId || wall.id === faceId || wall.isEditingReturn
+            : !wall.isBoundary ||
+              wall.roomId === roomId ||
+              (physicalWallId && wall.physicalWallId === physicalWallId))
         )
           continue;
         const other = segmentFrame(wall.points[0], wall.points[1]);
@@ -88,7 +98,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         const neighbour = view.rooms.find((room) => room.id === wall.roomId);
         const thickness = (wall.thickness ?? 0) * (view.gridSize || 20);
         const expected =
-          direction < 0 && overlap >= -8 / zoom
+          !editingGroupId && direction < 0 && overlap >= -8 / zoom
             ? -Math.sign(polygonArea(neighbour.vertices)) * thickness
             : 0;
         const difference = expected - project(other, start).offset;

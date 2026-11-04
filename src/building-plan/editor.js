@@ -58,6 +58,33 @@ export function createBuildingPlanEditor(options) {
     }
     return null;
   };
+  const faceEditorConflict = (snapshot) => {
+    const surviving = new Set(
+      snapshot.floors.flatMap((floor) =>
+        floor.rooms.flatMap((room) => room.faces.map((face) => face.id))
+      )
+    );
+    for (const editor of editors.values()) {
+      const target = session.resolveRow(editor.path);
+      if (target.faceId && !surviving.has(target.faceId))
+        return {
+          status: 'conflict',
+          record: session.getRecord(),
+          issues: [
+            {
+              code: 'wall_editor_active',
+              message:
+                'Save or cancel the affected wall entry before rejoining. Its open editor cannot be removed by another row.',
+              subject: { type: 'room_face', id: target.faceId },
+            },
+          ],
+        };
+    }
+    return null;
+  };
+  const includesRejoin = (operation) =>
+    operation?.type === 'rejoin_cut' ||
+    (operation?.type === 'batch' && operation.operations?.some(includesRejoin));
 
   function createOperation(path) {
     const kind = nodeFor(meta, keyOf(path.at(-1)))?.nodeKey;
@@ -182,7 +209,16 @@ export function createBuildingPlanEditor(options) {
       session.cancelScope(scopeId);
       fail('The editor path does not identify its new row.');
     }
-    editors.set(scopeId, { path: copy(path), initialRow: copy(selected) });
+    // Ordinary editor lifetimes follow row identities when geometry inserts sibling rows.
+    let parent = session.getRecord();
+    const stablePath = path.map((part) => {
+      const row = resolveBuildingPlanRow(parent, [part]);
+      parent = row;
+      return part.identity === 'position'
+        ? copy(part)
+        : { ...copy(part), instanceId: row.id ?? row.record_id };
+    });
+    editors.set(scopeId, { path: stablePath, initialRow: copy(selected) });
     publish(opened);
     return {
       status: 'opened',
@@ -279,10 +315,18 @@ export function createBuildingPlanEditor(options) {
       const conflict = openingEditorConflict(
         Array.isArray(operation?.removeOpeningIds) ? operation.removeOpeningIds : []
       );
-      return conflict || publish(session.apply(operation, options));
+      if (conflict) return conflict;
+      if (includesRejoin(operation)) {
+        const proposal = session.preview(operation, options);
+        if (proposal.status !== 'ready') return proposal;
+        return faceEditorConflict(proposal.snapshot) || publish(session.commit(proposal));
+      }
+      return publish(session.apply(operation, options));
     },
     commit(proposal) {
       if (proposal?.snapshot) {
+        const faceConflict = faceEditorConflict(proposal.snapshot);
+        if (faceConflict) return faceConflict;
         const surviving = new Set(
           proposal.snapshot.floors.flatMap((floor) =>
             floor.walls.flatMap((wall) =>

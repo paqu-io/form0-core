@@ -450,6 +450,18 @@ function validateSnapshot(snapshot) {
   const subjectFloors = new Map();
   let containingFloor;
   const register = (type, entity) => {
+    if (
+      type === 'vertex' &&
+      entity &&
+      own(entity, 'editingCutId') &&
+      (typeof entity.editingCutId !== 'string' || !entity.editingCutId.trim())
+    )
+      issues.push(
+        planIssue('invalid_editing_cut', 'An editing cut requires a nonempty string identity.', {
+          type,
+          id: entity.id,
+        })
+      );
     if (!entity || typeof entity.id !== 'string' || !entity.id || ids.has(entity.id))
       issues.push(
         planIssue('invalid_identity', 'Subject and geometry IDs must be nonempty and unique.', {

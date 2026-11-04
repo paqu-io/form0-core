@@ -47,6 +47,8 @@ import {
   wallTopologyOrigin,
 } from './topology.js';
 import { reconcileWallExtents } from './wall-extents.js';
+import { rejoinEditingCut, splitEditingFace } from './editing-cuts.js';
+import { movePartitionPortion } from './partition-edits.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
   const error = new Error(message);
@@ -359,9 +361,7 @@ function alignNewReturns(floor, changedEdges, activeRoomId, before) {
           project(reference, edge.end).along,
         ].sort((a, b) => a - b);
         if (Math.min(reference.length, span[1]) - Math.max(0, span[0]) < -EPS) continue;
-        const face = active.faces.find((face) =>
-          face.bindings.some((binding) => binding.edgeId === reference.id)
-        );
+        const face = active.faces.find((face) => face.edgeIds?.includes(reference.id));
         if (!face) continue;
         const wall = findWall(floor, face.wallId);
         const oldRoom = before.rooms.find((room) => room.id === activeRoomId);
@@ -379,7 +379,7 @@ function alignNewReturns(floor, changedEdges, activeRoomId, before) {
             : binding.roomInterval;
           return Math.min(span[1], range[1]) - Math.max(span[0], range[0]) >= -EPS;
         });
-        const thicknesses = bindings.map((binding) =>
+        const thicknesses = (bindings.length ? bindings : face.bindings).map((binding) =>
           buildingPlanSegmentThickness(
             wall,
             wall.segments.find((segment) => segment.id === binding.segmentId)
@@ -423,6 +423,17 @@ function finishBoundaryEdit(
   specifications
 ) {
   if (!changedEdges.length && !affectedWalls.length) return;
+  // A thickness update can move both sides of an explicit cut in one operation.
+  // Remove its temporary zero-length return before resolving new facing contacts.
+  for (const roomId of new Set(changedEdges.map((entry) => entry.roomId))) {
+    const room = findRoom(floor, roomId);
+    if (
+      room.vertices.some(
+        (point, index) => distance(point, room.vertices[(index + 1) % room.vertices.length]) <= EPS
+      )
+    )
+      normalizeRoomBoundary(floor, room, createId);
+  }
   const alignedRooms = alignNewReturns(floor, changedEdges, operation.activeRoomId, before);
   for (const roomId of new Set(changedEdges.map((entry) => entry.roomId)))
     normalizeRoomBoundary(floor, findRoom(floor, roomId), createId);
@@ -508,9 +519,17 @@ function finishBoundaryEdit(
 
 function detachRoom(floor, room, createId) {
   const stationaryWalls = new Set();
+  const replacements = new Map();
   for (const face of room.faces) {
     const wall = findWall(floor, face.wallId);
     if (!facesOfWall(floor, wall.id).some((entry) => entry.room.id !== room.id)) continue;
+    if (replacements.has(wall.id)) {
+      face.wallId = replacements.get(wall.id).id;
+      continue;
+    }
+    const roomBindings = room.faces
+      .filter((entry) => entry.wallId === wall.id)
+      .flatMap((entry) => entry.bindings);
     const replacement = {
       ...copy(wall),
       id: createId(),
@@ -521,9 +540,9 @@ function detachRoom(floor, room, createId) {
       lineage: { copiedFromWallId: wall.id, reason: 'room_detach' },
     };
     replacement.segments = wall.segments
-      .filter((segment) => face.bindings.some((binding) => binding.segmentId === segment.id))
+      .filter((segment) => roomBindings.some((binding) => binding.segmentId === segment.id))
       .map((segment) => {
-        const bindings = face.bindings.filter((binding) => binding.segmentId === segment.id);
+        const bindings = roomBindings.filter((binding) => binding.segmentId === segment.id);
         const frame = segmentFrame(segment.start, segment.end);
         const from = Math.min(...bindings.map((binding) => binding.interval[0]));
         const to = Math.max(...bindings.map((binding) => binding.interval[1]));
@@ -536,9 +555,30 @@ function detachRoom(floor, room, createId) {
         };
       });
     floor.walls.push(replacement);
+    replacements.set(wall.id, replacement);
     face.wallId = replacement.id;
     stationaryWalls.add(wall.id);
     wall.referenceFaceId = facesOfWall(floor, wall.id)[0]?.face.id || null;
+  }
+  const copiedCuts = new Map();
+  for (const wallId of stationaryWalls) {
+    const wall = findWall(floor, wallId);
+    wall.referenceFaceId = facesOfWall(floor, wallId)[0]?.face.id || null;
+  }
+  for (const point of [...room.vertices, ...room.faces.flatMap((face) => face.freePath || [])]) {
+    if (
+      !point.editingCutId ||
+      !floor.rooms.some(
+        (other) =>
+          other !== room &&
+          [...other.vertices, ...other.faces.flatMap((face) => face.freePath || [])].some(
+            (v) => v.editingCutId === point.editingCutId
+          )
+      )
+    )
+      continue;
+    if (!copiedCuts.has(point.editingCutId)) copiedCuts.set(point.editingCutId, createId());
+    point.editingCutId = copiedCuts.get(point.editingCutId);
   }
   reconcileWallExtents(floor, stationaryWalls, { retireUnbound: true });
 }
@@ -1089,6 +1129,10 @@ export function applyBuildingPlanOperation(
   }
   const floor = findBuildingPlanFloor(snapshot, operation.floorId);
   switch (operation.type) {
+    case 'split_face':
+      return splitEditingFace(floor, operation, createId);
+    case 'rejoin_cut':
+      return rejoinEditingCut(floor, operation, createId);
     case 'create_room': {
       const room = createBuildingPlanRoom(floor, operation, createId, specifications);
       if (operation.attach) attachRoom(floor, room, operation, createId, specifications);
@@ -1274,6 +1318,18 @@ export function applyBuildingPlanOperation(
       break;
     }
     case 'update_wall': {
+      if (
+        operation.faceId &&
+        findFace(floor, operation.faceId).face.freePath?.some((point) => point.editingCutId)
+      ) {
+        movePartitionPortion(floor, operation, {
+          createId,
+          splitSegment: splitGeometrySegment,
+          finish: (before, walls) =>
+            finishBoundaryEdit(floor, before, [], walls, operation, createId, specifications),
+        });
+        break;
+      }
       const wall = findWall(floor, operation.wallId);
       const linked = facesOfWall(floor, wall.id);
       if (linked.length !== 1 || !linked[0].face.freePath)
@@ -1290,7 +1346,7 @@ export function applyBuildingPlanOperation(
       const half = (wall.properties.wall_thickness_m ?? 0) / 2;
       const previous = copy(wall.segments);
       face.freePath = operation.vertices.map((p, index) =>
-        cleanPoint({ ...p, id: face.freePath[index].id })
+        cleanPoint({ ...face.freePath[index], ...p, id: face.freePath[index].id })
       );
       wall.segments = face.freePath.slice(0, -1).map((start, index) => {
         const frame = segmentFrame(start, face.freePath[index + 1]);

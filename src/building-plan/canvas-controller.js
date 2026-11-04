@@ -7,6 +7,7 @@ import { distance, project, roomBounds, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
+import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -42,6 +43,7 @@ export function buildingPlanCanvasSnapshot({
     windows: [],
     wallFootprints: [],
     physicalOpenings: [],
+    editingCuts: [],
   };
   const pixels = (point) => ({ x: point.x * gridSize, y: point.y * gridSize });
   const floorRows = record.repeatable?.[key(meta, 'floors')] || [];
@@ -60,6 +62,16 @@ export function buildingPlanCanvasSnapshot({
     Object.assign(output, buildingPlanFootprints(floor, gridSize));
     const roomRows = floorRow.repeatable[key(meta, 'rooms')] || [];
     for (const room of floor.rooms) {
+      const cuts = new Set();
+      for (const point of [
+        ...room.vertices,
+        ...room.faces.flatMap((face) => face.freePath || []),
+      ]) {
+        const token = `${point.editingCutId}:${point.x}:${point.y}`;
+        if (!point.editingCutId || cuts.has(token)) continue;
+        cuts.add(token);
+        output.editingCuts.push({ id: point.editingCutId, roomId: room.id, point: pixels(point) });
+      }
       const roomIndex = roomRows.findIndex((row) => subjectId(meta, 'rooms', row) === room.id);
       const roomRow = roomRows[roomIndex];
       const roomPath = [...floorPath, { key: key(meta, 'rooms'), index: roomIndex }];
@@ -97,6 +109,9 @@ export function buildingPlanCanvasSnapshot({
           id: face.id,
           physicalWallId: physical.id,
           isBoundary: !face.freePath,
+          isCutPortion: Boolean(face.freePath?.some((point) => point.editingCutId)),
+          editingGroupId: face.lineage?.editingOriginFaceId || null,
+          isEditingReturn: Boolean(face.lineage?.editingReturn),
           rowId: faceRow.id,
           roomId: room.id,
           floorIndex,
@@ -560,6 +575,21 @@ export class BuildingPlanCanvasController {
     const operation = this.wallOperation(id, points);
     return operation && this.previewOperation(operation);
   }
+  getCutPlacement(point, options = {}) {
+    return buildingPlanCutPlacement({ ...this.snapshot, gridSize: this.gridSize }, point, {
+      snapping: this.editingPolicy.snapping,
+      ...options,
+    });
+  }
+  getJoinPlacement(point, options = {}) {
+    return buildingPlanJoinPlacement(this.snapshot, point, options);
+  }
+  splitWall(id, { offset } = {}) {
+    return this.apply({ type: 'split_face', floorId: this.floorId, faceId: id, offset });
+  }
+  rejoinCut(id) {
+    return this.apply({ type: 'rejoin_cut', floorId: this.floorId, cutId: id });
+  }
   wallOperation(id, points) {
     const info = this.walls.get(id);
     if (!info) return null;
@@ -569,6 +599,7 @@ export class BuildingPlanCanvasController {
     if (face.freePath)
       return {
         type: 'update_wall',
+        faceId: id,
         floorId: floor.id,
         wallId: face.wallId,
         vertices: points.map((p) => this.metric(p)),

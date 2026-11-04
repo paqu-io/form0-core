@@ -80,6 +80,27 @@ physical subject identities have different roles. Pan/zoom and unfinished previe
 
 ## Jog edits and editor preferences
 
+Use `split_face` to divide a straight editable portion without dividing its physical wall:
+
+```js
+const split = session.apply({ type: 'split_face', floorId, faceId, offset: 1.5 });
+const cutId = split.created.id;
+session.apply({ type: 'rejoin_cut', floorId, cutId });
+```
+
+The offset is in metres from the selected portion's directed start. Corresponding shared faces
+receive their own rows and retain their room-side answers; physical values, openings and dated
+observations remain stored once. Metric vertices carry `editingCutId` references (on room vertices,
+or a partition's `freePath`), preserved in the existing JSON geometry/model fields. A cut remains
+after a jog returns to a straight line. Rejoin removes the chosen cut only when its portions are
+contiguous, collinear and compatible; other explicit cuts and meaningful construction divisions
+remain. Differing room-side answers must be resolved first, and cuts through openings are refused.
+The physical `split_wall` / `join_walls` APIs retain their separate construction-identity meaning.
+
+The browser canvases offer Split/Rejoin, magnetic point placement and exact distance entry from
+a marked `0` end. Native offers the same touch commands; select a wall in Select mode for exact
+distance entry. The normal child/floor Save/Cancel and Undo/Redo own these complete operations.
+
 Detaching a room reconciles the stationary wall's current segment extents to its surviving faces;
 unused automatic tails are removed from the saved geometry. Stationary identities, valid hosted
 opening positions, and dated observation source geometry remain intact. Independently authored

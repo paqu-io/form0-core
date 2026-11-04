@@ -91,6 +91,24 @@ function triangles(vertices) {
   return result;
 }
 
+function addWallCorner(walls, incoming, outgoing, point, a, b, side) {
+  if (!(a?.thickness > 0 && b?.thickness > 0)) return;
+  const denominator = cross(incoming.tangent, outgoing.tangent);
+  if (denominator * side <= EPS) return;
+  const qa = add(point, multiply(incoming.normal, -side * a.thickness));
+  const qb = add(point, multiply(outgoing.normal, -side * b.thickness));
+  const along = cross(subtract(qb, qa), outgoing.tangent) / denominator;
+  const intersection = add(qa, multiply(incoming.tangent, along));
+  const miter = Math.hypot(intersection.x - point.x, intersection.y - point.y);
+  walls
+    .get(a.wall.id)
+    .polygons.push(
+      miter <= 4 * Math.max(a.thickness, b.thickness)
+        ? [point, qa, intersection, qb]
+        : [point, qa, qb]
+    );
+}
+
 /** Derived metric wall material and canonical openings; never writes to the semantic model. */
 export function buildingPlanFootprints(floor, gridSize) {
   const pixels = (p) => ({ x: p.x * gridSize, y: p.y * gridSize });
@@ -164,22 +182,49 @@ export function buildingPlanFootprints(floor, gridSize) {
       const previous = (i + edges.length - 1) % edges.length;
       const a = bound(previous, true),
         b = bound(i, false);
-      if (!(a?.thickness > 0 && b?.thickness > 0)) continue;
-      const incoming = edges[previous],
-        outgoing = edges[i];
-      const denominator = cross(incoming.tangent, outgoing.tangent);
-      if (denominator * side <= EPS) continue;
-      const p = room.vertices[i];
-      const qa = add(p, multiply(incoming.normal, -side * a.thickness));
-      const qb = add(p, multiply(outgoing.normal, -side * b.thickness));
-      const along = cross(subtract(qb, qa), outgoing.tangent) / denominator;
-      const intersection = add(qa, multiply(incoming.tangent, along));
-      const miter = Math.hypot(intersection.x - p.x, intersection.y - p.y);
-      walls
-        .get(a.wall.id)
-        .polygons.push(
-          miter <= 4 * Math.max(a.thickness, b.thickness) ? [p, qa, intersection, qb] : [p, qa, qb]
+      addWallCorner(walls, edges[previous], edges[i], room.vertices[i], a, b, side);
+    }
+    // Explicit partition cuts connect their derived return to the same captured chain.
+    const partitions = room.faces.filter(
+      (face) => face.freePath?.length === 2 && face.lineage?.editingOriginFaceId
+    );
+    const construction = (face, binding) => {
+      const wall = floor.walls.find((wall) => wall.id === face.wallId);
+      return {
+        wall,
+        thickness: buildingPlanSegmentThickness(
+          wall,
+          wall.segments.find((segment) => segment.id === binding.segmentId)
+        ),
+      };
+    };
+    for (const incoming of partitions) {
+      const point = incoming.freePath[1];
+      if (!point.editingCutId) continue;
+      for (const outgoing of partitions.filter(
+        (face) =>
+          face !== incoming &&
+          face.lineage.editingOriginFaceId === incoming.lineage.editingOriginFaceId &&
+          face.freePath[0].editingCutId === point.editingCutId &&
+          Math.hypot(face.freePath[0].x - point.x, face.freePath[0].y - point.y) <= 1e-6
+      )) {
+        const incomingFrame = segmentFrame(...incoming.freePath),
+          outgoingFrame = segmentFrame(...outgoing.freePath);
+        const a = incoming.bindings.find(
+          (binding) => Math.abs(binding.roomInterval[1] - incomingFrame.length) <= 1e-6
         );
+        const b = outgoing.bindings.find((binding) => Math.abs(binding.roomInterval[0]) <= 1e-6);
+        if (!a || !b || a.side * a.direction !== b.side * b.direction) continue;
+        addWallCorner(
+          walls,
+          incomingFrame,
+          outgoingFrame,
+          point,
+          construction(incoming, a),
+          construction(outgoing, b),
+          a.side * a.direction
+        );
+      }
     }
   }
   const roomTriangles = new Map(floor.rooms.map((r) => [r.id, triangles(r.vertices)]));

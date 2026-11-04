@@ -22,7 +22,8 @@ const object = (value) => value && typeof value === 'object' && !Array.isArray(v
 export function diffBuildingPlanSnapshots(before, after, path = [], changes = []) {
   if (equalValue(before, after)) return changes;
   if (entityArray(before) && entityArray(after)) {
-    for (let i = 0; i < before.length; i++) {
+    // Undo reinserts removals in original order, including adjacent facing/edge entries.
+    for (let i = before.length - 1; i >= 0; i--) {
       const item = before[i];
       if (!after.some((entry) => entry.id === item.id))
         changes.push({

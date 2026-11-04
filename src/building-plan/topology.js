@@ -75,7 +75,13 @@ export function normalizeRoomBoundary(floor, room, createId) {
       const next = (i + 1) % vertices.length;
       const a = subtract(vertices[i], vertices[prev]);
       const b = subtract(vertices[next], vertices[i]);
-      if (Math.abs(cross(a, b)) > EPS || dot(a, b) <= 0 || !mayMerge(runs[prev], runs[i])) continue;
+      if (
+        vertices[i].editingCutId ||
+        Math.abs(cross(a, b)) > EPS ||
+        dot(a, b) <= 0 ||
+        !mayMerge(runs[prev], runs[i])
+      )
+        continue;
       runs[prev].sources.push(...runs[i].sources);
       vertices.splice(i, 1);
       runs.splice(i, 1);
