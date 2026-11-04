@@ -80,11 +80,20 @@ physical subject identities have different roles. Pan/zoom and unfinished previe
 
 ## Jog edits and editor preferences
 
+Detaching a room reconciles the stationary wall's current segment extents to its surviving faces;
+unused automatic tails are removed from the saved geometry. Stationary identities, valid hosted
+opening positions, and dated observation source geometry remain intact. Independently authored
+free-standing walls and host lengths needed by retained openings are preserved.
+
 A valid shared-face jog exposes six straight wall-facing rows for the second room. By default,
-the two new return runs receive their own physical subjects: this example then has nine physical
-walls. Partial sharing in the unchanged example still uses seven. Pass
-`editingPolicy: { preserveWallGrouping: true }` to a session/editor to keep seven physical walls
-while retaining the six facing rows. `setEditingPolicy()` changes future operations without
+new independent runs receive their own physical subjects; actual compatible contact can reuse an
+existing physical wall. A 0.20 m southward jog has nine physical walls, while a 0.60 m jog connects
+its vertical return to Room 1's existing right wall and has eight. The active room's face stays
+fixed and the opposite face is one effective thickness away: a 0.20 m wall draws one 0.20 m band.
+The return row carries its canonical wall's label, so it may be labelled W2 rather than W3.3.
+Partial sharing in the unchanged example still uses seven. Pass
+`editingPolicy: { preserveWallGrouping: true }` to preserve grouping of new runs, while retaining
+the six facing rows. Compatible contact can still join existing construction. `setEditingPolicy()` changes future operations without
 rewriting accepted records or adding history. The `separate_wall` operation can explicitly
 separate selected construction segments with `wallId` and optional `segmentIds`.
 

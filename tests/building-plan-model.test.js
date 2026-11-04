@@ -81,7 +81,7 @@ test('partial shared-face edits create a local jog, preserve subject IDs, and un
   assert.equal(a.vertices.length, 4);
   assert.equal(b.vertices.length, 6);
   assert.ok(Math.abs(Math.abs(polygonArea(a.vertices)) - 16) < 1e-6);
-  assert.ok(Math.abs(Math.abs(polygonArea(b.vertices)) - 14.6) < 1e-6);
+  assert.ok(Math.abs(Math.abs(polygonArea(b.vertices)) - 14.56) < 1e-6);
   assert.equal(
     a.faces.find((face) => face.id === f.faceA).wallId,
     b.faces.find((face) => face.id === f.faceB).wallId

@@ -39,21 +39,39 @@ export function sharedCornerMove(floor, referenceRoom, referenceEdge, room, edge
         dot(reference.tangent, adjacent.tangent) > -1 + EPS
       )
         continue;
-      const wall = host(floor, referenceRoom, reference.id),
-        thickness = wall?.properties.wall_thickness_m;
-      if (!Number.isFinite(thickness) || gap > thickness + EPS) continue;
       const range = [
         project(reference, adjacent.start).along,
         project(reference, adjacent.end).along,
       ].sort((a, b) => a - b);
-      if (
-        Math.min(reference.length, range[1]) - Math.max(0, range[0]) <= EPS ||
-        !near(
-          project(reference, adjacent.start).offset,
-          -Math.sign(polygonArea(referenceRoom.vertices)) * thickness
+      if (Math.min(reference.length, range[1]) - Math.max(0, range[0]) < -EPS) continue;
+      const wall = host(floor, referenceRoom, reference.id);
+      if (!wall) continue;
+      const thickness = referenceRoom.faces
+        .filter((face) => face.wallId === wall.id)
+        .flatMap((face) => face.bindings)
+        .filter(
+          (binding) =>
+            binding.edgeId === reference.id &&
+            Math.min(binding.roomInterval[1], range[1]) -
+              Math.max(binding.roomInterval[0], range[0]) >=
+              -EPS
         )
-      )
-        continue;
+        .map((binding) =>
+          buildingPlanSegmentThickness(
+            wall,
+            wall.segments.find((segment) => segment.id === binding.segmentId)
+          )
+        )
+        .find(
+          (value) =>
+            Number.isFinite(value) &&
+            gap <= value + EPS &&
+            near(
+              project(reference, adjacent.start).offset,
+              -Math.sign(polygonArea(referenceRoom.vertices)) * value
+            )
+        );
+      if (!Number.isFinite(thickness)) continue;
       result[end] = end ? edge.length : 0;
       connections.push({
         roomId: room.id,

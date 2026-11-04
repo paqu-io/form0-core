@@ -10,7 +10,7 @@ import { copyBuildingPlanData as copy, equalValue, facesOfWall, findWall } from 
 
 export const wallTopologyOrigin = (wall) => wall.lineage?.jogOriginWallId || wall.id;
 
-function remapSubject(floor, from, to, type) {
+export function remapSubject(floor, from, to, type) {
   if (from === to) return;
   for (const observation of floor.observations) {
     if (observation.subject?.id === from) {

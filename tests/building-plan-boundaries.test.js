@@ -252,11 +252,15 @@ for (const up of [-0.2, -0.6, -0.8])
 
 test('new contact conflicts preserve both physical answers until an explicit common resolution', () => {
   const f = fixture(),
-    right = f.snapshot.floors[0].rooms[0].faces[1].id;
-  edit(f, f.faceA, 0.6);
+    roomId = f.snapshot.floors[0].rooms[1].id;
+  assert.equal(
+    f.session.apply({ type: 'move_room', floorId: f.floorId, roomId, delta: { x: 10, y: 0 } })
+      .status,
+    'applied'
+  );
   const floor = f.session.getSnapshot().floors[0];
-  const a = floor.rooms[0].faces.find((face) => face.id === right).wallId;
-  const b = floor.walls.find((w) => w.values.wall_label === 'W3.3').id;
+  const a = floor.rooms[0].faces.find((face) => face.id === f.faceA).wallId;
+  const b = floor.rooms[1].faces.find((face) => face.id === f.faceB).wallId;
   for (const [wallId, value] of [
     [a, 'Concrete'],
     [b, 'Brick'],
@@ -271,11 +275,14 @@ test('new contact conflicts preserve both physical answers until an explicit com
       }).status,
       'applied'
     );
-  assert.equal(edit(f, right, -0.4).status, 'applied');
   const before = f.session.getSnapshot();
-  assert.equal(edit(f, right, 0.2).status, 'conflict');
+  const operation = { type: 'move_room', floorId: f.floorId, roomId, delta: { x: -10, y: 0 } };
+  assert.equal(f.session.apply(operation).status, 'conflict');
   assert.deepEqual(f.session.getSnapshot(), before);
-  assert.equal(edit(f, right, 0.2, { resolutions: { material: 'Concrete' } }).status, 'applied');
+  assert.equal(
+    f.session.apply({ ...operation, resolutions: { material: 'Concrete' } }).status,
+    'applied'
+  );
 });
 
 test('confirmation cannot overwrite an answer changed while the prompt was open', async () => {
