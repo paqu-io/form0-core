@@ -316,6 +316,142 @@ test('scoped physical calculations execute once per physical wall and feed face 
     }
 });
 
+for (const security of ['trusted', 'safe'])
+  test(`portion thickness feeds ordinary calculations, conditions and readonly fields (${security})`, async () => {
+    const f = fixture({
+      walls: {
+        extra_elements: [
+          field('CalculatedField', 'span_cost', {
+            calculate: 'SETRESULT($wall_thickness_m * 1000);',
+          }),
+          field('TextField', 'thick_note', {
+            visible: false,
+            visible_conditions: {
+              field_id: 'bp_wall_thickness_m',
+              operator: 'greater_than',
+              value: 0.3,
+            },
+            required_conditions: {
+              field_id: 'bp_wall_thickness_m',
+              operator: 'greater_than',
+              value: 0.3,
+            },
+          }),
+        ],
+      },
+    });
+    f.apply({ type: 'split_face', floorId: f.floorId, faceId: f.faceB, offset: 2 });
+    const wallId = f.session
+      .getSnapshot()
+      .floors[0].rooms[1].faces.find((face) => face.id === f.faceB).wallId;
+    const face = f.session
+      .getSnapshot()
+      .floors[0].rooms[1].faces.find((face) => face.wallId === wallId && face.id !== f.faceB);
+    f.apply({
+      type: 'set_property',
+      floorId: f.floorId,
+      faceId: face.id,
+      property: 'wall_thickness_m',
+      value: 0.4,
+    });
+    f.apply({
+      type: 'set_defaults',
+      floorId: f.floorId,
+      property: 'wall_thickness_m',
+      value: 0.25,
+    });
+    const nodes = f.meta.repeatablesByNodeKey;
+    const thickness = nodes.walls.fieldsByOriginalDataName.wall_thickness_m.dataName;
+    const cost = nodes.walls.fieldsByOriginalDataName.span_cost.dataName;
+    const note = nodes.walls.fieldsByOriginalDataName.thick_note.dataName;
+    const storage = nodes.walls.fields.find((field) => field.binding?.role === 'storage').dataName;
+    const evaluator = createRecordEvaluator({
+      schema: f.schema,
+      security: { mode: security },
+      diagnostics: { console: false },
+    });
+    const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
+    const evaluated = await evaluator.evaluate(record, { mode: 'refresh' });
+    assert.equal(evaluated.status, 'evaluated', JSON.stringify(evaluated.issues));
+    const floor = evaluated.snapshot.repeatable[nodes.floors.preferredKey][0];
+    const room = floor.repeatable[nodes.rooms.preferredKey][1];
+    const rows = room.repeatable[nodes.walls.preferredKey];
+    const index = rows.findIndex((row) => JSON.parse(row.values[storage]).id === face.id);
+    assert.equal(rows[index].values[thickness], 0.4);
+    assert.equal(rows[index].values[cost], 400);
+    assert.equal(rows[index].visible[note], true);
+    assert.equal(rows[index].required[note], true);
+    const shared = rows.find((row) => JSON.parse(row.values[storage]).id === f.faceB);
+    assert.equal(shared.values[thickness], 0.25);
+    assert.equal(shared.values[cost], 250);
+    assert.equal(shared.visible[note], false);
+    const readonly = structuredClone(record);
+    const selected =
+      readonly.repeatable[nodes.floors.preferredKey][0].repeatable[nodes.rooms.preferredKey][1]
+        .repeatable[nodes.walls.preferredKey][index];
+    selected.read_only = { [thickness]: true };
+    const managed = createBuildingPlanRecordSession({ meta: f.meta, record: readonly });
+    const changed = structuredClone(selected);
+    changed.values[thickness] = 0.5;
+    const blocked = managed.applyRow({
+      path: [
+        { key: nodes.floors.preferredKey, index: 0 },
+        { key: nodes.rooms.preferredKey, index: 1 },
+        { key: nodes.walls.preferredKey, index },
+      ],
+      editedRow: changed,
+    });
+    assert.equal(blocked.status, 'conflict');
+    assert.equal(blocked.issues[0].code, 'readonly_field');
+    f.apply({
+      type: 'set_property',
+      floorId: f.floorId,
+      faceId: face.id,
+      property: 'wall_thickness_m',
+      value: null,
+    });
+    const incomplete = await evaluator.prepareSubmission(
+      writeBuildingPlanRecord({
+        meta: f.meta,
+        plan: f.session.getSnapshot(),
+        record,
+      })
+    );
+    assert.ok(
+      incomplete.validationSummary.orderedIssues.some(
+        (issue) =>
+          issue.fieldName === thickness && issue.instancePath?.at(-1)?.instanceId === selected.id
+      ),
+      JSON.stringify(incomplete.validationSummary.orderedIssues)
+    );
+    f.apply({
+      type: 'set_property',
+      floorId: f.floorId,
+      faceId: face.id,
+      property: 'wall_thickness_m',
+      reset: true,
+    });
+    f.apply({
+      type: 'set_defaults',
+      floorId: f.floorId,
+      property: 'wall_thickness_m',
+      value: null,
+    });
+    const inheritedUnknown = await evaluator.prepareSubmission(
+      writeBuildingPlanRecord({
+        meta: f.meta,
+        plan: f.session.getSnapshot(),
+        record,
+      })
+    );
+    assert.equal(
+      inheritedUnknown.validationSummary.orderedIssues.filter(
+        (issue) => issue.fieldName === thickness
+      ).length,
+      7
+    );
+  });
+
 test('scope rewriting preserves strings, comments and regular expressions', () => {
   const source =
     'SETRESULT($thickness + "$thickness".length + /\u0024thickness/.source.length); // $thickness';

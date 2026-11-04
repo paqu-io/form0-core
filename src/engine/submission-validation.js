@@ -128,6 +128,7 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
     for (const scope of scopes) {
       if (!scope.participating) continue;
       for (const [name, canonical] of links.get(scope.record) || []) {
+        if (canonical.local) continue;
         if (scope.record.visible?.[name] === false) continue;
         if (!preferred.has(canonical.record)) preferred.set(canonical.record, new Map());
         const fields = preferred.get(canonical.record);

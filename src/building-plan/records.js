@@ -9,6 +9,7 @@ import {
   validateBuildingPlanSnapshot,
 } from './model.js';
 import { at, distance, project, segmentFrame, roomBounds } from './geometry.js';
+import { portionThicknessState } from './portion-properties.js';
 
 const metadataFor = (options) => {
   if (options.meta) return options.meta;
@@ -460,10 +461,20 @@ export function writeBuildingPlanRecord(options) {
   return record;
 }
 
+function projectedThickness(meta, cache, wall, face) {
+  if (!cache.has(wall))
+    cache.set(wall, {
+      segments: geometry(read(meta, 'physical_walls', wall, 'wall_geometry'), 'wall').segments,
+      properties: { wall_thickness_m: read(meta, 'physical_walls', wall, 'wall_thickness_m') },
+    });
+  return portionThicknessState(cache.get(wall), face);
+}
+
 /** Read-only joins used by engines/editors; these mirrors are excluded from persistence. */
 export function refreshBuildingPlanProjections(options) {
   const meta = metadataFor(options);
   const record = options.record;
+  const thicknessCache = new WeakMap();
   for (const floor of ownerRecords(meta, record).flatMap((owner) => rows(meta, 'floors', owner))) {
     const walls = previousBySubject(meta, 'physical_walls', floor);
     const observations = rows(meta, 'observations', floor);
@@ -472,10 +483,15 @@ export function refreshBuildingPlanProjections(options) {
         const state = modelOf(meta, 'walls', face);
         const wall = walls.get(state.wallId);
         if (!wall) continue;
+        const thickness = projectedThickness(meta, thicknessCache, wall, state);
         for (const field of nodeFor(meta, 'walls').fields.filter(
           (entry) => entry.binding?.role === 'projection'
         ))
-          face.values[field.dataName] = copy(wall.values[field.binding.sourceDataName] ?? null);
+          face.values[field.dataName] = copy(
+            thickness && field.binding.property === 'wall_thickness_m'
+              ? thickness.value
+              : (wall.values[field.binding.sourceDataName] ?? null)
+          );
         for (const [projected, source] of [
           ['face_doors', 'doors'],
           ['face_windows', 'windows'],
@@ -525,6 +541,7 @@ export function getBuildingPlanRecordMetadata(options) {
 /** Live source links let record calculations depend on the canonical physical calculation. */
 export function getBuildingPlanProjectionLinks({ meta, record }) {
   const links = new WeakMap();
+  const thicknessCache = new WeakMap();
   for (const floor of ownerRecords(meta, record).flatMap((owner) => rows(meta, 'floors', owner))) {
     const walls = previousBySubject(meta, 'physical_walls', floor);
     const observations = rows(meta, 'observations', floor);
@@ -533,6 +550,7 @@ export function getBuildingPlanProjectionLinks({ meta, record }) {
         const state = modelOf(meta, 'walls', face);
         const wall = walls.get(state.wallId);
         if (!wall) continue;
+        const thickness = projectedThickness(meta, thicknessCache, wall, state);
         links.set(
           face,
           new Map(
@@ -540,7 +558,10 @@ export function getBuildingPlanProjectionLinks({ meta, record }) {
               .fields.filter((field) => field.binding?.role === 'projection')
               .map((field) => [
                 field.dataName,
-                { record: wall, fieldName: field.binding.sourceDataName },
+                thickness?.source.mode === 'override' &&
+                field.binding.property === 'wall_thickness_m'
+                  ? { record: face, fieldName: field.dataName, local: true }
+                  : { record: wall, fieldName: field.binding.sourceDataName },
               ])
           )
         );

@@ -349,6 +349,321 @@ for (const partition of [false, true])
     assert.deepEqual(f.session.validate(), []);
   });
 
+test('the existing Thickness field edits only a split unshared span and child Cancel restores it', () => {
+  const f = fixture();
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  const nodes = f.meta.repeatablesByNodeKey;
+  const before = f.session.getSnapshot();
+  const face = before.floors[0].rooms[1].faces.find(
+    (face) => face.wallId === f.wallId && face.id !== f.faceB
+  );
+  const record = writeBuildingPlanRecord({ meta: f.meta, plan: before });
+  const editor = createBuildingPlanEditor({ meta: f.meta, record });
+  const baseline = editor.getSnapshot();
+  const faces =
+    record.repeatable[nodes.floors.preferredKey][0].repeatable[nodes.rooms.preferredKey][1]
+      .repeatable[nodes.walls.preferredKey];
+  const modelField = nodes.walls.fields.find((field) => field.binding?.role === 'storage').dataName;
+  const thicknessField = nodes.walls.fieldsByOriginalDataName.wall_thickness_m.dataName;
+  const path = [
+    { key: nodes.floors.preferredKey, index: 0 },
+    { key: nodes.rooms.preferredKey, index: 1 },
+    {
+      key: nodes.walls.preferredKey,
+      index: faces.findIndex((row) => JSON.parse(row.values[modelField]).id === face.id),
+    },
+  ];
+  const opened = editor.openRow({ path, scopeId: 'local-thickness' });
+  const edited = structuredClone(opened.row);
+  edited.values[thicknessField] = 0.4;
+  const changed = editor.updateRow('local-thickness', edited);
+  assert.equal(changed.status, 'applied', JSON.stringify(changed.issues));
+  const after = editor.getSnapshot();
+  const physical = after.floors[0].walls.find((wall) => wall.id === f.wallId);
+  assert.equal(after.floors[0].walls.length, 7);
+  assert.equal(physical.properties.wall_thickness_m, 0.2);
+  assert.deepEqual(
+    after.floors[0].rooms.map((room) => room.vertices),
+    before.floors[0].rooms.map((room) => room.vertices)
+  );
+  assert.deepEqual(after.floors[0].observations, before.floors[0].observations);
+  const valueFor = (id) => {
+    const output = editor.getRecord();
+    for (const room of output.repeatable[nodes.floors.preferredKey][0].repeatable[
+      nodes.rooms.preferredKey
+    ])
+      for (const row of room.repeatable[nodes.walls.preferredKey])
+        if (JSON.parse(row.values[modelField]).id === id) return row.values[thicknessField];
+  };
+  assert.equal(valueFor(face.id), 0.4);
+  assert.equal(valueFor(f.faceA), 0.2);
+  assert.equal(valueFor(f.faceB), 0.2);
+  const state = editor.fieldState(path, thicknessField);
+  assert.equal(state.source.scope, 'construction_segment');
+  assert.equal(state.source.mode, 'override');
+  assert.deepEqual(readBuildingPlanRecord({ meta: f.meta, record: editor.getRecord() }), after);
+  assert.equal(editor.cancelRow('local-thickness').status, 'cancelled');
+  assert.deepEqual(editor.getSnapshot(), baseline);
+});
+
+test('shared portion thickness anchors the active face, updates both room sides and resets without a micro-jog', () => {
+  const f = fixture();
+  const cutId = f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 }).created.id;
+  const before = f.session.getSnapshot();
+  f.apply({
+    type: 'set_property',
+    faceId: f.faceB,
+    activeRoomId: before.floors[0].rooms[1].id,
+    property: 'wall_thickness_m',
+    value: 0.4,
+  });
+  const after = f.session.getSnapshot();
+  const floor = after.floors[0];
+  assert.equal(floor.walls.length, 7);
+  assert.deepEqual(floor.rooms[1].vertices, before.floors[0].rooms[1].vertices);
+  assert.deepEqual(
+    floor.rooms[0].vertices.map(({ x, y }) => [x, y]),
+    [
+      [0, 0],
+      [5, 0],
+      [5, 2.8],
+      [3, 2.8],
+      [3, 3],
+      [0, 3],
+    ]
+  );
+  const wall = floor.walls.find((wall) => wall.id === f.wallId);
+  assert.equal(wall.properties.wall_thickness_m, 0.2);
+  assert.equal(
+    wall.doors[0].width,
+    before.floors[0].walls.find((wall) => wall.id === f.wallId).doors[0].width
+  );
+  assert.deepEqual(floor.observations, before.floors[0].observations);
+  const projection = buildingPlanCanvasSnapshot({
+    meta: f.meta,
+    record: writeBuildingPlanRecord({ meta: f.meta, plan: after }),
+    plan: after,
+    gridSize: 20,
+  });
+  assert.equal(projection.walls.find((face) => face.id === f.faceA).thickness, 0.4);
+  assert.equal(projection.walls.find((face) => face.id === f.faceB).thickness, 0.4);
+  const incompatible = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId });
+  assert.equal(incompatible.status, 'conflict');
+  assert.deepEqual(f.session.getSnapshot(), after);
+  f.session.undo();
+  assert.deepEqual(f.session.getSnapshot(), before);
+  f.session.redo();
+  assert.deepEqual(f.session.getSnapshot(), after);
+  f.apply({
+    type: 'set_property',
+    faceId: f.faceB,
+    activeRoomId: floor.rooms[1].id,
+    property: 'wall_thickness_m',
+    reset: true,
+  });
+  for (let i = 0; i < 2; i++)
+    assert.deepEqual(
+      f.session.getSnapshot().floors[0].rooms[i].vertices.map(({ x, y }) => [x, y]),
+      before.floors[0].rooms[i].vertices.map(({ x, y }) => [x, y])
+    );
+  f.apply({ type: 'rejoin_cut', cutId });
+});
+
+test('portion overrides keep live defaults, explicit unknown and readonly intent through round trips', () => {
+  const f = fixture();
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  const face = f.session
+    .getSnapshot()
+    .floors[0].rooms[1].faces.find((face) => face.wallId === f.wallId && face.id !== f.faceB);
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
+  f.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.3 });
+  assert.equal(f.session.getSnapshot().floors[0].walls.length, 7);
+  const view = () =>
+    buildingPlanCanvasSnapshot({
+      meta: f.meta,
+      gridSize: 20,
+      record: writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() }),
+      plan: f.session.getSnapshot(),
+    });
+  assert.equal(view().walls.find((wall) => wall.id === f.faceA).thickness, 0.3);
+  assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, 0.4);
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: null });
+  assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, null);
+  const before = f.session.getSnapshot();
+  const restored = readBuildingPlanRecord({
+    meta: f.meta,
+    record: writeBuildingPlanRecord({ meta: f.meta, plan: before }),
+  });
+  assert.ok(
+    restored.floors[0].walls
+      .flatMap((wall) => wall.segments)
+      .some(
+        (segment) =>
+          Object.hasOwn(segment.overrides || {}, 'wall_thickness_m') &&
+          segment.overrides.wall_thickness_m === null
+      )
+  );
+  const invalid = f.session.apply({
+    type: 'set_property',
+    floorId: f.floorId,
+    faceId: face.id,
+    property: 'wall_thickness_m',
+    value: -1,
+  });
+  assert.equal(invalid.status, 'conflict');
+  assert.deepEqual(f.session.getSnapshot(), before);
+  const locked = createBuildingPlanSession({
+    snapshot: before,
+    properties: f.meta.properties,
+    readOnly: true,
+  });
+  assert.equal(
+    locked.apply({
+      type: 'set_property',
+      floorId: f.floorId,
+      faceId: face.id,
+      property: 'wall_thickness_m',
+      value: 0.5,
+    }).status,
+    'blocked'
+  );
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', reset: true });
+  assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, 0.3);
+});
+
+test('a portion-property batch infers the selected room anchor without touching another floor', () => {
+  const f = fixture();
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({ type: 'create_floor', defaults: { wall_thickness_m: 0.25 } });
+  const before = f.session.getSnapshot();
+  f.apply({
+    type: 'batch',
+    operations: [
+      {
+        type: 'set_property',
+        floorId: f.floorId,
+        faceId: f.faceB,
+        property: 'wall_thickness_m',
+        value: 0.4,
+      },
+    ],
+  });
+  assert.deepEqual(
+    f.session.getSnapshot().floors[0].rooms[1].vertices,
+    before.floors[0].rooms[1].vertices
+  );
+  assert.deepEqual(f.session.getSnapshot().floors[1], before.floors[1]);
+});
+
+test('Rejoin checks the selected portions rather than an unrelated thickness profile elsewhere', () => {
+  const f = fixture();
+  const source = f.snapshot.floors[0].rooms[0].faces[0];
+  const first = f.apply({ type: 'split_face', faceId: source.id, offset: 2 }).created.id;
+  const secondFace = f.session
+    .getSnapshot()
+    .floors[0].rooms[0].faces.find(
+      (face) => face.wallId === source.wallId && face.id !== source.id
+    );
+  const second = f.apply({ type: 'split_face', faceId: secondFace.id, offset: 1 }).created.id;
+  const thirdFace = f.session
+    .getSnapshot()
+    .floors[0].rooms[0].faces.filter((face) => face.wallId === source.wallId)
+    .at(-1);
+  f.apply({ type: 'set_property', faceId: thirdFace.id, property: 'wall_thickness_m', value: 0.4 });
+  f.apply({ type: 'rejoin_cut', cutId: first });
+  assert.equal(f.session.getSnapshot().floors[0].rooms[0].faces.length, 5);
+  assert.ok(
+    f.session
+      .getSnapshot()
+      .floors[0].rooms[0].vertices.some((vertex) => vertex.editingCutId === second)
+  );
+  const unchanged = f.session.getSnapshot();
+  assert.equal(
+    f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: second }).status,
+    'conflict'
+  );
+  assert.deepEqual(f.session.getSnapshot(), unchanged);
+});
+
+test('partition Rejoin retains incompatible local thickness and its explicit cut', () => {
+  const f = fixture();
+  const wallId = f.apply({
+    type: 'create_wall',
+    roomId: f.snapshot.floors[0].rooms[0].id,
+    vertices: [
+      { x: 1, y: 1 },
+      { x: 4, y: 1 },
+    ],
+  }).created.id;
+  const face = f.session
+    .getSnapshot()
+    .floors[0].rooms[0].faces.find((face) => face.wallId === wallId);
+  const cutId = f.apply({ type: 'split_face', faceId: face.id, offset: 1.5 }).created.id;
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
+  const before = f.session.getSnapshot();
+  const rejected = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId });
+  assert.equal(rejected.status, 'conflict');
+  assert.equal(rejected.issues[0].code, 'cut_construction_conflict');
+  assert.deepEqual(f.session.getSnapshot(), before);
+});
+
+test('resetting shared thickness cannot retire another open wall editor', () => {
+  const f = fixture();
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({
+    type: 'set_property',
+    faceId: f.faceB,
+    property: 'wall_thickness_m',
+    value: 0.4,
+    activeRoomId: f.session.getSnapshot().floors[0].rooms[1].id,
+  });
+  const editor = createBuildingPlanEditor({
+    meta: f.meta,
+    record: writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() }),
+  });
+  const nodes = f.meta.repeatablesByNodeKey;
+  const model = nodes.walls.fields.find((field) => field.binding?.role === 'storage').dataName;
+  const rows =
+    editor.getRecord().repeatable[nodes.floors.preferredKey][0].repeatable[
+      nodes.rooms.preferredKey
+    ];
+  const path = (room, id) => [
+    { key: nodes.floors.preferredKey, index: 0 },
+    { key: nodes.rooms.preferredKey, index: room },
+    {
+      key: nodes.walls.preferredKey,
+      index: rows[room].repeatable[nodes.walls.preferredKey].findIndex(
+        (row) => JSON.parse(row.values[model]).id === id
+      ),
+    },
+  ];
+  const shared = editor.openRow({ path: path(1, f.faceB), scopeId: 'shared' });
+  const sibling = editor.getSnapshot().floors[0].rooms[0].faces.find(
+    (face) =>
+      face.wallId === f.wallId &&
+      face.id !== f.faceA &&
+      !face.bindings.some(
+        (binding) =>
+          f.session
+            .getSnapshot()
+            .floors[0].walls.find((wall) => wall.id === f.wallId)
+            .segments.find((segment) => segment.id === binding.segmentId)?.junction
+      )
+  );
+  assert.ok(sibling);
+  editor.openRow({ path: path(0, sibling.id), scopeId: 'sibling' });
+  const before = editor.getSnapshot();
+  const blocked = editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness_m'] });
+  assert.equal(blocked.status, 'conflict');
+  assert.equal(blocked.issues[0].code, 'wall_editor_active');
+  assert.deepEqual(editor.getSnapshot(), before);
+  editor.cancelRow('sibling');
+  assert.equal(
+    editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness_m'] }).status,
+    'applied'
+  );
+});
+
 test('live thickness changes preserve explicit cuts and readonly sessions refuse both commands', () => {
   const f = fixture();
   const cutId = f.apply({ type: 'split_face', faceId: f.faceA, offset: 1.5 }).created.id;

@@ -30,7 +30,7 @@ const edgesOf = (room, face) =>
         ...segmentFrame(point, face.freePath[index + 1]),
       }))
     : polygonEdges(room);
-const compatible = (faces) => {
+const compatible = (faces, floor) => {
   if (faces.some((face) => !face) || faces[0].wallId !== faces[1].wallId)
     fail(
       'cut_physical_conflict',
@@ -43,6 +43,17 @@ const compatible = (faces) => {
     fail(
       'cut_answer_conflict',
       'The split portions have different room-side answers. Resolve those answers before rejoining.'
+    );
+  const wall = floor.walls.find((wall) => wall.id === faces[0].wallId);
+  const segments = faces.flatMap((face) =>
+    face.bindings.map((binding) =>
+      wall.segments.find((segment) => segment.id === binding.segmentId)
+    )
+  );
+  if (segments.some((segment) => !equalValue(segment.overrides || {}, segments[0].overrides || {})))
+    fail(
+      'cut_construction_conflict',
+      'These portions have different physical properties. Resolve their thickness or construction overrides before rejoining.'
     );
 };
 
@@ -172,7 +183,7 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
         'cut_not_aligned',
         'Align the split portions on the same straight line before rejoining.'
       );
-    compatible([before, after]);
+    compatible([before, after], floor);
     const a = segmentFrame(before.freePath[0], before.freePath.at(-1));
     const b = segmentFrame(after.freePath[0], after.freePath.at(-1));
     if (Math.abs(cross(a.tangent, b.tangent)) > EPS || dot(a.tangent, b.tangent) < 1 - EPS)
@@ -223,7 +234,7 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
         )
       )
     );
-    compatible(faces);
+    compatible(faces, floor);
     delete vertex.editingCutId;
     const previous = room.edges;
     normalizeRoomBoundary(floor, room, createId);

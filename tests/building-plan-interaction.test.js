@@ -134,3 +134,97 @@ test('jog realignment uses stationary wall extensions instead of following the s
   interaction.reset();
   assert.equal(interaction.getGuides().length, 0);
 });
+
+for (const axis of ['x', 'y'])
+  for (const grouped of [false, true])
+    test(`wall guides reach same-room extensions and stationary split siblings (${axis}, grouped=${grouped})`, () => {
+      const vertices = [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 120 },
+        { x: 0, y: 120 },
+      ];
+      const points =
+        axis === 'x'
+          ? [
+              { x: 2, y: 80 },
+              { x: 2, y: 120 },
+            ]
+          : [
+              { x: 80, y: 2 },
+              { x: 120, y: 2 },
+            ];
+      const reference =
+        axis === 'x'
+          ? [
+              { x: 0, y: 0 },
+              { x: 0, y: 40 },
+            ]
+          : [
+              { x: 0, y: 0 },
+              { x: 40, y: 0 },
+            ];
+      const interaction = createBuildingPlanInteraction({
+        scene: () => ({
+          gridSize: 20,
+          rooms: [{ id: 'active', vertices }],
+          walls: [
+            {
+              id: 'stationary',
+              roomId: 'active',
+              physicalWallId: grouped ? 'construction' : 'other',
+              isBoundary: true,
+              points: reference,
+              thickness: 0.2,
+            },
+          ],
+        }),
+      });
+      const actual = interaction.snapTranslation(points, {
+        roomId: 'active',
+        faceId: 'moving',
+        physicalWallId: 'construction',
+      });
+      assert.equal(actual[0][axis], 0);
+      assert.equal(actual[1][axis], 0);
+      assert.ok(
+        interaction.getGuides().some((guide) => guide.from[axis === 'x' ? 'y' : 'x'] === 0)
+      );
+      assert.deepEqual(
+        interaction.snapTranslation(points, {
+          roomId: 'active',
+          faceId: 'moving',
+          physicalWallId: 'construction',
+          bypass: true,
+        }),
+        points
+      );
+      assert.equal(interaction.getGuides().length, 0);
+    });
+
+test('whole-room movement does not use its own boundary as a magnetic reference', () => {
+  const points = [
+    { x: 2, y: 2 },
+    { x: 102, y: 2 },
+    { x: 102, y: 62 },
+    { x: 2, y: 62 },
+  ];
+  const interaction = createBuildingPlanInteraction({
+    scene: () => ({
+      rooms: [{ id: 'active', vertices: room.vertices }],
+      walls: [
+        {
+          id: 'own',
+          roomId: 'active',
+          isBoundary: true,
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+          ],
+          thickness: 0.2,
+        },
+      ],
+    }),
+  });
+  assert.deepEqual(interaction.snapTranslation(points, { roomId: 'active' }), points);
+});

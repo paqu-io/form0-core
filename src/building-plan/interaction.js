@@ -1,4 +1,4 @@
-import { dot, polygonArea, project, segmentFrame } from './geometry.js';
+import { at, dot, polygonArea, project, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
@@ -82,11 +82,12 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       for (const wall of view.walls || []) {
         if (
           wall.points.length !== 2 ||
+          wall.id === faceId ||
           (editingGroupId
             ? wall.editingGroupId !== editingGroupId || wall.id === faceId || wall.isEditingReturn
             : !wall.isBoundary ||
-              wall.roomId === roomId ||
-              (physicalWallId && wall.physicalWallId === physicalWallId))
+              (wall.roomId === roomId && !faceId) ||
+              (physicalWallId && wall.physicalWallId === physicalWallId && wall.roomId !== roomId))
         )
           continue;
         const other = segmentFrame(wall.points[0], wall.points[1]);
@@ -98,7 +99,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         const neighbour = view.rooms.find((room) => room.id === wall.roomId);
         const thickness = (wall.thickness ?? 0) * (view.gridSize || 20);
         const expected =
-          !editingGroupId && direction < 0 && overlap >= -8 / zoom
+          !editingGroupId && wall.roomId !== roomId && direction < 0 && overlap >= -8 / zoom
             ? -Math.sign(polygonArea(neighbour.vertices)) * thickness
             : 0;
         const difference = expected - project(other, start).offset;
@@ -110,8 +111,8 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
           delta,
           guides: [
             {
-              from: { x: start.x + delta.x, y: start.y + delta.y },
-              to: { x: end.x + delta.x, y: end.y + delta.y },
+              from: at(other, Math.min(0, ...offsets), expected),
+              to: at(other, Math.max(other.length, ...offsets), expected),
             },
           ],
         });

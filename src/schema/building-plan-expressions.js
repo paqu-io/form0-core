@@ -98,15 +98,17 @@ export function scopeBuildingPlanExpression(source, aliases) {
   return result;
 }
 
-export function scopeBuildingPlanConditions(value, aliases) {
+export function scopeBuildingPlanConditions(value, aliases, fieldKeys = new Map()) {
   if (Array.isArray(value))
-    return value.map((entry) => scopeBuildingPlanConditions(entry, aliases));
+    return value.map((entry) => scopeBuildingPlanConditions(entry, aliases, fieldKeys));
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => {
+      if (key === 'field_id' && typeof entry === 'string')
+        return [key, fieldKeys.get(entry) || entry];
       if (['field', 'field_name', 'data_name'].includes(key) && typeof entry === 'string')
         return [key, aliases.get(entry) || entry];
-      return [key, scopeBuildingPlanConditions(entry, aliases)];
+      return [key, scopeBuildingPlanConditions(entry, aliases, fieldKeys)];
     })
   );
 }

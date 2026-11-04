@@ -74,7 +74,7 @@ export function createBuildingPlanEditor(options) {
             {
               code: 'wall_editor_active',
               message:
-                'Save or cancel the affected wall entry before rejoining. Its open editor cannot be removed by another row.',
+                'Save or cancel the affected wall entry, then repeat this edit. Its open editor cannot be removed by another row.',
               subject: { type: 'room_face', id: target.faceId },
             },
           ],
@@ -82,9 +82,12 @@ export function createBuildingPlanEditor(options) {
     }
     return null;
   };
-  const includesRejoin = (operation) =>
+  const includesFaceEdit = (operation) =>
     operation?.type === 'rejoin_cut' ||
-    (operation?.type === 'batch' && operation.operations?.some(includesRejoin));
+    (operation?.type === 'set_property' &&
+      operation.faceId &&
+      operation.property === 'wall_thickness_m') ||
+    (operation?.type === 'batch' && operation.operations?.some(includesFaceEdit));
 
   function createOperation(path) {
     const kind = nodeFor(meta, keyOf(path.at(-1)))?.nodeKey;
@@ -232,13 +235,17 @@ export function createBuildingPlanEditor(options) {
   function updateRow(scopeId, row, { resetProperties = [] } = {}) {
     const editor = editors.get(scopeId);
     if (!editor) fail('This BuildingPlan editor has ended.');
-    const result = session.applyRow({
+    const proposal = session.previewRow({
       path: editor.path,
       initialRow: editor.initialRow,
       editedRow: row,
       resetProperties,
       scopeId,
     });
+    const result =
+      proposal.status === 'ready'
+        ? faceEditorConflict(proposal.snapshot) || session.commit(proposal)
+        : { ...proposal, record: session.getRecord() };
     if (result.status === 'applied') {
       const record = session.getRecord();
       const target = resolveBuildingPlanRow(record, editor.path);
@@ -316,7 +323,7 @@ export function createBuildingPlanEditor(options) {
         Array.isArray(operation?.removeOpeningIds) ? operation.removeOpeningIds : []
       );
       if (conflict) return conflict;
-      if (includesRejoin(operation)) {
+      if (includesFaceEdit(operation)) {
         const proposal = session.preview(operation, options);
         if (proposal.status !== 'ready') return proposal;
         return faceEditorConflict(proposal.snapshot) || publish(session.commit(proposal));

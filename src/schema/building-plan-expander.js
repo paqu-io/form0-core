@@ -228,6 +228,7 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
 
   for (const node of localMeta.repeatables) {
     const aliases = new Map();
+    const fieldKeys = new Map();
     const ancestors = localMeta.repeatables
       .filter(
         (candidate) =>
@@ -236,8 +237,10 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
       )
       .sort((a, b) => a.path.length - b.path.length);
     for (const ancestor of ancestors)
-      for (const entry of ancestor.fields || [])
+      for (const entry of ancestor.fields || []) {
         aliases.set(entry.originalDataName, entry.dataName);
+        fieldKeys.set(entry.originalKey, entry.key);
+      }
     for (const entry of node.fields || []) {
       const binding = entry.binding;
       if (binding) {
@@ -274,7 +277,11 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
         entry.field.calculate = scopeBuildingPlanExpression(entry.field.calculate, aliases);
       for (const attribute of ['visible_conditions', 'required_conditions', 'read_only_conditions'])
         if (entry.field[attribute])
-          entry.field[attribute] = scopeBuildingPlanConditions(entry.field[attribute], aliases);
+          entry.field[attribute] = scopeBuildingPlanConditions(
+            entry.field[attribute],
+            aliases,
+            fieldKeys
+          );
     }
   }
 

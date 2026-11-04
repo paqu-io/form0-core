@@ -7,6 +7,9 @@ These terms describe collected building geometry and its room-first editing work
 **Physical wall**: A durable construction subject with accepted physical properties and hosted openings.
 Several rooms can face different portions of the same physical wall.
 
+**Construction segment**: A meaningful part of a continuous physical wall with its own properties.
+A change in thickness can define a segment without creating a different physical wall.
+
 **Facing portion**: A room's side of a physical wall over a particular extent, with its own room-side answers.
 _Avoid_: Independent physical wall when referring only to a room's view.
 

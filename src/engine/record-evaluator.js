@@ -705,7 +705,14 @@ export function createRecordEvaluator({
         scope.template.conditions
       );
       for (const field of scope.template.fields) {
-        if (!scoped && context.buildingPlanProjections.fields.has(field.data_name)) {
+        const localPhysicalValue = planLinks.some(
+          (links) => links.get(scope.sourceRecord)?.get(field.data_name)?.local === true
+        );
+        if (
+          !scoped &&
+          context.buildingPlanProjections.fields.has(field.data_name) &&
+          !localPhysicalValue
+        ) {
           scope.record.required[field.data_name] = false;
           continue;
         }

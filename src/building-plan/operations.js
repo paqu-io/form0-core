@@ -49,6 +49,7 @@ import {
 import { reconcileWallExtents } from './wall-extents.js';
 import { rejoinEditingCut, splitEditingFace } from './editing-cuts.js';
 import { movePartitionPortion } from './partition-edits.js';
+import { preparePortionThickness } from './portion-properties.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
   const error = new Error(message);
@@ -175,7 +176,7 @@ function splitGeometrySegment(wall, segment, low, high, delta, createId) {
     const moved = from >= low - EPS && to <= high + EPS;
     const shift = moved ? delta : { x: 0, y: 0 };
     pieces.push({
-      ...segment,
+      ...copy(segment),
       id: moved ? segment.id : createId(),
       start: cleanPoint(add(at(frame, from), shift)),
       end: cleanPoint(add(at(frame, to), shift)),
@@ -199,6 +200,8 @@ function splitGeometrySegment(wall, segment, low, high, delta, createId) {
       );
     opening.segmentId = pieces[index].id;
     opening.offset -= cuts[index];
+    const offsetField = `${opening.type}_offset_m`;
+    if (own(opening.values, offsetField)) opening.values[offsetField] = opening.offset;
   }
   const index = wall.segments.indexOf(segment);
   wall.segments.splice(index, 1, ...pieces);
@@ -1013,12 +1016,23 @@ function applyThicknessChanges(
         )
     )
   );
+  const hasThicknessProfile = affected.some(
+    (wall) =>
+      wall.lineage?.thicknessProfile ||
+      [...wall.segments, ...(before.walls.find((old) => old.id === wall.id)?.segments || [])].some(
+        (segment) => own(segment.overrides, 'wall_thickness_m')
+      )
+  );
   finishBoundaryEdit(
     floor,
     before,
     changedEdges,
     affected,
-    { ...operation, activeRoomId },
+    {
+      ...operation,
+      activeRoomId,
+      preserveWallGrouping: operation.preserveWallGrouping || hasThicknessProfile,
+    },
     createId,
     specifications
   );
@@ -1057,16 +1071,41 @@ export function applyBuildingPlanOperation(
       operation.operations.some((entry) => !entry || entry.type === 'batch')
     )
       failOperation('invalid_batch', 'A batch requires a flat list of operations.');
-    const before = copy(snapshot);
     const propertyOperations = operation.operations.filter((entry) =>
       ['set_property', 'set_defaults'].includes(entry.type)
     );
+    const portions = new Set(
+      propertyOperations.filter(
+        (entry) =>
+          entry.type === 'set_property' && entry.faceId && entry.property === 'wall_thickness_m'
+      )
+    );
+    const preparedPortions = [...portions].map((entry) =>
+      preparePortionThickness(
+        findBuildingPlanFloor(snapshot, entry.floorId),
+        entry.faceId,
+        createId,
+        splitGeometrySegment
+      )
+    );
+    const before = copy(snapshot);
     for (const entry of propertyOperations) {
       propertyKey(entry.property);
       const specification = specifications[entry.property];
       if (!specification || specification.scope === 'observation')
         failOperation('unknown_property', 'Choose a declared property.');
       const floor = findBuildingPlanFloor(snapshot, entry.floorId);
+      if (portions.has(entry)) {
+        const { face, wall } = findFace(floor, entry.faceId);
+        for (const segment of wall.segments.filter((segment) =>
+          face.bindings.some((binding) => binding.segmentId === segment.id)
+        )) {
+          segment.overrides ||= {};
+          if (entry.reset) delete segment.overrides[entry.property];
+          else segment.overrides[entry.property] = copy(entry.value);
+        }
+        continue;
+      }
       let target;
       if (entry.type === 'set_defaults') {
         if (!specification.inherit)
@@ -1100,17 +1139,23 @@ export function applyBuildingPlanOperation(
     }
     for (const floor of snapshot.floors) {
       const old = before.floors.find((entry) => entry.id === floor.id);
+      const local = [...portions].find((entry) => entry.floorId === floor.id);
       if (old)
         applyThicknessChanges(
           floor,
           old,
           operation.activeRoomId ||
-            propertyOperations.find((entry) => entry.floorId === floor.id)?.activeRoomId,
+            propertyOperations.find((entry) => entry.floorId === floor.id)?.activeRoomId ||
+            (local && findFace(floor, local.faceId).room.id) ||
+            (operation.floorId === floor.id &&
+              operation.faceId &&
+              findFace(floor, operation.faceId).room.id),
           createId,
-          operation,
+          local ? { ...operation, preserveWallGrouping: true } : operation,
           specifications
         );
     }
+    for (const prepared of preparedPortions) prepared.releaseCuts();
     const created = [];
     for (const entry of operation.operations.filter((item) => !propertyOperations.includes(item))) {
       const result = applyBuildingPlanOperation(snapshot, entry, {
@@ -1525,24 +1570,33 @@ export function applyBuildingPlanOperation(
     }
     case 'set_property':
     case 'set_defaults': {
-      const before = copy(floor);
       propertyKey(operation.property);
       const specification = specifications[operation.property];
       if (!specification || specification.scope === 'observation')
         failOperation('unknown_property', 'Choose a declared inheritable property.');
+      const portion =
+        operation.type === 'set_property' &&
+        operation.faceId &&
+        operation.property === 'wall_thickness_m'
+          ? preparePortionThickness(floor, operation.faceId, createId, splitGeometrySegment)
+          : null;
+      const before = copy(floor);
       if (operation.type === 'set_property') {
         let subject =
-          specification.scope === 'room_face'
+          portion?.wall ||
+          (specification.scope === 'room_face'
             ? findFace(floor, operation.faceId).face
-            : findWall(floor, operation.wallId);
+            : findWall(floor, operation.wallId));
         if (operation.segmentId) {
           subject = subject.segments?.find((segment) => segment.id === operation.segmentId);
           if (!subject)
             failOperation('missing_segment', 'The construction segment no longer exists.');
         }
-        subject.overrides ||= {};
-        if (operation.reset) delete subject.overrides[operation.property];
-        else subject.overrides[operation.property] = copy(operation.value);
+        for (const target of portion?.segments || [subject]) {
+          target.overrides ||= {};
+          if (operation.reset) delete target.overrides[operation.property];
+          else target.overrides[operation.property] = copy(operation.value);
+        }
       } else {
         if (!specification.inherit)
           failOperation(
@@ -1562,11 +1616,14 @@ export function applyBuildingPlanOperation(
       applyThicknessChanges(
         floor,
         before,
-        operation.activeRoomId || operation.roomId,
+        operation.activeRoomId ||
+          operation.roomId ||
+          (portion && findFace(floor, operation.faceId).room.id),
         createId,
-        operation,
+        portion ? { ...operation, preserveWallGrouping: true } : operation,
         specifications
       );
+      portion?.releaseCuts();
       break;
     }
     case 'set_values': {

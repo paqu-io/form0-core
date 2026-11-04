@@ -3,6 +3,7 @@ import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
 import { copyBuildingPlanData as copy, equalValue, findFace, findRoom, own } from './model.js';
 import { roomBounds } from './geometry.js';
+import { portionThicknessState, usesPortionThickness } from './portion-properties.js';
 import {
   getBuildingPlanRecordMetadata,
   readBuildingPlanRecord,
@@ -132,7 +133,8 @@ export function buildingPlanOperationsForRow({
           ? roomId
             ? { roomId }
             : {}
-          : binding.scope === 'room_face'
+          : binding.scope === 'room_face' ||
+              (node.nodeKey === 'walls' && usesPortionThickness(model, property))
             ? { faceId: model.id }
             : { wallId }),
       };
@@ -399,13 +401,17 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
           mode: own(subject?.defaults, property) ? 'override' : 'inherit',
         }
       : subject?.provenance?.[property];
+  const portion =
+    physical && selected.node.nodeKey === 'walls' && property === 'wall_thickness_m'
+      ? portionThicknessState(subject, selected.model)
+      : null;
   return {
     managed,
     scope: binding.scope,
     property,
     inheritable: Boolean(binding.inherit || binding.role === 'default'),
     value: copy(selected.row.values[dataName]),
-    source: copy(provenance || null),
+    source: copy(portion?.source || provenance || null),
     subjectId: subject?.id,
   };
 }

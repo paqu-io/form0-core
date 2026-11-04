@@ -36,6 +36,17 @@ export function normalizeRoomBoundary(floor, room, createId) {
     if (!faces.length) return true;
     const first = faces[0];
     const wall = findWall(floor, first.wallId);
+    const edgeIds = new Set([...a.sources, ...b.sources]);
+    const localSegments = (face) => {
+      const host = findWall(floor, face.wallId);
+      const matching = face.bindings.filter((binding) => edgeIds.has(binding.edgeId));
+      const bindings = matching.length ? matching : face.bindings;
+      return bindings.length
+        ? host.segments.filter((segment) =>
+            bindings.some((binding) => binding.segmentId === segment.id)
+          )
+        : host.segments;
+    };
     return faces.every((face) => {
       const other = findWall(floor, face.wallId);
       if (
@@ -48,8 +59,8 @@ export function normalizeRoomBoundary(floor, room, createId) {
         equalValue(first.values, face.values) &&
         equalValue(first.overrides, face.overrides) &&
         equalValue(wall.overrides, other.overrides) &&
-        wall.segments.every((segment) =>
-          other.segments.every((entry) =>
+        localSegments(first).every((segment) =>
+          localSegments(face).every((entry) =>
             equalValue(segment.overrides || {}, entry.overrides || {})
           )
         )

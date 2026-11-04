@@ -101,6 +101,23 @@ The browser canvases offer Split/Rejoin, magnetic point placement and exact dist
 a marked `0` end. Native offers the same touch commands; select a wall in Select mode for exact
 distance entry. The normal child/floor Save/Cancel and Undo/Redo own these complete operations.
 
+The existing Thickness field on a split portion writes a canonical override for that physical
+span. No second thickness field or scope question is added. Shared room sides read the same value;
+other spans retain their effective thickness. Room/floor defaults remain live, and Reset removes
+only the local exception. The active face is anchored; any opposite-face step represents the actual
+thickness change. Rejoin retains meaningful thickness divisions until their properties agree.
+
+```js
+session.apply({ type: 'set_property', floorId, faceId, property: 'wall_thickness_m', value: 0.4 });
+session.apply({ type: 'set_property', floorId, faceId, property: 'wall_thickness_m', reset: true });
+```
+
+Passing `wallId` instead of `faceId` retains the existing whole-wall domain operation. Local
+exceptions live in `wall_geometry.segments[].overrides`; `lineage.thicknessProfile` retains the
+continuous physical grouping during later default changes. This introduces no new measurement.
+Other physical-wall properties keep their declared scope. Magnetic guides include stationary
+same-room edges and their extension lines; exact straightening keeps cuts until explicit Rejoin.
+
 Detaching a room reconciles the stationary wall's current segment extents to its surviving faces;
 unused automatic tails are removed from the saved geometry. Stationary identities, valid hosted
 opening positions, and dated observation source geometry remain intact. Independently authored

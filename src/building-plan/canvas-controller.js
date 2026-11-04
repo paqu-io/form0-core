@@ -8,6 +8,7 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
+import { portionThicknessState } from './portion-properties.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -98,6 +99,7 @@ export function buildingPlanCanvasSnapshot({
         const faceRow = faceRows[faceIndex];
         const wallPath = [...roomPath, { key: key(meta, 'walls'), index: faceIndex }];
         const physical = floor.walls.find((wall) => wall.id === face.wallId);
+        const thickness = portionThicknessState(physical, face);
         const portions = buildingPlanFaceSegments(floor, room, face).map((part) =>
           part.direction > 0 ? part : { ...part, start: part.end, end: part.start }
         );
@@ -124,7 +126,7 @@ export function buildingPlanCanvasSnapshot({
           windows: [],
           label: physical.values.wall_label || '',
           displayLabel: physical.values.wall_label || `W#${faceIndex + 1}`,
-          thickness: physical.properties.wall_thickness_m,
+          thickness: thickness ? thickness.value : physical.properties.wall_thickness_m,
           height: physical.properties.wall_height_m,
           provenance: copy(physical.provenance),
         };
