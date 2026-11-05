@@ -12,11 +12,14 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   let edgeSince = null;
   let lastFrame = null;
   let referenceScene = null;
+  let cornerAxis = null;
+  let wallAxis = null;
   const currentScene = () => referenceScene || scene();
   const settings = () => normalizeBuildingPlanEditingPolicy(policy());
+  const captureError = (entry) => entry.captureError ?? entry.error;
   function choose(candidates, zoom) {
     const ranked = candidates
-      .filter((entry) => entry.error * zoom <= (latch.has(entry.key) ? 13 : 8))
+      .filter((entry) => captureError(entry) * zoom <= (latch.has(entry.key) ? 13 : 8))
       .sort(
         (a, b) =>
           Number(latch.has(b.key)) - Number(latch.has(a.key)) ||
@@ -62,6 +65,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       zoom = 1,
       originalPoints = [],
       bypass = false,
+      translationAxis = null,
     } = {}
   ) {
     if (!settings().snapping || bypass || points.length < 2) {
@@ -102,11 +106,15 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
           !editingGroupId && wall.roomId !== roomId && direction < 0 && overlap >= -8 / zoom
             ? -Math.sign(polygonArea(neighbour.vertices)) * thickness
             : 0;
-        const difference = expected - project(other, start).offset;
+        const offset = project(other, start).offset;
+        const difference = expected - offset;
         const delta = { x: other.normal.x * difference, y: other.normal.y * difference };
         candidates.push({
           key: `face:${index}:${wall.id}`,
           error: Math.abs(difference),
+          // Opposing inside faces bound the same physical material. Capture contact across
+          // that band as well as the usual screen tolerance, even when zoomed in closely.
+          captureError: Math.max(0, Math.min(0, expected) - offset, offset - Math.max(0, expected)),
           normal: other.normal,
           delta,
           guides: [
@@ -119,7 +127,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       }
     }
     if (
-      !candidates.some((candidate) => candidate.error * zoom <= 8) &&
+      !candidates.some((candidate) => captureError(candidate) * zoom <= 8) &&
       originalPoints.length === points.length
     ) {
       const delta = { x: originalPoints[0].x - points[0].x, y: originalPoints[0].y - points[0].y };
@@ -136,7 +144,26 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         return points.map((point) => ({ ...point, x: point.x + delta.x, y: point.y + delta.y }));
       }
     }
-    const chosen = choose(candidates, zoom);
+    const restricted = translationAxis
+      ? candidates.flatMap((candidate) => {
+          const component = candidate.normal[translationAxis];
+          if (Math.abs(component) < 1e-6) return [];
+          const amount = dot(candidate.delta, candidate.normal) / component;
+          return [
+            {
+              ...candidate,
+              normal: { x: translationAxis === 'x' ? 1 : 0, y: translationAxis === 'y' ? 1 : 0 },
+              delta: {
+                x: translationAxis === 'x' ? amount : 0,
+                y: translationAxis === 'y' ? amount : 0,
+              },
+              error: Math.abs(amount),
+              captureError: captureError(candidate) / Math.abs(component),
+            },
+          ];
+        })
+      : candidates;
+    const chosen = choose(restricted, zoom);
     if (chosen)
       return points.map((point) => ({
         ...point,
@@ -147,13 +174,44 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     if (
       points.length > 2 &&
       movingRoom &&
-      !candidates.some((candidate) => candidate.error * zoom <= 20)
+      !candidates.some((candidate) => captureError(candidate) * zoom <= 20)
     ) {
       const snapped = snapPoint(points[0], { roomId, zoom, bypass });
       const delta = { x: snapped.x - points[0].x, y: snapped.y - points[0].y };
       return points.map((point) => ({ ...point, x: point.x + delta.x, y: point.y + delta.y }));
     }
     return points;
+  }
+  function snapWallTranslation(points, options = {}) {
+    const { originalPoints = [], zoom = 1, bypass = false, perpendicular = false } = options;
+    if (perpendicular && originalPoints.length >= 2 && points.length === originalPoints.length) {
+      const frame = segmentFrame(originalPoints[0], originalPoints.at(-1));
+      const amount = project(frame, points[0]).offset;
+      return snapTranslation(
+        originalPoints.map((point) => ({
+          ...point,
+          x: point.x + frame.normal.x * amount,
+          y: point.y + frame.normal.y * amount,
+        })),
+        options
+      );
+    }
+    if (bypass || points.length !== originalPoints.length || !points.length)
+      return snapTranslation(points, options);
+    const dx = points[0].x - originalPoints[0].x,
+      dy = points[0].y - originalPoints[0].y;
+    const start = originalPoints[0],
+      end = originalPoints.at(-1);
+    if (Math.abs(end.x - start.x) < 1e-6) wallAxis = 'x';
+    else if (Math.abs(end.y - start.y) < 1e-6) wallAxis = 'y';
+    if (!wallAxis && Math.hypot(dx, dy) * zoom >= 3)
+      wallAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+    const axis = wallAxis || (Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y');
+    const constrained = points.map((point, index) => ({
+      ...point,
+      [axis === 'x' ? 'y' : 'x']: originalPoints[index][axis === 'x' ? 'y' : 'x'],
+    }));
+    return snapTranslation(constrained, { ...options, translationAxis: axis });
   }
   function snapPoint(point, { roomId, zoom = 1, bypass = false } = {}) {
     guides = [];
@@ -170,6 +228,31 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       result[axis] = target[axis];
       guides.push({ from: target, to: { ...result } });
     }
+    return result;
+  }
+  function snapCorner(point, { roomId, vertexId, originalPoint, zoom = 1, bypass = false } = {}) {
+    guides = [];
+    if (bypass || !settings().snapping || !originalPoint) return { ...point };
+    const dx = point.x - originalPoint.x,
+      dy = point.y - originalPoint.y;
+    if (!cornerAxis && Math.hypot(dx, dy) * zoom >= 3)
+      cornerAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+    const axis = cornerAxis || (Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y');
+    const result = {
+      ...point,
+      [axis === 'x' ? 'y' : 'x']: originalPoint[axis === 'x' ? 'y' : 'x'],
+    };
+    const targets = (currentScene().corners || []).filter((corner) => corner.id !== vertexId);
+    const nearest = targets
+      .filter((c) => Math.abs(c.point[axis] - result[axis]) * zoom <= 8)
+      .sort(
+        (a, b) => Math.abs(a.point[axis] - result[axis]) - Math.abs(b.point[axis] - result[axis])
+      )[0];
+    if (nearest) {
+      result[axis] = nearest.point[axis];
+      guides.push({ from: nearest.point, to: { ...result } });
+    }
+    guides.push({ from: { ...originalPoint }, to: { ...result } });
     return result;
   }
   function edgePan(point, bounds, now) {
@@ -199,13 +282,19 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   return {
     begin() {
       referenceScene = copyBuildingPlanData(scene());
+      cornerAxis = null;
+      wallAxis = null;
     },
     snapPoint,
+    snapCorner,
     snapTranslation,
+    snapWallTranslation,
     edgePan,
     getGuides: () => guides.map((guide) => ({ from: { ...guide.from }, to: { ...guide.to } })),
     reset() {
       referenceScene = null;
+      cornerAxis = null;
+      wallAxis = null;
       latch.clear();
       guides = [];
       edgeSince = null;

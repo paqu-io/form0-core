@@ -310,7 +310,7 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
             segmentId: segment.id,
             edgeId: edge.id,
             interval: [low, high],
-            roomInterval: [Math.min(edgeStart, edgeEnd), Math.max(edgeStart, edgeEnd)],
+            roomInterval: [Math.min(edgeStart, edgeEnd) || 0, Math.max(edgeStart, edgeEnd) || 0],
             direction,
             side: a.offset < 0 ? -1 : 1,
           });

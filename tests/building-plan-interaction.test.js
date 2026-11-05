@@ -12,6 +12,113 @@ const room = {
     { x: 60, y: 124 },
   ],
 };
+
+test('diagonal wall travel holds its initial world axis and allows a free bypass', () => {
+  const interaction = createBuildingPlanInteraction({ policy: () => ({ snapping: false }) });
+  const originalPoints = [
+    { x: 0, y: 0 },
+    { x: 100, y: 50 },
+  ];
+  const translated = (x, y) => originalPoints.map((p) => ({ x: p.x + x, y: p.y + y }));
+  interaction.begin();
+  assert.deepEqual(
+    interaction.snapWallTranslation(translated(20, 3), { originalPoints }),
+    translated(20, 0)
+  );
+  assert.deepEqual(
+    interaction.snapWallTranslation(translated(23, 50), { originalPoints }),
+    translated(23, 0)
+  );
+  assert.deepEqual(
+    interaction.snapWallTranslation(translated(23, 50), { originalPoints, bypass: true }),
+    translated(23, 50)
+  );
+  interaction.reset();
+  interaction.begin();
+  assert.deepEqual(
+    interaction.snapWallTranslation(translated(3, 20), { originalPoints }),
+    translated(0, 20)
+  );
+});
+
+test('magnetic alignment of a diagonal wall respects its chosen translation axis', () => {
+  const originalPoints = [
+    { x: 0, y: 0 },
+    { x: 100, y: 50 },
+  ];
+  const interaction = createBuildingPlanInteraction({
+    scene: () => ({
+      rooms: [room],
+      walls: [
+        {
+          id: 'reference',
+          roomId: room.id,
+          isBoundary: true,
+          thickness: 0.2,
+          points: [
+            { x: 20, y: 0 },
+            { x: 120, y: 50 },
+          ],
+        },
+      ],
+    }),
+  });
+  interaction.begin();
+  const result = interaction.snapWallTranslation(
+    [
+      { x: 18, y: 2 },
+      { x: 118, y: 52 },
+    ],
+    {
+      roomId: 'active',
+      faceId: 'moving',
+      originalPoints,
+    }
+  );
+  assert.ok(Math.abs(result[0].x - 20) < 1e-6);
+  assert.equal(result[0].y, 0);
+  assert.equal(result[1].y, 50);
+});
+
+test('free guidance bypass preserves a split internal partition perpendicular constraint', () => {
+  const interaction = createBuildingPlanInteraction();
+  const originalPoints = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+  ];
+  assert.deepEqual(
+    interaction.snapWallTranslation(
+      [
+        { x: 6, y: 12 },
+        { x: 106, y: 12 },
+      ],
+      {
+        originalPoints,
+        bypass: true,
+        perpendicular: true,
+      }
+    ),
+    [
+      { x: 0, y: 12 },
+      { x: 100, y: 12 },
+    ]
+  );
+});
+
+test('corner travel holds its chosen axis, supports free bypass and resets for the next gesture', () => {
+  const interaction = createBuildingPlanInteraction();
+  const originalPoint = { x: 0, y: 0 };
+  interaction.begin();
+  assert.deepEqual(interaction.snapCorner({ x: 15, y: 3 }, { originalPoint }), { x: 15, y: 0 });
+  assert.deepEqual(interaction.snapCorner({ x: 18, y: 30 }, { originalPoint }), { x: 18, y: 0 });
+  assert.deepEqual(interaction.snapCorner({ x: 18, y: 30 }, { originalPoint, bypass: true }), {
+    x: 18,
+    y: 30,
+  });
+  interaction.reset();
+  interaction.begin();
+  assert.deepEqual(interaction.snapCorner({ x: 2, y: 15 }, { originalPoint }), { x: 0, y: 15 });
+});
 function fixture(policy = {}) {
   return createBuildingPlanInteraction({
     policy: () => policy,

@@ -1,4 +1,5 @@
 import { prepareBuildingPlanEdit } from './opening-edits.js';
+import { buildingPlanPinIssues } from './corner-edits.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import {
@@ -212,6 +213,7 @@ export function createBuildingPlanSession({
         (candidate, edit) =>
           applyBuildingPlanOperation(candidate, edit, { createId, specifications, editingPolicy }),
         (candidate) => [
+          ...buildingPlanPinIssues(current, candidate, operation.pinnedFaceIds),
           ...reconcileBuildingPlanProperties(candidate, specifications),
           ...validate(candidate),
         ]

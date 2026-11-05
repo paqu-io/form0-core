@@ -1,8 +1,4 @@
-import {
-  sharedCornerMove,
-  resolveReversedCorners,
-  repairSharedWallExtents,
-} from './boundary-edits.js';
+import { repairSharedWallExtents } from './boundary-edits.js';
 import {
   GEOMETRY_EPSILON as EPS,
   add,
@@ -18,7 +14,6 @@ import {
   polygonIssue,
   project,
   segmentFrame,
-  shiftRoomEdge,
   subtract,
 } from './geometry.js';
 import {
@@ -50,6 +45,13 @@ import { reconcileWallExtents } from './wall-extents.js';
 import { rejoinEditingCut, splitEditingFace } from './editing-cuts.js';
 import { movePartitionPortion } from './partition-edits.js';
 import { preparePortionThickness } from './portion-properties.js';
+import { reshapeBuildingPlanCorner } from './corner-edits.js';
+import {
+  shiftBuildingPlanBoundary,
+  reshapeBuildingPlanBoundary,
+  buildingPlanJunctionReferences,
+  alignBuildingPlanThicknessReturns,
+} from './junction-edits.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
   const error = new Error(message);
@@ -112,7 +114,7 @@ function remapOpeningForSegment(opening, oldSegment, newSegment, unchanged = nul
 }
 
 /** Repair adjoining unshared walls after a room vertex changes. */
-function repairUnsharedWalls(floor, before, createId) {
+function repairUnsharedWalls(floor, before, createId, transformed = new Set()) {
   for (const wall of floor.walls) {
     const linked = facesOfWall(floor, wall.id);
     for (const { room, face } of linked) {
@@ -122,6 +124,7 @@ function repairUnsharedWalls(floor, before, createId) {
       if (!oldFace || !oldWall) continue;
       const edges = sourceEdges(room, face);
       for (const binding of oldFace.bindings) {
+        if (transformed.has(binding.segmentId)) continue;
         // A return belongs to one facing extent even when the physical wall is shared.
         const users = linked.filter((entry) =>
           before.rooms
@@ -240,27 +243,9 @@ function addJogGeometry(floor, wall, changedEdges, createId) {
 }
 
 function shiftBoundEdge(room, edgeId, interval, delta, createId, changedEdges) {
-  const previous = new Set(room.edges.map((edge) => edge.id));
-  const edge = room.edges.find((entry) => entry.id === edgeId);
-  shiftRoomEdge(room, edgeId, interval, delta, createId);
-  if (!room.edges.some((entry) => entry.id === edgeId)) {
-    const start = room.vertices.findIndex((point) => point.id === edge.startId);
-    const replacement = [];
-    for (
-      let i = start, count = 0;
-      count < room.edges.length;
-      count++, i = (i + 1) % room.edges.length
-    ) {
-      replacement.push(room.edges[i].id);
-      if (room.edges[i].endId === edge.endId) break;
-    }
-    for (const face of room.faces)
-      if (face.edgeIds?.includes(edgeId))
-        face.edgeIds = face.edgeIds.flatMap((id) => (id === edgeId ? replacement : [id]));
-  }
   changedEdges.push({
     roomId: room.id,
-    edgeIds: room.edges.filter((edge) => !previous.has(edge.id)).map((edge) => edge.id),
+    edgeIds: shiftBuildingPlanBoundary(room, edgeId, interval, delta, createId),
   });
 }
 
@@ -293,7 +278,6 @@ function resizeFace(floor, operation, createId, specifications) {
   const before = copy(floor);
   const changedEdges = [];
   const moves = [];
-  const connections = [];
   for (const binding of selected) {
     const segment = wall.segments.find((entry) => entry.id === binding.segmentId);
     const frame = segmentFrame(segment.start, segment.end);
@@ -312,26 +296,34 @@ function resizeFace(floor, operation, createId, specifications) {
           (bound.side *
             (buildingPlanSegmentThickness(wall, segment) ?? (segment.referenceOffset ?? 0) * 2)) /
           2;
-        const move = sharedCornerMove(
-          floor,
-          room,
-          edge,
-          other.room,
-          otherEdge,
-          [
-            project(otherEdge, at(frame, from, offset)).along,
-            project(otherEdge, at(frame, to, offset)).along,
-          ].sort((a, b) => a - b)
-        );
-        moves.push({ room: other.room, edgeId: bound.edgeId, interval: move.interval });
-        connections.push(...move.connections);
+        const interval = [
+          project(otherEdge, at(frame, from, offset)).along,
+          project(otherEdge, at(frame, to, offset)).along,
+        ].sort((a, b) => a - b);
+        const point = (along) => cleanPoint(add(at(otherEdge, along), delta));
+        moves.push({
+          room: other.room,
+          edit: {
+            edgeId: bound.edgeId,
+            activeEdgeId: edge.id,
+            interval,
+            start: point(interval[0]),
+            end: point(interval[1]),
+          },
+        });
       }
     splitGeometrySegment(wall, segment, low, high, delta, createId);
   }
-  for (const move of moves)
-    shiftBoundEdge(move.room, move.edgeId, move.interval, delta, createId, changedEdges);
   shiftBoundEdge(room, edge.id, interval, delta, createId, changedEdges);
-  resolveReversedCorners(floor, connections);
+  normalizeRoomBoundary(floor, room, createId);
+  const references = buildingPlanJunctionReferences(floor, before, room.id);
+  for (const other of new Set(moves.map((move) => move.room))) {
+    const edits = moves.filter((move) => move.room === other).map((move) => move.edit);
+    changedEdges.push({
+      roomId: other.id,
+      edgeIds: reshapeBuildingPlanBoundary(other, edits, createId, references),
+    });
+  }
   finishBoundaryEdit(
     floor,
     before,
@@ -341,79 +333,6 @@ function resizeFace(floor, operation, createId, specifications) {
     createId,
     specifications
   );
-}
-
-/** New returns alongside the active room use its fixed face and one wall-thickness gap. */
-function alignNewReturns(floor, changedEdges, activeRoomId, before) {
-  const active = floor.rooms.find((room) => room.id === activeRoomId);
-  const aligned = new Set();
-  if (!active) return aligned;
-  for (const change of changedEdges.filter((entry) => entry.roomId !== activeRoomId)) {
-    const room = findRoom(floor, change.roomId);
-    for (const edgeId of change.edgeIds) {
-      const edge = polygonEdges(room).find((entry) => entry.id === edgeId);
-      if (!edge) continue;
-      for (const reference of polygonEdges(active)) {
-        if (
-          dot(edge.tangent, reference.tangent) > -1 + EPS ||
-          !near(project(reference, edge.start).offset, 0)
-        )
-          continue;
-        const span = [
-          project(reference, edge.start).along,
-          project(reference, edge.end).along,
-        ].sort((a, b) => a - b);
-        if (Math.min(reference.length, span[1]) - Math.max(0, span[0]) < -EPS) continue;
-        const face = active.faces.find((face) => face.edgeIds?.includes(reference.id));
-        if (!face) continue;
-        const wall = findWall(floor, face.wallId);
-        const oldRoom = before.rooms.find((room) => room.id === activeRoomId);
-        const oldEdge = oldRoom && polygonEdges(oldRoom).find((edge) => edge.id === reference.id);
-        const bindings = face.bindings.filter((binding) => {
-          if (binding.edgeId !== reference.id) return false;
-          const range = oldEdge
-            ? binding.roomInterval.map((along, index) =>
-                near(along, index === 0 ? 0 : oldEdge.length)
-                  ? index === 0
-                    ? 0
-                    : reference.length
-                  : project(reference, at(oldEdge, along)).along
-              )
-            : binding.roomInterval;
-          return Math.min(span[1], range[1]) - Math.max(span[0], range[0]) >= -EPS;
-        });
-        const thicknesses = (bindings.length ? bindings : face.bindings).map((binding) =>
-          buildingPlanSegmentThickness(
-            wall,
-            wall.segments.find((segment) => segment.id === binding.segmentId)
-          )
-        );
-        const thickness = thicknesses[0];
-        if (thicknesses.some((value) => !near(value, thickness)))
-          failOperation(
-            'jog_thickness_conflict',
-            'The new return reaches segments with different thicknesses. Edit a shorter portion or resolve those thicknesses first.',
-            { type: 'wall', id: wall.id }
-          );
-        if (!(thickness > EPS))
-          failOperation(
-            'unknown_wall_thickness',
-            'Set a positive thickness for the adjacent wall before connecting this return.',
-            { type: 'wall', id: wall.id }
-          );
-        aligned.add(room.id);
-        const delta = multiply(
-          reference.normal,
-          -Math.sign(polygonArea(active.vertices)) * thickness
-        );
-        for (const vertex of room.vertices)
-          if (vertex.id === edge.start.id || vertex.id === edge.end.id)
-            Object.assign(vertex, cleanPoint(add(vertex, delta)));
-        break;
-      }
-    }
-  }
-  return aligned;
 }
 
 function finishBoundaryEdit(
@@ -437,7 +356,13 @@ function finishBoundaryEdit(
     )
       normalizeRoomBoundary(floor, room, createId);
   }
-  const alignedRooms = alignNewReturns(floor, changedEdges, operation.activeRoomId, before);
+  const alignedRooms = ['move_corner', 'resize_face'].includes(operation.type)
+    ? new Set(
+        changedEdges
+          .filter((change) => change.roomId !== operation.activeRoomId)
+          .map((change) => change.roomId)
+      )
+    : alignBuildingPlanThicknessReturns(floor, changedEdges, operation.activeRoomId, before);
   for (const roomId of new Set(changedEdges.map((entry) => entry.roomId)))
     normalizeRoomBoundary(floor, findRoom(floor, roomId), createId);
   for (const candidate of floor.rooms) {
@@ -450,7 +375,7 @@ function finishBoundaryEdit(
         { reason: problem }
       );
   }
-  repairUnsharedWalls(floor, before, createId);
+  repairUnsharedWalls(floor, before, createId, operation.transformedSegments);
   repairSharedWallExtents(floor, before);
   reconcileWallExtents(floor, new Set(affectedWalls.map((wall) => wall.id)));
   rebindBuildingPlanFaces(floor, createId);
@@ -1252,6 +1177,19 @@ export function applyBuildingPlanOperation(
     case 'resize_face':
       resizeFace(floor, operation, createId, specifications);
       break;
+    case 'move_corner': {
+      const edit = reshapeBuildingPlanCorner(floor, operation, createId);
+      finishBoundaryEdit(
+        floor,
+        edit.before,
+        edit.changedEdges,
+        edit.affectedWalls,
+        { ...operation, activeRoomId: operation.roomId, transformedSegments: edit.transformed },
+        createId,
+        specifications
+      );
+      break;
+    }
     case 'separate_wall': {
       const wall = findWall(floor, operation.wallId);
       if (
@@ -1800,7 +1738,11 @@ export function applyBuildingPlanOperation(
     default:
       failOperation('unknown_operation', `Unsupported building-plan operation: ${operation.type}`);
   }
-  if (['resize_face', 'resize_room', 'set_property', 'set_defaults'].includes(operation.type))
+  if (
+    ['resize_face', 'resize_room', 'move_corner', 'set_property', 'set_defaults'].includes(
+      operation.type
+    )
+  )
     for (const room of floor.rooms)
       attachRoom(floor, room, { ...operation, attachmentTolerance: 0 }, createId, specifications);
   const conflicts = reconcileBuildingPlanProperties(snapshot, specifications);
@@ -1810,5 +1752,15 @@ export function applyBuildingPlanOperation(
     throw error;
   }
   rebindBuildingPlanFaces(floor, createId);
+  if (
+    ['move_corner', 'resize_face', 'resize_room', 'set_property', 'set_defaults'].includes(
+      operation.type
+    )
+  )
+    for (const wall of floor.walls)
+      for (const opening of [...wall.doors, ...wall.windows]) {
+        const field = `${opening.type}_offset_m`;
+        if (own(opening.values, field)) opening.values[field] = opening.offset;
+      }
   return {};
 }

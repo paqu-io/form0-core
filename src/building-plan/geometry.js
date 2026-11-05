@@ -152,64 +152,6 @@ export function assignRoomEdges(room, createId, previousEdges = room.edges || []
   });
 }
 
-/** Shift just an interval of an edge; partial intervals create a local jog. */
-export function shiftRoomEdge(room, edgeId, interval, delta, createId) {
-  const edges = polygonEdges(room);
-  const index = edges.findIndex((edge) => edge.id === edgeId);
-  if (index < 0) throw new Error('The room edge no longer exists.');
-  const edge = edges[index];
-  let [from, to] = [...interval].sort((a, b) => a - b);
-  if (
-    from < -GEOMETRY_EPSILON ||
-    to > edge.length + GEOMETRY_EPSILON ||
-    to - from <= GEOMETRY_EPSILON
-  )
-    throw new Error('The edited extent is outside its room edge.');
-  from = Math.max(0, from);
-  to = Math.min(edge.length, to);
-  const previous = room.edges;
-  const adjacentStart = edges[(index + edges.length - 1) % edges.length];
-  const adjacentEnd = edges[(index + 1) % edges.length];
-  const holdStart =
-    from <= GEOMETRY_EPSILON &&
-    edge.start.editingCutId &&
-    near(dot(adjacentStart.tangent, edge.tangent), 1);
-  const holdEnd =
-    to >= edge.length - GEOMETRY_EPSILON &&
-    edge.end.editingCutId &&
-    near(dot(adjacentEnd.tangent, edge.tangent), 1);
-  const start =
-    from <= GEOMETRY_EPSILON && !holdStart
-      ? cleanPoint({ ...edge.start, ...add(edge.start, delta) })
-      : edge.start;
-  const end =
-    to >= edge.length - GEOMETRY_EPSILON && !holdEnd
-      ? cleanPoint({ ...edge.end, ...add(edge.end, delta) })
-      : edge.end;
-  const inserted = [];
-  if (holdStart)
-    inserted.push(cleanPoint({ ...edge.start, ...add(edge.start, delta), id: createId() }));
-  if (from > GEOMETRY_EPSILON) {
-    inserted.push(
-      { ...at(edge, from), id: createId() },
-      { ...cleanPoint(add(at(edge, from), delta)), id: createId() }
-    );
-  }
-  if (to < edge.length - GEOMETRY_EPSILON) {
-    inserted.push(
-      { ...cleanPoint(add(at(edge, to), delta)), id: createId() },
-      { ...at(edge, to), id: createId() }
-    );
-  }
-  if (holdEnd) inserted.push(cleanPoint({ ...edge.end, ...add(edge.end, delta), id: createId() }));
-  const vertices = room.vertices.map((p) =>
-    p.id === edge.start.id ? start : p.id === edge.end.id ? end : p
-  );
-  vertices.splice(index + 1, 0, ...inserted);
-  room.vertices = vertices;
-  assignRoomEdges(room, createId, previous);
-}
-
 export function roomBounds(room) {
   const xs = room.vertices.map((p) => p.x);
   const ys = room.vertices.map((p) => p.y);

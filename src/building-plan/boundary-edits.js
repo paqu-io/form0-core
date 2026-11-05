@@ -8,8 +8,6 @@ import {
   polygonEdges,
   project,
   segmentFrame,
-  add,
-  multiply,
 } from './geometry.js';
 import {
   buildingPlanSegmentThickness,
@@ -18,94 +16,6 @@ import {
   equalValue,
   planIssue,
 } from './model.js';
-
-const host = (floor, room, edgeId) => {
-  const face = room.faces.find((face) => face.edgeIds?.includes(edgeId));
-  return face && findWall(floor, face.wallId);
-};
-/** Extend a partial propagation to a real connected corner, rather than creating a thickness-wide bay. */
-export function sharedCornerMove(floor, referenceRoom, referenceEdge, room, edge, interval) {
-  const edges = polygonEdges(room),
-    index = edges.findIndex((item) => item.id === edge.id);
-  const connections = [];
-  const result = [...interval];
-  for (const end of [0, 1]) {
-    const gap = end ? edge.length - result[1] : result[0];
-    if (gap <= EPS) continue;
-    const adjacent = edges[(index + (end ? 1 : edges.length - 1)) % edges.length];
-    for (const reference of polygonEdges(referenceRoom)) {
-      if (
-        Math.abs(dot(reference.tangent, referenceEdge.tangent)) > EPS ||
-        dot(reference.tangent, adjacent.tangent) > -1 + EPS
-      )
-        continue;
-      const range = [
-        project(reference, adjacent.start).along,
-        project(reference, adjacent.end).along,
-      ].sort((a, b) => a - b);
-      if (Math.min(reference.length, range[1]) - Math.max(0, range[0]) < -EPS) continue;
-      const wall = host(floor, referenceRoom, reference.id);
-      if (!wall) continue;
-      const thickness = referenceRoom.faces
-        .filter((face) => face.wallId === wall.id)
-        .flatMap((face) => face.bindings)
-        .filter(
-          (binding) =>
-            binding.edgeId === reference.id &&
-            Math.min(binding.roomInterval[1], range[1]) -
-              Math.max(binding.roomInterval[0], range[0]) >=
-              -EPS
-        )
-        .map((binding) =>
-          buildingPlanSegmentThickness(
-            wall,
-            wall.segments.find((segment) => segment.id === binding.segmentId)
-          )
-        )
-        .find(
-          (value) =>
-            Number.isFinite(value) &&
-            gap <= value + EPS &&
-            near(
-              project(reference, adjacent.start).offset,
-              -Math.sign(polygonArea(referenceRoom.vertices)) * value
-            )
-        );
-      if (!Number.isFinite(thickness)) continue;
-      result[end] = end ? edge.length : 0;
-      connections.push({
-        roomId: room.id,
-        edgeId: adjacent.id,
-        referenceRoomId: referenceRoom.id,
-        referenceEdgeId: reference.id,
-        oldTangent: adjacent.tangent,
-      });
-      break;
-    }
-  }
-  return { interval: result, connections };
-}
-
-/** A return that reverses at a shared corner switches to the other face of its stable wall axis. */
-export function resolveReversedCorners(floor, connections) {
-  for (const connection of connections) {
-    const room = floor.rooms.find((item) => item.id === connection.roomId);
-    const referenceRoom = floor.rooms.find((item) => item.id === connection.referenceRoomId);
-    const identity = room.edges.find((item) => item.id === connection.edgeId);
-    const start = room.vertices.find((item) => item.id === identity?.startId);
-    const end = room.vertices.find((item) => item.id === identity?.endId);
-    if (!start || !end || distance(start, end) <= EPS) continue;
-    const edge = { ...identity, ...segmentFrame(start, end) };
-    const reference = polygonEdges(referenceRoom).find(
-      (item) => item.id === connection.referenceEdgeId
-    );
-    if (!edge || !reference || dot(edge.tangent, connection.oldTangent) > -1 + EPS) continue;
-    const delta = multiply(reference.normal, -project(reference, edge.start).offset);
-    for (const vertex of room.vertices)
-      if (vertex.id === edge.start.id || vertex.id === edge.end.id)
-        Object.assign(vertex, add(vertex, delta));
-  }
-}
 
 /** Reconcile captured straight extents with their physical host, retaining its identity and fixed-end offsets. */
 export function repairSharedWallExtents(floor, before) {
@@ -148,7 +58,7 @@ export function repairSharedWallExtents(floor, before) {
         }
       }
       if (!ranges.length) continue;
-      const from = Math.min(...ranges),
+      const from = near(Math.min(...ranges), 0) ? 0 : Math.min(...ranges),
         to = Math.max(...ranges);
       if (to - from <= EPS) continue;
       segment.start = at(frame, from);

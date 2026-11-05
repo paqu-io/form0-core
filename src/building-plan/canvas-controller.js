@@ -3,7 +3,7 @@ import { createBuildingPlanSession } from './session.js';
 import { getBuildingPlanFieldState } from './transactions.js';
 import { readBuildingPlanRecord, writeBuildingPlanRecord } from './records.js';
 import { buildingPlanFaceSegments, copyBuildingPlanData as copy } from './model.js';
-import { distance, project, roomBounds, segmentFrame } from './geometry.js';
+import { distance, polygonArea, project, roomBounds, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
@@ -45,6 +45,7 @@ export function buildingPlanCanvasSnapshot({
     wallFootprints: [],
     physicalOpenings: [],
     editingCuts: [],
+    corners: [],
   };
   const pixels = (point) => ({ x: point.x * gridSize, y: point.y * gridSize });
   const floorRows = record.repeatable?.[key(meta, 'floors')] || [];
@@ -76,6 +77,13 @@ export function buildingPlanCanvasSnapshot({
       const roomIndex = roomRows.findIndex((row) => subjectId(meta, 'rooms', row) === room.id);
       const roomRow = roomRows[roomIndex];
       const roomPath = [...floorPath, { key: key(meta, 'rooms'), index: roomIndex }];
+      output.corners.push(
+        ...room.vertices.map((point) => ({
+          id: point.id,
+          roomId: room.id,
+          point: pixels(point),
+        }))
+      );
       const bounds = roomBounds(room);
       output.rooms.push({
         id: room.id,
@@ -265,12 +273,17 @@ export class BuildingPlanCanvasController {
     this.gridSize = 20;
     this.activeFloorIndex = 0;
     this.listeners = new Set();
+    this.pinnedFaceIds = new Set();
     this.disposed = false;
     this.busy = false;
     this.syncFromState();
   }
   syncFromState() {
     if (this.busy || this.disposed) return;
+    if (this.pinScopeId !== undefined && this.pinScopeId !== this.scopeId()) {
+      this.pinnedFaceIds.clear();
+      this.pinScopeId = undefined;
+    }
     try {
       const record = this.readRecord();
       const plan = readBuildingPlanRecord({ meta: this.meta, record });
@@ -305,6 +318,7 @@ export class BuildingPlanCanvasController {
     this.floorCount = this.floors.length;
     for (const collection of ['rooms', 'walls', 'columns', 'beams', 'doors', 'windows'])
       this[collection] = new Map(this.snapshot[collection].map((item) => [item.id, item]));
+    for (const id of this.pinnedFaceIds) if (!this.walls.has(id)) this.pinnedFaceIds.delete(id);
   }
   canEdit() {
     return (
@@ -317,7 +331,7 @@ export class BuildingPlanCanvasController {
     return this.busy;
   }
   getSnapshot() {
-    return copy({
+    const view = copy({
       ...(this.previewView ||
         this.snapshot || {
           floors: [],
@@ -331,6 +345,8 @@ export class BuildingPlanCanvasController {
       history: this.session?.getState(),
       guides: this.interaction?.getGuides() || [],
     });
+    for (const wall of view.walls) wall.pinned = this.pinnedFaceIds.has(wall.id);
+    return view;
   }
   subscribe(listener) {
     this.listeners.add(listener);
@@ -348,6 +364,7 @@ export class BuildingPlanCanvasController {
     }
   }
   setActiveFloor(index) {
+    this.pinnedFaceIds.clear();
     this.activeFloorIndex = index;
     this.refresh();
     this.emitUpdate();
@@ -362,6 +379,7 @@ export class BuildingPlanCanvasController {
     this.disposed = true;
     this.listeners.clear();
     this.interaction.reset();
+    this.pinnedFaceIds.clear();
   }
   setEditingPolicy(policy) {
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(policy);
@@ -379,6 +397,7 @@ export class BuildingPlanCanvasController {
     this.syncFromState();
     operation = {
       ...operation,
+      pinnedFaceIds: [...this.pinnedFaceIds],
       preserveWallGrouping:
         operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
     };
@@ -482,6 +501,7 @@ export class BuildingPlanCanvasController {
     const proposal = this.session.preview(
       {
         ...operation,
+        pinnedFaceIds: [...this.pinnedFaceIds],
         preserveWallGrouping:
           operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
       },
@@ -569,6 +589,59 @@ export class BuildingPlanCanvasController {
       vertices: points.map((p) => this.metric(p)),
     });
   }
+  getCornerPlacement(point, { roomId, preferredRoomId, zoom = 1 } = {}) {
+    const corner = (this.snapshot.corners || [])
+      .filter(
+        (corner) =>
+          (!roomId || corner.roomId === roomId) && distance(corner.point, point) * zoom <= 9
+      )
+      .sort(
+        (a, b) =>
+          Number(b.roomId === preferredRoomId) - Number(a.roomId === preferredRoomId) ||
+          distance(a.point, point) - distance(b.point, point)
+      )[0];
+    if (!corner) return null;
+    // Reserve the centre of short portions for wall selection: adjacent vertex handles
+    // otherwise cover the entire return at ordinary zoom levels.
+    const wallCentre = this.snapshot.walls.some((wall) => {
+      if (wall.roomId !== corner.roomId || wall.points.length !== 2) return false;
+      const frame = segmentFrame(...wall.points),
+        value = project(frame, point);
+      return (
+        frame.length * zoom < 18 &&
+        value.along / frame.length > 0.25 &&
+        value.along / frame.length < 0.75 &&
+        Math.abs(value.offset) * zoom <= 3
+      );
+    });
+    return wallCentre ? null : copy(corner);
+  }
+  toggleWallPin(id) {
+    if (!this.canEdit() || !this.walls.has(id)) return false;
+    this.pinScopeId = this.scopeId();
+    if (this.pinnedFaceIds.has(id)) this.pinnedFaceIds.delete(id);
+    else this.pinnedFaceIds.add(id);
+    this.emitUpdate();
+    return true;
+  }
+  previewCorner(roomId, vertexId, point) {
+    return this.previewOperation({
+      type: 'move_corner',
+      floorId: this.floorId,
+      roomId,
+      vertexId,
+      point: this.metric(point),
+    });
+  }
+  updateCorner(roomId, vertexId, point) {
+    return this.apply({
+      type: 'move_corner',
+      floorId: this.floorId,
+      roomId,
+      vertexId,
+      point: this.metric(point),
+    });
+  }
   updateWall(id, points) {
     const operation = this.wallOperation(id, points);
     return operation && this.apply(operation);
@@ -617,13 +690,13 @@ export class BuildingPlanCanvasController {
       (selected, value) => (Math.abs(value) > Math.abs(selected) ? value : selected),
       0
     );
-    // The polygon's clockwise interior is on the right of its directed boundary.
+    // The direction of an outward displacement follows the room's actual winding.
     return {
       type: 'resize_face',
       floorId: floor.id,
       faceId: id,
       edgeId: binding.edgeId,
-      distance: -delta,
+      distance: -Math.sign(polygonArea(room.vertices)) * delta,
     };
   }
   createColumn(roomId, values = {}) {

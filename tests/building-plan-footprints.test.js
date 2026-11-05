@@ -37,6 +37,45 @@ function fixture(editingPolicy) {
 const covers = (footprints, point) =>
   footprints.some((wall) => wall.polygons.some((p) => pointInPolygon(point, p)));
 
+for (const preserveWallGrouping of [false, true])
+  test(`shared corner edits preserve a straight outer wall with no material spike (grouped=${preserveWallGrouping})`, () => {
+    const f = fixture({ preserveWallGrouping }),
+      floor = f.session.getSnapshot().floors[0];
+    f.apply({ type: 'resize_face', faceId: floor.rooms[1].faces[1].id, distance: -3 });
+    f.apply({ type: 'resize_face', faceId: f.faceB, distance: 1 });
+    const before = f.session.getSnapshot(),
+      room = before.floors[0].rooms[1];
+    f.apply({
+      type: 'move_corner',
+      roomId: room.id,
+      vertexId: room.vertices[0].id,
+      point: { x: 3, y: 1.4 },
+    });
+    const next = f.session.getSnapshot();
+    for (const [i, r] of before.floors[0].rooms.entries())
+      for (const vertex of r.vertices.filter((v) => v.x === 5))
+        assert.equal(next.floors[0].rooms[i].vertices.find((v) => v.id === vertex.id).x, 5);
+    const scene = f.scene(1),
+      points = scene.wallFootprints.flatMap((w) => w.polygons.flat());
+    assert.ok(
+      Math.max(...points.map((p) => p.x)) <= 5.2 + 1e-6,
+      'No material beyond the straight 0.20 m outer wall'
+    );
+    assert.ok(covers(scene.wallFootprints, { x: 5.1, y: 2.7 }));
+    assert.ok(!covers(scene.wallFootprints, { x: 5.21, y: 2.1 }));
+    assert.deepEqual(validateBuildingPlanSnapshot(next), []);
+    f.apply({
+      type: 'move_corner',
+      roomId: room.id,
+      vertexId: room.vertices[0].id,
+      point: { x: 3, y: 2.2 },
+    });
+    assert.deepEqual(
+      f.session.getSnapshot().floors[0].rooms.map((r) => r.vertices),
+      before.floors[0].rooms.map((r) => r.vertices)
+    );
+  });
+
 test('one physical shared wall has metric material between its two facing rows and one door cut', () => {
   const f = fixture(),
     before = f.session.getSnapshot(),
