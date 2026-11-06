@@ -1,5 +1,17 @@
-import { add, at, cross, multiply, polygonArea, segmentFrame, subtract } from './geometry.js';
-import { buildingPlanSegmentThickness } from './model.js';
+import {
+  add,
+  at,
+  cross,
+  multiply,
+  polygonArea,
+  segmentFrame,
+  subtract,
+  distance,
+  polygonsOverlap,
+} from './geometry.js';
+import { buildingPlanSegmentThickness, planIssue } from './model.js';
+import { createBuildingPlanAxisNetwork } from './axis-network.js';
+import { junctionIntersection } from './junction-edits.js';
 
 const EPS = 1e-9;
 const area = (points) => Math.abs(polygonArea(points));
@@ -91,7 +103,7 @@ function triangles(vertices) {
   return result;
 }
 
-function addWallCorner(walls, incoming, outgoing, point, a, b, side) {
+function addWallCorner(walls, incoming, outgoing, point, a, b, side, register = () => {}) {
   if (!(a?.thickness > 0 && b?.thickness > 0)) return;
   const denominator = cross(incoming.tangent, outgoing.tangent);
   if (denominator * side <= EPS) return;
@@ -100,19 +112,21 @@ function addWallCorner(walls, incoming, outgoing, point, a, b, side) {
   const along = cross(subtract(qb, qa), outgoing.tangent) / denominator;
   const intersection = add(qa, multiply(incoming.tangent, along));
   const miter = Math.hypot(intersection.x - point.x, intersection.y - point.y);
-  walls
-    .get(a.wall.id)
-    .polygons.push(
-      miter <= 4 * Math.max(a.thickness, b.thickness)
-        ? [point, qa, intersection, qb]
-        : [point, qa, qb]
-    );
+  const polygon =
+    miter <= 4 * Math.max(a.thickness, b.thickness)
+      ? [point, qa, intersection, qb]
+      : [point, qa, qb];
+  walls.get(a.wall.id).polygons.push(polygon);
+  register(polygon);
 }
 
 /** Derived metric wall material and canonical openings; never writes to the semantic model. */
-export function buildingPlanFootprints(floor, gridSize) {
+export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false } = {}) {
   const pixels = (p) => ({ x: p.x * gridSize, y: p.y * gridSize });
   const walls = new Map();
+  const network = createBuildingPlanAxisNetwork(floor);
+  const clipsByPolygon = new WeakMap(),
+    axesByPolygon = new WeakMap();
   const openings = [];
   const boundaryRooms = new Map(floor.walls.map((wall) => [wall.id, new Set()]));
   for (const room of floor.rooms)
@@ -126,10 +140,19 @@ export function buildingPlanFootprints(floor, gridSize) {
     };
     walls.set(wall.id, entry);
     for (const segment of wall.segments) {
+      if (
+        boundaryOnly &&
+        !network.runs.some((run) => run.wall.id === wall.id && run.segment.id === segment.id)
+      )
+        continue;
       const frame = segmentFrame(segment.start, segment.end);
       const thickness = buildingPlanSegmentThickness(wall, segment);
-      if (thickness > 0) entry.polygons.push(rect(frame, 0, frame.length, thickness / 2));
-      else
+      if (thickness > 0) {
+        const polygon = rect(frame, 0, frame.length, thickness / 2);
+        entry.polygons.push(polygon);
+        clipsByPolygon.set(polygon, network.roomsForSegment(wall, segment));
+        axesByPolygon.set(polygon, [frame]);
+      } else
         entry.schematicSegments.push({
           id: segment.id,
           points: [pixels(segment.start), pixels(segment.end)],
@@ -170,6 +193,10 @@ export function buildingPlanFootprints(floor, gridSize) {
             const wall = floor.walls.find((w) => w.id === face.wallId);
             return {
               wall,
+              axis: segmentFrame(
+                wall.segments.find((s) => s.id === binding.segmentId).start,
+                wall.segments.find((s) => s.id === binding.segmentId).end
+              ),
               thickness: buildingPlanSegmentThickness(
                 wall,
                 wall.segments.find((s) => s.id === binding.segmentId)
@@ -178,16 +205,24 @@ export function buildingPlanFootprints(floor, gridSize) {
           }
       return null;
     };
-    for (let i = 0; i < edges.length; i++) {
+    for (let i = 0; !boundaryOnly && i < edges.length; i++) {
       const previous = (i + edges.length - 1) % edges.length;
       const a = bound(previous, true),
         b = bound(i, false);
-      addWallCorner(walls, edges[previous], edges[i], room.vertices[i], a, b, side);
+      addWallCorner(walls, edges[previous], edges[i], room.vertices[i], a, b, side, (polygon) => {
+        const joint = a?.axis && b?.axis && junctionIntersection(a.axis, b.axis);
+        clipsByPolygon.set(polygon, [
+          ...new Set([room.id, ...(joint ? network.roomsAtJunction(a, b, joint) : [])]),
+        ]);
+        axesByPolygon.set(polygon, [a?.axis, b?.axis].filter(Boolean));
+      });
     }
     // Explicit partition cuts connect their derived return to the same captured chain.
-    const partitions = room.faces.filter(
-      (face) => face.freePath?.length === 2 && face.lineage?.editingOriginFaceId
-    );
+    const partitions = boundaryOnly
+      ? []
+      : room.faces.filter(
+          (face) => face.freePath?.length === 2 && face.lineage?.editingOriginFaceId
+        );
     const construction = (face, binding) => {
       const wall = floor.walls.find((wall) => wall.id === face.wallId);
       return {
@@ -229,16 +264,29 @@ export function buildingPlanFootprints(floor, gridSize) {
   }
   const roomTriangles = new Map(floor.rooms.map((r) => [r.id, triangles(r.vertices)]));
   for (const entry of walls.values()) {
-    const clips = entry.roomIds.flatMap((id) => roomTriangles.get(id));
-    clips.push(
-      ...openings.filter((o) => o.wallId === entry.id && o.polygon.length).map((o) => o.polygon)
-    );
-    for (const clip of clips)
-      entry.polygons = entry.polygons.flatMap((p) => subtractConvex(p, clip));
+    entry.polygons = entry.polygons.flatMap((polygon) => {
+      const clips = (clipsByPolygon.get(polygon) || []).flatMap((id) => roomTriangles.get(id));
+      const axes = axesByPolygon.get(polygon) || [];
+      clips.push(
+        ...openings
+          .filter(
+            (o) =>
+              o.polygon.length &&
+              (axes.length
+                ? axes.some((axis) => network.collinear(axis, segmentFrame(...o.points)))
+                : o.wallId === entry.id)
+          )
+          .map((o) => o.polygon)
+      );
+      let pieces = [polygon];
+      for (const clip of clips) pieces = pieces.flatMap((piece) => subtractConvex(piece, clip));
+      return pieces;
+    });
     entry.polygons = entry.polygons.map((polygon) =>
       (polygonArea(polygon) < 0 ? [...polygon].reverse() : polygon).map(pixels)
     );
   }
+
   return {
     wallFootprints: [...walls.values()],
     physicalOpenings: openings.map((o) => ({
@@ -258,4 +306,32 @@ export function buildingPlanFaceAxes(wall, portions, pixels) {
     const end = at(frame, part.interval[part.direction > 0 ? 1 : 0]);
     return index ? [pixels(end)] : [pixels(start), pixels(end)];
   });
+}
+
+/** Perimeter bands cannot occupy a different room where no shared axis bounds them.
+ * This is a metric clearance constraint, not a blanket renderer clip. Deliberately authored
+ * internal partitions are excluded. Stationary lines and intentional cuts can make a drag
+ * unsatisfiable even when the two clear-room polygons merely touch rather than overlap.
+ */
+export function buildingPlanBoundaryClearanceIssues(floor) {
+  const { wallFootprints } = buildingPlanFootprints(floor, 1, { boundaryOnly: true });
+  for (const wall of wallFootprints)
+    for (const room of floor.rooms) {
+      const overlap = wall.polygons.some((points) => {
+        const polygon = points.filter(
+          (p, i) => distance(p, points[(i + points.length - 1) % points.length]) > 1e-6
+        );
+        return polygon.length >= 3 && polygonsOverlap(polygon, room.vertices);
+      });
+      if (overlap)
+        return [
+          planIssue(
+            'wall_clearance_conflict',
+            `The wall would enter Room ${floor.rooms.indexOf(room) + 1}. Move rejected; try a smaller drag or edit the adjoining portion.`,
+            { type: 'room', id: room.id },
+            { wallId: wall.id }
+          ),
+        ];
+    }
+  return [];
 }

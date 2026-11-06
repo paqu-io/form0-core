@@ -158,7 +158,7 @@ function validate(snapshot) {
 /**
  * Own immutable candidate operations, accepted history, and nested editor scopes.
  * Hosts own rendering, form lifecycle events, and actual record persistence.
- * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {preserveWallGrouping?: boolean, snapping?: boolean, edgeAutoPan?: boolean}}} [options]
+ * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {preserveWallGrouping?: boolean, snapping?: boolean, edgeAutoPan?: boolean, thicknessAnchor?: 'room_face'|'midline'}}} [options]
  * @returns {Object} Portable building-plan session.
  */
 export function createBuildingPlanSession({

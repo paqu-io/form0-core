@@ -292,6 +292,7 @@ export class BuildingPlanCanvasController {
           snapshot: plan,
           properties: this.meta.properties,
           createId: this.createId,
+          editingPolicy: this.editingPolicy,
         });
       else {
         const result = this.session.synchronize(plan);
@@ -383,6 +384,7 @@ export class BuildingPlanCanvasController {
   }
   setEditingPolicy(policy) {
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(policy);
+    this.session?.setEditingPolicy(this.editingPolicy);
     this.interaction.reset();
     this.emitUpdate();
   }
@@ -400,6 +402,7 @@ export class BuildingPlanCanvasController {
       pinnedFaceIds: [...this.pinnedFaceIds],
       preserveWallGrouping:
         operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
+      thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
     };
     this.previewView = null;
     let proposal = this.session.preview(operation, { scopeId: this.scopeId() });
@@ -504,6 +507,7 @@ export class BuildingPlanCanvasController {
         pinnedFaceIds: [...this.pinnedFaceIds],
         preserveWallGrouping:
           operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
+        thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
       },
       { scopeId: this.scopeId() }
     );

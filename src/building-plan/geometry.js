@@ -11,10 +11,11 @@ export const distance = (a, b) => length(subtract(b, a));
 export const near = (a, b, tolerance = GEOMETRY_EPSILON) => Math.abs(a - b) <= tolerance;
 export const samePoint = (a, b) => distance(a, b) <= GEOMETRY_EPSILON;
 export const isPoint = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
+// Normalize signed zero too: JSON records represent both zero signs as 0.
 export const cleanPoint = (p) => ({
   ...p,
-  x: Math.round(p.x * 1e9) / 1e9,
-  y: Math.round(p.y * 1e9) / 1e9,
+  x: Math.round(p.x * 1e9) / 1e9 + 0,
+  y: Math.round(p.y * 1e9) / 1e9 + 0,
 });
 
 export function segmentFrame(start, end) {

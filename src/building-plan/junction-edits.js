@@ -1,7 +1,5 @@
 import {
   GEOMETRY_EPSILON as EPS,
-  add,
-  multiply,
   at,
   assignRoomEdges,
   cleanPoint,
@@ -13,15 +11,17 @@ import {
   project,
   segmentFrame,
 } from './geometry.js';
-import { buildingPlanSegmentThickness, findRoom, findWall, planIssue } from './model.js';
+import { buildingPlanSegmentThickness, findWall, planIssue } from './model.js';
 
-function reject(code, message, subject = null) {
-  throw Object.assign(new Error(message), { issues: [planIssue(code, message, subject)] });
+function reject(code, message, subject = null, details = {}) {
+  throw Object.assign(new Error(message), { issues: [planIssue(code, message, subject, details)] });
 }
-function conflict() {
+function conflict(details) {
   reject(
     'corner_constraint_conflict',
-    'These shared portions cannot meet while preserving the adjoining wall. Split a shorter portion or move a different corner.'
+    'These shared portions cannot meet while preserving the adjoining wall. Split a shorter portion or move a different corner.',
+    null,
+    details
   );
 }
 
@@ -100,10 +100,16 @@ export function buildingPlanJunctionAllowance(floor, room, edge, vertex, thickne
 function connection(moving, stationary, reference, end, sign) {
   if (!(reference.thickness > EPS)) return null;
   for (const opposite of [true, false]) {
-    const offset = opposite ? -reference.sign * reference.thickness : 0;
+    const referenceAxis =
+      reference.axis ||
+      segmentFrame(
+        at(reference.edge, 0, (-reference.sign * reference.thickness) / 2),
+        at(reference.edge, reference.edge.length, (-reference.sign * reference.thickness) / 2)
+      );
+    const offset = ((opposite ? -1 : 1) * reference.sign * reference.thickness) / 2;
     const line = segmentFrame(
-      at(reference.edge, 0, offset),
-      at(reference.edge, reference.edge.length, offset)
+      at(referenceAxis, 0, offset),
+      at(referenceAxis, referenceAxis.length, offset)
     );
     const point = junctionIntersection(moving, line),
       fixed = junctionIntersection(stationary, line);
@@ -137,7 +143,25 @@ function prepareConnections(room, edits, references) {
     const active = references.find((r) => r.old.id === edit.activeEdgeId);
     if (!active) continue;
     for (const end of [0, 1]) {
+      if (edit[end ? 'joinEnd' : 'joinStart']) continue;
       let partial = !near(edit.interval[end], end ? edge.length : 0);
+      const vertexId = end ? edge.end.id : edge.start.id;
+      // Supplied incident lines are solved together by boundary projection. A contact
+      // helper must not replace one of those explicit constraints with its old line.
+      if (
+        !partial &&
+        (end ? edge.end : edge.start).editingCutId &&
+        edits.some((other) => {
+          if (other === edit || other.edgeId === edge.id) return false;
+          const adjacent = edges.find((e) => e.id === other.edgeId);
+          return (
+            adjacent &&
+            ((adjacent.start.id === vertexId && near(other.interval[0], 0)) ||
+              (adjacent.end.id === vertexId && near(other.interval[1], adjacent.length)))
+          );
+        })
+      )
+        continue;
       const oldPoint = at(edge, edit.interval[end]);
       const corner = project(active.old, oldPoint).along;
       const gap = Math.max(active.thickness || 0, EPS) * 2;
@@ -189,6 +213,16 @@ function prepareConnections(room, edits, references) {
         const id = end ? edge.end.id : edge.start.id;
         adjacent = edges.find((e) => e.id !== edge.id && (e.start.id === id || e.end.id === id));
         if (!adjacent) continue;
+        if (
+          reference.network &&
+          reference.oldAxis &&
+          Math.abs(dot(adjacent.tangent, reference.old.tangent)) >= 1 - EPS
+        ) {
+          const run = reference.network.runs.find(
+            (run) => run.room.id === room.id && run.edge.id === adjacent.id
+          );
+          if (run && !reference.network.collinear(run.axis, reference.oldAxis)) continue;
+        }
         const offset = project(reference.old, adjacent.start).offset;
         if (
           Math.abs(dot(adjacent.tangent, reference.old.tangent)) >= 1 - EPS &&
@@ -236,13 +270,49 @@ function prepareConnections(room, edits, references) {
   }
 }
 
+/** Project both sides of a generated editing-cut return from its single axis. */
+function prepareCutConnections(room, edits, cutReferences) {
+  const edges = polygonEdges(room);
+  for (const edit of edits) {
+    const edge = edges.find((e) => e.id === edit.edgeId);
+    for (const end of [0, 1]) {
+      if (!near(edit.interval[end], end ? edge.length : 0)) continue;
+      const vertex = end ? edge.end : edge.start;
+      const reference = cutReferences.find((r) => r.cutId === vertex.editingCutId);
+      if (!reference) continue;
+      const fixedEdge = edges.find(
+        (e) => e.id !== edge.id && (e.start.id === vertex.id || e.end.id === vertex.id)
+      );
+      if (!fixedEdge) continue;
+      if (edits.some((other) => other !== edit && other.edgeId === fixedEdge.id)) continue;
+      if (Math.abs(dot(fixedEdge.tangent, edge.tangent)) < 1 - EPS) continue;
+      const line = segmentFrame(
+        at(reference.axis, 0, -reference.side * reference.half),
+        at(reference.axis, reference.axis.length, -reference.side * reference.half)
+      );
+      const point = junctionIntersection(segmentFrame(edit.start, edit.end), line),
+        fixed = junctionIntersection(fixedEdge, line);
+      if (!point || !fixed) continue;
+      edit[end ? 'end' : 'start'] = point;
+      edit[end ? 'joinEnd' : 'joinStart'] = { point, fixed };
+    }
+  }
+}
+
 /**
  * Reconstruct a local boundary from changed lines and bound extents. Both wall-body
  * and corner edits cross this seam; physical ownership and history remain with callers.
  * Edits are updated to their resolved endpoints for physical-host extent reconciliation.
  */
-export function reshapeBuildingPlanBoundary(room, edits, createId, references = []) {
+export function reshapeBuildingPlanBoundary(
+  room,
+  edits,
+  createId,
+  references = [],
+  cutReferences = []
+) {
   const edges = polygonEdges(room);
+  prepareCutConnections(room, edits, cutReferences);
   prepareConnections(room, edits, references);
   const targets = new Map(),
     held = new Map(),
@@ -273,20 +343,27 @@ export function reshapeBuildingPlanBoundary(room, edits, createId, references = 
     let point = collapsed?.start || lines[0].start;
     if (!collapsed) {
       const moving = segmentFrame(lines[0].start, lines[0].end);
-      const stationary =
-        lines.length === 1 &&
-        edges.find((e) => e.id !== lines[0].edgeId && (e.start.id === id || e.end.id === id));
-      if (stationary) {
-        point = junctionIntersection(moving, stationary);
-        if (!point && Math.abs(project(stationary, lines[0].start).offset) <= EPS)
-          point = at(stationary, project(stationary, lines[0].start).along);
-        if (!point && vertices.get(id).editingCutId) {
-          held.set(id, lines[0]);
-          continue;
+      const cut = cutReferences.find(
+        (reference) => reference.half === 0 && reference.cutId === vertices.get(id).editingCutId
+      );
+      // Straight incident lines still share one explicit cut station.
+      if (cut && lines.length > 1) point = junctionIntersection(moving, cut.axis);
+      else {
+        const stationary =
+          lines.length === 1 &&
+          edges.find((e) => e.id !== lines[0].edgeId && (e.start.id === id || e.end.id === id));
+        if (stationary) {
+          point = junctionIntersection(moving, stationary);
+          if (!point && Math.abs(project(stationary, lines[0].start).offset) <= EPS)
+            point = at(stationary, project(stationary, lines[0].start).along);
+          if (!point && vertices.get(id).editingCutId) {
+            held.set(id, lines[0]);
+            continue;
+          }
         }
+        if (lines.length > 1 && distance(point, lines[1].start) > EPS)
+          point = junctionIntersection(moving, segmentFrame(lines[1].start, lines[1].end));
       }
-      if (lines.length > 1 && distance(point, lines[1].start) > EPS)
-        point = junctionIntersection(moving, segmentFrame(lines[1].start, lines[1].end));
     }
     if (
       !point ||
@@ -296,8 +373,8 @@ export function reshapeBuildingPlanBoundary(room, edits, createId, references = 
           Math.abs(project(segmentFrame(line.start, line.end), point).offset) > EPS
       )
     )
-      conflict();
-    Object.assign(vertices.get(id), cleanPoint(point));
+      conflict({ roomId: room.id, vertexId: id, lines, point });
+    if (distance(vertices.get(id), point) > EPS) Object.assign(vertices.get(id), cleanPoint(point));
   }
   const next = [],
     replacements = new Map();
@@ -349,98 +426,4 @@ export function reshapeBuildingPlanBoundary(room, edits, createId, references = 
         return ids;
       });
   return room.edges.filter((e) => !previous.some((old) => old.id === e.id)).map((e) => e.id);
-}
-
-/** Translate one selected supporting line; neighbouring directions are constraints. */
-export function shiftBuildingPlanBoundary(room, edgeId, interval, delta, createId) {
-  const edge = polygonEdges(room).find((e) => e.id === edgeId);
-  if (
-    !edge ||
-    interval[0] < -EPS ||
-    interval[1] > edge.length + EPS ||
-    interval[1] - interval[0] <= EPS
-  )
-    throw new Error('The edited extent is outside its room edge.');
-  const point = (along) => {
-    const p = at(edge, along);
-    return cleanPoint({ x: p.x + delta.x, y: p.y + delta.y });
-  };
-  return reshapeBuildingPlanBoundary(
-    room,
-    [{ edgeId, interval, start: point(interval[0]), end: point(interval[1]) }],
-    createId
-  );
-}
-
-/** New returns alongside the active room use its fixed face and one wall-thickness gap. */
-export function alignBuildingPlanThicknessReturns(floor, changedEdges, activeRoomId, before) {
-  const active = floor.rooms.find((room) => room.id === activeRoomId);
-  const aligned = new Set();
-  if (!active) return aligned;
-  for (const change of changedEdges.filter((entry) => entry.roomId !== activeRoomId)) {
-    const room = findRoom(floor, change.roomId);
-    for (const edgeId of change.edgeIds) {
-      const edge = polygonEdges(room).find((entry) => entry.id === edgeId);
-      if (!edge) continue;
-      for (const reference of polygonEdges(active)) {
-        if (
-          dot(edge.tangent, reference.tangent) > -1 + EPS ||
-          !near(project(reference, edge.start).offset, 0)
-        )
-          continue;
-        const span = [
-          project(reference, edge.start).along,
-          project(reference, edge.end).along,
-        ].sort((a, b) => a - b);
-        if (Math.min(reference.length, span[1]) - Math.max(0, span[0]) < -EPS) continue;
-        const face = active.faces.find((face) => face.edgeIds?.includes(reference.id));
-        if (!face) continue;
-        const wall = findWall(floor, face.wallId);
-        const oldRoom = before.rooms.find((room) => room.id === activeRoomId);
-        const oldEdge = oldRoom && polygonEdges(oldRoom).find((edge) => edge.id === reference.id);
-        const bindings = face.bindings.filter((binding) => {
-          if (binding.edgeId !== reference.id) return false;
-          const range = oldEdge
-            ? binding.roomInterval.map((along, index) =>
-                near(along, index === 0 ? 0 : oldEdge.length)
-                  ? index === 0
-                    ? 0
-                    : reference.length
-                  : project(reference, at(oldEdge, along)).along
-              )
-            : binding.roomInterval;
-          return Math.min(span[1], range[1]) - Math.max(span[0], range[0]) >= -EPS;
-        });
-        const thicknesses = (bindings.length ? bindings : face.bindings).map((binding) =>
-          buildingPlanSegmentThickness(
-            wall,
-            wall.segments.find((segment) => segment.id === binding.segmentId)
-          )
-        );
-        const thickness = thicknesses[0];
-        if (thicknesses.some((value) => !near(value, thickness)))
-          reject(
-            'jog_thickness_conflict',
-            'The new return reaches segments with different thicknesses. Edit a shorter portion or resolve those thicknesses first.',
-            { type: 'wall', id: wall.id }
-          );
-        if (!(thickness > EPS))
-          reject(
-            'unknown_wall_thickness',
-            'Set a positive thickness for the adjacent wall before connecting this return.',
-            { type: 'wall', id: wall.id }
-          );
-        aligned.add(room.id);
-        const delta = multiply(
-          reference.normal,
-          -Math.sign(polygonArea(active.vertices)) * thickness
-        );
-        for (const vertex of room.vertices)
-          if (vertex.id === edge.start.id || vertex.id === edge.end.id)
-            Object.assign(vertex, cleanPoint(add(vertex, delta)));
-        break;
-      }
-    }
-  }
-  return aligned;
 }

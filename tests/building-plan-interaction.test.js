@@ -142,6 +142,7 @@ test('editor policy defaults are independent, typed and do not force grouping', 
     preserveWallGrouping: false,
     snapping: true,
     edgeAutoPan: true,
+    thicknessAnchor: 'room_face',
   });
   assert.throws(() => normalizeBuildingPlanEditingPolicy({ snapping: 'yes' }), /boolean/);
 });
@@ -334,4 +335,65 @@ test('whole-room movement does not use its own boundary as a magnetic reference'
     }),
   });
   assert.deepEqual(interaction.snapTranslation(points, { roomId: 'active' }), points);
+});
+
+for (const vertical of [false, true])
+  test(`wall alignment snaps supporting midlines despite different thicknesses (${vertical})`, () => {
+    const p = (x, y) => (vertical ? { x: y, y: x } : { x, y });
+    const originalPoints = [p(0, 0), p(100, 0)];
+    const interaction = createBuildingPlanInteraction({
+      scene: () => ({
+        gridSize: 20,
+        rooms: [room],
+        walls: [
+          {
+            id: 'moving',
+            roomId: 'active',
+            isBoundary: true,
+            thickness: 0.4,
+            points: originalPoints,
+            axisPoints: [p(0, -4), p(100, -4)],
+          },
+          {
+            id: 'reference',
+            roomId: 'other',
+            isBoundary: true,
+            thickness: 0.2,
+            points: [p(150, 64), p(250, 64)],
+            axisPoints: [p(150, 62), p(250, 62)],
+          },
+        ],
+      }),
+    });
+    interaction.begin();
+    const points = [p(0, 65), p(100, 65)];
+    assert.deepEqual(
+      interaction.snapWallTranslation(points, {
+        faceId: 'moving',
+        roomId: 'active',
+        originalPoints,
+      }),
+      [p(0, 66), p(100, 66)]
+    );
+    assert.deepEqual(
+      interaction.snapWallTranslation(points, {
+        faceId: 'moving',
+        roomId: 'active',
+        originalPoints,
+        bypass: true,
+      }),
+      points
+    );
+    assert.ok(interaction.getGuides().length === 0);
+  });
+
+test('thickness anchor accepts only the declared policies', () => {
+  assert.equal(
+    normalizeBuildingPlanEditingPolicy({ thicknessAnchor: 'midline' }).thicknessAnchor,
+    'midline'
+  );
+  assert.throws(
+    () => normalizeBuildingPlanEditingPolicy({ thicknessAnchor: 'center' }),
+    /thicknessAnchor/
+  );
 });

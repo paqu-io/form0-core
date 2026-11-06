@@ -73,6 +73,13 @@ export function normalizeRoomBoundary(floor, room, createId) {
     for (let i = 0; i < vertices.length; i++) {
       const next = (i + 1) % vertices.length;
       if (distance(vertices[i], vertices[next]) > EPS) continue;
+      // A generated connector can collapse onto an intentional editing cut. Keep
+      // that stable cut vertex rather than deleting its identity with the connector.
+      if (vertices[next].editingCutId && !vertices[i].editingCutId) {
+        const retired = vertices[i].id;
+        vertices[i] = { ...vertices[next] };
+        remapSubject(floor, retired, vertices[i].id, 'vertex');
+      }
       // The collapsed edge has no surviving extent. Its answers are remapped below.
       runs[i].sources = [...runs[next].sources];
       vertices.splice(next, 1);

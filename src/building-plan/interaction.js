@@ -83,6 +83,27 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     for (const [index, [start, end]] of edges.entries()) {
       if (Math.hypot(end.x - start.x, end.y - start.y) < 1e-6) continue;
       const own = segmentFrame(start, end);
+      const originalStart = originalPoints[index] || start;
+      const originalEnd = originalPoints[(index + 1) % originalPoints.length] || end;
+      const original = segmentFrame(originalStart, originalEnd);
+      const movingWall = (view.walls || []).find((wall) =>
+        faceId
+          ? wall.id === faceId
+          : wall.roomId === roomId &&
+            wall.points.length === 2 &&
+            Math.abs(dot(original.normal, segmentFrame(...wall.points).tangent)) < 1e-6 &&
+            Math.abs(project(original, wall.points[0]).offset) < 1e-6 &&
+            Math.min(
+              original.length,
+              Math.max(...wall.points.map((p) => project(original, p).along))
+            ) -
+              Math.max(0, Math.min(...wall.points.map((p) => project(original, p).along))) >
+              1e-6
+      );
+      const ownAxisOffset =
+        movingWall?.axisPoints?.length === 2
+          ? project(original, movingWall.axisPoints[0]).offset
+          : null;
       for (const wall of view.walls || []) {
         if (
           wall.points.length !== 2 ||
@@ -102,10 +123,13 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
           Math.min(other.length, Math.max(...offsets)) - Math.max(0, Math.min(...offsets));
         const neighbour = view.rooms.find((room) => room.id === wall.roomId);
         const thickness = (wall.thickness ?? 0) * (view.gridSize || 20);
-        const expected =
+        let expected =
           !editingGroupId && wall.roomId !== roomId && direction < 0 && overlap >= -8 / zoom
             ? -Math.sign(polygonArea(neighbour.vertices)) * thickness
             : 0;
+        const otherAxis = wall.axisPoints?.length === 2 ? segmentFrame(...wall.axisPoints) : null;
+        if (ownAxisOffset !== null && otherAxis)
+          expected = project(other, otherAxis.start).offset - direction * ownAxisOffset;
         const offset = project(other, start).offset;
         const difference = expected - offset;
         const delta = { x: other.normal.x * difference, y: other.normal.y * difference };
@@ -119,8 +143,16 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
           delta,
           guides: [
             {
-              from: at(other, Math.min(0, ...offsets), expected),
-              to: at(other, Math.max(other.length, ...offsets), expected),
+              from: at(
+                other,
+                Math.min(0, ...offsets),
+                otherAxis ? project(other, otherAxis.start).offset : expected
+              ),
+              to: at(
+                other,
+                Math.max(other.length, ...offsets),
+                otherAxis ? project(other, otherAxis.start).offset : expected
+              ),
             },
           ],
         });
