@@ -52,6 +52,7 @@ import { rejoinEditingCut, splitEditingFace } from './editing-cuts.js';
 import { movePartitionPortion } from './partition-edits.js';
 
 import { reshapeBuildingPlanAxes, reshapeBuildingPlanAxisThickness } from './axis-edits.js';
+import { completeThicknessCorners } from './corner-profiles.js';
 import { reshapeBuildingPlanBoundary } from './junction-edits.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
@@ -300,6 +301,22 @@ function finishBoundaryEdit(
   );
   for (const roomId of new Set(changedEdges.map((entry) => entry.roomId)))
     normalizeRoomBoundary(floor, findRoom(floor, roomId), createId);
+  if (thicknessProfile) {
+    const completed = completeThicknessCorners(
+      floor,
+      before,
+      new Set(affectedWalls.map((wall) => wall.id)),
+      createId
+    );
+    for (const roomId of completed) {
+      const room = findRoom(floor, roomId);
+      normalizeRoomBoundary(floor, room, createId);
+      const change = changedEdges.find((entry) => entry.roomId === roomId);
+      if (change)
+        change.edgeIds = [...new Set([...change.edgeIds, ...room.edges.map((edge) => edge.id)])];
+      else changedEdges.push({ roomId, edgeIds: room.edges.map((edge) => edge.id) });
+    }
+  }
   for (const candidate of floor.rooms) {
     const problem = polygonIssue(candidate.vertices);
     if (problem)

@@ -1,4 +1,5 @@
 import {
+  GEOMETRY_EPSILON,
   add,
   at,
   cross,
@@ -12,8 +13,9 @@ import {
 import { buildingPlanSegmentThickness, planIssue } from './model.js';
 import { createBuildingPlanAxisNetwork } from './axis-network.js';
 import { junctionIntersection } from './junction-edits.js';
+import { wallCornerPolygon } from './corner-profiles.js';
 
-const EPS = 1e-9;
+const EPS = GEOMETRY_EPSILON;
 const area = (points) => Math.abs(polygonArea(points));
 const rect = (frame, from, to, half) => [
   at(frame, from, half),
@@ -80,29 +82,31 @@ export function buildingPlanMaterialCovered(polygon, material) {
     (length, point, i) => length + distance(point, polygon[(i + 1) % polygon.length]),
     0
   );
-  return remaining.reduce((total, piece) => total + area(piece), 0) <= EPS * perimeter;
+  // Axes and projected polygon intersections round independently to nanometres.
+  return remaining.reduce((total, piece) => total + area(piece), 0) <= 1e-9 * 16 * perimeter;
 }
 
 function triangles(vertices) {
   const points = vertices.map(({ x, y }) => ({ x, y }));
   const side = Math.sign(polygonArea(points));
   const turn = (a, b, c) => side * cross(subtract(b, a), subtract(c, b));
+  const tolerance = (a, b, c) => GEOMETRY_EPSILON * (distance(a, b) + distance(b, c));
   const result = [];
   while (points.length > 3) {
     const index = points.findIndex((b, i) => {
       const a = points[(i + points.length - 1) % points.length];
       const c = points[(i + 1) % points.length];
-      if (Math.abs(turn(a, b, c)) <= EPS) return true;
+      if (Math.abs(turn(a, b, c)) <= tolerance(a, b, c)) return true;
       return (
-        turn(a, b, c) > 0 &&
+        turn(a, b, c) > tolerance(a, b, c) &&
         !points.some(
           (p) =>
             p !== a &&
             p !== b &&
             p !== c &&
-            turn(a, b, p) >= -EPS &&
-            turn(b, c, p) >= -EPS &&
-            turn(c, a, p) >= -EPS
+            turn(a, b, p) >= -tolerance(a, b, p) &&
+            turn(b, c, p) >= -tolerance(b, c, p) &&
+            turn(c, a, p) >= -tolerance(c, a, p)
         )
       );
     });
@@ -110,7 +114,7 @@ function triangles(vertices) {
     const a = points[(index + points.length - 1) % points.length];
     const b = points[index],
       c = points[(index + 1) % points.length];
-    if (Math.abs(turn(a, b, c)) > EPS) result.push([a, b, c]);
+    if (Math.abs(turn(a, b, c)) > tolerance(a, b, c)) result.push([a, b, c]);
     points.splice(index, 1);
   }
   if (area(points) > EPS * EPS) result.push(points);
@@ -118,18 +122,8 @@ function triangles(vertices) {
 }
 
 function addWallCorner(walls, incoming, outgoing, point, a, b, side, register = () => {}) {
-  if (!(a?.thickness > 0 && b?.thickness > 0)) return;
-  const denominator = cross(incoming.tangent, outgoing.tangent);
-  if (denominator * side <= EPS) return;
-  const qa = add(point, multiply(incoming.normal, -side * a.thickness));
-  const qb = add(point, multiply(outgoing.normal, -side * b.thickness));
-  const along = cross(subtract(qb, qa), outgoing.tangent) / denominator;
-  const intersection = add(qa, multiply(incoming.tangent, along));
-  const miter = Math.hypot(intersection.x - point.x, intersection.y - point.y);
-  const polygon =
-    miter <= 4 * Math.max(a.thickness, b.thickness)
-      ? [point, qa, intersection, qb]
-      : [point, qa, qb];
+  const polygon = wallCornerPolygon(incoming, outgoing, point, a?.thickness, b?.thickness, side);
+  if (!polygon) return;
   walls.get(a.wall.id).polygons.push(polygon);
   register(polygon);
 }

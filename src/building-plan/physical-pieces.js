@@ -21,7 +21,7 @@ import { buildingPlanFootprints, buildingPlanMaterialCovered } from './footprint
 /** A new connector wholly supplied by existing material is an end/corner profile.
  * Its copied answers already live on the retained source; it cannot become a new
  * physical owner just because the clear-room polygon has another straight edge.
- * Existing owners and cuts within an accepted span are never retired here.
+ * Existing owners and deliberate cuts within an accepted span are never retired here.
  */
 function retireMaterialProfiles(floor, before) {
   if (!before) return new Set();
@@ -64,8 +64,22 @@ function retireMaterialProfiles(floor, before) {
     if (segment.junction && !segment.thicknessProfile && !wall.lineage?.profileSource) return false;
     const frame = segmentFrame(old.start, old.end);
     const points = [segment.start, segment.end].map((p) => project(frame, p));
-    return !points.every(
+    const withinSource = points.every(
       (p) => Math.abs(p.offset) <= EPS && p.along >= -EPS && p.along <= frame.length + EPS
+    );
+    // A divider's width can leave a collinear gap in room coverage at a T-junction.
+    // Its automatic adjacency piece may be supplied entirely by the other wall bands.
+    if (!withinSource) return true;
+    if (wall.lineage?.automaticDivision !== 'adjacency' || wall.lineage.explicitPhysicalSeparation)
+      return false;
+    const rooms = new Set(wall.sides.map((side) => side.roomId).filter(Boolean));
+    return floor.walls.some(
+      (other) =>
+        other !== wall &&
+        other.sides.every((side) => side.roomId && !rooms.has(side.roomId)) &&
+        other.segments.some(
+          (span) => Math.abs(dot(frame.normal, segmentFrame(span.start, span.end).tangent)) > EPS
+        )
     );
   });
   const omitted = new Set(candidates.map((wall) => wall.id));
@@ -102,9 +116,30 @@ function retireMaterialProfiles(floor, before) {
       at(frame, 0, -half),
     ];
     if (buildingPlanMaterialCovered(polygon, material)) {
-      retired.add(wall.id);
       const wallId = wall.lineage?.profileSource?.wallId || wall.lineage.dividedFromWallId;
-      for (const { room, face } of facesOfWall(floor, wall.id))
+      const linked = facesOfWall(floor, wall.id);
+      const transfers = [];
+      let canRetire = true;
+      for (const { room, face } of linked) {
+        const previous = before.rooms.find((other) => other.id === room.id)?.faces || [];
+        if (!previous.some((other) => other.id === face.id)) continue;
+        const target = room.faces.find((other) => other.wallId === wallId && other.id !== face.id);
+        if (!target || previous.some((other) => other.id === target.id)) {
+          canRetire = false;
+          break;
+        }
+        transfers.push({ face, target });
+      }
+      if (!canRetire) continue;
+      // A temporary cap can capture the old facing identity during corner division.
+      // Keep that accepted row on the surviving source rather than losing an editor.
+      const retained = floor.walls.find((other) => other.id === wallId);
+      for (const { face, target } of transfers) {
+        if (retained.referenceFaceId === target.id) retained.referenceFaceId = face.id;
+        target.id = face.id;
+      }
+      retired.add(wall.id);
+      for (const { room, face } of linked)
         for (const edge of room.edges.filter((edge) => face.edgeIds?.includes(edge.id)))
           edge.profile = wall.lineage?.profileSource || {
             wallId,

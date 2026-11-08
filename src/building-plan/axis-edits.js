@@ -659,10 +659,27 @@ export function reshapeBuildingPlanAxisThickness(floor, before, operation, creat
       if (!anchor) continue;
       const frame = segmentFrame(old.start, old.end),
         delta = nextT - oldT;
-      const shift =
+      let shift =
         operation.thicknessAnchor === 'midline'
           ? { x: 0, y: 0 }
           : multiply(frame.normal, (-anchor.binding.side * delta) / 2);
+      const sourceId = wall.lineage?.profileSource?.wallId;
+      const source = floor.walls.find((other) => other.id === sourceId);
+      const previousSource = before.walls.find((other) => other.id === sourceId);
+      if (source && previousSource) {
+        const reference = segmentFrame(
+          previousSource.segments[0].start,
+          previousSource.segments[0].end
+        );
+        if (
+          Math.abs(dot(reference.tangent, frame.tangent)) >= 1 - EPS &&
+          Math.abs(project(reference, old.start).offset) <= EPS
+        ) {
+          // A collinear cap follows its supplying axis, including when thickness shrinks.
+          // Its sole projected face must not become a separately anchored physical wall.
+          shift = multiply(reference.normal, project(reference, source.segments[0].start).offset);
+        }
+      }
       segment.start = cleanPoint(add(old.start, shift));
       segment.end = cleanPoint(add(old.end, shift));
       segment.referenceOffset = nextT / 2;
