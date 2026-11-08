@@ -1,3 +1,4 @@
+import { mergeWalls } from './wall-merge.js';
 import {
   GEOMETRY_EPSILON as EPS,
   assignRoomEdges,
@@ -18,7 +19,7 @@ import {
   planIssue,
   rebindBuildingPlanFaces,
 } from './model.js';
-import { coalesceFacingRows, normalizeRoomBoundary, remapSubject } from './topology.js';
+import { coalesceFacingRows, normalizeRoomBoundary } from './topology.js';
 
 const fail = (code, message) => {
   throw Object.assign(new Error(message), { issues: [planIssue(code, message)] });
@@ -30,34 +31,49 @@ const edgesOf = (room, face) =>
         ...segmentFrame(point, face.freePath[index + 1]),
       }))
     : polygonEdges(room);
-const compatible = (faces, floor) => {
-  if (faces.some((face) => !face) || faces[0].wallId !== faces[1].wallId)
-    fail(
-      'cut_physical_conflict',
-      'These portions belong to separate physical walls. Resolve their physical relationship before rejoining.'
-    );
+const compatible = (faces, floor, createId) => {
+  if (faces.some((face) => !face))
+    fail('cut_physical_conflict', 'These pieces no longer share a boundary.');
+  const a = floor.walls.find((wall) => wall.id === faces[0].wallId),
+    b = floor.walls.find((wall) => wall.id === faces[1].wallId);
+  if (a === b) return;
+  const direction =
+    dot(
+      segmentFrame(a.segments[0].start, a.segments[0].end).tangent,
+      segmentFrame(b.segments[0].start, b.segments[0].end).tangent
+    ) >= 0
+      ? 1
+      : -1;
   if (
-    !equalValue(faces[0].values, faces[1].values) ||
-    !equalValue(faces[0].overrides, faces[1].overrides)
+    !equalValue(a.overrides, b.overrides) ||
+    !equalValue(a.providerOverrides || {}, b.providerOverrides || {}) ||
+    !equalValue(a.values, b.values) ||
+    !equalValue(a.repeatable || {}, b.repeatable || {})
   )
     fail(
-      'cut_answer_conflict',
-      'The split portions have different room-side answers. Resolve those answers before rejoining.'
-    );
-  const wall = floor.walls.find((wall) => wall.id === faces[0].wallId);
-  const segments = faces.flatMap((face) =>
-    face.bindings.map((binding) =>
-      wall.segments.find((segment) => segment.id === binding.segmentId)
-    )
-  );
-  if (segments.some((segment) => !equalValue(segment.overrides || {}, segments[0].overrides || {})))
-    fail(
       'cut_construction_conflict',
-      'These portions have different physical properties. Resolve their thickness or construction overrides before rejoining.'
+      'Resolve the physical answers and override intent before rejoining.'
     );
+  for (const side of a.sides || []) {
+    const other = b.sides.find((entry) => entry.sign === side.sign * direction);
+    if (
+      !other ||
+      side.roomId !== other.roomId ||
+      !equalValue(side.overrides, other.overrides) ||
+      !equalValue(side.providerOverrides || {}, other.providerOverrides || {}) ||
+      !equalValue(side.values, other.values) ||
+      !equalValue(side.repeatable || {}, other.repeatable || {})
+    )
+      fail(
+        'cut_answer_conflict',
+        'Rejoin requires matching room adjacency and compatible answers on both surfaces.'
+      );
+  }
+  mergeWalls(floor, a, b, {}, createId);
+  rebindBuildingPlanFaces(floor, createId);
 };
 
-/** Divide selectable faces without dividing their physical construction or measurements. */
+/** Divide selectable faces; accepted physical ownership is normalized by the session. */
 export function splitEditingFace(floor, operation, createId) {
   const { room, face, wall } = findFace(floor, operation.faceId);
   const edgeIds = (face.freeEdges || face.edgeIds).filter(
@@ -65,12 +81,33 @@ export function splitEditingFace(floor, operation, createId) {
   );
   if (edgeIds.length !== 1) fail('ambiguous_cut', 'Choose one straight wall portion to split.');
   const edge = edgesOf(room, face).find((edge) => edge.id === edgeIds[0]);
-  const bindings = face.bindings.filter((binding) => binding.edgeId === edge.id);
+  const bindings = face.bindings.filter(
+    (binding) =>
+      binding.edgeId === edge.id &&
+      (!operation.segmentId || binding.segmentId === operation.segmentId)
+  );
   if (!bindings.length)
     fail('uncaptured_cut', 'Capture this straight wall portion before splitting it.');
   const from = Math.min(...bindings.map((binding) => binding.roomInterval[0]));
   const to = Math.max(...bindings.map((binding) => binding.roomInterval[1]));
   const along = from + operation.offset;
+  if (Number.isFinite(along) && (Math.abs(along - from) < EPS || Math.abs(along - to) < EPS)) {
+    const point = at(edge, along),
+      vertex = room.vertices.find(
+        (entry) =>
+          Math.hypot(entry.x - point.x, entry.y - point.y) < EPS &&
+          entry.physicalBoundaryId &&
+          !entry.editingCutId
+      );
+    if (vertex) {
+      const marker = vertex.physicalBoundaryId,
+        cutId = createId();
+      for (const target of floor.rooms)
+        for (const point of target.vertices)
+          if (point.physicalBoundaryId === marker) point.editingCutId = cutId;
+      return { created: { type: 'editing_cut', id: cutId } };
+    }
+  }
   if (!Number.isFinite(along) || along <= from + EPS || along >= to - EPS)
     fail('invalid_cut', 'Choose an interior position on this wall portion.');
   const binding = bindings.find(
@@ -113,7 +150,7 @@ export function splitEditingFace(floor, operation, createId) {
     const index = target.vertices.findIndex((vertex) => vertex.id === source.start.id);
     const vertex = { ...point, id: createId(), editingCutId: cutId };
     const origin = portion.lineage?.editingOriginFaceId || portion.id;
-    remapSubject(floor, source.id, portion.id, 'room_face');
+
     if (portion.freePath) {
       if (portion.freePath.length !== 2)
         fail('ambiguous_cut', 'Choose one straight wall portion to split.');
@@ -129,6 +166,7 @@ export function splitEditingFace(floor, operation, createId) {
       portion.freeEdges = [createId()];
       portion.lineage = { ...portion.lineage, editingOriginFaceId: origin };
       target.faces.splice(target.faces.indexOf(portion) + 1, 0, next);
+      rebindBuildingPlanFaces(floor, createId);
       continue;
     }
     const previous = target.edges;
@@ -152,6 +190,7 @@ export function splitEditingFace(floor, operation, createId) {
     portion.edgeIds = [left.id];
     portion.lineage = { ...portion.lineage, editingOriginFaceId: origin };
     target.faces.splice(target.faces.indexOf(portion) + 1, 0, next);
+    rebindBuildingPlanFaces(floor, createId);
   }
   if (!divisions)
     fail(
@@ -162,9 +201,10 @@ export function splitEditingFace(floor, operation, createId) {
   return { created: { type: 'editing_cut', id: cutId } };
 }
 
-/** Explicit cuts are removed only after all linked facing portions agree. */
+/** Explicit cuts and retained automatic boundaries require compatible linked portions. */
 export function rejoinEditingCut(floor, { cutId }, createId) {
-  const targets = floor.rooms.filter((room) => room.vertices.some((v) => v.editingCutId === cutId));
+  const matches = (v) => (v.editingCutId || v.physicalBoundaryId) === cutId;
+  const targets = floor.rooms.filter((room) => room.vertices.some(matches));
   const freeTargets = floor.rooms.filter((room) =>
     room.faces.some((face) => face.freePath?.some((v) => v.editingCutId === cutId))
   );
@@ -183,7 +223,7 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
         'cut_not_aligned',
         'Align the split portions on the same straight line before rejoining.'
       );
-    compatible([before, after], floor);
+    compatible([before, after], floor, createId);
     const a = segmentFrame(before.freePath[0], before.freePath.at(-1));
     const b = segmentFrame(after.freePath[0], after.freePath.at(-1));
     if (Math.abs(cross(a.tangent, b.tangent)) > EPS || dot(a.tangent, b.tangent) < 1 - EPS)
@@ -191,14 +231,6 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
         'cut_not_aligned',
         'Align the split portions on the same straight line before rejoining.'
       );
-    for (const id of [
-      before.freePath.at(-1).id,
-      after.freePath[0].id,
-      ...before.freeEdges,
-      ...after.freeEdges,
-      after.id,
-    ])
-      remapSubject(floor, id, before.id, 'room_face');
     before.freePath = [before.freePath[0], after.freePath.at(-1)];
     before.freeEdges = [createId()];
     const wall = floor.walls.find((wall) => wall.id === before.wallId);
@@ -206,7 +238,7 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
     room.faces = room.faces.filter((face) => face !== after);
   }
   for (const room of targets) {
-    const vertices = room.vertices.filter((v) => v.editingCutId === cutId);
+    const vertices = room.vertices.filter(matches);
     if (vertices.length !== 1)
       fail(
         'cut_not_aligned',
@@ -234,18 +266,15 @@ export function rejoinEditingCut(floor, { cutId }, createId) {
         )
       )
     );
-    compatible(faces, floor);
+    compatible(faces, floor, createId);
     delete vertex.editingCutId;
-    const previous = room.edges;
+    delete vertex.physicalBoundaryId;
     normalizeRoomBoundary(floor, room, createId);
     if (room.vertices.some((v) => v.id === vertex.id))
       fail(
         'cut_construction_conflict',
         'A construction division prevents this join. Keep the division or resolve its properties first.'
       );
-    remapSubject(floor, vertex.id, faces[0].id, 'room_face');
-    for (const edge of previous.filter((edge) => !room.edges.some((entry) => entry.id === edge.id)))
-      remapSubject(floor, edge.id, faces[0].id, 'room_face');
   }
   coalesceFacingRows(floor);
   rebindBuildingPlanFaces(floor, createId);

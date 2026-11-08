@@ -1,5 +1,6 @@
 export const BUILDING_PLAN_EDITING_DEFAULTS = Object.freeze({
-  preserveWallGrouping: false,
+  inheritedChangePolicy: 'ask',
+  copyCustomAnswersAutomatically: false,
   snapping: true,
   edgeAutoPan: true,
   thicknessAnchor: 'room_face',
@@ -10,6 +11,12 @@ export function normalizeBuildingPlanEditingPolicy(policy = {}) {
   const result = { ...BUILDING_PLAN_EDITING_DEFAULTS };
   for (const key of Object.keys(result)) {
     if (policy[key] === undefined) continue;
+    if (key === 'inheritedChangePolicy') {
+      if (!['ask', 'apply'].includes(policy[key]))
+        throw new TypeError('inheritedChangePolicy must be ask or apply.');
+      result[key] = policy[key];
+      continue;
+    }
     if (key === 'thicknessAnchor') {
       if (!['room_face', 'midline'].includes(policy[key]))
         throw new TypeError('thicknessAnchor must be room_face or midline.');

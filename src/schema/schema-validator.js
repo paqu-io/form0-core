@@ -79,12 +79,23 @@ export function validateSchema(form) {
 
 // Internal entrypoint lets engine construction reuse its ownership index.
 export function validateSchemaWithContext(form, contextResolver) {
+  const invalidBuildingPlanSettings = [];
+  const checkSettings = (elements, inPlan = false) => {
+    for (const field of elements || []) {
+      if (field.type !== 'BuildingPlanSection' && field.building_plan && !inPlan)
+        invalidBuildingPlanSettings.push(
+          'building_plan field settings are available only within BuildingPlanSection predefined nodes.'
+        );
+      checkSettings(field.elements, inPlan || field.type === 'BuildingPlanSection');
+    }
+  };
+  checkSettings(form.elements);
   const fields = flattenFields(form.elements);
   const seenDataNames = new Set();
   const seenKeys = new Set();
   const duplicateDataNames = new Set();
   const duplicateKeys = new Set();
-  const errors = [];
+  const errors = [...invalidBuildingPlanSettings];
   if (
     form.repeatable_recalculation !== undefined &&
     !['automatic', 'confirm'].includes(form.repeatable_recalculation)

@@ -1,3 +1,5 @@
+import { createWallSides, wallSide } from './wall-sides.js';
+import { resolveInheritedProperty, nodeSubjects } from './inheritance.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { validateFieldValue } from '../schema/field-value-registry.js';
 import {
@@ -21,7 +23,7 @@ import {
   subtract,
 } from './geometry.js';
 
-export const BUILDING_PLAN_VERSION = 1;
+export const BUILDING_PLAN_VERSION = 2;
 export const BUILDING_PLAN_PROPERTIES = Object.freeze({
   wall_thickness_m: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: 0.2 }),
   wall_height_m: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: null }),
@@ -77,10 +79,7 @@ export function facesOfWall(floor, wallId) {
   );
 }
 
-export const buildingPlanSegmentThickness = (wall, segment) =>
-  own(segment.properties, 'wall_thickness_m')
-    ? segment.properties.wall_thickness_m
-    : wall.properties.wall_thickness_m;
+export const buildingPlanSegmentThickness = (wall, segment) => wall.properties.wall_thickness_m;
 
 /** Defaults are proposals/properties, never measurements or new evidence. */
 export function resolveBuildingPlanProperty(
@@ -89,94 +88,32 @@ export function resolveBuildingPlanProperty(
   property,
   specification = BUILDING_PLAN_PROPERTIES[property]
 ) {
-  if (own(wall.overrides, property))
-    return {
-      value: copyBuildingPlanData(wall.overrides[property]),
-      source: { scope: 'physical_wall', id: wall.id },
-      mode: 'override',
-    };
-  if (specification?.inherit !== false) {
-    const rooms = [
-      ...new Map(facesOfWall(floor, wall.id).map(({ room }) => [room.id, room])).values(),
-    ];
-    const candidates = rooms
-      .filter((room) => own(room.defaults, property))
-      .map((room) => ({ value: room.defaults[property], id: room.id }));
-    const distinct = candidates.filter(
-      (candidate, index) =>
-        candidates.findIndex((entry) => equalValue(entry.value, candidate.value)) === index
-    );
-    if (distinct.length > 1)
-      return {
-        conflict: planIssue(
-          'conflicting_room_defaults',
-          'Choose one value for this shared wall; the adjacent rooms specify different defaults.',
-          { type: 'wall', id: wall.id },
-          { property, candidates }
-        ),
-      };
-    if (distinct.length === 1)
-      return {
-        value: copyBuildingPlanData(distinct[0].value),
-        source: { scope: 'room', ids: candidates.map((entry) => entry.id) },
-        mode: 'inherit',
-      };
-    if (own(floor.defaults, property))
-      return {
-        value: copyBuildingPlanData(floor.defaults[property]),
-        source: { scope: 'floor', id: floor.id },
-        mode: 'inherit',
-      };
-  }
-  return {
-    value: copyBuildingPlanData(specification?.fallback ?? null),
-    source: { scope: 'schema' },
-    mode: 'inherit',
-  };
+  return resolveInheritedProperty(
+    { floor, subject: wall, wall, nodeKey: 'walls' },
+    property,
+    specification
+  );
 }
 
 export function resolveRoomFaceProperty(floor, room, face, property, specification = {}) {
-  if (own(face.overrides, property))
-    return {
-      value: copyBuildingPlanData(face.overrides[property]),
-      source: { scope: 'room_face', id: face.id },
-      mode: 'override',
-    };
-  if (specification.inherit) {
-    if (own(room.defaults, property))
-      return {
-        value: copyBuildingPlanData(room.defaults[property]),
-        source: { scope: 'room', ids: [room.id] },
-        mode: 'inherit',
-      };
-    if (own(floor.defaults, property))
-      return {
-        value: copyBuildingPlanData(floor.defaults[property]),
-        source: { scope: 'floor', id: floor.id },
-        mode: 'inherit',
-      };
-  }
-  return {
-    value: copyBuildingPlanData(specification.fallback ?? null),
-    source: { scope: 'schema' },
-    mode: 'inherit',
-  };
+  const wall = floor.walls.find((entry) => entry.id === face.wallId);
+  const side = wallSide(floor, face);
+  return resolveInheritedProperty(
+    { floor, subject: side || face, wall, side, room, nodeKey: 'walls' },
+    property,
+    specification
+  );
 }
 
+// Geometry spans are references only in version 2; all physical answers belong to the wall.
 export function resolveBuildingPlanSegmentProperty(
   floor,
   wall,
-  segment,
+  _segment,
   property,
   specification = BUILDING_PLAN_PROPERTIES[property]
 ) {
-  return own(segment.overrides, property)
-    ? {
-        value: copyBuildingPlanData(segment.overrides[property]),
-        source: { scope: 'construction_segment', id: segment.id },
-        mode: 'override',
-      }
-    : resolveBuildingPlanProperty(floor, wall, property, specification);
+  return resolveBuildingPlanProperty(floor, wall, property, specification);
 }
 
 export function reconcileBuildingPlanProperties(
@@ -184,79 +121,76 @@ export function reconcileBuildingPlanProperties(
   specifications = BUILDING_PLAN_PROPERTIES
 ) {
   const issues = [];
+  const assign = (subject, property, specification, context) => {
+    if (specification.kind === 'collection') return;
+    subject.properties ||= {};
+    subject.provenance ||= {};
+    subject.overrides ||= {};
+    const resolved = resolveInheritedProperty({ ...context, subject }, property, specification);
+    if (resolved.conflict) {
+      issues.push(resolved.conflict);
+      return;
+    }
+    subject.properties[property] = resolved.value;
+    if (context.nodeKey !== 'walls') {
+      subject.values ||= {};
+      subject.values[property] = copyBuildingPlanData(resolved.value);
+      const dimensions = {
+        door_width_m: 'width',
+        door_height_m: 'height',
+        window_width_m: 'width',
+        window_height_m: 'height',
+        window_distance_from_floor_m: 'sillHeight',
+        column_cross_section_width_m: 'width',
+        column_cross_section_height_m: 'height',
+        beam_cross_section_width_m: 'width',
+        beam_cross_section_height_m: 'height',
+      };
+      if (dimensions[property])
+        subject[dimensions[property]] = copyBuildingPlanData(resolved.value);
+    }
+    subject.provenance[property] = { ...resolved.source, mode: resolved.mode };
+    const error = specification.field && validateFieldValue(specification.field, resolved.value);
+    if (error)
+      issues.push(
+        planIssue(
+          'invalid_property_value',
+          error,
+          { type: context.nodeKey, id: subject.id },
+          { property }
+        )
+      );
+  };
   for (const floor of snapshot.floors) {
     for (const wall of floor.walls) {
-      wall.properties = {};
-      wall.provenance = {};
-      for (const [property, specification] of Object.entries(specifications)) {
-        if (specification.scope !== 'physical_wall') continue;
-        const resolved = resolveBuildingPlanProperty(floor, wall, property, specification);
-        if (resolved.conflict) issues.push(resolved.conflict);
-        else {
-          wall.properties[property] = resolved.value;
-          wall.provenance[property] = { ...resolved.source, mode: resolved.mode };
-          const error =
-            specification.field && validateFieldValue(specification.field, resolved.value);
-          if (error)
-            issues.push(
-              planIssue(
-                'invalid_property_value',
-                error,
-                { type: 'wall', id: wall.id },
-                { property }
-              )
-            );
-        }
+      wall.properties ||= {};
+      wall.provenance ||= {};
+      for (const [key, specification] of Object.entries(specifications)) {
+        const property = specification.property || key;
+        if (specification.scope === 'physical_wall')
+          assign(wall, property, specification, { floor, wall, nodeKey: 'walls' });
+        else if (['wall_face', 'room_face'].includes(specification.scope))
+          for (const side of wall.sides || [])
+            assign(side, property, specification, { floor, wall, side, nodeKey: 'walls' });
       }
-      for (const segment of wall.segments) {
-        segment.properties = {};
-        segment.provenance = {};
-        for (const [property, specification] of Object.entries(specifications)) {
-          if (specification.scope !== 'physical_wall') continue;
-          const resolved = resolveBuildingPlanSegmentProperty(
-            floor,
-            wall,
-            segment,
-            property,
-            specification
-          );
-          if (resolved.conflict) continue;
-          segment.properties[property] = resolved.value;
-          segment.provenance[property] = { ...resolved.source, mode: resolved.mode };
-          const error =
-            specification.field && validateFieldValue(specification.field, resolved.value);
-          if (error)
-            issues.push(
-              planIssue(
-                'invalid_property_value',
-                error,
-                { type: 'segment', id: segment.id },
-                { property }
-              )
-            );
-        }
-      }
+    }
+    for (const [key, specification] of Object.entries(specifications)) {
+      if (specification.scope !== 'node') continue;
+      for (const context of nodeSubjects(floor, specification.nodeKey))
+        assign(context.subject, specification.property || key, specification, {
+          floor,
+          nodeKey: specification.nodeKey,
+          ...context,
+        });
     }
     for (const room of floor.rooms)
       for (const face of room.faces) {
-        face.properties = {};
-        face.provenance = {};
-        for (const [property, specification] of Object.entries(specifications)) {
-          if (specification.scope !== 'room_face') continue;
-          const resolved = resolveRoomFaceProperty(floor, room, face, property, specification);
-          face.properties[property] = resolved.value;
-          face.provenance[property] = { ...resolved.source, mode: resolved.mode };
-          const error =
-            specification.field && validateFieldValue(specification.field, resolved.value);
-          if (error)
-            issues.push(
-              planIssue(
-                'invalid_property_value',
-                error,
-                { type: 'room_face', id: face.id },
-                { property }
-              )
-            );
+        const side = wallSide(floor, face);
+        if (side) {
+          face.properties = copyBuildingPlanData(side.properties);
+          face.provenance = copyBuildingPlanData(side.provenance);
+          face.overrides = copyBuildingPlanData(side.overrides);
+          face.values = copyBuildingPlanData(side.values);
         }
       }
   }
@@ -281,9 +215,7 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
       const bindings = [];
       for (const edge of faceEdges(room, face))
         for (const segment of wall.segments) {
-          const thickness = own(segment.properties, 'wall_thickness_m')
-            ? segment.properties.wall_thickness_m
-            : wall.properties.wall_thickness_m;
+          const thickness = wall.properties.wall_thickness_m;
           const frame = segmentFrame(segment.start, segment.end);
           if (Math.abs(dot(frame.normal, edge.tangent)) > EPS) continue;
           const a = project(frame, edge.start);
@@ -316,6 +248,8 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
           });
         }
       face.bindings = bindings;
+      const side = wall.sides?.find((entry) => entry.sign === bindings[0]?.side);
+      if (side) face.sideId = side.id;
     }
 }
 
@@ -330,7 +264,6 @@ export function createBuildingPlanFloor({
     defaults: copyBuildingPlanData(defaults),
     rooms: [],
     walls: [],
-    observations: [],
   };
 }
 
@@ -381,6 +314,7 @@ export function createBuildingPlanRoom(
       values: {},
       referenceFaceId: face.id,
       segments: [],
+      sides: createWallSides(createId),
       doors: [],
       windows: [],
     };
@@ -445,7 +379,12 @@ function validateSnapshot(snapshot) {
     snapshot.unit !== 'm' ||
     !Array.isArray(snapshot.floors)
   )
-    return [planIssue('invalid_snapshot', 'Expected a versioned metric BuildingPlan snapshot.')];
+    return [
+      planIssue(
+        'invalid_snapshot',
+        'Expected BuildingPlan version 2 metric data. Version 1 development payloads are not migrated.'
+      ),
+    ];
   const ids = new Map();
   const subjectFloors = new Map();
   let containingFloor;
@@ -477,26 +416,56 @@ function validateSnapshot(snapshot) {
   for (const floor of snapshot.floors) {
     containingFloor = floor.id;
     register('floor', floor);
-    if (![floor.rooms, floor.walls, floor.observations].every(Array.isArray)) {
+    if (![floor.rooms, floor.walls].every(Array.isArray)) {
       issues.push(
-        planIssue('invalid_floor', 'A floor requires rooms, walls, and observations collections.', {
+        planIssue('invalid_floor', 'A floor requires rooms and physical walls.', {
           type: 'floor',
           id: floor.id,
         })
       );
       continue;
     }
+    if (own(floor, 'observations'))
+      issues.push(
+        planIssue(
+          'removed_observations',
+          'Predefined observation collections are not supported in version 2.'
+        )
+      );
     for (const wall of floor.walls) {
       register('wall', wall);
-      if (!Array.isArray(wall.segments) || !wall.segments.length)
+      if (
+        !Array.isArray(wall.sides) ||
+        wall.sides.length !== 2 ||
+        ![-1, 1].every((sign) => wall.sides.some((side) => side.sign === sign))
+      )
         issues.push(
-          planIssue('invalid_wall', 'A physical wall requires geometry segments.', {
+          planIssue('invalid_wall_sides', 'A physical wall requires two canonical sides.', {
             type: 'wall',
             id: wall.id,
           })
         );
+      for (const side of wall.sides || []) register('wall_face', side);
+      if (!Array.isArray(wall.segments) || wall.segments.length !== 1)
+        issues.push(
+          planIssue(
+            'invalid_wall',
+            'A physical wall requires exactly one straight geometry span.',
+            {
+              type: 'wall',
+              id: wall.id,
+            }
+          )
+        );
       for (const segment of wall.segments || []) {
         register('segment', segment);
+        if (['overrides', 'properties', 'provenance'].some((key) => own(segment, key)))
+          issues.push(
+            planIssue(
+              'segment_property_removed',
+              'Geometry spans cannot own physical properties in version 2.'
+            )
+          );
         if (
           !isPoint(segment.start) ||
           !isPoint(segment.end) ||
@@ -526,9 +495,7 @@ function validateSnapshot(snapshot) {
       for (const opening of openings) {
         register(opening.type || 'opening', opening);
         const segment = wall.segments?.find((entry) => entry.id === opening.segmentId);
-        const hostHeight = own(segment?.properties, 'wall_height_m')
-          ? segment.properties.wall_height_m
-          : wall.properties.wall_height_m;
+        const hostHeight = wall.properties.wall_height_m;
         if (
           !segment ||
           !Number.isFinite(opening.offset) ||
@@ -590,7 +557,22 @@ function validateSnapshot(snapshot) {
       if (problem)
         issues.push(planIssue('invalid_room_geometry', problem, { type: 'room', id: room.id }));
       for (const vertex of room.vertices || []) register('vertex', vertex);
-      for (const edge of room.edges || []) register('edge', edge);
+      for (const edge of room.edges || []) {
+        register('edge', edge);
+        if (
+          own(edge, 'profile') &&
+          (!edge.profile ||
+            !floor.walls.some((wall) => wall.id === edge.profile.wallId) ||
+            ![-1, 1].includes(edge.profile.sideSign))
+        )
+          issues.push(
+            planIssue(
+              'invalid_material_profile',
+              'A material profile must reference an existing physical wall and canonical side.',
+              { type: 'edge', id: edge.id }
+            )
+          );
+      }
       if (
         room.edges?.length !== room.vertices.length ||
         room.vertices.some(
@@ -763,7 +745,7 @@ function validateSnapshot(snapshot) {
             )
           );
       }
-    for (const observation of floor.observations) register('observation', observation);
+
     for (const wall of floor.walls)
       if (
         wall.referenceFaceId != null &&
@@ -779,34 +761,5 @@ function validateSnapshot(snapshot) {
           )
         );
   }
-  for (const floor of snapshot.floors)
-    for (const observation of floor.observations || []) {
-      if (
-        [observation.subject, ...(observation.relatedSubjects || [])].some(
-          (subject) =>
-            !subject ||
-            ids.get(subject.id) !== subject.type ||
-            subjectFloors.get(subject.id) !== floor.id
-        )
-      )
-        issues.push(
-          planIssue('dangling_observation', 'An observation references a missing subject.', {
-            type: 'observation',
-            id: observation.id,
-          })
-        );
-      if (
-        observation.observedAt != null &&
-        (typeof observation.observedAt !== 'string' ||
-          !Number.isFinite(Date.parse(observation.observedAt)))
-      )
-        issues.push(
-          planIssue(
-            'invalid_observation_date',
-            'Use a valid observation date or leave it uncaptured.',
-            { type: 'observation', id: observation.id }
-          )
-        );
-    }
   return issues;
 }

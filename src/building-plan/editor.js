@@ -1,3 +1,6 @@
+import { isFieldValueEmpty } from '../engine/submission-validation.js';
+import { validateFieldValue } from '../schema/field-value-registry.js';
+import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import {
   copyBuildingPlanData as copy,
@@ -27,7 +30,7 @@ export function createBuildingPlanEditor(options) {
   let revision = 0;
   let evaluation = null;
   const publish = (result) => {
-    if (result.issues?.length || result.status === 'unchanged') return result;
+    if (result.issues?.length || ['unchanged', 'pending'].includes(result.status)) return result;
     if (result.changes && !result.changes.length) return result;
     revision++;
     for (const listener of listeners) listener();
@@ -163,12 +166,6 @@ export function createBuildingPlanEditor(options) {
         sillHeight: window ? 0.9 : null,
       };
     }
-    if (['observations', 'face_observations'].includes(kind))
-      return {
-        ...base,
-        type: 'add_observation',
-        subject: { type: parent.faceId ? 'room_face' : 'floor', id: parent.faceId || floor.id },
-      };
     fail('Create physical walls through a room wall row or the canvas.');
   }
 
@@ -197,6 +194,26 @@ export function createBuildingPlanEditor(options) {
       if (row) {
         const { values, repeatable, ...metadata } = copy(row);
         Object.assign(selected, metadata);
+        if (selectedNode.sourceNode) {
+          const canonical = nodeFor(meta, selectedNode.sourceNode);
+          const storage = canonical.fields.find(
+            (field) => field.binding?.role === 'storage'
+          ).dataName;
+          const adopt = (parent) => {
+            for (const [key, rows] of Object.entries(parent.repeatable || {}))
+              for (const candidate of rows) {
+                if (
+                  key === canonical.preferredKey &&
+                  JSON.parse(candidate.values[storage]).id === selectedId
+                )
+                  Object.assign(candidate, metadata);
+                else adopt(candidate);
+              }
+          };
+          // Opening rows shown beneath a room face project a canonical host row.
+          // A newly opened editor's record identity must survive the projection.
+          adopt(record);
+        }
         for (const field of selectedNode.fields) {
           if (
             (!field.binding || field.binding.role === 'value') &&
@@ -268,13 +285,10 @@ export function createBuildingPlanEditor(options) {
     return publish(result);
   }
 
-  function removeRow(
-    path,
-    { scopeId = null, allowObservationDeletion = false, preview = false } = {}
-  ) {
+  function removeRow(path, { scopeId = null, preview = false } = {}) {
     const target = session.resolveRow(path);
     const { floorId, roomId, faceId, model, node } = target;
-    const base = { floorId, allowObservationDeletion };
+    const base = { floorId };
     let operation;
     if (node.nodeKey === 'floors') operation = { ...base, type: 'remove_floor' };
     else if (node.nodeKey === 'rooms')
@@ -288,8 +302,6 @@ export function createBuildingPlanEditor(options) {
         collection: node.nodeKey,
         elementId: model.id,
       };
-    else if (['observations', 'face_observations'].includes(node.nodeKey))
-      operation = { ...base, type: 'remove_observation', observationId: model.id };
     else if (['doors', 'windows', 'face_doors', 'face_windows'].includes(node.nodeKey)) {
       const floor = findBuildingPlanFloor(session.getSnapshot(), floorId);
       const wall = floor.walls.find((entry) =>
@@ -364,6 +376,72 @@ export function createBuildingPlanEditor(options) {
     getRevision: () => revision,
     openRow,
     updateRow,
+    completeRow(scopeId, row, { fieldName = null, finishAll = false } = {}) {
+      const editor = editors.get(scopeId);
+      if (!editor) return { status: 'stale', issues: [], record: session.getRecord() };
+      const node = session.resolveRow(editor.path).node;
+      let changed;
+      try {
+        changed = node.fields.filter(
+          (field) =>
+            ![
+              'CalculatedField',
+              'LabelField',
+              'TitleField',
+              'Section',
+              'BuildingPlanSection',
+              'RepeatableSection',
+            ].includes(field.type) &&
+            !['storage', 'geometry', 'derived', 'reference'].includes(field.binding?.role) &&
+            !['storage', 'geometry', 'derived', 'reference'].includes(field.binding?.storageRole) &&
+            JSON.stringify(normalizeFieldValue(field.field, row.values?.[field.dataName])) !==
+              JSON.stringify(
+                normalizeFieldValue(field.field, editor.initialRow.values?.[field.dataName])
+              )
+        );
+      } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+        return { status: 'invalid', issues: [], record: session.getRecord() };
+      }
+      if (
+        !changed.length &&
+        JSON.stringify(row.repeatable) === JSON.stringify(editor.initialRow.repeatable)
+      )
+        return { status: 'unchanged', issues: [], record: session.getRecord() };
+      if (
+        !finishAll &&
+        !fieldName &&
+        changed.some((field) => ['TextField', 'NumericField'].includes(field.type))
+      )
+        return { status: 'draft', issues: [], record: session.getRecord() };
+      if (
+        changed.some(
+          (field) =>
+            row.errors?.[field.dataName] ||
+            ((row.required?.[field.dataName] ?? field.field.required) &&
+              row.visible?.[field.dataName] !== false &&
+              isFieldValueEmpty(
+                field.field,
+                normalizeFieldValue(field.field, row.values?.[field.dataName])
+              )) ||
+            validateFieldValue(
+              field.field,
+              normalizeFieldValue(field.field, row.values?.[field.dataName])
+            )
+        )
+      )
+        return { status: 'invalid', issues: [], record: session.getRecord() };
+      return updateRow(scopeId, row);
+    },
+    resolveUIRequest(id, response) {
+      const result = session.resolveUIRequest(id, response);
+      if (result.status === 'applied')
+        for (const editor of editors.values()) {
+          const row = resolveBuildingPlanRow(session.getRecord(), editor.path);
+          if (row) editor.initialRow = copy(row);
+        }
+      return publish(result);
+    },
     removeRow,
     acceptRow: (id) => close(id, true),
     cancelRow: (id) => close(id, false),

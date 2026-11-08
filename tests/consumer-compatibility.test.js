@@ -145,6 +145,27 @@ for (const security of [undefined, { mode: 'safe' }]) {
     changed.operations.find((x) => x.params?.fieldDataName === 'event_trace').params.valueToSet,
     'x'
   );
+  const questionSchema = structuredClone(special.schema);
+  questionSchema.form.events.code += `
+    ON('blur', 'amount', function() {
+      MESSAGEBOX({message: 'Confirm', buttons: [{id: 'apply', label: 'Apply'}], context: {amount: $amount}}, function(reply) {
+        if (!reply.cancelled) SETVALUE('event_trace', String(reply.context.amount));
+      });
+    });`;
+  const questions = createFormEngine({
+    schema: questionSchema,
+    initialValues: special.snapshot.values,
+    security,
+    diagnostics: { console: false },
+  });
+  const request = questions.triggerDetailed('blur', 'amount');
+  assert.deepEqual(request.issues, []);
+  assert.equal(request.operations[0].operation, 'MESSAGEBOX');
+  const reply = questions.resolveUIRequest(request.operations[0].params.requestId, {
+    value: 'apply',
+  });
+  assert.deepEqual(reply.issues, []);
+  assert.equal(reply.operations[0].params.valueToSet, String(special.snapshot.values.amount));
   source.getState().values.amount = -1;
   assert.deepEqual(source.triggerDetailed('validate-record').validationIssues, [
     { message: 'Root amount is invalid', instancePath: [] },

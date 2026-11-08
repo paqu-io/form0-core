@@ -3,7 +3,8 @@ import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
 import { copyBuildingPlanData as copy, equalValue, findFace, findRoom, own } from './model.js';
 import { roomBounds } from './geometry.js';
-import { portionThicknessState, usesPortionThickness } from './portion-properties.js';
+import { wallSide } from './wall-sides.js';
+import { nodeSubjects } from './inheritance.js';
 import {
   getBuildingPlanRecordMetadata,
   readBuildingPlanRecord,
@@ -31,7 +32,7 @@ function rowModel(node, row) {
   );
   try {
     const model = JSON.parse(row.values[field.dataName]);
-    if (model.version === 1 && typeof model.id === 'string') return model;
+    if (model.version === 2 && typeof model.id === 'string') return model;
   } catch {
     /* Report a typed error at the adapter seam. */
   }
@@ -94,13 +95,16 @@ export function buildingPlanOperationsForRow({
   for (const field of node.fields) {
     const binding = field.binding;
     const property = binding?.property;
-    const reset = property && resetProperties.includes(property);
+    const reset =
+      resetProperties.includes(field.dataName) ||
+      (property && resetProperties.includes(property) && !binding.outside);
     const before = changed.values?.[field.dataName];
     const value = editedRow.values?.[field.dataName];
     const isProperty =
       binding?.role === 'property' ||
       (binding?.role === 'projection' && binding.storageRole === 'property');
     const isDefault = binding?.role === 'default';
+    const isProvider = binding?.role === 'provider';
     const previousFlags = isDefault
       ? rowModel(node, changed).defaultProperties
       : rowModel(node, changed).overrideProperties;
@@ -115,7 +119,7 @@ export function buildingPlanOperationsForRow({
       binding.storageRole !== 'value'
     )
       continue;
-    if (field.type === 'CalculatedField') continue;
+    if (['CalculatedField', 'RepeatableSection'].includes(field.type)) continue;
     if (field.field.read_only === true || target.row.read_only?.[field.dataName] === true) {
       const error = new TypeError('This BuildingPlan field is read-only.');
       error.issues = [
@@ -123,20 +127,25 @@ export function buildingPlanOperationsForRow({
       ];
       throw error;
     }
-    if (isProperty || isDefault) {
+    if (isProperty || isDefault || isProvider) {
       const command = {
-        type: isDefault ? 'set_defaults' : 'set_property',
+        type: isProvider ? 'set_provider' : isDefault ? 'set_defaults' : 'set_property',
         floorId,
         property,
         activeRoomId: roomId,
-        ...(isDefault
-          ? roomId
-            ? { roomId }
-            : {}
-          : binding.scope === 'room_face' ||
-              (node.nodeKey === 'walls' && usesPortionThickness(model, property))
-            ? { faceId: model.id }
-            : { wallId }),
+        nodeKey: ['walls', 'physical_walls', 'wall_sides'].includes(node.nodeKey)
+          ? 'walls'
+          : node.sourceNode || node.nodeKey,
+        scope: binding.scope,
+        outside: binding.outside === true,
+        ...(isProvider ? { fieldName: field.originalDataName } : {}),
+        ...(node.nodeKey === 'walls'
+          ? { faceId: model.id, wallId }
+          : node.nodeKey === 'physical_walls'
+            ? { wallId }
+            : node.nodeKey === 'rooms'
+              ? { roomId: model.id, elementId: model.id }
+              : { roomId, elementId: model.id }),
       };
       if (reset || (modeChanged && !(flags || []).includes(property))) command.reset = true;
       else command.value = normalizeFieldValue(field.field, value);
@@ -213,41 +222,81 @@ export function buildingPlanOperationsForRow({
       elementId: model.id,
       element: shape,
     });
-  } else if (node.nodeKey === 'observations' || node.nodeKey === 'face_observations') {
-    const floor = readBuildingPlanRecord({ meta, record }).floors.find(
-      (entry) => entry.id === floorId
-    );
-    const previous = floor.observations.find((entry) => entry.id === model.id);
-    commands.push({
-      type: 'update_observation',
-      floorId,
-      observationId: model.id,
-      values: { ...previous.values, ...plain },
-    });
   } else if (Object.keys(plain).length) {
-    const physical = Object.fromEntries(
-      Object.entries(plain).filter(
-        ([name]) => node.fieldsByOriginalDataName[name]?.binding?.role === 'projection'
-      )
-    );
-    const local = Object.fromEntries(
-      Object.entries(plain).filter(([name]) => !own(physical, name))
-    );
-    if (Object.keys(physical).length)
-      commands.push({ type: 'set_values', floorId, wallId, values: physical });
-    if (Object.keys(local).length)
+    const grouped = new Map();
+    for (const [name, value] of Object.entries(plain)) {
+      const binding = node.fieldsByOriginalDataName[name]?.binding;
+      const scope = binding?.scope || 'node';
+      const key = `${scope}:${binding?.outside === true}`;
+      if (!grouped.has(key)) grouped.set(key, { binding, values: {} });
+      grouped.get(key).values[name] = value;
+    }
+    for (const { binding, values } of grouped.values())
       commands.push({
         type: 'set_values',
         floorId,
-        ...(node.nodeKey === 'rooms'
-          ? { roomId: model.id }
-          : node.nodeKey === 'walls'
-            ? { faceId: model.id }
-            : node.nodeKey === 'physical_walls'
-              ? { wallId: model.id }
-              : {}),
-        values: local,
+        nodeKey: node.sourceNode || node.nodeKey,
+        elementId: model.id,
+        roomId: node.nodeKey === 'rooms' ? model.id : roomId,
+        wallId,
+        faceId: node.nodeKey === 'walls' ? model.id : undefined,
+        scope: binding?.scope,
+        outside: binding?.outside,
+        values,
       });
+  }
+  for (const field of node.fields.filter((entry) => entry.type === 'RepeatableSection')) {
+    const before = changed.repeatable?.[field.preferredKey] || [],
+      after = editedRow.repeatable?.[field.preferredKey] || [];
+    if (equalValue(before, after)) continue;
+    const convert = (entries, row) => ({
+      ...copy(row),
+      values: Object.fromEntries(
+        entries
+          .filter((entry) => entry.type !== 'RepeatableSection' && entry.type !== 'CalculatedField')
+          .map((entry) => [entry.originalDataName, copy(row.values?.[entry.dataName] ?? null)])
+      ),
+      repeatable: Object.fromEntries(
+        entries
+          .filter((entry) => entry.type === 'RepeatableSection')
+          .map((entry) => [
+            entry.originalDataName,
+            (row.repeatable?.[entry.preferredKey] || []).map((row) =>
+              convert(entry.children || [], row)
+            ),
+          ])
+      ),
+    });
+    const binding = field.binding;
+    const plan = readBuildingPlanRecord({ meta, record });
+    const floor = plan.floors.find((entry) => entry.id === floorId);
+    const wall = wallId && floor.walls.find((entry) => entry.id === wallId);
+    const subject =
+      node.nodeKey === 'walls'
+        ? binding?.scope === 'physical_wall'
+          ? wall
+          : wallSide(floor, findFace(floor, model.id).face, binding?.outside)
+        : node.nodeKey === 'physical_walls'
+          ? wall
+          : nodeSubjects(floor, node.nodeKey).find((entry) => entry.subject.id === model.id)
+              ?.subject;
+    commands.push({
+      type: 'set_custom_rows',
+      floorId,
+      nodeKey: node.nodeKey,
+      elementId: model.id,
+      roomId,
+      wallId,
+      faceId: node.nodeKey === 'walls' ? model.id : undefined,
+      scope: binding?.scope,
+      outside: binding?.outside,
+      repeatable: {
+        ...subject?.repeatable,
+        [binding?.sourceOriginalDataName || field.originalDataName]: after.map((row) =>
+          convert(field.children || [], row)
+        ),
+      },
+    });
   }
   return {
     type: 'batch',
@@ -314,6 +363,9 @@ export function createBuildingPlanRecordSession({
   return {
     meta,
     getSnapshot: session.getSnapshot,
+    resolveUIRequest: (id, response) => materialize(session.resolveUIRequest(id, response)),
+    cancelUIRequests: session.cancelUIRequests,
+    isUIRequestCurrent: session.isUIRequestCurrent,
     setEditingPolicy: session.setEditingPolicy,
     getRecord: () => copy(source),
     adoptRowMetadata(record) {
@@ -323,10 +375,13 @@ export function createBuildingPlanRecordSession({
     async evaluate(evaluator, parentValues = {}) {
       const request = ++evaluationRequest;
       const revision = session.getState().revision;
-      const result = await evaluator.evaluate({
-        ...copy(source),
-        values: { ...parentValues, ...source.values },
-      });
+      const result = await evaluator.evaluate(
+        {
+          ...copy(source),
+          values: { ...parentValues, ...source.values },
+        },
+        { mode: 'refresh' }
+      );
       if (request !== evaluationRequest || revision !== session.getState().revision)
         return { status: 'stale', issues: [], record: copy(source) };
       const merge = (target, evaluated, node) => {
@@ -336,7 +391,14 @@ export function createBuildingPlanRecordSession({
         for (const map of ['errors', 'visible', 'required', 'read_only'])
           if (evaluated[map]) target[map] = copy(evaluated[map]);
         for (const [key, rows] of Object.entries(target.repeatable || {})) {
-          const descriptor = meta.repeatables.find((entry) => entry.preferredKey === key);
+          const descriptor =
+            meta.repeatables.find((entry) => entry.preferredKey === key) ||
+            (() => {
+              const entry = node?.fields?.find(
+                (field) => field.type === 'RepeatableSection' && field.preferredKey === key
+              );
+              return entry ? { fields: entry.children } : null;
+            })();
           for (const row of rows) {
             const match = evaluated.repeatable?.[key]?.find(
               (entry) => (entry.id ?? entry.record_id) === (row.id ?? row.record_id)
@@ -382,36 +444,37 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
   const floor = plan.floors.find((entry) => entry.id === selected.floorId);
   const room = floor.rooms.find((entry) => entry.id === selected.roomId);
   const property = binding.property;
-  const physical = binding.scope === 'physical_wall' && binding.role !== 'default';
+  const physical = binding.scope === 'physical_wall' && binding.role !== 'provider';
+  const wall = floor.walls.find(
+    (entry) => entry.id === (selected.model.wallId || selected.model.id)
+  );
   const subject = physical
-    ? floor.walls.find((entry) => entry.id === (selected.model.wallId || selected.model.id))
-    : binding.role === 'default'
-      ? room || floor
-      : room?.faces.find((entry) => entry.id === selected.model.id);
-  const provenance =
-    binding.role === 'default'
+    ? wall
+    : binding.scope === 'wall_face'
+      ? wallSide(floor, findFace(floor, selected.model.id).face, binding.outside)
+      : nodeSubjects(floor, selected.node.nodeKey).find(
+          (entry) => entry.subject.id === selected.model.id
+        )?.subject;
+  const source =
+    binding.role === 'provider'
       ? {
-          scope: own(subject?.defaults, property)
-            ? room
-              ? 'room'
-              : 'floor'
-            : own(floor.defaults, property)
-              ? 'floor'
-              : 'schema',
-          mode: own(subject?.defaults, property) ? 'override' : 'inherit',
+          scope: selected.node.nodeKey,
+          mode: own(subject?.providerOverrides, field.originalDataName) ? 'override' : 'inherit',
         }
       : subject?.provenance?.[property];
-  const portion =
-    physical && selected.node.nodeKey === 'walls' && property === 'wall_thickness_m'
-      ? portionThicknessState(subject, selected.model)
-      : null;
   return {
     managed,
+    dataName,
     scope: binding.scope,
     property,
-    inheritable: Boolean(binding.inherit || binding.role === 'default'),
+    inheritable: Boolean(
+      binding.inherit || binding.role === 'provider' || binding.role === 'default'
+    ),
     value: copy(selected.row.values[dataName]),
-    source: copy(portion?.source || provenance || null),
+    source: copy(source || null),
     subjectId: subject?.id,
+    outside: binding.outside === true && Boolean(subject) && subject.roomId == null,
+    opposite: binding.outside === true && Boolean(subject?.roomId),
+    applicable: binding.outside ? Boolean(subject) : true,
   };
 }

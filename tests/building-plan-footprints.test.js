@@ -1,3 +1,4 @@
+import { originalVertices, originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -8,7 +9,7 @@ import {
   validateBuildingPlanSnapshot,
 } from '../src/index.js';
 import { buildingPlanCanvasSnapshot } from '../src/building-plan/canvas-controller.js';
-import { pointInPolygon } from '../src/building-plan/geometry.js';
+import { at, segmentFrame, pointInPolygon } from '../src/building-plan/geometry.js';
 
 function fixture(editingPolicy) {
   const f = createBuildingPlanExample();
@@ -41,14 +42,14 @@ for (const preserveWallGrouping of [false, true])
   test(`shared corner edits preserve a straight outer wall with no material spike (grouped=${preserveWallGrouping})`, () => {
     const f = fixture({ preserveWallGrouping }),
       floor = f.session.getSnapshot().floors[0];
-    f.apply({ type: 'resize_face', faceId: floor.rooms[1].faces[1].id, distance: -3 });
+    f.apply({ type: 'resize_face', faceId: originalFaces(floor.rooms[1])[1].id, distance: -3 });
     f.apply({ type: 'resize_face', faceId: f.faceB, distance: 1 });
     const before = f.session.getSnapshot(),
       room = before.floors[0].rooms[1];
     f.apply({
       type: 'move_corner',
       roomId: room.id,
-      vertexId: room.vertices[0].id,
+      vertexId: originalVertices(room)[0].id,
       point: { x: 3, y: 1.4 },
     });
     const next = f.session.getSnapshot();
@@ -67,21 +68,25 @@ for (const preserveWallGrouping of [false, true])
     f.apply({
       type: 'move_corner',
       roomId: room.id,
-      vertexId: room.vertices[0].id,
+      vertexId: originalVertices(room)[0].id,
       point: { x: 3, y: 2.2 },
     });
-    assert.deepEqual(
-      f.session.getSnapshot().floors[0].rooms.map((r) => r.vertices),
-      before.floors[0].rooms.map((r) => r.vertices)
-    );
+    for (const [index, room] of before.floors[0].rooms.entries())
+      for (const vertex of originalVertices(room)) {
+        const current = f.session
+          .getSnapshot()
+          .floors[0].rooms[index].vertices.find((point) => point.id === vertex.id);
+        assert.ok(current);
+        assert.ok(Math.hypot(current.x - vertex.x, current.y - vertex.y) < 1e-6);
+      }
   });
 
 test('one physical shared wall has metric material between its two facing rows and one door cut', () => {
   const f = fixture(),
     before = f.session.getSnapshot(),
     scene = f.scene();
-  assert.equal(scene.wallFootprints.length, 7);
-  assert.equal(scene.walls.length, 8);
+  assert.equal(scene.wallFootprints.length, 9);
+  assert.equal(scene.walls.length, 10);
   const shared = scene.wallFootprints.filter((wall) => wall.id === f.wallId);
   assert.equal(shared.length, 1);
   assert.ok(covers(shared, { x: 320, y: 310 }));
@@ -104,7 +109,7 @@ for (const preserveWallGrouping of [false, true])
         floor = before.floors[0];
       const active = floor.rooms[side === 'a' ? 0 : 1];
       const neighbour = floor.rooms[side === 'a' ? 1 : 0];
-      const existingFace = active.faces[side === 'a' ? 1 : 3];
+      const existingFace = originalFaces(active)[side === 'a' ? 1 : 3];
       const anchorX = side === 'a' ? 5 : 3;
       const expectedX = side === 'a' ? 5.2 : 2.8;
       f.apply({ type: 'resize_face', faceId: side === 'a' ? f.faceA : f.faceB, distance: 0.6 });
@@ -114,7 +119,9 @@ for (const preserveWallGrouping of [false, true])
         .find((r) => r.id === neighbour.id)
         .faces.find(
           (face) =>
-            face.wallId === existingFace.wallId &&
+            (face.wallId === existingFace.wallId ||
+              next.walls.find((wall) => wall.id === face.wallId)?.lineage?.splitFromWallId ===
+                existingFace.wallId) &&
             face.edgeIds.some((id) => {
               const e = next.rooms
                 .find((r) => r.id === neighbour.id)
@@ -254,7 +261,9 @@ test('repeated jogs have connected material, preserve canonical openings, and un
   const before = f.scene();
   f.apply({ type: 'resize_face', faceId: f.faceA, distance: 0.6 });
   let scene = f.scene();
-  assert.equal(scene.wallFootprints.length, 8);
+  assert.ok(
+    scene.wallFootprints.every((wall) => wall.polygons.every((polygon) => polygon.length >= 3))
+  );
   assert.ok(
     covers(scene.wallFootprints, { x: 510, y: 370 }),
     'The jog corner has no material gap.'
@@ -272,7 +281,7 @@ test('repeated jogs have connected material, preserve canonical openings, and un
   assert.deepEqual(f.scene(), before);
 });
 
-test('segment thickness and active-face anchoring control the drawn width at every grid scale', () => {
+test('physical thickness and active-face anchoring control the drawn width at every grid scale', () => {
   const f = fixture();
   const room = f.session.getSnapshot().floors[0].rooms[0];
   f.apply({
@@ -298,12 +307,9 @@ test('segment thickness and active-face anchoring control the drawn width at eve
       )
     )
   );
-  const segmentId = f.session.getSnapshot().floors[0].walls.find((w) => w.id === f.wallId)
-    .segments[0].id;
   f.apply({
     type: 'set_property',
     wallId: f.wallId,
-    segmentId,
     activeRoomId: room.id,
     property: 'wall_thickness_m',
     value: 0.4,
@@ -325,15 +331,14 @@ test('explicit unknown thickness stays schematic and never invents a measured wa
   assert.equal(wall.schematicSegments[0].thicknessUnknown, true);
 });
 
-test('jog alignment uses the adjacent construction segment thickness and keeps the active face fixed', () => {
+test('jog alignment uses the adjacent physical wall thickness and keeps the active face fixed', () => {
   const f = fixture(),
     wall = f.snapshot.floors[0].walls.find(
-      (w) => w.id === f.snapshot.floors[0].rooms[0].faces[1].wallId
+      (w) => w.id === originalFaces(f.snapshot.floors[0].rooms[0])[1].wallId
     );
   f.apply({
     type: 'set_property',
     wallId: wall.id,
-    segmentId: wall.segments[0].id,
     property: 'wall_thickness_m',
     value: 0.3,
   });
@@ -341,17 +346,17 @@ test('jog alignment uses the adjacent construction segment thickness and keeps t
   const floor = f.session.getSnapshot().floors[0],
     room = floor.rooms[1];
   assert.ok(room.vertices.some((v) => v.x === 5.3));
-  assert.equal(floor.rooms[0].vertices[1].x, 5);
+  assert.equal(originalVertices(floor.rooms[0])[1].x, 5);
   assert.ok(!covers(f.scene().wallFootprints, { x: 490, y: 340 }));
   assert.deepEqual(f.session.validate(), []);
   f.apply({ type: 'resize_face', faceId: f.faceA, distance: -0.6 });
-  assert.equal(f.session.getSnapshot().floors[0].rooms[1].vertices.length, 4);
+  assert.equal(originalVertices(f.session.getSnapshot().floors[0].rooms[1]).length, 4);
   assert.deepEqual(f.session.validate(), []);
 });
 
 test('a return cannot invent a thickness when the adjacent construction is explicitly unknown', () => {
   const f = fixture(),
-    wall = f.snapshot.floors[0].rooms[0].faces[1].wallId;
+    wall = originalFaces(f.snapshot.floors[0].rooms[0])[1].wallId;
   f.apply({ type: 'set_property', wallId: wall, property: 'wall_thickness_m', value: null });
   const before = f.session.getSnapshot();
   const result = f.session.apply({
@@ -366,21 +371,27 @@ test('a return cannot invent a thickness when the adjacent construction is expli
 });
 
 for (const preserveWallGrouping of [false, true])
-  test(`new return contacts retain conflicting physical answers until one explicit resolution (${preserveWallGrouping})`, () => {
+  test(`new returns continue the adjoining physical owner and retain the selected wall answers (${preserveWallGrouping})`, () => {
     const f = fixture({ preserveWallGrouping }),
-      right = f.snapshot.floors[0].rooms[0].faces[1].wallId;
+      right = originalFaces(f.snapshot.floors[0].rooms[0])[1].wallId;
     f.apply({ type: 'set_property', wallId: right, property: 'material', value: 'Concrete' });
     f.apply({ type: 'set_property', wallId: f.wallId, property: 'material', value: 'Brick' });
     const before = f.session.getSnapshot(),
       operation = { type: 'resize_face', floorId: f.floorId, faceId: f.faceA, distance: 0.6 };
-    const result = f.session.apply(operation);
-    assert.equal(result.status, 'conflict');
-    assert.equal(result.issues[0].code, 'conflicting_wall_properties');
-    assert.deepEqual(f.session.getSnapshot(), before);
-    assert.equal(
-      f.session.apply({ ...operation, resolutions: { material: 'Concrete' } }).status,
-      'applied'
+    assert.equal(f.session.apply(operation).status, 'applied');
+    const after = f.session.getSnapshot().floors[0];
+    const sharedReturn = after.walls.find(
+      (wall) =>
+        wall.exposure === 'interior' &&
+        wall.segments.every(
+          (segment) =>
+            Math.abs(segment.start.x - 5.1) < 1e-6 && Math.abs(segment.end.x - 5.1) < 1e-6
+        )
     );
+    assert.ok(sharedReturn);
+    assert.equal(sharedReturn.properties.material, 'Concrete');
+    const main = after.rooms[0].faces.find((face) => face.id === f.faceA);
+    assert.equal(after.walls.find((wall) => wall.id === main.wallId).properties.material, 'Brick');
     assert.deepEqual(f.session.getSnapshot().floors[0].observations, before.floors[0].observations);
   });
 
@@ -411,16 +422,38 @@ test('detachment preserves an intentionally authored free-standing wall outside 
   );
 });
 
-test('detachment retains the host extent required by an opening outside the remaining facing portion', () => {
+test('an exterior opening follows its physical owner when its room detaches', () => {
   const f = fixture();
-  f.apply({ type: 'create_opening', wallId: f.wallId, kind: 'window', offset: 7, width: 0.5 });
-  const before = f.session.getSnapshot(),
-    window = before.floors[0].walls.find((w) => w.id === f.wallId).windows[0];
+  const wallId = f.snapshot.floors[0].rooms[0].faces.find(
+    (face) => face.lineage?.editingOriginFaceId === f.faceA && face.id !== f.faceA
+  ).wallId;
+  f.apply({ type: 'create_opening', wallId, kind: 'window', offset: 2, width: 0.5 });
+  const before = f.session.getSnapshot();
+  const opening = before.floors[0].walls.find((wall) => wall.id === wallId).windows[0];
   f.apply({ type: 'move_room', roomId: before.floors[0].rooms[0].id, delta: { x: 0, y: -5 } });
-  const wall = f.session.getSnapshot().floors[0].walls.find((w) => w.id === f.wallId);
-  assert.equal(wall.windows[0].id, window.id);
-  assert.equal(wall.segments[0].end.x, 0.5);
-  assert.equal(wall.windows[0].offset, 7);
+  const after = f.session.getSnapshot().floors[0];
+  const owner = after.walls.find((wall) => wall.id === wallId);
+  const { offset, ...identityAndDimensions } = opening;
+  const { offset: newOffset, ...currentIdentityAndDimensions } = owner.windows[0];
+  assert.deepEqual(currentIdentityAndDimensions, identityAndDimensions);
+  const oldOwner = before.floors[0].walls.find((wall) => wall.id === wallId);
+  const oldFrame = segmentFrame(oldOwner.segments[0].start, oldOwner.segments[0].end);
+  const newFrame = segmentFrame(owner.segments[0].start, owner.segments[0].end);
+  const oldPoint = at(oldFrame, offset),
+    newPoint = at(newFrame, newOffset);
+  assert.ok(
+    Math.hypot(newPoint.x - oldPoint.x, newPoint.y - oldPoint.y + 5) < 1e-6,
+    'Automatic coalescence rebases the offset while retaining the translated world position'
+  );
+  assert.equal(
+    owner.segments[0].start.y,
+    before.floors[0].walls.find((wall) => wall.id === wallId).segments[0].start.y - 5
+  );
+  for (const vertex of originalVertices(before.floors[0].rooms[1])) {
+    const current = after.rooms[1].vertices.find((point) => point.id === vertex.id);
+    assert.ok(current);
+    assert.ok(Math.hypot(current.x - vertex.x, current.y - vertex.y) < 1e-6);
+  }
   assert.deepEqual(f.session.validate(), []);
 });
 
@@ -449,65 +482,18 @@ for (const moving of [0, 1])
     );
   });
 
-test('retired automatic segment observations retain their original measured context', () => {
-  const f = fixture({ preserveWallGrouping: true });
-  f.apply({ type: 'resize_face', faceId: f.faceA, distance: 0.6 });
-  const floor = f.session.getSnapshot().floors[0];
-  const wall = floor.walls.find((wall) =>
-    wall.segments.some((segment) =>
-      [segment.start, segment.end].every((p) => Math.abs(p.y - 3.1) < 1e-6)
-    )
-  );
-  const segment = wall.segments.find((segment) =>
-    [segment.start, segment.end].every((p) => Math.abs(p.y - 3.1) < 1e-6)
-  );
-  f.apply({
-    type: 'add_observation',
-    subject: { type: 'segment', id: segment.id },
-    observedAt: '2026-11-04T10:00:00Z',
-    coverage: { interval: [0, 1] },
-    evidence: [{ reference: 'fixture://original-segment' }],
-    values: { observed_thickness_m: 0.19 },
-  });
-  const original = f.session.getSnapshot().floors[0].observations.at(-1);
-  f.apply({ type: 'move_room', roomId: floor.rooms[1].id, delta: { x: 0, y: 5 } });
-  const after = f.session.getSnapshot().floors[0];
-  assert.ok(!after.walls.flatMap((wall) => wall.segments).some((s) => s.id === segment.id));
-  assert.deepEqual(after.observations.at(-1), {
-    ...original,
-    subject: { type: 'wall', id: wall.id },
-  });
-  assert.deepEqual(f.session.validate(), []);
-});
-
-test('detachment preserves meaningful collinear segment divisions and their overrides', () => {
+test('detachment preserves separate physical pieces and their independent overrides', () => {
   const f = fixture();
-  const original = f.snapshot.floors[0].walls.find((w) => w.id === f.wallId);
-  f.apply({ type: 'split_wall', wallId: f.wallId, offset: 2 });
-  const other = f.session
-    .getSnapshot()
-    .floors[0].walls.find((w) => w.id !== f.wallId && w.lineage?.splitFromWallId === f.wallId);
-  assert.ok(other);
-  f.apply({
-    type: 'set_property',
-    wallId: f.wallId,
-    segmentId: original.segments[0].id,
-    property: 'wall_height_m',
-    value: 2.6,
-  });
-  f.apply({ type: 'join_walls', wallId: f.wallId, otherWallId: other.id });
-  f.apply({ type: 'move_room', roomId: f.snapshot.floors[0].rooms[0].id, delta: { x: 0, y: -5 } });
-  const wall = f.session.getSnapshot().floors[0].walls.find((w) => w.id === f.wallId);
-  assert.equal(wall.segments.length, 2);
-  assert.equal(wall.segments[0].overrides.wall_height_m, 2.6);
-  assert.deepEqual(
-    wall.segments.map((s) => [s.start.x, s.end.x]),
-    [
-      [8, 6],
-      [6, 3],
-    ]
-  );
+  f.apply({ type: 'split_face', faceId: f.faceA, offset: 1.5 });
+  f.apply({ type: 'set_property', wallId: f.wallId, property: 'wall_height_m', value: 2.6 });
+  const before = f.session.getSnapshot();
+  f.apply({ type: 'move_room', roomId: before.floors[0].rooms[0].id, delta: { x: 0, y: -5 } });
+  const floor = f.session.getSnapshot().floors[0];
+  assert.ok(floor.walls.every((wall) => wall.segments.length === 1));
+  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).overrides.wall_height_m, 2.6);
   assert.deepEqual(f.session.validate(), []);
+  f.session.undo();
+  assert.deepEqual(f.session.getSnapshot(), before);
 });
 
 test('child cancellation restores the shared return and detached extents while keeping earlier floor defaults', () => {
@@ -541,9 +527,18 @@ test('child cancellation restores the shared return and detached extents while k
 
 test('thickness-spaced return alignment confirms a partially cut opening and removes it in the same operation', () => {
   const f = fixture();
-  f.apply({ type: 'create_opening', wallId: f.wallId, kind: 'window', offset: 2.5, width: 0.4 });
+  const exteriorWallId = f.snapshot.floors[0].rooms[1].faces.find(
+    (face) => face.lineage?.editingOriginFaceId === f.faceB && face.id !== f.faceB
+  ).wallId;
+  f.apply({
+    type: 'create_opening',
+    wallId: exteriorWallId,
+    kind: 'window',
+    offset: 2.5,
+    width: 0.4,
+  });
   const before = f.session.getSnapshot(),
-    opening = before.floors[0].walls.find((w) => w.id === f.wallId).windows[0];
+    opening = before.floors[0].walls.find((w) => w.id === exteriorWallId).windows[0];
   const operation = { type: 'resize_face', floorId: f.floorId, faceId: f.faceA, distance: 0.6 };
   const result = f.session.apply(operation);
   assert.equal(result.status, 'conflict');

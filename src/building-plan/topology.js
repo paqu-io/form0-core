@@ -7,22 +7,10 @@ import {
   subtract,
 } from './geometry.js';
 import { copyBuildingPlanData as copy, equalValue, facesOfWall, findWall } from './model.js';
+import { renewBuildingPlanRowIdentities, sameBuildingPlanCustomRows } from './custom-rows.js';
 
-export const wallTopologyOrigin = (wall) => wall.lineage?.jogOriginWallId || wall.id;
-
-export function remapSubject(floor, from, to, type) {
-  if (from === to) return;
-  for (const observation of floor.observations) {
-    if (observation.subject?.id === from) {
-      observation.sourceSubject ||= copy(observation.subject);
-      observation.subject = { type, id: to };
-    }
-    if (observation.relatedSubjects)
-      observation.relatedSubjects = observation.relatedSubjects.map((subject) =>
-        subject.id === from ? { type, id: to } : subject
-      );
-  }
-}
+export const wallTopologyOrigin = (wall) =>
+  wall.lineage?.jogOriginWallId || wall.lineage?.splitFromWallId || wall.id;
 
 /** Remove only geometrically redundant automatic topology, preserving meaningful divisions. */
 export function normalizeRoomBoundary(floor, room, createId) {
@@ -31,7 +19,11 @@ export function normalizeRoomBoundary(floor, room, createId) {
   const runs = room.edges.map((edge) => ({ sources: [edge.id] }));
   const owners = (run) =>
     room.faces.filter((face) => face.edgeIds?.some((id) => run.sources.includes(id)));
-  const mayMerge = (a, b) => {
+  const mayMerge = (a, b, collapsingCutReturn = false) => {
+    // A material profile has no longitudinal wall binding. Keep its endpoint
+    // distinct from the captured run rather than extending that run across it.
+    if (!collapsingCutReturn && Boolean(owners(a).length) !== Boolean(owners(b).length))
+      return false;
     const faces = [...new Set([...owners(a), ...owners(b)])];
     if (!faces.length) return true;
     const first = faces[0];
@@ -50,15 +42,30 @@ export function normalizeRoomBoundary(floor, room, createId) {
     return faces.every((face) => {
       const other = findWall(floor, face.wallId);
       if (
+        !collapsingCutReturn &&
         wall.id !== other.id &&
         (wall.lineage?.explicitPhysicalSeparation || other.lineage?.explicitPhysicalSeparation)
       )
         return false;
       return (
-        wallTopologyOrigin(wall) === wallTopologyOrigin(other) &&
+        (wallTopologyOrigin(wall) === wallTopologyOrigin(other) ||
+          (collapsingCutReturn &&
+            [...localSegments(first), ...localSegments(face)].some(
+              (segment) => segment.junction
+            ))) &&
         equalValue(first.values, face.values) &&
         equalValue(first.overrides, face.overrides) &&
         equalValue(wall.overrides, other.overrides) &&
+        equalValue(wall.values, other.values) &&
+        equalValue(wall.repeatable || {}, other.repeatable || {}) &&
+        (wall.sides || []).every((side) =>
+          (other.sides || []).some(
+            (candidate) =>
+              equalValue(side.overrides, candidate.overrides) &&
+              equalValue(side.values, candidate.values) &&
+              equalValue(side.repeatable || {}, candidate.repeatable || {})
+          )
+        ) &&
         localSegments(first).every((segment) =>
           localSegments(face).every((entry) =>
             equalValue(segment.overrides || {}, entry.overrides || {})
@@ -78,12 +85,53 @@ export function normalizeRoomBoundary(floor, room, createId) {
       if (vertices[next].editingCutId && !vertices[i].editingCutId) {
         const retired = vertices[i].id;
         vertices[i] = { ...vertices[next] };
-        remapSubject(floor, retired, vertices[i].id, 'vertex');
       }
       // The collapsed edge has no surviving extent. Its answers are remapped below.
       runs[i].sources = [...runs[next].sources];
       vertices.splice(next, 1);
       runs.splice(next, 1);
+      changed = true;
+      break;
+    }
+    if (changed) continue;
+    // A moved automatic station can overshoot a stationary collinear sibling.
+    // Trim that zero-area return before validating the polygon, retaining explicit cuts.
+    for (let i = 0; i < vertices.length; i++) {
+      const prev = (i + vertices.length - 1) % vertices.length;
+      const next = (i + 1) % vertices.length;
+      const a = subtract(vertices[i], vertices[prev]);
+      const b = subtract(vertices[next], vertices[i]);
+      const sameCut =
+        vertices[prev].editingCutId &&
+        vertices[prev].editingCutId === vertices[next].editingCutId &&
+        distance(vertices[prev], vertices[next]) <= EPS;
+      if (
+        !vertices[i].physicalBoundaryId ||
+        vertices[i].editingCutId ||
+        Math.abs(cross(a, b)) > EPS ||
+        dot(a, b) >= 0
+      )
+        continue;
+      if (!mayMerge(runs[prev], runs[i], true)) {
+        // Trim the zero-area cap without merging its owner's answers into the
+        // preceding physical piece. Its facing row must retain another extent.
+        const survives = owners(runs[i]).every((face) =>
+          runs.some(
+            (run, index) =>
+              index !== i &&
+              run.sources.some((id) => face.edgeIds?.includes(id)) &&
+              distance(vertices[index], vertices[(index + 1) % vertices.length]) > EPS
+          )
+        );
+        if (!survives || vertices[next].editingCutId) continue;
+        vertices[i] = { ...vertices[i], x: vertices[next].x, y: vertices[next].y };
+        changed = true;
+        break;
+      }
+      if (sameCut) vertices[prev] = { ...vertices[next] };
+      runs[prev].sources.push(...runs[i].sources);
+      vertices.splice(i, 1);
+      runs.splice(i, 1);
       changed = true;
       break;
     }
@@ -95,6 +143,7 @@ export function normalizeRoomBoundary(floor, room, createId) {
       const b = subtract(vertices[next], vertices[i]);
       if (
         vertices[i].editingCutId ||
+        vertices[i].physicalBoundaryId ||
         Math.abs(cross(a, b)) > EPS ||
         dot(a, b) <= 0 ||
         !mayMerge(runs[prev], runs[i])
@@ -131,14 +180,14 @@ export function normalizeRoomBoundary(floor, room, createId) {
       throw new Error(
         'This alignment removes a portion with different room-side answers. Resolve those answers or use a smaller move.'
       );
-    remapSubject(floor, face.id, replacement.id, 'room_face');
+
     const wall = findWall(floor, face.wallId);
     if (wall.referenceFaceId === face.id) wall.referenceFaceId = null;
   }
 }
 
 /** Retire stale automatic returns after the room polygon has been normalized/rebound. */
-export function pruneAutomaticReturns(floor) {
+export function pruneAutomaticReturns(floor, before = floor) {
   for (const wall of [...floor.walls]) {
     const linked = facesOfWall(floor, wall.id);
     const referenced = new Set(
@@ -156,21 +205,94 @@ export function pruneAutomaticReturns(floor) {
         throw new Error(
           'An opening occupies the return being removed. Move it before aligning the wall.'
         );
-      remapSubject(floor, segment.id, wallTopologyOrigin(wall), 'wall');
     }
     wall.segments = wall.segments.filter((segment) => !retired.includes(segment));
     if (!linked.length && wall.lineage?.jogOriginWallId) {
+      const profileSource =
+        wall.lineage.profileSource &&
+        floor.walls.find(
+          (entry) => entry.id === wall.lineage.profileSource.wallId && entry !== wall
+        );
+      const sameContent = (a, b) =>
+        b &&
+        equalValue(a.overrides, b.overrides) &&
+        equalValue(a.values, b.values) &&
+        equalValue(a.providerOverrides || {}, b.providerOverrides || {}) &&
+        sameBuildingPlanCustomRows(a, b);
+      // These rows are private solver copies, never independently accepted
+      // records. Retire them only while all content survives on their source.
+      if (
+        profileSource &&
+        sameContent(wall, profileSource) &&
+        wall.sides.every((side) =>
+          sameContent(
+            side,
+            profileSource.sides.find(
+              (other) => other.sign === side.sign * (wall.lineage.profileDirection || 1)
+            )
+          )
+        )
+      ) {
+        floor.walls = floor.walls.filter((entry) => entry !== wall);
+        continue;
+      }
       const surviving = floor.walls.find(
         (entry) =>
           entry !== wall &&
           wallTopologyOrigin(entry) === wallTopologyOrigin(wall) &&
           facesOfWall(floor, entry.id).length
       );
-      if (surviving && !equalValue(wall.overrides, surviving.overrides))
-        throw new Error(
-          'This return has different physical wall answers. Resolve those overrides or use a smaller move.'
+      const hasRows = [wall, ...(wall.sides || [])].some((subject) =>
+        Object.values(subject.repeatable || {}).some((rows) => rows.length)
+      );
+      const previous = before.walls.find((entry) => entry.id === wall.id);
+      const previousSource = before.walls.find(
+        (entry) => entry.id === previous?.lineage?.dividedFromWallId && entry.id !== wall.id
+      );
+      const source = previousSource && floor.walls.find((entry) => entry.id === previousSource.id);
+      const sameAnswers = (a, b) =>
+        a &&
+        b &&
+        equalValue(a.overrides, b.overrides) &&
+        equalValue(a.values, b.values) &&
+        equalValue(a.providerOverrides || {}, b.providerOverrides || {}) &&
+        (a.sides || []).every((side) => {
+          const other = b.sides?.find((entry) => entry.sign === side.sign);
+          return (
+            other &&
+            equalValue(side.overrides, other.overrides) &&
+            equalValue(side.values, other.values)
+          );
+        });
+      // System-generated shoulders copy their source's accepted properties. A
+      // source reset may remove that shoulder when it has no independent answers.
+      const followsSourceReset =
+        source && sameAnswers(wall, previous) && sameAnswers(previous, previousSource);
+      const compatibleAnswers =
+        followsSourceReset ||
+        (surviving &&
+          equalValue(wall.overrides, surviving.overrides) &&
+          equalValue(wall.values, surviving.values) &&
+          (wall.sides || []).every((side) => {
+            const other = surviving.sides?.find((entry) => entry.sign === side.sign);
+            return (
+              other &&
+              equalValue(side.overrides, other.overrides) &&
+              equalValue(side.values, other.values)
+            );
+          }));
+      const explicitAnswers =
+        Object.keys(wall.overrides || {}).length ||
+        Object.keys(wall.values || {}).length ||
+        (wall.sides || []).some(
+          (side) =>
+            Object.keys(side.overrides || {}).length || Object.keys(side.values || {}).length
         );
-      remapSubject(floor, wall.id, wallTopologyOrigin(wall), 'wall');
+      if (hasRows || (explicitAnswers && !compatibleAnswers))
+        throw new Error(
+          'This return has custom records or distinct accepted answers. Resolve them before straightening the wall.'
+        );
+
       floor.walls = floor.walls.filter((entry) => entry !== wall);
     }
   }
@@ -199,8 +321,25 @@ export function splitFacingRows(floor, createId, segmentOwners = new Map(), wall
       }
       const origin = face.lineage?.jogOriginFaceId || face.id;
       const usedVertices = new Set();
-      for (const [index, group] of [...groups.values()].entries()) {
-        const part = index ? { ...copy(sourceFace), id: createId() } : face;
+      const edgeOrder = sourceFace.freeEdges || room.edges.map((edge) => edge.id);
+      const ordered = [...groups.values()].sort(
+        (a, b) =>
+          edgeOrder.indexOf(a.edgeId) - edgeOrder.indexOf(b.edgeId) ||
+          Math.min(...a.bindings.map((binding) => binding.roomInterval[0])) -
+            Math.min(...b.bindings.map((binding) => binding.roomInterval[0]))
+      );
+      // Keep the existing row on its physical piece, rather than assigning its
+      // identity to the first newly inserted return in room-edge order.
+      const primary = floor.walls.find((wall) => wall.id === sourceFace.wallId)?.segments[0]?.id;
+      let retained = ordered.findIndex(
+        (group) =>
+          group.wallId === sourceFace.wallId &&
+          group.bindings.some((binding) => binding.segmentId === primary)
+      );
+      if (retained < 0) retained = ordered.findIndex((group) => group.wallId === sourceFace.wallId);
+      retained = Math.max(0, retained);
+      for (const [index, group] of ordered.entries()) {
+        const part = index === retained ? face : { ...copy(sourceFace), id: createId() };
         part.wallId = group.wallId;
         part.bindings = group.bindings;
         if (sourceFace.freePath) {
@@ -226,7 +365,7 @@ export function splitFacingRows(floor, createId, segmentOwners = new Map(), wall
   }
 }
 
-/** Separate geometric runs without copying observations or opening identities. */
+/** Separate geometric runs while preserving opening identities. */
 export function separatePhysicalWallRuns(floor, wall, createId, selectedIds = null) {
   const selected = selectedIds
     ? new Set(selectedIds)
@@ -244,10 +383,18 @@ export function separatePhysicalWallRuns(floor, wall, createId, selectedIds = nu
       ...copy(wall),
       id: createId(),
       segments: [segment],
+      sides: wall.sides.map((side) => ({ ...copy(side), id: createId() })),
       doors: [],
       windows: [],
-      lineage: { ...copy(wall.lineage), copiedFromWallId: wall.id, jogOriginWallId: origin },
+      lineage: {
+        ...copy(wall.lineage),
+        copiedFromWallId: wall.id,
+        dividedFromWallId: wall.id,
+        jogOriginWallId: origin,
+      },
     };
+    renewBuildingPlanRowIdentities(part, createId);
+    for (const side of part.sides) renewBuildingPlanRowIdentities(side, createId);
     if (part.values.wall_label)
       part.values.wall_label = `${part.values.wall_label}.${created.length + 2}`;
     for (const collection of ['doors', 'windows']) {
@@ -260,13 +407,7 @@ export function separatePhysicalWallRuns(floor, wall, createId, selectedIds = nu
   wall.segments = retained;
   floor.walls.push(...created);
   splitFacingRows(floor, createId, owners, new Set([wall.id]));
-  for (const observation of floor.observations) {
-    if (observation.subject?.id !== wall.id) continue;
-    observation.relatedSubjects = [wall, ...created].map((entry) => ({
-      type: 'wall',
-      id: entry.id,
-    }));
-  }
+
   return created;
 }
 
@@ -285,15 +426,10 @@ export function coalesceFacingRows(floor) {
         kept.push(face);
         continue;
       }
-      remapSubject(floor, face.id, equivalent.id, 'room_face');
+
       const wall = findWall(floor, face.wallId);
       if (wall.referenceFaceId === face.id) wall.referenceFaceId = equivalent.id;
     }
     room.faces = kept;
   }
-  for (const observation of floor.observations)
-    if (observation.relatedSubjects)
-      observation.relatedSubjects = observation.relatedSubjects.filter(
-        (subject) => subject.type !== 'wall' || floor.walls.some((wall) => wall.id === subject.id)
-      );
 }

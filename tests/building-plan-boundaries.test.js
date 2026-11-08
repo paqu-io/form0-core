@@ -1,3 +1,8 @@
+import {
+  originalVertices,
+  originalFaces,
+  openingWorldPositions,
+} from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -8,6 +13,8 @@ import {
   validateBuildingPlanSnapshot,
   BuildingPlanCanvasController,
 } from '../src/index.js';
+import { buildingPlanFootprints } from '../src/building-plan/footprints.js';
+import { pointInPolygon } from '../src/building-plan/geometry.js';
 const fixture = () => {
   const f = createBuildingPlanExample();
   let id = 0;
@@ -23,9 +30,24 @@ const fixture = () => {
 const edit = (f, faceId, distance, extra = {}) =>
   f.session.apply({ type: 'resize_face', floorId: f.floorId, faceId, distance, ...extra });
 function coverage(plan) {
+  const floor = plan.floors[0];
+  const material = buildingPlanFootprints(floor, 1).wallFootprints.flatMap((wall) => wall.polygons);
   for (const room of plan.floors[0].rooms)
     for (let i = 0; i < room.edges.length; i++) {
       const edge = room.edges[i];
+      if (edge.profile) {
+        assert.ok(floor.walls.some((wall) => wall.id === edge.profile.wallId));
+        const a = room.vertices[i],
+          b = room.vertices[(i + 1) % room.vertices.length];
+        for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+          const point = { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
+          assert.ok(
+            material.some((polygon) => pointInPolygon(point, polygon)),
+            'A derived profile must be supplied by physical wall material'
+          );
+        }
+        continue;
+      }
       const intervals = room.faces
         .flatMap((f) => f.bindings.filter((b) => b.edgeId === edge.id).map((b) => b.roomInterval))
         .sort((a, b) => a[0] - b[0]);
@@ -45,7 +67,7 @@ function coverage(plan) {
 test('extending a shared boundary retains full wall coverage, opening position and source observations', () => {
   const f = fixture(),
     before = f.session.getSnapshot();
-  assert.equal(edit(f, before.floors[0].rooms[1].faces[3].id, 3.2).status, 'applied');
+  assert.equal(edit(f, originalFaces(before.floors[0].rooms[1])[3].id, 3.2).status, 'applied');
   const after = f.session.getSnapshot();
   coverage(after);
   assert.deepEqual(validateBuildingPlanSnapshot(after), []);
@@ -61,7 +83,7 @@ test('extending a shared boundary retains full wall coverage, opening position a
 });
 test('the supplied W3/W2 contact sequence establishes sharing and avoids the narrow dent', () => {
   const f = fixture(),
-    right = f.snapshot.floors[0].rooms[0].faces[1].id;
+    right = originalFaces(f.snapshot.floors[0].rooms[0])[1].id;
   for (const [face, distance] of [
     [f.faceA, 0.6],
     [right, -0.4],
@@ -69,15 +91,24 @@ test('the supplied W3/W2 contact sequence establishes sharing and avoids the nar
   ])
     assert.equal(edit(f, face, distance).status, 'applied');
   const aligned = f.session.getSnapshot().floors[0];
-  const a = aligned.rooms[0].faces.find((face) => face.id === right);
-  const b =
-    aligned.rooms[1].faces.find(
-      (face) => aligned.walls.find((w) => w.id === face.wallId).values.wall_label === 'W3.3'
-    ) || aligned.rooms[1].faces.find((face) => face.wallId === a.wallId);
+  const rightOwner = f.snapshot.floors[0].rooms[0].faces.find((face) => face.id === right).wallId;
+  const a = aligned.rooms[0].faces.find((face) => {
+    const wall = aligned.walls.find((wall) => wall.id === face.wallId);
+    return (
+      wall.exposure === 'interior' &&
+      (wall.id === rightOwner || wall.lineage?.splitFromWallId === rightOwner)
+    );
+  });
+  assert.ok(a, 'The contact has a shared physical piece.');
+  const b = aligned.rooms[1].faces.find((face) => face.wallId === a.wallId);
   assert.equal(a.wallId, b.wallId, 'A completed compatible contact must be shared');
-  assert.equal(edit(f, f.faceA, -0.8).status, 'applied');
+  const beforeCrossing = f.session.getSnapshot();
+  const rejected = edit(f, f.faceA, -0.8);
+  assert.equal(rejected.status, 'conflict');
+  assert.ok(rejected.issues.some((issue) => issue.code === 'invalid_room_geometry'));
+  assert.deepEqual(f.session.getSnapshot(), beforeCrossing);
   const after = f.session.getSnapshot();
-  assert.equal(after.floors[0].rooms[1].vertices.length, 6);
+  assert.ok(after.floors[0].walls.every((wall) => wall.segments.length === 1));
   coverage(after);
   assert.deepEqual(validateBuildingPlanSnapshot(after), []);
   const record = writeBuildingPlanRecord({ meta: f.meta, plan: after, record: f.record });
@@ -100,7 +131,7 @@ for (const kind of ['door', 'window'])
       f.session = createBuildingPlanSession({ snapshot: p, properties: f.meta.properties });
     }
     const before = f.session.getSnapshot(),
-      left = before.floors[0].rooms[1].faces[3].id;
+      left = originalFaces(before.floors[0].rooms[1])[3].id;
     const r = edit(f, left, -1);
     assert.equal(r.status, 'conflict');
     assert.equal(r.issues[0].code, 'opening_cut_requires_confirmation');
@@ -111,7 +142,7 @@ for (const kind of ['door', 'window'])
     assert.equal(edit(f, left, -1, { removeOpeningIds: ids }).status, 'applied');
     const after = f.session.getSnapshot();
     assert.equal(after.floors[0].walls.flatMap((w) => [...w.doors, ...w.windows]).length, 0);
-    assert.equal(after.floors[0].rooms[1].vertices[0].x, 4);
+    assert.equal(originalVertices(after.floors[0].rooms[1])[0].x, 4);
     f.session.undo();
     assert.deepEqual(f.session.getSnapshot(), before);
     f.session.redo();
@@ -120,10 +151,10 @@ for (const kind of ['door', 'window'])
 test('an opening wholly outside the edited room remains on the stationary physical wall', () => {
   const f = fixture(),
     before = f.session.getSnapshot();
-  assert.equal(edit(f, before.floors[0].rooms[1].faces[3].id, -1.8).status, 'applied');
+  assert.equal(edit(f, originalFaces(before.floors[0].rooms[1])[3].id, -1.8).status, 'applied');
   assert.deepEqual(
-    f.session.getSnapshot().floors[0].walls.flatMap((w) => w.doors),
-    before.floors[0].walls.flatMap((w) => w.doors)
+    openingWorldPositions(f.session.getSnapshot().floors[0]),
+    openingWorldPositions(before.floors[0])
   );
 });
 test('same-line room snapping resolves both axes without merging physical subjects', () => {
@@ -141,7 +172,7 @@ test('same-line room snapping resolves both axes without merging physical subjec
   });
   assert.equal(snap[0].x, 0);
   assert.equal(snap[0].y, 64);
-  assert.equal(c.getSnapshot().walls.length, 8);
+  assert.equal(c.getSnapshot().walls.length, 10);
   c.dispose();
 });
 
@@ -164,7 +195,7 @@ for (const confirmed of [false, true])
         return confirmed;
       },
     });
-    const face = f.snapshot.floors[0].rooms[1].faces[3].id;
+    const face = originalFaces(f.snapshot.floors[0].rooms[1])[3].id;
     const points = c
       .getSnapshot()
       .walls.find((w) => w.id === face)
@@ -192,7 +223,7 @@ test('a stale opening confirmation cannot accept into a disposed or changed host
         release = resolve;
       }),
   });
-  const face = f.snapshot.floors[0].rooms[1].faces[3].id;
+  const face = originalFaces(f.snapshot.floors[0].rooms[1])[3].id;
   const pending = c.updateWall(
     face,
     c
@@ -206,26 +237,15 @@ test('a stale opening confirmation cannot accept into a disposed or changed host
   await pending;
   assert.equal(writes, 0);
 });
-test('opening observations require the explicit cascade and are restored by the same Undo', () => {
+test('opening removal needs no removed observation cascade and Undo restores the opening', () => {
   const f = fixture();
-  const door = f.session.getSnapshot().floors[0].walls.flatMap((w) => w.doors)[0];
-  assert.equal(
-    f.session.apply({
-      type: 'add_observation',
-      floorId: f.floorId,
-      subject: { type: 'door', id: door.id },
-      observedAt: '2026-11-03',
-      evidence: ['opening-photo'],
-    }).status,
-    'applied'
-  );
-  const before = f.session.getSnapshot(),
-    left = before.floors[0].rooms[1].faces[3].id;
+  const before = f.session.getSnapshot();
+  const left = originalFaces(before.floors[0].rooms[1])[3].id;
   const result = edit(f, left, -1);
-  assert.equal(result.issues[0].observationIds.length, 1);
-  assert.equal(edit(f, left, -1, { removeOpeningIds: [door.id] }).status, 'conflict');
+  assert.equal(result.issues[0].code, 'opening_cut_requires_confirmation');
+  assert.equal(result.issues[0].observationIds, undefined);
   assert.equal(
-    edit(f, left, -1, { removeOpeningIds: [door.id], allowObservationDeletion: true }).status,
+    edit(f, left, -1, { removeOpeningIds: result.issues[0].openingIds }).status,
     'applied'
   );
   f.session.undo();
@@ -235,14 +255,21 @@ test('opening observations require the explicit cascade and are restored by the 
 for (const up of [-0.2, -0.6, -0.8])
   test(`a connected corner handles partial, straight, and reversed return movement (${up})`, () => {
     const f = fixture(),
-      right = f.snapshot.floors[0].rooms[0].faces[1].id;
+      right = originalFaces(f.snapshot.floors[0].rooms[0])[1].id;
     for (const [face, distance] of [
       [f.faceA, 0.6],
       [right, -0.4],
       [right, 0.2],
       [f.faceA, up],
     ]) {
+      const before = f.session.getSnapshot();
       const result = edit(f, face, distance);
+      if (face === f.faceA && distance === up && up <= -0.6) {
+        assert.equal(result.status, 'conflict');
+        assert.equal(result.issues[0].code, 'invalid_room_geometry');
+        assert.deepEqual(f.session.getSnapshot(), before);
+        break;
+      }
       assert.equal(result.status, 'applied', JSON.stringify(result.issues));
     }
     coverage(f.session.getSnapshot());
@@ -301,7 +328,7 @@ test('confirmation cannot overwrite an answer changed while the prompt was open'
         release = resolve;
       }),
   });
-  const face = f.snapshot.floors[0].rooms[1].faces[3].id;
+  const face = originalFaces(f.snapshot.floors[0].rooms[1])[3].id;
   const pending = c.updateWall(
     face,
     c
@@ -326,7 +353,7 @@ test('one precise confirmation can remove both affected openings and restore the
       floorId: f.floorId,
       wallId: wall.id,
       kind: 'window',
-      offset: 3.5,
+      offset: 0.5,
       width: 0.9,
       height: 0.5,
       sillHeight: 2.3,
@@ -334,7 +361,7 @@ test('one precise confirmation can remove both affected openings and restore the
     'applied'
   );
   const before = f.session.getSnapshot(),
-    left = before.floors[0].rooms[1].faces[3].id;
+    left = originalFaces(before.floors[0].rooms[1])[3].id;
   const result = edit(f, left, -1);
   assert.equal(result.issues[0].openingIds.length, 2);
   assert.equal(
@@ -377,7 +404,7 @@ test('an unrelated floor edit cannot offer removal for a pre-existing partial op
     {
       type: 'resize_face',
       floorId: f.floorId,
-      faceId: snapshot.floors[0].rooms[1].faces[3].id,
+      faceId: originalFaces(snapshot.floors[0].rooms[1])[3].id,
       distance: -1,
     },
     {
@@ -387,7 +414,9 @@ test('an unrelated floor edit cannot offer removal for a pre-existing partial op
   );
   const session = createBuildingPlanSession({ snapshot, properties: f.meta.properties });
   const before = session.getSnapshot();
-  assert.equal(session.apply({ type: 'create_floor' }).status, 'applied');
+  const result = session.apply({ type: 'create_floor' });
+  assert.equal(result.status, 'applied');
+  assert.ok(!result.issues.some((issue) => issue.code === 'opening_cut_requires_confirmation'));
   assert.deepEqual(session.getSnapshot().floors[0], before.floors[0]);
 });
 
@@ -410,7 +439,7 @@ test('child cancellation restores confirmed geometry/removal while keeping an ea
   const operation = {
     type: 'resize_face',
     floorId: f.floorId,
-    faceId: f.snapshot.floors[0].rooms[1].faces[3].id,
+    faceId: originalFaces(f.snapshot.floors[0].rooms[1])[3].id,
     distance: -1,
   };
   const conflict = editor.apply(operation, { scopeId: 'wall' });
@@ -444,7 +473,7 @@ test('confirmed removal cannot discard a separately open opening editor', async 
     operation = {
       type: 'resize_face',
       floorId: f.floorId,
-      faceId: f.snapshot.floors[0].rooms[1].faces[3].id,
+      faceId: originalFaces(f.snapshot.floors[0].rooms[1])[3].id,
       distance: -1,
     };
   const issue = editor.apply(operation, { scopeId: 'floor' }).issues[0];
@@ -470,10 +499,10 @@ test('confirmed removal cannot discard a separately open opening editor', async 
 });
 
 for (const up of [-0.2, -0.6, -0.8])
-  test(`grouped physical walls bind their selected run and retain coherent corners (${up})`, () => {
+  test(`local physical pieces preserve contacts and reject crossing a held neighbour (${up})`, () => {
     const f = fixture();
     f.session.setEditingPolicy({ preserveWallGrouping: true });
-    const right = f.snapshot.floors[0].rooms[0].faces[1].id;
+    const right = originalFaces(f.snapshot.floors[0].rooms[0])[1].id;
     for (const [face, distance] of [
       [f.faceA, 0.6],
       [right, -0.4],
@@ -481,7 +510,14 @@ for (const up of [-0.2, -0.6, -0.8])
       [f.faceA, up],
       [f.faceA, 0.1],
     ]) {
+      const before = f.session.getSnapshot();
       const r = edit(f, face, distance);
+      if (face === f.faceA && distance === up && up <= -0.6) {
+        assert.equal(r.status, 'conflict');
+        assert.equal(r.issues[0].code, 'invalid_room_geometry');
+        assert.deepEqual(f.session.getSnapshot(), before);
+        break;
+      }
       assert.equal(r.status, 'applied', JSON.stringify(r.issues));
       const plan = f.session.getSnapshot();
       coverage(plan);
@@ -489,7 +525,7 @@ for (const up of [-0.2, -0.6, -0.8])
       assert.equal(doors.length, 1);
       assert.equal(doors[0].id, f.snapshot.floors[0].walls.flatMap((wall) => wall.doors)[0].id);
       assert.equal(doors[0].width, 0.9);
-      const original = f.snapshot.floors[0].rooms[0].faces[2].bindings[0].segmentId;
+      const original = originalFaces(f.snapshot.floors[0].rooms[0])[2].bindings[0].segmentId;
       assert.ok(
         plan.floors[0].walls.some((wall) =>
           wall.segments.some((segment) => segment.id === original)
@@ -523,7 +559,7 @@ test('captured boundaries cannot bind the wrong side of a physical wall', () => 
   const f = fixture(),
     plan = f.session.getSnapshot(),
     room = plan.floors[0].rooms[0],
-    face = room.faces[0];
+    face = originalFaces(room)[0];
   const wall = plan.floors[0].walls.find((w) => w.id === face.wallId);
   wall.segments[0].start.y += 0.2;
   wall.segments[0].end.y += 0.2;

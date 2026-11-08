@@ -22,6 +22,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       .filter((entry) => captureError(entry) * zoom <= (latch.has(entry.key) ? 13 : 8))
       .sort(
         (a, b) =>
+          Number(Boolean(b.contact)) - Number(Boolean(a.contact)) ||
           Number(latch.has(b.key)) - Number(latch.has(a.key)) ||
           a.error - b.error ||
           a.key.localeCompare(b.key)
@@ -135,6 +136,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         const delta = { x: other.normal.x * difference, y: other.normal.y * difference };
         candidates.push({
           key: `face:${index}:${wall.id}`,
+          contact: overlap >= -8 / zoom,
           error: Math.abs(difference),
           // Opposing inside faces bound the same physical material. Capture contact across
           // that band as well as the usual screen tolerance, even when zoomed in closely.

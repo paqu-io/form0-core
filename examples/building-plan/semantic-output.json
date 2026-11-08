@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "unit": "m",
   "axes": "x-right-y-down",
   "floors": [
@@ -14,6 +14,9 @@
         "floor_height_m": 3,
         "floor_note": "Keep this earlier floor answer"
       },
+      "overrides": {},
+      "providerOverrides": {},
+      "repeatable": {},
       "defaults": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
       "rooms": [
         {
@@ -22,6 +25,12 @@
             { "x": 0, "y": 0, "id": "acceptance-subject-3" },
             { "x": 5, "y": 0, "id": "acceptance-subject-4" },
             { "x": 5, "y": 3, "id": "acceptance-subject-5" },
+            {
+              "x": 3,
+              "y": 3,
+              "id": "acceptance-subject-77",
+              "physicalBoundaryId": "acceptance-subject-76"
+            },
             { "x": 0, "y": 3, "id": "acceptance-subject-6" }
           ],
           "edges": [
@@ -36,8 +45,13 @@
               "endId": "acceptance-subject-5"
             },
             {
-              "id": "acceptance-subject-9",
+              "id": "acceptance-subject-78",
               "startId": "acceptance-subject-5",
+              "endId": "acceptance-subject-77"
+            },
+            {
+              "id": "acceptance-subject-79",
+              "startId": "acceptance-subject-77",
               "endId": "acceptance-subject-6"
             },
             {
@@ -51,14 +65,18 @@
             "room_name": { "choice": [{ "value": "bedroom", "label": "Bedroom" }], "other": [] },
             "room_note": null
           },
+          "overrides": {},
+          "providerOverrides": {},
+          "repeatable": {},
           "faces": [
             {
               "id": "acceptance-subject-12",
               "wallId": "acceptance-subject-11",
+              "sideId": "acceptance-subject-14",
               "bindings": [
                 {
-                  "id": "acceptance-subject-23",
-                  "segmentId": "acceptance-subject-13",
+                  "id": "acceptance-subject-31",
+                  "segmentId": "acceptance-subject-15",
                   "edgeId": "acceptance-subject-7",
                   "interval": [0, 5],
                   "roomInterval": [0, 5],
@@ -69,16 +87,20 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-7"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-15",
-              "wallId": "acceptance-subject-14",
+              "id": "acceptance-subject-17",
+              "wallId": "acceptance-subject-16",
+              "sideId": "acceptance-subject-19",
               "bindings": [
                 {
-                  "id": "acceptance-subject-24",
-                  "segmentId": "acceptance-subject-16",
+                  "id": "acceptance-subject-32",
+                  "segmentId": "acceptance-subject-20",
                   "edgeId": "acceptance-subject-8",
                   "interval": [0, 3],
                   "roomInterval": [0, 3],
@@ -89,36 +111,70 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-8"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-18",
-              "wallId": "acceptance-subject-17",
+              "id": "acceptance-subject-22",
+              "wallId": "acceptance-subject-21",
+              "sideId": "acceptance-subject-24",
               "bindings": [
                 {
-                  "id": "acceptance-subject-25",
-                  "segmentId": "acceptance-subject-19",
-                  "edgeId": "acceptance-subject-9",
-                  "interval": [3, 8],
-                  "roomInterval": [0, 5],
+                  "id": "acceptance-subject-85",
+                  "segmentId": "acceptance-subject-83",
+                  "edgeId": "acceptance-subject-78",
+                  "interval": [0, 2],
+                  "roomInterval": [0, 2],
                   "direction": 1,
                   "side": 1
                 }
               ],
               "overrides": {},
               "values": {},
-              "edgeIds": ["acceptance-subject-9"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "edgeIds": ["acceptance-subject-78"],
+              "lineage": { "editingOriginFaceId": "acceptance-subject-22" },
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-21",
-              "wallId": "acceptance-subject-20",
+              "id": "acceptance-subject-80",
+              "wallId": "acceptance-subject-91",
+              "sideId": "acceptance-subject-93",
               "bindings": [
                 {
-                  "id": "acceptance-subject-26",
-                  "segmentId": "acceptance-subject-22",
+                  "id": "acceptance-subject-86",
+                  "segmentId": "acceptance-subject-84",
+                  "edgeId": "acceptance-subject-79",
+                  "interval": [0, 3],
+                  "roomInterval": [0, 3],
+                  "direction": 1,
+                  "side": 1
+                }
+              ],
+              "overrides": {},
+              "values": {},
+              "edgeIds": ["acceptance-subject-79"],
+              "lineage": { "editingOriginFaceId": "acceptance-subject-22" },
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
+            },
+            {
+              "id": "acceptance-subject-27",
+              "wallId": "acceptance-subject-26",
+              "sideId": "acceptance-subject-29",
+              "bindings": [
+                {
+                  "id": "acceptance-subject-34",
+                  "segmentId": "acceptance-subject-30",
                   "edgeId": "acceptance-subject-10",
                   "interval": [0, 3],
                   "roomInterval": [0, 3],
@@ -129,8 +185,11 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-10"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             }
           ],
           "columns": [],
@@ -138,33 +197,44 @@
           "objects": []
         },
         {
-          "id": "acceptance-subject-27",
+          "id": "acceptance-subject-35",
           "vertices": [
-            { "x": 3, "y": 3.2, "id": "acceptance-subject-28" },
-            { "x": 8, "y": 3.2, "id": "acceptance-subject-29" },
-            { "x": 8, "y": 6.2, "id": "acceptance-subject-30" },
-            { "x": 3, "y": 6.2, "id": "acceptance-subject-31" }
+            { "x": 3, "y": 3.2, "id": "acceptance-subject-36" },
+            {
+              "x": 5,
+              "y": 3.2,
+              "id": "acceptance-subject-70",
+              "physicalBoundaryId": "acceptance-subject-69"
+            },
+            { "x": 8, "y": 3.2, "id": "acceptance-subject-37" },
+            { "x": 8, "y": 6.2, "id": "acceptance-subject-38" },
+            { "x": 3, "y": 6.2, "id": "acceptance-subject-39" }
           ],
           "edges": [
             {
-              "id": "acceptance-subject-32",
-              "startId": "acceptance-subject-28",
-              "endId": "acceptance-subject-29"
+              "id": "acceptance-subject-71",
+              "startId": "acceptance-subject-36",
+              "endId": "acceptance-subject-70"
             },
             {
-              "id": "acceptance-subject-33",
-              "startId": "acceptance-subject-29",
-              "endId": "acceptance-subject-30"
+              "id": "acceptance-subject-72",
+              "startId": "acceptance-subject-70",
+              "endId": "acceptance-subject-37"
             },
             {
-              "id": "acceptance-subject-34",
-              "startId": "acceptance-subject-30",
-              "endId": "acceptance-subject-31"
+              "id": "acceptance-subject-41",
+              "startId": "acceptance-subject-37",
+              "endId": "acceptance-subject-38"
             },
             {
-              "id": "acceptance-subject-35",
-              "startId": "acceptance-subject-31",
-              "endId": "acceptance-subject-28"
+              "id": "acceptance-subject-42",
+              "startId": "acceptance-subject-38",
+              "endId": "acceptance-subject-39"
+            },
+            {
+              "id": "acceptance-subject-43",
+              "startId": "acceptance-subject-39",
+              "endId": "acceptance-subject-36"
             }
           ],
           "defaults": {},
@@ -172,35 +242,69 @@
             "room_name": { "choice": [{ "value": "bedroom", "label": "Bedroom" }], "other": [] },
             "room_note": null
           },
+          "overrides": {},
+          "providerOverrides": {},
+          "repeatable": {},
           "faces": [
             {
-              "id": "acceptance-subject-37",
-              "wallId": "acceptance-subject-17",
+              "id": "acceptance-subject-45",
+              "wallId": "acceptance-subject-21",
+              "sideId": "acceptance-subject-23",
               "bindings": [
                 {
-                  "id": "acceptance-subject-52",
-                  "segmentId": "acceptance-subject-19",
-                  "edgeId": "acceptance-subject-32",
-                  "interval": [0, 5],
-                  "roomInterval": [0, 5],
+                  "id": "acceptance-subject-87",
+                  "segmentId": "acceptance-subject-83",
+                  "edgeId": "acceptance-subject-71",
+                  "interval": [0, 2],
+                  "roomInterval": [0, 2],
                   "direction": -1,
                   "side": -1
                 }
               ],
               "overrides": {},
               "values": {},
-              "edgeIds": ["acceptance-subject-32"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "edgeIds": ["acceptance-subject-71"],
+              "lineage": { "editingOriginFaceId": "acceptance-subject-45" },
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-40",
-              "wallId": "acceptance-subject-39",
+              "id": "acceptance-subject-73",
+              "wallId": "acceptance-subject-88",
+              "sideId": "acceptance-subject-89",
               "bindings": [
                 {
-                  "id": "acceptance-subject-49",
-                  "segmentId": "acceptance-subject-41",
-                  "edgeId": "acceptance-subject-33",
+                  "id": "acceptance-subject-75",
+                  "segmentId": "acceptance-subject-25",
+                  "edgeId": "acceptance-subject-72",
+                  "interval": [0, 3],
+                  "roomInterval": [0, 3],
+                  "direction": -1,
+                  "side": -1
+                }
+              ],
+              "overrides": {},
+              "values": {},
+              "edgeIds": ["acceptance-subject-72"],
+              "lineage": { "editingOriginFaceId": "acceptance-subject-45" },
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
+            },
+            {
+              "id": "acceptance-subject-50",
+              "wallId": "acceptance-subject-49",
+              "sideId": "acceptance-subject-52",
+              "bindings": [
+                {
+                  "id": "acceptance-subject-65",
+                  "segmentId": "acceptance-subject-53",
+                  "edgeId": "acceptance-subject-41",
                   "interval": [0, 3],
                   "roomInterval": [0, 3],
                   "direction": 1,
@@ -209,18 +313,22 @@
               ],
               "overrides": {},
               "values": {},
-              "edgeIds": ["acceptance-subject-33"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "edgeIds": ["acceptance-subject-41"],
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-43",
-              "wallId": "acceptance-subject-42",
+              "id": "acceptance-subject-55",
+              "wallId": "acceptance-subject-54",
+              "sideId": "acceptance-subject-57",
               "bindings": [
                 {
-                  "id": "acceptance-subject-50",
-                  "segmentId": "acceptance-subject-44",
-                  "edgeId": "acceptance-subject-34",
+                  "id": "acceptance-subject-66",
+                  "segmentId": "acceptance-subject-58",
+                  "edgeId": "acceptance-subject-42",
                   "interval": [0, 5],
                   "roomInterval": [0, 5],
                   "direction": 1,
@@ -229,18 +337,22 @@
               ],
               "overrides": {},
               "values": {},
-              "edgeIds": ["acceptance-subject-34"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "edgeIds": ["acceptance-subject-42"],
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             },
             {
-              "id": "acceptance-subject-46",
-              "wallId": "acceptance-subject-45",
+              "id": "acceptance-subject-60",
+              "wallId": "acceptance-subject-59",
+              "sideId": "acceptance-subject-62",
               "bindings": [
                 {
-                  "id": "acceptance-subject-51",
-                  "segmentId": "acceptance-subject-47",
-                  "edgeId": "acceptance-subject-35",
+                  "id": "acceptance-subject-67",
+                  "segmentId": "acceptance-subject-63",
+                  "edgeId": "acceptance-subject-43",
                   "interval": [0, 3],
                   "roomInterval": [0, 3],
                   "direction": 1,
@@ -249,9 +361,12 @@
               ],
               "overrides": {},
               "values": {},
-              "edgeIds": ["acceptance-subject-35"],
-              "properties": { "finish": null },
-              "provenance": { "finish": { "scope": "schema", "mode": "inherit" } }
+              "edgeIds": ["acceptance-subject-43"],
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              }
             }
           ],
           "columns": [],
@@ -262,127 +377,241 @@
       "walls": [
         {
           "id": "acceptance-subject-11",
+          "autoLabel": "W1",
           "referenceFaceId": "acceptance-subject-12",
+          "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-13",
+              "id": "acceptance-subject-15",
               "start": { "x": 0, "y": -0.1 },
               "end": { "x": 5, "y": -0.1 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-              "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+              "referenceOffset": 0.1
             }
           ],
           "overrides": {},
           "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
           "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
+            "wall_height_m": {
               "scope": "floor",
-              "id": "acceptance-subject-1",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
               "mode": "inherit"
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "wall_label": "W1" },
+          "values": {},
           "doors": [],
-          "windows": []
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-13",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-14",
+              "sign": 1,
+              "roomId": "acceptance-subject-2",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
         },
         {
-          "id": "acceptance-subject-14",
-          "referenceFaceId": "acceptance-subject-15",
+          "id": "acceptance-subject-16",
+          "autoLabel": "W2",
+          "referenceFaceId": "acceptance-subject-17",
+          "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-16",
+              "id": "acceptance-subject-20",
               "start": { "x": 5.1, "y": 0 },
               "end": { "x": 5.1, "y": 3 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-              "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+              "referenceOffset": 0.1
             }
           ],
           "overrides": {},
           "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
           "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
+            "wall_height_m": {
               "scope": "floor",
-              "id": "acceptance-subject-1",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
               "mode": "inherit"
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "wall_label": "W2" },
+          "values": {},
           "doors": [],
-          "windows": []
-        },
-        {
-          "id": "acceptance-subject-17",
-          "referenceFaceId": "acceptance-subject-18",
-          "segments": [
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-18",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
             {
               "id": "acceptance-subject-19",
-              "start": { "x": 8, "y": 3.1 },
-              "end": { "x": 0, "y": 3.1 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+              "sign": 1,
+              "roomId": "acceptance-subject-2",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
               "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
+        },
+        {
+          "id": "acceptance-subject-88",
+          "autoLabel": "W3.1",
+          "referenceFaceId": "acceptance-subject-73",
+          "providerOverrides": {},
+          "segments": [
+            {
+              "id": "acceptance-subject-25",
+              "start": { "x": 8, "y": 3.1 },
+              "end": { "x": 5, "y": 3.1 },
+              "referenceOffset": 0.1
             }
           ],
           "overrides": {},
           "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
           "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
+            "wall_height_m": {
               "scope": "floor",
-              "id": "acceptance-subject-1",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
               "mode": "inherit"
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "wall_label": "W3" },
+          "values": {},
+          "doors": [],
+          "windows": [],
+          "lineage": {
+            "mergedWallIds": ["acceptance-subject-44"],
+            "splitFromWallId": "acceptance-subject-21",
+            "dividedFromWallId": "acceptance-subject-21",
+            "automaticDivision": "adjacency"
+          },
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-89",
+              "sign": -1,
+              "roomId": "acceptance-subject-35",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-90",
+              "sign": 1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
+        },
+        {
+          "id": "acceptance-subject-21",
+          "autoLabel": "W3",
+          "referenceFaceId": "acceptance-subject-22",
+          "providerOverrides": {},
+          "segments": [
+            {
+              "id": "acceptance-subject-83",
+              "start": { "x": 5, "y": 3.1 },
+              "end": { "x": 3, "y": 3.1 },
+              "referenceOffset": 0.1
+            }
+          ],
+          "overrides": {},
+          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+          "provenance": {
+            "wall_height_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
+          },
+          "values": {},
           "doors": [
             {
-              "id": "acceptance-subject-53",
+              "id": "acceptance-subject-94",
               "type": "door",
-              "segmentId": "acceptance-subject-19",
-              "offset": 3.5,
+              "segmentId": "acceptance-subject-83",
+              "offset": 0.5,
               "width": 0.9,
               "height": 2,
               "sillHeight": null,
@@ -390,203 +619,380 @@
                 "door_label": "Shared door",
                 "door_width_m": 0.9,
                 "door_height_m": 2,
-                "door_offset_m": 3.5
-              }
+                "door_offset_m": 0.5
+              },
+              "overrides": {},
+              "providerOverrides": {},
+              "repeatable": {}
             }
           ],
           "windows": [],
-          "lineage": { "mergedWallIds": ["acceptance-subject-36"] }
+          "lineage": {
+            "mergedWallIds": ["acceptance-subject-44"],
+            "splitFromWallId": "acceptance-subject-21",
+            "dividedFromWallId": "acceptance-subject-21",
+            "automaticDivision": "adjacency"
+          },
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-23",
+              "sign": -1,
+              "roomId": "acceptance-subject-35",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-24",
+              "sign": 1,
+              "roomId": "acceptance-subject-2",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "interior"
         },
         {
-          "id": "acceptance-subject-20",
-          "referenceFaceId": "acceptance-subject-21",
+          "id": "acceptance-subject-91",
+          "autoLabel": "W3.2",
+          "referenceFaceId": "acceptance-subject-80",
+          "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-22",
+              "id": "acceptance-subject-84",
+              "start": { "x": 3, "y": 3.1 },
+              "end": { "x": 0, "y": 3.1 },
+              "referenceOffset": 0.1
+            }
+          ],
+          "overrides": {},
+          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+          "provenance": {
+            "wall_height_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
+          },
+          "values": {},
+          "doors": [],
+          "windows": [],
+          "lineage": {
+            "mergedWallIds": ["acceptance-subject-44"],
+            "splitFromWallId": "acceptance-subject-21",
+            "dividedFromWallId": "acceptance-subject-21",
+            "automaticDivision": "adjacency"
+          },
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-92",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-93",
+              "sign": 1,
+              "roomId": "acceptance-subject-2",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
+        },
+        {
+          "id": "acceptance-subject-26",
+          "autoLabel": "W4",
+          "referenceFaceId": "acceptance-subject-27",
+          "providerOverrides": {},
+          "segments": [
+            {
+              "id": "acceptance-subject-30",
               "start": { "x": -0.1, "y": 3 },
               "end": { "x": -0.1, "y": 0 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-              "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+              "referenceOffset": 0.1
             }
           ],
           "overrides": {},
           "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
           "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
+            "wall_height_m": {
               "scope": "floor",
-              "id": "acceptance-subject-1",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
               "mode": "inherit"
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "wall_label": "W4" },
+          "values": {},
           "doors": [],
-          "windows": []
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-28",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-29",
+              "sign": 1,
+              "roomId": "acceptance-subject-2",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
         },
         {
-          "id": "acceptance-subject-39",
-          "referenceFaceId": "acceptance-subject-40",
+          "id": "acceptance-subject-49",
+          "autoLabel": "W6",
+          "referenceFaceId": "acceptance-subject-50",
+          "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-41",
+              "id": "acceptance-subject-53",
               "start": { "x": 8.1, "y": 3.2 },
               "end": { "x": 8.1, "y": 6.2 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-              "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+              "referenceOffset": 0.1
             }
           ],
           "overrides": {},
           "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
           "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
+            "wall_height_m": {
               "scope": "floor",
-              "id": "acceptance-subject-1",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
               "mode": "inherit"
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "wall_label": "W5" },
+          "values": {},
           "doors": [],
-          "windows": []
-        },
-        {
-          "id": "acceptance-subject-42",
-          "referenceFaceId": "acceptance-subject-43",
-          "segments": [
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
             {
-              "id": "acceptance-subject-44",
-              "start": { "x": 8, "y": 6.3 },
-              "end": { "x": 3, "y": 6.3 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+              "id": "acceptance-subject-51",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
               "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
-            }
-          ],
-          "overrides": {},
-          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-          "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
-              "scope": "floor",
-              "id": "acceptance-subject-1",
-              "mode": "inherit"
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
             },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-          },
-          "values": { "wall_label": "W6" },
-          "doors": [],
-          "windows": []
-        },
-        {
-          "id": "acceptance-subject-45",
-          "referenceFaceId": "acceptance-subject-46",
-          "segments": [
             {
-              "id": "acceptance-subject-47",
-              "start": { "x": 2.9, "y": 6.2 },
-              "end": { "x": 2.9, "y": 3.2 },
-              "referenceOffset": 0.1,
-              "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+              "id": "acceptance-subject-52",
+              "sign": 1,
+              "roomId": "acceptance-subject-35",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
               "provenance": {
-                "wall_height_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "wall_thickness_m": {
-                  "scope": "floor",
-                  "id": "acceptance-subject-1",
-                  "mode": "inherit"
-                },
-                "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-              }
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
             }
           ],
-          "overrides": {},
-          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
-          "provenance": {
-            "wall_height_m": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" },
-            "wall_thickness_m": {
-              "scope": "floor",
-              "id": "acceptance-subject-1",
-              "mode": "inherit"
-            },
-            "material": { "scope": "floor", "id": "acceptance-subject-1", "mode": "inherit" }
-          },
-          "values": { "wall_label": "W7" },
-          "doors": [],
-          "windows": []
-        }
-      ],
-      "observations": [
+          "exposure": "exterior"
+        },
         {
           "id": "acceptance-subject-54",
-          "subject": { "type": "room_face", "id": "acceptance-subject-18" },
-          "observedAt": "2026-11-02",
-          "coverage": { "interval": [3, 5], "unit": "m" },
-          "method": null,
-          "evidence": ["fixture-photo-reference"],
-          "sourceSubject": { "type": "room_face", "id": "acceptance-subject-18" },
-          "sourceGeometry": {
-            "basis": "accepted_layout",
-            "portions": [
-              {
-                "id": "acceptance-subject-25",
-                "segmentId": "acceptance-subject-19",
-                "edgeId": "acceptance-subject-9",
-                "interval": [3, 8],
-                "roomInterval": [0, 5],
-                "direction": 1,
-                "side": 1,
-                "start": { "x": 5, "y": 3 },
-                "end": { "x": 0, "y": 3 },
-                "roomId": "acceptance-subject-2",
-                "wallId": "acceptance-subject-17",
-                "faceId": "acceptance-subject-18"
-              }
-            ]
+          "autoLabel": "W7",
+          "referenceFaceId": "acceptance-subject-55",
+          "providerOverrides": {},
+          "segments": [
+            {
+              "id": "acceptance-subject-58",
+              "start": { "x": 8, "y": 6.3 },
+              "end": { "x": 3, "y": 6.3 },
+              "referenceOffset": 0.1
+            }
+          ],
+          "overrides": {},
+          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+          "provenance": {
+            "wall_height_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
           },
-          "values": { "measured_thickness": 0.19 }
+          "values": {},
+          "doors": [],
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-56",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-57",
+              "sign": 1,
+              "roomId": "acceptance-subject-35",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
+        },
+        {
+          "id": "acceptance-subject-59",
+          "autoLabel": "W8",
+          "referenceFaceId": "acceptance-subject-60",
+          "providerOverrides": {},
+          "segments": [
+            {
+              "id": "acceptance-subject-63",
+              "start": { "x": 2.9, "y": 6.2 },
+              "end": { "x": 2.9, "y": 3.2 },
+              "referenceOffset": 0.1
+            }
+          ],
+          "overrides": {},
+          "properties": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+          "provenance": {
+            "wall_height_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "wall_thickness_m": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [],
+              "mode": "inherit"
+            },
+            "material": { "scope": "schema", "mode": "inherit" }
+          },
+          "values": {},
+          "doors": [],
+          "windows": [],
+          "lineage": {},
+          "repeatable": {},
+          "sides": [
+            {
+              "id": "acceptance-subject-61",
+              "sign": -1,
+              "roomId": null,
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            },
+            {
+              "id": "acceptance-subject-62",
+              "sign": 1,
+              "roomId": "acceptance-subject-35",
+              "overrides": {},
+              "values": {},
+              "properties": { "finish": null, "measured_thickness": null },
+              "provenance": {
+                "finish": { "scope": "schema", "mode": "inherit" },
+                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+              },
+              "repeatable": {}
+            }
+          ],
+          "exposure": "exterior"
         }
       ]
     }

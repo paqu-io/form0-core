@@ -1,3 +1,5 @@
+import { providerApplies } from './inheritance.js';
+import { reconcileWallLabels } from './wall-labels.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { expandBuildingPlanSchema } from '../schema/building-plan-expander.js';
 import { getBuildingPlanMetadata } from './metadata.js';
@@ -9,7 +11,6 @@ import {
   validateBuildingPlanSnapshot,
 } from './model.js';
 import { at, distance, project, segmentFrame, roomBounds } from './geometry.js';
-import { portionThicknessState } from './portion-properties.js';
 
 const metadataFor = (options) => {
   if (options.meta) return options.meta;
@@ -47,7 +48,7 @@ function decode(value, name) {
   } catch {
     throw new TypeError(`Invalid BuildingPlan ${name} JSON.`);
   }
-  if (!result || result.version !== 1 || typeof result.id !== 'string')
+  if (!result || result.version !== 2 || typeof result.id !== 'string')
     throw new TypeError(
       `BuildingPlan ${name} requires a versioned model identity. Existing development payloads are not migrated.`
     );
@@ -61,12 +62,12 @@ function geometry(value, name) {
   } catch {
     throw new TypeError(`Invalid BuildingPlan ${name} geometry JSON.`);
   }
-  if (!result || result.version !== 1 || result.unit !== 'meters')
+  if (!result || result.version !== 2 || result.unit !== 'meters')
     throw new TypeError(`BuildingPlan ${name} requires versioned metric geometry.`);
   return result;
 }
 
-const encode = (value) => JSON.stringify({ version: 1, ...value });
+const encode = (value) => JSON.stringify({ version: 2, ...value });
 function modelOf(meta, node, row) {
   const storage = nodeFor(meta, node).fields.find((entry) => entry.binding?.role === 'storage');
   return decode(row.values?.[storage.dataName], node);
@@ -76,7 +77,8 @@ function plainValues(meta, node, row) {
   const result = {};
   for (const entry of nodeFor(meta, node).fields || []) {
     if (entry.type === 'CalculatedField') continue;
-    if (entry.binding && !['value', 'calculation'].includes(entry.binding.role)) continue;
+    if (entry.binding && !['value', 'calculation', 'provider'].includes(entry.binding.role))
+      continue;
     if (own(row.values, entry.dataName))
       result[entry.originalDataName] = copy(row.values[entry.dataName]);
   }
@@ -84,12 +86,23 @@ function plainValues(meta, node, row) {
 }
 
 function readDefaults(meta, node, row, model) {
-  const result = {};
+  const result = copy(model.defaultValues || {});
   for (const entry of nodeFor(meta, node).fields.filter(
     (field) => field.binding?.role === 'default'
   ))
     if (model.defaultProperties?.includes(entry.binding.property))
       result[entry.binding.property] = copy(row.values[entry.dataName]);
+  return result;
+}
+
+function readProviders(meta, node, row, model) {
+  const result = {};
+  for (const name of model.providerProperties || []) {
+    const field = nodeFor(meta, node).fieldsByOriginalDataName[name];
+    if (!field || field.binding?.role !== 'provider')
+      throw new TypeError('BuildingPlan provider metadata must reference declared source fields.');
+    result[name] = copy(row.values?.[field.dataName] ?? null);
+  }
   return result;
 }
 
@@ -103,6 +116,60 @@ function readOverrides(meta, node, row, model) {
   return result;
 }
 
+const intent = (subject) => ({
+  overrideProperties: Object.keys(subject.overrides || {}),
+  providerProperties: Object.keys(subject.providerOverrides || {}),
+});
+function unpackCustom(entries, row) {
+  const target = { ...copy(row), values: {}, repeatable: {} };
+  for (const entry of entries) {
+    if (entry.type === 'RepeatableSection')
+      target.repeatable[entry.originalDataName] = (row.repeatable?.[entry.preferredKey] || []).map(
+        (child) => unpackCustom(entry.children || [], child)
+      );
+    else if (own(row.values, entry.dataName))
+      target.values[entry.originalDataName] = copy(row.values[entry.dataName]);
+  }
+  return target;
+}
+function packCustom(entries, row) {
+  const target = { ...copy(row), values: {}, repeatable: {} };
+  for (const entry of entries) {
+    if (entry.type === 'RepeatableSection')
+      target.repeatable[entry.preferredKey] = (row.repeatable?.[entry.originalDataName] || []).map(
+        (child) => packCustom(entry.children || [], child)
+      );
+    else
+      target.values[entry.dataName] = copy(
+        row.values?.[entry.originalDataName] ?? entry.field.default_value ?? null
+      );
+  }
+  return target;
+}
+function readCustom(meta, node, row) {
+  return Object.fromEntries(
+    nodeFor(meta, node)
+      .fields.filter(
+        (entry) => entry.type === 'RepeatableSection' && entry.binding?.role !== 'projection'
+      )
+      .map((entry) => [
+        entry.originalDataName,
+        (row.repeatable?.[entry.preferredKey] || []).map((child) =>
+          unpackCustom(entry.children || [], child)
+        ),
+      ])
+  );
+}
+function writeCustom(meta, node, row, subject) {
+  row.repeatable ||= {};
+  for (const entry of nodeFor(meta, node).fields.filter(
+    (entry) => entry.type === 'RepeatableSection' && entry.binding?.role !== 'projection'
+  ))
+    row.repeatable[entry.preferredKey] = (subject.repeatable?.[entry.originalDataName] || []).map(
+      (child) => packCustom(entry.children || [], child)
+    );
+}
+
 /** Read the canonical floor-owned physical records, never the room-side mirrors. */
 export function readBuildingPlanRecord(options) {
   const meta = metadataFor(options);
@@ -113,10 +180,12 @@ export function readBuildingPlanRecord(options) {
     const floor = {
       id: model.id,
       values: plainValues(meta, 'floors', row),
+      overrides: readOverrides(meta, 'floors', row, model),
+      providerOverrides: readProviders(meta, 'floors', row, model),
+      repeatable: readCustom(meta, 'floors', row),
       defaults: readDefaults(meta, 'floors', row, model),
       rooms: [],
       walls: [],
-      observations: [],
     };
     snapshot.floors.push(floor);
     for (const wallRow of rows(meta, 'physical_walls', row)) {
@@ -124,7 +193,9 @@ export function readBuildingPlanRecord(options) {
       const shape = geometry(read(meta, 'physical_walls', wallRow, 'wall_geometry'), 'wall');
       const wall = {
         id: state.id,
+        ...(state.autoLabel ? { autoLabel: state.autoLabel } : {}),
         referenceFaceId: state.referenceFaceId,
+        providerOverrides: readProviders(meta, 'physical_walls', wallRow, state),
         segments: copy(shape.segments),
         overrides: readOverrides(meta, 'physical_walls', wallRow, state),
         properties: {},
@@ -133,7 +204,23 @@ export function readBuildingPlanRecord(options) {
         doors: [],
         windows: [],
       };
+      if (state.autoLabel != null && wall.values.wall_label === state.autoLabel)
+        delete wall.values.wall_label;
       if (state.lineage) wall.lineage = copy(state.lineage);
+      wall.repeatable = readCustom(meta, 'physical_walls', wallRow);
+      wall.sides = rows(meta, 'wall_sides', wallRow).map((sideRow) => {
+        const side = modelOf(meta, 'wall_sides', sideRow);
+        const sideIdentity = { id: side.id, sign: side.sign, roomId: side.roomId };
+        return {
+          ...sideIdentity,
+          overrides: readOverrides(meta, 'wall_sides', sideRow, side),
+          values: plainValues(meta, 'wall_sides', sideRow),
+          properties: {},
+          provenance: {},
+          repeatable: readCustom(meta, 'wall_sides', sideRow),
+        };
+      });
+      wall.exposure = wall.sides.every((side) => side.roomId) ? 'interior' : 'exterior';
       floor.walls.push(wall);
       for (const collection of ['doors', 'windows'])
         for (const openingRow of rows(meta, collection, wallRow)) {
@@ -151,6 +238,9 @@ export function readBuildingPlanRecord(options) {
                 ? read(meta, collection, openingRow, 'window_distance_from_floor_m')
                 : null,
             values: plainValues(meta, collection, openingRow),
+            overrides: readOverrides(meta, collection, openingRow, state),
+            providerOverrides: readProviders(meta, collection, openingRow, state),
+            repeatable: readCustom(meta, collection, openingRow),
             ...(state.provenance ? { provenance: copy(state.provenance) } : {}),
           });
         }
@@ -164,6 +254,9 @@ export function readBuildingPlanRecord(options) {
         edges: copy(state.edges),
         defaults: readDefaults(meta, 'rooms', roomRow, state),
         values: plainValues(meta, 'rooms', roomRow),
+        overrides: readOverrides(meta, 'rooms', roomRow, state),
+        providerOverrides: readProviders(meta, 'rooms', roomRow, state),
+        repeatable: readCustom(meta, 'rooms', roomRow),
         faces: [],
         columns: [],
         beams: [],
@@ -175,6 +268,7 @@ export function readBuildingPlanRecord(options) {
         const face = {
           id: state.id,
           wallId: state.wallId,
+          sideId: state.sideId,
           bindings: copy(state.bindings),
           overrides: readOverrides(meta, 'walls', faceRow, state),
           values: plainValues(meta, 'walls', faceRow),
@@ -189,16 +283,25 @@ export function readBuildingPlanRecord(options) {
           room[collection].push({
             ...copy(state),
             values: plainValues(meta, collection, elementRow),
+            overrides: readOverrides(meta, collection, elementRow, state),
+            repeatable: readCustom(meta, collection, elementRow),
           });
           const element = room[collection].at(-1);
           delete element.version;
+          delete element.overrideProperties;
+          delete element.providerProperties;
+          delete element.defaultProperties;
           const bounds = roomBounds(room);
           const location = (uName, vName) => {
             const u = read(meta, collection, elementRow, uName),
               v = read(meta, collection, elementRow, vName);
-            return u == null || v == null
-              ? null
-              : { x: bounds.x + u * bounds.width, y: bounds.y + v * bounds.height };
+            if (u == null || v == null) {
+              // Preserve a partially captured coordinate without inventing the other axis.
+              if (u != null) element.values[uName] = copy(u);
+              if (v != null) element.values[vName] = copy(v);
+              return null;
+            }
+            return { x: bounds.x + u * bounds.width, y: bounds.y + v * bounds.height };
           };
           if (collection === 'columns') {
             element.position = location('column_center_u', 'column_center_v');
@@ -212,16 +315,11 @@ export function readBuildingPlanRecord(options) {
           }
         }
     }
-    for (const observationRow of rows(meta, 'observations', row)) {
-      const state = modelOf(meta, 'observations', observationRow);
-      delete state.version;
-      floor.observations.push({
-        ...state,
-        values: plainValues(meta, 'observations', observationRow),
-      });
-    }
   }
-  const issues = reconcileBuildingPlanProperties(snapshot, meta.properties);
+  const issues = [
+    ...reconcileBuildingPlanProperties(snapshot, meta.properties),
+    ...validateBuildingPlanSnapshot(snapshot),
+  ];
   if (issues.length) {
     const error = new TypeError(issues[0].message);
     error.issues = issues;
@@ -254,7 +352,8 @@ function writeModel(meta, node, row, model) {
 function writePlain(meta, node, row, values) {
   for (const entry of nodeFor(meta, node).fields || []) {
     if (entry.type === 'CalculatedField') continue;
-    if (entry.binding && !['value', 'calculation'].includes(entry.binding.role)) continue;
+    if (entry.binding && !['value', 'calculation', 'provider'].includes(entry.binding.role))
+      continue;
     if (own(values, entry.originalDataName))
       row.values[entry.dataName] = copy(values[entry.originalDataName]);
     else if (!own(row.values, entry.dataName))
@@ -281,13 +380,16 @@ function writeProperties(meta, node, row, subject) {
   for (const entry of nodeFor(meta, node).fields.filter(
     (field) => field.binding?.role === 'property'
   ))
-    row.values[entry.dataName] = copy(subject.properties[entry.binding.property] ?? null);
+    row.values[entry.dataName] = copy(subject.properties?.[entry.binding.property] ?? null);
 }
 
 function writeOpening(meta, node, row, opening, wall) {
   const prefix = node === 'doors' ? 'door' : 'window';
   writePlain(meta, node, row, opening.values);
+  writeProperties(meta, node, row, opening);
+  writeCustom(meta, node, row, opening);
   writeModel(meta, node, row, {
+    ...intent(opening),
     id: opening.id,
     segmentId: opening.segmentId,
     ...(opening.provenance ? { provenance: opening.provenance } : {}),
@@ -316,6 +418,7 @@ function writeOpening(meta, node, row, opening, wall) {
 export function writeBuildingPlanRecord(options) {
   const meta = metadataFor(options);
   const plan = copy(options.plan);
+  for (const floor of plan.floors || []) reconcileWallLabels(floor);
   const createRowId = options.createRowId || generateUuidV7;
   const problems = [
     ...reconcileBuildingPlanProperties(plan, meta.properties),
@@ -332,24 +435,48 @@ export function writeBuildingPlanRecord(options) {
   record.repeatable[keyFor(meta, 'floors')] = plan.floors.map((floor) => {
     const row = makeRow(oldFloors.get(floor.id), createRowId);
     writePlain(meta, 'floors', row, floor.values);
+    writeProperties(meta, 'floors', row, floor);
+    writeCustom(meta, 'floors', row, floor);
     writeDefaults(meta, 'floors', row, floor, floor);
     writeModel(meta, 'floors', row, {
+      ...intent(floor),
       id: floor.id,
       defaultProperties: Object.keys(floor.defaults),
+      defaultValues: copy(floor.defaults),
     });
     const oldWalls = previousBySubject(meta, 'physical_walls', row);
     row.repeatable[keyFor(meta, 'physical_walls')] = floor.walls.map((wall, index) => {
       const target = makeRow(oldWalls.get(wall.id), createRowId);
-      writePlain(meta, 'physical_walls', target, { wall_label: `W${index + 1}`, ...wall.values });
+      writePlain(meta, 'physical_walls', target, {
+        wall_label: wall.autoLabel || `W${index + 1}`,
+        ...wall.values,
+      });
       writeProperties(meta, 'physical_walls', target, wall);
+      writeCustom(meta, 'physical_walls', target, wall);
+      const oldSides = previousBySubject(meta, 'wall_sides', target);
+      target.repeatable[keyFor(meta, 'wall_sides')] = wall.sides.map((side) => {
+        const entry = makeRow(oldSides.get(side.id), createRowId);
+        writePlain(meta, 'wall_sides', entry, side.values);
+        writeProperties(meta, 'wall_sides', entry, side);
+        writeCustom(meta, 'wall_sides', entry, side);
+        writeModel(meta, 'wall_sides', entry, {
+          ...intent(side),
+          id: side.id,
+          sign: side.sign,
+          roomId: side.roomId,
+        });
+        return entry;
+      });
       write(
         meta,
         'physical_walls',
         target,
         'wall_geometry',
-        JSON.stringify({ version: 1, unit: 'meters', segments: wall.segments })
+        JSON.stringify({ version: 2, unit: 'meters', segments: wall.segments })
       );
       writeModel(meta, 'physical_walls', target, {
+        ...intent(wall),
+        autoLabel: wall.autoLabel,
         id: wall.id,
         referenceFaceId: wall.referenceFaceId,
         overrideProperties: Object.keys(wall.overrides),
@@ -369,18 +496,22 @@ export function writeBuildingPlanRecord(options) {
     row.repeatable[keyFor(meta, 'rooms')] = floor.rooms.map((room) => {
       const target = makeRow(oldRooms.get(room.id), createRowId);
       writePlain(meta, 'rooms', target, room.values);
+      writeProperties(meta, 'rooms', target, room);
+      writeCustom(meta, 'rooms', target, room);
       writeDefaults(meta, 'rooms', target, room, floor);
       writeModel(meta, 'rooms', target, {
+        ...intent(room),
         id: room.id,
         edges: room.edges,
         defaultProperties: Object.keys(room.defaults),
+        defaultValues: copy(room.defaults),
       });
       write(
         meta,
         'rooms',
         target,
         'room_vertices',
-        JSON.stringify({ version: 1, unit: 'meters', vertices: room.vertices })
+        JSON.stringify({ version: 2, unit: 'meters', vertices: room.vertices })
       );
       const oldFaces = previousBySubject(meta, 'walls', target);
       target.repeatable[keyFor(meta, 'walls')] = room.faces.map((face) => {
@@ -390,6 +521,7 @@ export function writeBuildingPlanRecord(options) {
         writeModel(meta, 'walls', entry, {
           id: face.id,
           wallId: face.wallId,
+          sideId: face.sideId,
           bindings: face.bindings,
           overrideProperties: Object.keys(face.overrides),
           ...Object.fromEntries(
@@ -437,7 +569,17 @@ export function writeBuildingPlanRecord(options) {
                 element.start && element.end ? distance(element.start, element.end) : null,
             });
           writePlain(meta, collection, entry, presented);
-          const { values, ...state } = element;
+          writeProperties(meta, collection, entry, element);
+          writeCustom(meta, collection, entry, element);
+          for (const [name, value] of Object.entries(presented))
+            if (
+              ['derived', 'geometry'].includes(
+                nodeFor(meta, collection).fieldsByOriginalDataName[name]?.binding?.role
+              )
+            )
+              write(meta, collection, entry, name, value);
+          const { values, repeatable, properties, provenance, overrides, ...state } = element;
+          Object.assign(state, intent(element));
           if (collection !== 'objects')
             for (const attribute of ['position', 'start', 'end', 'width', 'height', 'length'])
               delete state[attribute];
@@ -447,87 +589,156 @@ export function writeBuildingPlanRecord(options) {
       }
       return target;
     });
-    const previous = previousBySubject(meta, 'observations', row);
-    row.repeatable[keyFor(meta, 'observations')] = floor.observations.map((observation) => {
-      const entry = makeRow(previous.get(observation.id), createRowId);
-      const { values, ...state } = observation;
-      writeModel(meta, 'observations', entry, state);
-      writePlain(meta, 'observations', entry, values);
-      return entry;
-    });
     return row;
   });
   refreshBuildingPlanProjections({ meta, record });
   return record;
 }
 
-function projectedThickness(meta, cache, wall, face) {
-  if (!cache.has(wall))
-    cache.set(wall, {
-      segments: geometry(read(meta, 'physical_walls', wall, 'wall_geometry'), 'wall').segments,
-      properties: { wall_thickness_m: read(meta, 'physical_walls', wall, 'wall_thickness_m') },
-    });
-  return portionThicknessState(cache.get(wall), face);
+/** Project only from canonical owners. A room editor never supplies outside-surface context. */
+function sourceFor(meta, wall, state, binding) {
+  if (binding.sourceNode !== 'wall_sides') return wall;
+  const current = rows(meta, 'wall_sides', wall)
+    .map((row) => modelOf(meta, 'wall_sides', row))
+    .find((side) => side.id === state.sideId);
+  return rows(meta, 'wall_sides', wall).find((row) => {
+    const side = modelOf(meta, 'wall_sides', row);
+    return binding.outside
+      ? side.id !== current?.id && (!side.roomId || side.roomId === current?.roomId)
+      : side.id === state.sideId;
+  });
 }
 
-/** Read-only joins used by engines/editors; these mirrors are excluded from persistence. */
+function projectRow(entries, source, previous = source, links = null) {
+  const target = { ...copy(previous), values: {}, repeatable: {} };
+  const references = new Map();
+  for (const entry of entries) {
+    const sourceName = entry.binding?.sourceDataName || entry.sourceDataName;
+    if (entry.type === 'RepeatableSection') {
+      target.repeatable[entry.preferredKey] = (source?.repeatable?.[sourceName] || []).map((row) =>
+        projectRow(entry.children || [], row, row, links)
+      );
+    } else {
+      target.values[entry.dataName] = copy(source?.values?.[sourceName] ?? null);
+      if (source) references.set(entry.dataName, { record: source, fieldName: sourceName });
+    }
+  }
+  if (links) links.set(target, references);
+  return target;
+}
+
 export function refreshBuildingPlanProjections(options) {
-  const meta = metadataFor(options);
-  const record = options.record;
-  const thicknessCache = new WeakMap();
+  const meta = metadataFor(options),
+    record = options.record;
   for (const floor of ownerRecords(meta, record).flatMap((owner) => rows(meta, 'floors', owner))) {
     const walls = previousBySubject(meta, 'physical_walls', floor);
-    const observations = rows(meta, 'observations', floor);
+    const roomsById = previousBySubject(meta, 'rooms', floor);
+    const conditionFields = Object.fromEntries(
+      meta.repeatables.flatMap((node) =>
+        node.fields.flatMap((entry) => [
+          [entry.originalKey, { ...entry.field, data_name: entry.originalDataName }],
+          [entry.originalDataName, { ...entry.field, data_name: entry.originalDataName }],
+        ])
+      )
+    );
+    const contextValues = (node, row) =>
+      row
+        ? Object.fromEntries(
+            nodeFor(meta, node)
+              .fields.filter((entry) => entry.type !== 'RepeatableSection')
+              .map((entry) => [entry.originalDataName, copy(row.values?.[entry.dataName])])
+          )
+        : {};
+    const flags = (node, row, wall, sideRow = null, only = null) => {
+      const side = sideRow && modelOf(meta, 'wall_sides', sideRow),
+        room = side?.roomId && roomsById.get(side.roomId);
+      const context = {
+        floor: { values: contextValues('floors', floor) },
+        room: room ? { values: contextValues('rooms', room) } : null,
+        wall: {
+          exposure: rows(meta, 'wall_sides', wall).every(
+            (row) => modelOf(meta, 'wall_sides', row).roomId
+          )
+            ? 'interior'
+            : 'exterior',
+        },
+        side,
+      };
+      for (const entry of nodeFor(meta, node).fields) {
+        if (entry.binding?.contextNode === 'rooms')
+          row.values[entry.dataName] = copy(
+            room?.values?.[fieldFor(meta, 'rooms', entry.binding.contextOriginalDataName)] ?? null
+          );
+        if (!entry.binding?.applicabilityFor || (only && entry.dataName !== only)) continue;
+        const field = nodeFor(meta, node).fieldsByOriginalDataName[entry.binding.applicabilityFor];
+        const source = {
+          values: { ...contextValues('physical_walls', wall), ...contextValues(node, row) },
+        };
+        row.values[entry.dataName] =
+          (!field.binding?.outside || Boolean(sideRow)) &&
+          providerApplies(
+            { applies_to: field.binding?.applies_to, conditionFields },
+            context,
+            source
+          )
+            ? 1
+            : 0;
+      }
+    };
+    for (const wall of walls.values()) {
+      flags('physical_walls', wall, wall);
+      for (const side of rows(meta, 'wall_sides', wall)) flags('wall_sides', side, wall, side);
+    }
     for (const room of rows(meta, 'rooms', floor))
       for (const face of rows(meta, 'walls', room)) {
-        const state = modelOf(meta, 'walls', face);
-        const wall = walls.get(state.wallId);
+        const state = modelOf(meta, 'walls', face),
+          wall = walls.get(state.wallId);
         if (!wall) continue;
-        const thickness = projectedThickness(meta, thicknessCache, wall, state);
         for (const field of nodeFor(meta, 'walls').fields.filter(
           (entry) => entry.binding?.role === 'projection'
-        ))
-          face.values[field.dataName] = copy(
-            thickness && field.binding.property === 'wall_thickness_m'
-              ? thickness.value
-              : (wall.values[field.binding.sourceDataName] ?? null)
-          );
+        )) {
+          const source = sourceFor(meta, wall, state, field.binding);
+          if (field.type === 'RepeatableSection') {
+            face.repeatable ||= {};
+            face.repeatable[field.preferredKey] = (
+              source?.repeatable?.[field.binding.sourceDataName] || []
+            ).map((row) => projectRow(field.children || [], row));
+          } else
+            face.values[field.dataName] = copy(
+              source?.values?.[field.binding.sourceDataName] ?? null
+            );
+        }
+        for (const flag of nodeFor(meta, 'walls').fields.filter(
+          (entry) => entry.binding?.applicabilityFor
+        )) {
+          const field = nodeFor(meta, 'walls').fieldsByOriginalDataName[
+            flag.binding.applicabilityFor
+          ];
+          const source = sourceFor(meta, wall, state, {
+            sourceNode: 'wall_sides',
+            outside: field.binding?.outside,
+          });
+          flags('walls', face, wall, source, flag.dataName);
+        }
         for (const [projected, source] of [
           ['face_doors', 'doors'],
           ['face_windows', 'windows'],
-          ['face_observations', 'observations'],
         ]) {
-          const sourceRows =
-            source === 'observations'
-              ? observations.filter((row) => {
-                  const model = modelOf(meta, 'observations', row);
-                  return [model.subject, ...(model.relatedSubjects || [])].some((subject) =>
-                    [state.id, state.wallId].includes(subject?.id)
-                  );
-                })
-              : rows(meta, source, wall).filter((row) => {
-                  const model = modelOf(meta, source, row);
-                  const prefix = source === 'doors' ? 'door' : 'window';
-                  const offset = read(meta, source, row, `${prefix}_offset_m`);
-                  const width = read(meta, source, row, `${prefix}_width_m`);
-                  return state.bindings.some(
-                    (binding) =>
-                      binding.segmentId === model.segmentId &&
-                      offset >= binding.interval[0] - 1e-6 &&
-                      offset + width <= binding.interval[1] + 1e-6
-                  );
-                });
           face.repeatable ||= {};
-          face.repeatable[keyFor(meta, projected)] = sourceRows.map((row) => ({
-            ...copy(row),
-            values: Object.fromEntries(
-              nodeFor(meta, projected).fields.map((field) => [
-                field.dataName,
-                copy(row.values[field.binding.sourceDataName] ?? null),
-              ])
-            ),
-            repeatable: {},
-          }));
+          face.repeatable[keyFor(meta, projected)] = rows(meta, source, wall)
+            .filter((row) => {
+              const model = modelOf(meta, source, row),
+                prefix = source === 'doors' ? 'door' : 'window';
+              const offset = read(meta, source, row, `${prefix}_offset_m`),
+                width = read(meta, source, row, `${prefix}_width_m`);
+              return state.bindings.some(
+                (binding) =>
+                  binding.segmentId === model.segmentId &&
+                  offset >= binding.interval[0] - 1e-6 &&
+                  offset + width <= binding.interval[1] + 1e-6
+              );
+            })
+            .map((row) => projectRow(nodeFor(meta, projected).fields, row));
         }
       }
   }
@@ -538,41 +749,53 @@ export function getBuildingPlanRecordMetadata(options) {
   return metadataFor(options);
 }
 
-/** Live source links let record calculations depend on the canonical physical calculation. */
 export function getBuildingPlanProjectionLinks({ meta, record }) {
   const links = new WeakMap();
-  const thicknessCache = new WeakMap();
+  const linkChildren = (entries, target, source) => {
+    const fields = new Map();
+    for (const entry of entries || []) {
+      const name = entry.binding?.sourceDataName || entry.sourceDataName;
+      if (entry.type === 'RepeatableSection')
+        for (const child of target.repeatable?.[entry.preferredKey] || []) {
+          const original = (source.repeatable?.[name] || []).find((row) => row.id === child.id);
+          if (original) linkChildren(entry.children, child, original);
+        }
+      else fields.set(entry.dataName, { record: source, fieldName: name });
+    }
+    links.set(target, fields);
+  };
   for (const floor of ownerRecords(meta, record).flatMap((owner) => rows(meta, 'floors', owner))) {
     const walls = previousBySubject(meta, 'physical_walls', floor);
-    const observations = rows(meta, 'observations', floor);
     for (const room of rows(meta, 'rooms', floor))
       for (const face of rows(meta, 'walls', room)) {
-        const state = modelOf(meta, 'walls', face);
-        const wall = walls.get(state.wallId);
+        const state = modelOf(meta, 'walls', face),
+          wall = walls.get(state.wallId);
         if (!wall) continue;
-        const thickness = projectedThickness(meta, thicknessCache, wall, state);
-        links.set(
-          face,
-          new Map(
-            nodeFor(meta, 'walls')
-              .fields.filter((field) => field.binding?.role === 'projection')
-              .map((field) => [
-                field.dataName,
-                thickness?.source.mode === 'override' &&
-                field.binding.property === 'wall_thickness_m'
-                  ? { record: face, fieldName: field.dataName, local: true }
-                  : { record: wall, fieldName: field.binding.sourceDataName },
-              ])
-          )
-        );
+        const entries = new Map();
+        for (const field of nodeFor(meta, 'walls').fields.filter(
+          (entry) => entry.binding?.role === 'projection'
+        )) {
+          const source = sourceFor(meta, wall, state, field.binding);
+          if (source && field.type !== 'RepeatableSection')
+            entries.set(field.dataName, {
+              record: source,
+              fieldName: field.binding.sourceDataName,
+            });
+          else if (source)
+            for (const row of face.repeatable?.[field.preferredKey] || []) {
+              const original = (source.repeatable?.[field.binding.sourceDataName] || []).find(
+                (entry) => entry.id === row.id
+              );
+              if (original) linkChildren(field.children, row, original);
+            }
+        }
+        links.set(face, entries);
         for (const [projected, source] of [
           ['face_doors', 'doors'],
           ['face_windows', 'windows'],
-          ['face_observations', 'observations'],
-        ]) {
-          const canonical = source === 'observations' ? observations : rows(meta, source, wall);
+        ])
           for (const row of rows(meta, projected, face)) {
-            const original = canonical.find((entry) => entry.id === row.id);
+            const original = rows(meta, source, wall).find((item) => item.id === row.id);
             if (original)
               links.set(
                 row,
@@ -584,7 +807,6 @@ export function getBuildingPlanProjectionLinks({ meta, record }) {
                 )
               );
           }
-        }
       }
   }
   return links;

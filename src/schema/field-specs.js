@@ -1598,3 +1598,8 @@ export const FIELD_SPECS = {
 for (const spec of Object.values(FIELD_SPECS)) {
   spec.attributes.ai = AI_ATTRIBUTE_DEFINITION;
 }
+
+for (const [type, specification] of Object.entries(FIELD_SPECS)) {
+  if (type !== 'BuildingPlanSection' && specification.attributes)
+    specification.attributes.building_plan = { type: 'object', required: false, nullable: false };
+}

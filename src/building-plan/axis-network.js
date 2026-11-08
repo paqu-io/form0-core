@@ -74,10 +74,13 @@ export function createBuildingPlanAxisNetwork(floor) {
   const collinear = (a, b) =>
     Math.abs(dot(a.normal, b.tangent)) <= EPS && Math.abs(project(a, b.start).offset) <= EPS;
   function users(source, span = source.span) {
-    const a = at(source.axis, span[0]),
-      b = at(source.axis, span[1]);
+    // Miter caps couple opposite room faces at a junction. Same-room straight
+    // siblings remain stationary when only one physical piece is selected.
     return runs.flatMap((run) => {
       if (!collinear(source.axis, run.axis)) return [];
+      const oppositeRoom = run.room.id !== source.room.id;
+      const a = at(source.axis, oppositeRoom ? span[0] : Math.max(0, span[0])),
+        b = at(source.axis, oppositeRoom ? span[1] : Math.min(source.axis.length, span[1]));
       const range = [project(run.axis, a).along, project(run.axis, b).along].sort((a, b) => a - b);
       const low = Math.max(range[0], run.span[0]),
         high = Math.min(range[1], run.span[1]);

@@ -18,7 +18,6 @@ import {
   planIssue,
   rebindBuildingPlanFaces,
 } from './model.js';
-import { remapSubject } from './topology.js';
 
 function fail(code, message, subject = null, details = {}) {
   throw Object.assign(new Error(message), { issues: [planIssue(code, message, subject, details)] });
@@ -101,12 +100,8 @@ export function movePartitionPortion(floor, operation, { createId, splitSegment,
           'This return has distinct answers. Resolve them before straightening the partition.'
         );
       room.faces = room.faces.filter((candidate) => candidate !== entry);
-      for (const id of [entry.id, ...entry.freePath.map((point) => point.id), ...entry.freeEdges])
-        remapSubject(floor, id, start.face.id, 'room_face');
-      remapSubject(floor, segment.id, start.face.wallId, 'wall');
       host.segments = host.segments.filter((candidate) => candidate !== segment);
       if (!host.segments.length) {
-        remapSubject(floor, host.id, start.face.wallId, 'wall');
         floor.walls = floor.walls.filter((candidate) => candidate !== host);
       } else if (host.referenceFaceId === entry.id) host.referenceFaceId = start.face.id;
       continue;

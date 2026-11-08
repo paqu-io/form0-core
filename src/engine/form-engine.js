@@ -215,6 +215,8 @@ export function createFormEngine({
       }
     );
     eventManager.eventContext = eventContext; // Update the event context
+    if (/^(cancel|unload)-/.test(eventType)) eventManager.cancelUIRequests();
+    else if (eventType === 'change') eventManager.cancelUIRequests(fieldKey);
     return eventManager.trigger(eventType, fieldKey, metadata, interactionMode);
   }
 
@@ -242,6 +244,7 @@ export function createFormEngine({
 
   /** Host-owned mode changes do not replay events, restore a record or evaluate implicitly. */
   function setMode(nextMode) {
+    if (interactionMode !== nextMode) eventManager.cancelUIRequests();
     interactionMode = validateInteractionMode(nextMode);
     if (interactionMode === 'edit') {
       for (const [field, placeholder] of pendingDefaults) {
@@ -260,8 +263,37 @@ export function createFormEngine({
    * @returns {ManagedEventResult}
    */
   function triggerDetailed(eventType, fieldKey, metadata = {}) {
+    if (/^(cancel|unload)-/.test(eventType)) eventManager.cancelUIRequests();
+    else if (eventType === 'change') eventManager.cancelUIRequests(fieldKey);
     eventManager.eventContext = buildEventContext(values, eventHelpers, {});
     return dispatchManagedEvent(eventType, fieldKey, metadata);
+  }
+
+  function resolveUIRequest(requestId, response) {
+    eventManager.eventContext = buildEventContext(values, eventHelpers, {});
+    try {
+      const pending = eventManager.uiRequests.resolve(requestId, response);
+      eventManager.uiRequestOrigins.delete(requestId);
+      return dispatchManagedEvent(
+        pending.event.type,
+        pending.event.fieldKey,
+        pending.event,
+        pending
+      );
+    } catch (error) {
+      return {
+        operations: [],
+        validationIssues: [],
+        issues: [
+          {
+            code: 'invalid_ui_response',
+            message: error.message,
+            eventType: null,
+            instancePath: copyRecordData(eventScope.instancePath),
+          },
+        ],
+      };
+    }
   }
 
   const ownershipPath = eventScope.instancePath.map((part) => part.repeatableKey);
@@ -291,6 +323,8 @@ export function createFormEngine({
     setMode,
     trigger,
     triggerDetailed,
+    resolveUIRequest,
+    cancelUIRequests: () => eventManager.cancelUIRequests(),
     getState,
     getDiagnostics: calculationDiagnostics.getSnapshot,
     getWarningSystem: () => sharedWarningSystem,

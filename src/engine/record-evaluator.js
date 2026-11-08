@@ -713,7 +713,8 @@ export function createRecordEvaluator({
           context.buildingPlanProjections.fields.has(field.data_name) &&
           !localPhysicalValue
         ) {
-          scope.record.required[field.data_name] = false;
+          // Keep the ordinary control's required indicator. Full submission validation
+          // owns deduplication through canonical links, not by changing presentation.
           continue;
         }
         const error = validateFieldValue(field, scope.record.values[field.data_name]);

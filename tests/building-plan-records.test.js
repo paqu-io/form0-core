@@ -1,3 +1,4 @@
+import { originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -93,70 +94,51 @@ function fixture(custom = {}) {
   return { schema, expanded: expanded.schema, meta, session, apply, floorId, a, b, faceA, faceB };
 }
 
-test('editors keep canonical collections internal and expose observation questions only by opt-in', () => {
-  for (const observations of [false, true]) {
-    const f = fixture(
-      observations
-        ? {
-            walls: {
-              extra_elements: [field('NumericField', 'measured_thickness')],
-              field_bindings: { measured_thickness: { scope: 'observation' } },
-            },
-          }
-        : {}
-    );
-    const nodes = f.meta.repeatablesByNodeKey;
-    const internal = (name) => isBuildingPlanInternalCollection(f.meta, nodes[name].dataName);
-    assert.equal(internal('physical_walls'), true);
-    assert.equal(internal('observations'), true);
-    assert.equal(internal('face_observations'), !observations);
-    for (const name of [
-      'floors',
-      'rooms',
-      'walls',
-      'columns',
-      'beams',
-      'objects',
-      'face_doors',
-      'face_windows',
-    ])
-      assert.equal(internal(name), false, name);
-    assert.equal(isBuildingPlanInternalCollection(f.meta, 'ordinary_repeatable'), false);
-    assert.equal(isBuildingPlanInternalCollection(null, nodes.rooms.dataName), false);
-    f.apply({
-      type: 'add_observation',
-      floorId: f.floorId,
-      subject: { type: 'room_face', id: f.faceA },
-      observedAt: '2026-11-03',
-      values: { measured_thickness: 0.19 },
-    });
-    const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
-    const stored = createStructuredRecord(record, f.expanded.form.elements, {
-      originalElements: f.expanded.form.elements,
-      fieldKeyMode: 'prefer-key',
-    });
-    const restored = readBuildingPlanRecord({
-      meta: f.meta,
-      record: buildFormRecordSnapshot(f.expanded, stored),
-    });
-    assert.equal(restored.floors[0].walls.length, 7);
-    assert.equal(restored.floors[0].observations.length, 1);
-    assert.equal(restored.floors[0].observations[0].observedAt, '2026-11-03');
-    if (observations)
-      assert.equal(restored.floors[0].observations[0].values.measured_thickness, 0.19);
-  }
+test('canonical wall and side collections remain internal and privileged observations are absent', () => {
+  const f = fixture(),
+    nodes = f.meta.repeatablesByNodeKey;
+  for (const name of ['physical_walls', 'wall_sides'])
+    assert.equal(isBuildingPlanInternalCollection(f.meta, nodes[name].dataName), true);
+  for (const name of [
+    'floors',
+    'rooms',
+    'walls',
+    'columns',
+    'beams',
+    'objects',
+    'face_doors',
+    'face_windows',
+  ])
+    assert.equal(isBuildingPlanInternalCollection(f.meta, nodes[name].dataName), false, name);
+  assert.equal(nodes.observations, undefined);
+  assert.equal(nodes.face_observations, undefined);
+  assert.equal(isBuildingPlanInternalCollection(f.meta, 'ordinary_repeatable'), false);
+  assert.throws(
+    () => fixture({ walls: { field_bindings: { measured: { scope: 'observation' } } } }),
+    /managed/
+  );
+  const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
+  const stored = createStructuredRecord(record, f.expanded.form.elements, {
+    originalElements: f.expanded.form.elements,
+  });
+  const restored = readBuildingPlanRecord({
+    meta: f.meta,
+    record: buildFormRecordSnapshot(f.expanded, stored),
+  });
+  assert.equal(restored.floors[0].walls.length, 9);
+  assert.equal(Object.hasOwn(restored.floors[0], 'observations'), false);
 });
 
 test('canonical records own physical walls once and omit projected field/child copies', () => {
   const f = fixture();
   const plan = f.session.getSnapshot();
-  const sharedWall = plan.floors[0].rooms[0].faces[2].wallId;
+  const sharedWall = originalFaces(plan.floors[0].rooms[0])[2].wallId;
   f.apply({
     type: 'create_opening',
     floorId: f.floorId,
     wallId: sharedWall,
     kind: 'door',
-    offset: 4,
+    offset: 0.5,
     width: 0.9,
     height: 2.1,
   });
@@ -169,7 +151,7 @@ test('canonical records own physical walls once and omit projected field/child c
   });
   const nodes = f.meta.repeatablesByNodeKey;
   const floor = record.repeatable[nodes.floors.key][0];
-  assert.equal(floor.repeatable[nodes.physical_walls.key].length, 7);
+  assert.equal(floor.repeatable[nodes.physical_walls.key].length, 9);
   const roomFaces = floor.repeatable[nodes.rooms.key].flatMap(
     (room) => room.repeatable[nodes.walls.key]
   );
@@ -184,11 +166,11 @@ test('canonical records own physical walls once and omit projected field/child c
     });
     const restored = buildFormRecordSnapshot(f.expanded, stored);
     const model = readBuildingPlanRecord({ meta: f.meta, record: restored });
-    assert.equal(model.floors[0].walls.length, 7);
+    assert.equal(model.floors[0].walls.length, 9);
     assert.equal(model.floors[0].walls.flatMap((wall) => wall.doors).length, 1);
-    assert.equal(model.floors[0].walls.find((wall) => wall.id === sharedWall).doors[0].offset, 4);
+    assert.equal(model.floors[0].walls.find((wall) => wall.id === sharedWall).doors[0].offset, 0.5);
     const storedText = JSON.stringify(stored);
-    for (const node of ['face_doors', 'face_windows', 'face_observations'])
+    for (const node of ['face_doors', 'face_windows'])
       assert.ok(
         !storedText.includes(mode === 'data-name' ? nodes[node].dataName : nodes[node].key)
       );
@@ -198,22 +180,25 @@ test('canonical records own physical walls once and omit projected field/child c
   assert.notEqual(floor.id, f.floorId);
 });
 
-test('custom wall questions keep face, physical and observation ownership through round trips', () => {
+test('custom surface and physical questions retain separate canonical owners through serialization', () => {
   const f = fixture({
+    floors: {
+      extra_elements: [
+        field('NumericField', 'insulation_default', {
+          building_plan: { property: 'insulation', scope: 'physical_wall', inherit_to: 'walls' },
+        }),
+      ],
+    },
     walls: {
       extra_elements: [
-        field('TextField', 'paint', { default_value: 'White' }),
-        field('NumericField', 'insulation'),
-        field('TextField', 'finding'),
+        field('TextField', 'paint', {
+          default_value: 'White',
+          building_plan: { scope: 'wall_face', on_split: 'copy' },
+        }),
       ],
-      field_bindings: {
-        insulation: { scope: 'physical_wall', inherit: true },
-        finding: { scope: 'observation' },
-      },
     },
   });
-  const wallId = f.session.getSnapshot().floors[0].rooms[0].faces[2].wallId;
-  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'insulation', value: 0.05 });
+  f.apply({ type: 'set_values', floorId: f.floorId, values: { insulation_default: 0.05 } });
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
@@ -221,35 +206,25 @@ test('custom wall questions keep face, physical and observation ownership throug
     property: 'paint',
     value: 'Cream',
   });
-  f.apply({
-    type: 'add_observation',
-    floorId: f.floorId,
-    subject: { type: 'room_face', id: f.faceB },
-    observedAt: '2026-11-02',
-    values: { finding: 'Cracks' },
-    coverage: { length: 2 },
-    evidence: ['photo'],
-  });
-  const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
-  const stored = createStructuredRecord(record, f.expanded.form.elements, {
-    originalElements: f.expanded.form.elements,
-  });
+  const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() }),
+    stored = createStructuredRecord(record, f.expanded.form.elements, {
+      originalElements: f.expanded.form.elements,
+    });
   const model = readBuildingPlanRecord({
     meta: f.meta,
     record: buildFormRecordSnapshot(f.expanded, stored),
   });
-  assert.equal(
-    model.floors[0].walls.find((wall) => wall.id === wallId).properties.insulation,
-    0.05
-  );
-  assert.equal(model.floors[0].rooms[0].faces[2].properties.paint, 'Cream');
-  assert.equal(model.floors[0].rooms[1].faces[0].properties.paint, 'White');
-  assert.deepEqual(model.floors[0].observations[0].values, { finding: 'Cracks' });
-  assert.deepEqual(model.floors[0].observations[0].evidence, ['photo']);
+  const a = model.floors[0].rooms[0].faces.find((face) => face.id === f.faceA),
+    b = model.floors[0].rooms[1].faces.find((face) => face.id === f.faceB);
+  const wall = model.floors[0].walls.find((wall) => wall.id === a.wallId);
+  assert.equal(wall.properties.insulation, 0.05);
+  assert.equal(a.properties.paint, 'Cream');
+  assert.equal(b.properties.paint, 'White');
+  assert.equal(wall.sides.find((side) => side.id === a.sideId).overrides.paint, 'Cream');
   assert.ok(
     buildDatasetDescriptors(f.expanded).every(
       (dataset) =>
-        !['face_doors', 'face_windows', 'face_observations'].some(
+        !['face_doors', 'face_windows'].some(
           (node) => dataset.repeatable_field_id === f.meta.repeatablesByNodeKey[node].key
         )
     )
@@ -284,10 +259,10 @@ test('scoped physical calculations execute once per physical wall and feed face 
       extra_elements: [
         field('CalculatedField', 'wall_cost', {
           calculate: 'SETRESULT(count($wall_thickness_m) * 1000);',
+          building_plan: { scope: 'physical_wall' },
         }),
         field('CalculatedField', 'face_cost', { calculate: 'SETRESULT($wall_cost + 1);' }),
       ],
-      field_bindings: { wall_cost: { scope: 'physical_wall' } },
     },
   });
   const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
@@ -304,7 +279,7 @@ test('scoped physical calculations execute once per physical wall and feed face 
   });
   const evaluated = await evaluator.evaluate(record, { mode: 'refresh' });
   assert.equal(evaluated.status, 'evaluated', JSON.stringify(evaluated.issues));
-  assert.equal(calls, 7);
+  assert.equal(calls, 9);
   const nodes = f.meta.repeatablesByNodeKey;
   const faceField = nodes.walls.fieldsByOriginalDataName.face_cost.dataName;
   const wallField = nodes.walls.fieldsByOriginalDataName.wall_cost.dataName;
@@ -340,13 +315,15 @@ for (const security of ['trusted', 'safe'])
         ],
       },
     });
-    f.apply({ type: 'split_face', floorId: f.floorId, faceId: f.faceB, offset: 2 });
+    f.apply({ type: 'split_face', floorId: f.floorId, faceId: f.faceB, offset: 1.5 });
     const wallId = f.session
       .getSnapshot()
       .floors[0].rooms[1].faces.find((face) => face.id === f.faceB).wallId;
     const face = f.session
       .getSnapshot()
-      .floors[0].rooms[1].faces.find((face) => face.wallId === wallId && face.id !== f.faceB);
+      .floors[0].rooms[1].faces.find(
+        (face) => face.id !== f.faceB && face.lineage?.editingOriginFaceId === f.faceB
+      );
     f.apply({
       type: 'set_property',
       floorId: f.floorId,
@@ -420,7 +397,9 @@ for (const security of ['trusted', 'safe'])
     assert.ok(
       incomplete.validationSummary.orderedIssues.some(
         (issue) =>
-          issue.fieldName === thickness && issue.instancePath?.at(-1)?.instanceId === selected.id
+          issue.fieldName === thickness &&
+          issue.canonical?.fieldName ===
+            nodes.physical_walls.fieldsByOriginalDataName.wall_thickness_m.dataName
       ),
       JSON.stringify(incomplete.validationSummary.orderedIssues)
     );
@@ -446,9 +425,14 @@ for (const security of ['trusted', 'safe'])
     );
     assert.equal(
       inheritedUnknown.validationSummary.orderedIssues.filter(
-        (issue) => issue.fieldName === thickness
+        (issue) =>
+          issue.fieldName === thickness ||
+          issue.fieldName ===
+            nodes.physical_walls.fieldsByOriginalDataName.wall_thickness_m.dataName
       ).length,
-      7
+      f.session
+        .getSnapshot()
+        .floors[0].walls.filter((wall) => wall.properties.wall_thickness_m === null).length
     );
   });
 
@@ -498,11 +482,11 @@ test('invalid custom scope and observation inheritance fail authoring expansion'
           field_bindings: { finding: { scope: 'observation', inherit: true } },
         },
       }),
-    /cannot inherit/
+    /managed/
   );
   assert.throws(
     () => fixture({ walls: { field_bindings: { absent: { scope: 'physical_wall' } } } }),
-    /custom wall field/
+    /managed/
   );
 });
 
@@ -531,7 +515,7 @@ test('normal row edits write one canonical shared property and cancel sibling ge
   const result = session.applyRow({ path, editedRow: edited, initialRow: face, scopeId: child });
   assert.equal(result.status, 'applied', JSON.stringify(result.issues));
   const after = session.getSnapshot().floors[0];
-  const shared = after.walls.find((wall) => wall.id === after.rooms[0].faces[2].wallId);
+  const shared = after.walls.find((wall) => wall.id === originalFaces(after.rooms[0])[2].wallId);
   assert.equal(shared.properties.wall_thickness_m, 0.4);
   assert.equal(shared.provenance.wall_thickness_m.scope, 'physical_wall');
   assert.equal(session.cancelScope(child).status, 'cancelled');
@@ -595,6 +579,7 @@ test('pending canvas completion cannot accept a gesture after its host is dispos
   const before = controller.session.getSnapshot();
   const pending = controller.createRoom({ x: 400, y: 0, width: 100, height: 100 });
   assert.equal(controller.isBusy(), true);
+  while (!finish) await Promise.resolve();
   controller.dispose();
   finish(true);
   assert.equal(await pending, null);
@@ -722,9 +707,10 @@ test('uncaptured structural coordinates stay uncaptured through record round tri
 
 test('inherited custom choices keep ordinary values, requiredness, and readonly write protection', async () => {
   const f = fixture({
-    walls: {
+    floors: {
       extra_elements: [
-        field('SingleChoiceField', 'material', {
+        field('SingleChoiceField', 'default_material', {
+          building_plan: { property: 'material', scope: 'physical_wall', inherit_to: 'walls' },
           choices: [
             { value: 'brick', label: 'Brick' },
             { value: 'stone', label: 'Stone' },
@@ -733,7 +719,6 @@ test('inherited custom choices keep ordinary values, requiredness, and readonly 
           required: true,
         }),
       ],
-      field_bindings: { material: { scope: 'physical_wall', inherit: true } },
     },
   });
   const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
@@ -783,7 +768,7 @@ test('physical requiredness produces one finding per wall that navigates to an o
   const heightIssues = result.validationSummary.orderedIssues.filter(
     (issue) => issue.canonical?.fieldName === physicalHeight
   );
-  assert.equal(heightIssues.length, 7);
+  assert.equal(heightIssues.length, 9);
   for (const issue of heightIssues) {
     assert.equal(issue.fieldName, faceHeight);
     assert.equal(issue.instancePath.at(-1).repeatableKey, nodes.walls.preferredKey);

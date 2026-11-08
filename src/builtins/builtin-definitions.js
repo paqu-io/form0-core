@@ -246,6 +246,19 @@ export const ALERT_METADATA = defineBuiltinMetadata({
   contexts: [BUILTIN_CONTEXTS.EVENT],
 });
 
+export const MESSAGEBOX_METADATA = defineBuiltinMetadata({
+  name: 'MESSAGEBOX',
+  operation: { type: 'UI_OPERATION', effects: ['presentation'] },
+  category: 'event',
+  signature: 'MESSAGEBOX(options, callback)',
+  description:
+    'Ask a question with buttons and optional text input; handle its response in the originating scope.',
+  examples: [
+    "MESSAGEBOX({ title: 'Continue?', buttons: ['Yes', 'No'] }, function(reply) { if (reply.value === 'Yes') ALERT('Continuing'); })",
+  ],
+  contexts: [BUILTIN_CONTEXTS.EVENT],
+});
+
 export const SETVALUE_METADATA = defineBuiltinMetadata({
   name: 'SETVALUE',
   operation: { type: 'FIELD_OPERATION', effects: ['record-write'] },
@@ -336,6 +349,7 @@ export const BUILTIN_DEFINITIONS = Object.freeze([
   UPPER_METADATA,
   SETRESULT_METADATA,
   ALERT_METADATA,
+  MESSAGEBOX_METADATA,
   SETVALUE_METADATA,
   ON_METADATA,
   OFF_METADATA,

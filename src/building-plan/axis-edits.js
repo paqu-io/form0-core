@@ -22,9 +22,12 @@ import {
   planIssue,
 } from './model.js';
 import { createBuildingPlanAxisNetwork } from './axis-network.js';
+import { normalizeRoomBoundary } from './topology.js';
 import {
   buildingPlanJunctionAllowance,
   buildingPlanJunctionReferences,
+  junctionIntersection,
+  resolveBuildingPlanConnection,
   reshapeBuildingPlanBoundary,
 } from './junction-edits.js';
 
@@ -48,7 +51,8 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
   const oldRoom = findRoom(before, room.id),
     oldEdges = polygonEdges(oldRoom),
     changes = [],
-    activeEdits = [];
+    activeEdits = [],
+    fittedRoomIds = new Set();
   if (operation.type === 'move_corner') {
     const vertex = oldRoom.vertices.find((v) => v.id === operation.vertexId);
     if (!vertex || !isPoint(operation.point))
@@ -61,18 +65,52 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
         transformed: new Set(),
         activeRoomId: room.id,
       };
-    for (const old of oldEdges.filter((e) => e.start.id === vertex.id || e.end.id === vertex.id)) {
-      const start =
-        old.start.id === vertex.id
-          ? cleanPoint({ ...old.start, x: operation.point.x, y: operation.point.y })
-          : old.start;
-      const end =
-        old.end.id === vertex.id
-          ? cleanPoint({ ...old.end, x: operation.point.x, y: operation.point.y })
-          : old.end;
-      if (distance(start, end) <= EPS)
-        conflict('invalid_room_geometry', 'This corner would collapse a wall. Try a smaller move.');
-      activeEdits.push({ edgeId: old.id, interval: [0, old.length], start, end });
+    const incident = oldEdges.filter(
+      (edge) => edge.start.id === vertex.id || edge.end.id === vertex.id
+    );
+    const used = new Set();
+    for (const edge of incident) {
+      const run = [edge];
+      const movingAtStart = edge.start.id === vertex.id;
+      let fixed = movingAtStart ? edge.end : edge.start;
+      if (!vertex.physicalBoundaryId || vertex.editingCutId) {
+        while (fixed.physicalBoundaryId && !fixed.editingCutId) {
+          const adjacent = oldEdges.find(
+            (candidate) =>
+              !run.includes(candidate) &&
+              (movingAtStart ? candidate.start.id === fixed.id : candidate.end.id === fixed.id)
+          );
+          if (
+            !adjacent ||
+            Math.abs(dot(edge.normal, adjacent.tangent)) > EPS ||
+            dot(edge.tangent, adjacent.tangent) < 1 - EPS
+          )
+            break;
+          run.push(adjacent);
+          fixed = movingAtStart ? adjacent.end : adjacent.start;
+        }
+      }
+      const frame = segmentFrame(fixed, vertex);
+      const mapped = (point) => {
+        const ratio = project(frame, point).along / frame.length;
+        return cleanPoint({
+          ...point,
+          x: fixed.x + (operation.point.x - fixed.x) * ratio,
+          y: fixed.y + (operation.point.y - fixed.y) * ratio,
+        });
+      };
+      for (const old of run) {
+        if (used.has(old.id)) continue;
+        used.add(old.id);
+        const start = mapped(old.start),
+          end = mapped(old.end);
+        if (distance(start, end) <= EPS)
+          conflict(
+            'invalid_room_geometry',
+            'This corner would collapse a wall. Try a smaller move.'
+          );
+        activeEdits.push({ edgeId: old.id, interval: [0, old.length], start, end });
+      }
     }
   } else {
     const { face } = findFace(before, operation.faceId);
@@ -114,6 +152,49 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
       start: cleanPoint(add(at(old, interval[0]), delta)),
       end: cleanPoint(add(at(old, interval[1]), delta)),
     });
+    for (const end of [0, 1]) {
+      const vertex = end ? old.end : old.start;
+      if (
+        !vertex.physicalBoundaryId ||
+        vertex.editingCutId ||
+        !near(interval[end], end ? old.length : 0)
+      )
+        continue;
+      const cap = oldEdges.find(
+        (edge) => edge.id !== old.id && (edge.start.id === vertex.id || edge.end.id === vertex.id)
+      );
+      if (!cap || Math.abs(dot(old.normal, cap.tangent)) > EPS) continue;
+      const far = cap.start.id === vertex.id ? cap.end : cap.start;
+      if (far.editingCutId) continue;
+      const run = network.runs.find((run) => run.room.id === room.id && run.edge.id === cap.id);
+      if (!run) continue;
+      const reach = buildingPlanJunctionAllowance(before, oldRoom, cap, far, run.half * 2);
+      if (!(reach > EPS) || cap.length > reach + EPS) continue;
+      const shoulder = oldEdges.find(
+        (edge) => edge.id !== cap.id && (edge.start.id === far.id || edge.end.id === far.id)
+      );
+      if (!shoulder) continue;
+      const outside = shoulder.start.id === far.id ? shoulder.end : shoulder.start;
+      const continuation = oldEdges.find(
+        (edge) =>
+          edge.id !== shoulder.id && (edge.start.id === outside.id || edge.end.id === outside.id)
+      );
+      const target = segmentFrame(activeEdits[0].start, activeEdits[0].end);
+      if (
+        !continuation ||
+        Math.abs(dot(target.normal, continuation.tangent)) > EPS ||
+        Math.abs(project(target, continuation.start).offset) > EPS
+      )
+        continue;
+      // A short collinear material cap belongs to the connected junction. Move
+      // it with the supporting line while keeping its physical answers separate.
+      activeEdits.push({
+        edgeId: cap.id,
+        interval: [0, cap.length],
+        start: cleanPoint(add(cap.start, delta)),
+        end: cleanPoint(add(cap.end, delta)),
+      });
+    }
   }
   for (const edit of activeEdits) {
     const old = oldEdges.find((e) => e.id === edit.edgeId);
@@ -318,13 +399,131 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
       network,
     };
   });
+  // An automatic adjacency station can meet a true corner on the other room.
+  // Its new connector follows that existing material band, including its far face.
+  if (operation.type !== 'move_corner') {
+    for (const edit of activeEdits) {
+      if (distance(edit.start, edit.end) <= EPS) continue;
+      const old = oldEdges.find((edge) => edge.id === edit.edgeId);
+      const source = network.runs.find((run) => run.room.id === room.id && run.edge.id === old.id);
+      if (!source) continue;
+      const fitStationary =
+        source.face.id === operation.faceId &&
+        !network.runs.some((run) => run.wall.id === source.wall.id && run.room.id !== room.id);
+      for (const end of [0, 1]) {
+        const vertex = end ? old.end : old.start;
+        if (
+          !vertex.physicalBoundaryId ||
+          vertex.editingCutId ||
+          !near(edit.interval[end], end ? old.length : 0)
+        )
+          continue;
+        let stationary = oldEdges.find(
+          (edge) => edge.id !== old.id && (edge.start.id === vertex.id || edge.end.id === vertex.id)
+        );
+        let junction = vertex;
+        const connectionEdges = [];
+        while (fitStationary && stationary && Math.abs(dot(stationary.normal, old.tangent)) > EPS) {
+          const endpoint = stationary.start.id === junction.id ? stationary.end : stationary.start;
+          if (!endpoint.physicalBoundaryId || endpoint.editingCutId) break;
+          connectionEdges.push(stationary);
+          junction = endpoint;
+          stationary = oldEdges.find(
+            (edge) =>
+              !connectionEdges.includes(edge) &&
+              edge.id !== old.id &&
+              (edge.start.id === junction.id || edge.end.id === junction.id)
+          );
+        }
+        if (!fitStationary && stationary && Math.abs(dot(stationary.normal, old.tangent)) > EPS) {
+          const far = stationary.start.id === vertex.id ? stationary.end : stationary.start;
+          if (far.physicalBoundaryId !== vertex.physicalBoundaryId || far.editingCutId) continue;
+          stationary = oldEdges.find(
+            (edge) =>
+              edge.id !== stationary.id &&
+              edge.id !== old.id &&
+              (edge.start.id === far.id || edge.end.id === far.id)
+          );
+        }
+        if (!stationary || Math.abs(dot(stationary.normal, old.tangent)) > EPS) continue;
+        const sourceWalls = new Set([
+          source.wall.id,
+          ...network.runs
+            .filter(
+              (run) =>
+                fitStationary &&
+                run.room.id === room.id &&
+                network.runs.some(
+                  (reference) =>
+                    reference.room.id === room.id &&
+                    reference.edge.id === stationary.id &&
+                    network.collinear(reference.axis, run.axis)
+                )
+            )
+            .map((run) => run.wall.id),
+        ]);
+        const neighbours = new Set(
+          network.runs
+            .filter((run) => sourceWalls.has(run.wall.id) && run.room.id !== room.id)
+            .map((run) => run.room.id)
+        );
+        const transverse = network.runs
+          .filter(
+            (run) =>
+              neighbours.has(run.room.id) &&
+              Math.abs(dot(run.axis.normal, source.axis.tangent)) > EPS &&
+              [run.edge.start, run.edge.end].some(
+                (point) => distance(point, junction) <= (source.half + run.half) * 2 + EPS
+              )
+          )
+          .sort(
+            (a, b) =>
+              Number(Boolean(a.segment.junction)) - Number(Boolean(b.segment.junction)) ||
+              b.axis.length - a.axis.length
+          )[0];
+        if (!transverse) continue;
+        const joined = resolveBuildingPlanConnection(
+          segmentFrame(edit.start, edit.end),
+          stationary,
+          {
+            axis: transverse.axis,
+            edge: transverse.edge,
+            sign: Math.sign(polygonArea(transverse.room.vertices)),
+            thickness: transverse.half * 2,
+          },
+          end,
+          Math.sign(polygonArea(room.vertices))
+        );
+        if (joined) {
+          edit[end ? 'end' : 'start'] = joined.point;
+          edit[end ? 'joinEnd' : 'joinStart'] = joined;
+          if (fitStationary) {
+            fittedRoomIds.add(room.id);
+            for (const edge of connectionEdges) {
+              if (activeEdits.some((entry) => entry.edgeId === edge.id)) continue;
+              activeEdits.push({
+                edgeId: edge.id,
+                interval: [0, edge.length],
+                start: joined.fixed,
+                end: joined.fixed,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
   // Resolve the active path first so both room sides use one generated cut-return axis.
   const changedEdges = [
     { roomId: room.id, edgeIds: reshapeBuildingPlanBoundary(room, activeEdits, createId) },
   ];
+  // A returning piece can temporarily fold over its own connector. Resolve that
+  // zero-area geometry before deriving the shared cut station for the other side.
+  normalizeRoomBoundary(floor, room, createId);
   const cutReferences = [];
-  for (const vertex of room.vertices.filter((v) => v.editingCutId)) {
-    if (cutReferences.some((r) => r.cutId === vertex.editingCutId)) continue;
+  for (const vertex of room.vertices.filter((v) => v.editingCutId || v.physicalBoundaryId)) {
+    if (cutReferences.some((r) => r.cutId === (vertex.editingCutId || vertex.physicalBoundaryId)))
+      continue;
     const connector = room.vertices
       .flatMap((start, i) => {
         const end = room.vertices[(i + 1) % room.vertices.length];
@@ -332,14 +531,22 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
       })
       .find(
         (edge) =>
-          edge.start.editingCutId === vertex.editingCutId &&
-          edge.end.editingCutId === vertex.editingCutId
+          (edge.start.editingCutId || edge.start.physicalBoundaryId) ===
+            (vertex.editingCutId || vertex.physicalBoundaryId) &&
+          (edge.end.editingCutId || edge.end.physicalBoundaryId) ===
+            (vertex.editingCutId || vertex.physicalBoundaryId)
       );
-    const oldVertex = oldRoom.vertices.find((v) => v.editingCutId === vertex.editingCutId);
+    const oldVertex = oldRoom.vertices.find(
+      (v) =>
+        (v.editingCutId || v.physicalBoundaryId) ===
+        (vertex.editingCutId || vertex.physicalBoundaryId)
+    );
     const source = changes.find(
       (c) =>
-        c.old.start.editingCutId === vertex.editingCutId ||
-        c.old.end.editingCutId === vertex.editingCutId
+        (c.old.start.editingCutId || c.old.start.physicalBoundaryId) ===
+          (vertex.editingCutId || vertex.physicalBoundaryId) ||
+        (c.old.end.editingCutId || c.old.end.physicalBoundaryId) ===
+          (vertex.editingCutId || vertex.physicalBoundaryId)
     );
     if (!source || !oldVertex) continue;
     if (!connector) {
@@ -356,19 +563,44 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
       half = connector ? source.run.half : 0;
     const line = connector || segmentFrame(vertex, add(vertex, source.axis.normal));
     const axis = segmentFrame(at(line, 0, -side * half), at(line, line.length, -side * half));
-    cutReferences.push({ cutId: vertex.editingCutId, axis, side, half });
+    cutReferences.push({
+      cutId: vertex.editingCutId || vertex.physicalBoundaryId,
+      axis,
+      side,
+      half,
+    });
   }
-  for (const [id, edits] of editsByRoom)
+  for (const [id, edits] of editsByRoom) {
+    const neighbour = findRoom(floor, id);
     changedEdges.push({
       roomId: id,
-      edgeIds: reshapeBuildingPlanBoundary(
-        findRoom(floor, id),
-        edits,
-        createId,
-        references,
-        cutReferences
-      ),
+      edgeIds: reshapeBuildingPlanBoundary(neighbour, edits, createId, references, cutReferences),
     });
+    normalizeRoomBoundary(floor, neighbour, createId);
+    // When a connector straightens, the fixed and moving endpoints can retain
+    // different along-line stations. Both room sides must keep the same cut axis.
+    const edges = polygonEdges(neighbour);
+    for (const vertex of neighbour.vertices.filter((point) => point.editingCutId)) {
+      const reference = cutReferences.find(
+        (entry) => entry.cutId === vertex.editingCutId && entry.half === 0
+      );
+      const incoming = edges.find((edge) => edge.end.id === vertex.id);
+      const outgoing = edges.find((edge) => edge.start.id === vertex.id);
+      if (
+        !reference ||
+        !incoming ||
+        !outgoing ||
+        Math.abs(dot(incoming.normal, outgoing.tangent)) > EPS
+      )
+        continue;
+      const station = junctionIntersection(incoming, reference.axis);
+      if (!station) continue;
+      const span = segmentFrame(incoming.start, outgoing.end);
+      const along = project(span, station).along;
+      if (along >= -EPS && along <= span.length + EPS) Object.assign(vertex, cleanPoint(station));
+    }
+    normalizeRoomBoundary(floor, neighbour, createId);
+  }
   for (const { piece, wall, original, task } of mapped) {
     const frame = segmentFrame(piece.start, piece.end);
     const points = links
@@ -387,7 +619,14 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
     for (const opening of [...wall.doors, ...wall.windows])
       if (opening.segmentId === piece.id) opening.offset -= from;
   }
-  return { before, changedEdges, affectedWalls: [...affected], transformed, activeRoomId: room.id };
+  return {
+    before,
+    changedEdges,
+    affectedWalls: [...affected],
+    transformed,
+    activeRoomId: room.id,
+    fittedRoomIds: [...fittedRoomIds],
+  };
 }
 
 /** Solve changed thicknesses together from accepted axes, then derive all room faces once. */
@@ -412,7 +651,9 @@ export function reshapeBuildingPlanAxisThickness(floor, before, operation, creat
         (r) => r.wall.id === wall.id && r.segment.id === segment.id
       );
       const anchor =
-        users.find((r) => r.room.id === operation.activeRoomId) ||
+        users.find(
+          (r) => r.room.id === (operation.activeRoomsByWall?.[wall.id] || operation.activeRoomId)
+        ) ||
         users.find((r) => r.face.id === wall.referenceFaceId) ||
         users[0];
       if (!anchor) continue;

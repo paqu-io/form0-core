@@ -1,3 +1,4 @@
+import { originalVertices, originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -116,8 +117,8 @@ for (const anchor of ['room_face', 'midline'])
     assert.ok(
       wall.segments.every((s) => Math.abs(s.start.y - (anchor === 'midline' ? 3.1 : 3.2)) < 1e-6)
     );
-    assert.equal(floor.rooms[0].vertices[2].y, anchor === 'midline' ? 2.9 : 3);
-    assert.equal(floor.rooms[1].vertices[0].y, anchor === 'midline' ? 3.3 : 3.4);
+    assert.equal(originalVertices(floor.rooms[0])[2].y, anchor === 'midline' ? 2.9 : 3);
+    assert.equal(originalVertices(floor.rooms[1])[0].y, anchor === 'midline' ? 3.3 : 3.4);
     f.coherent();
     f.session.undo();
     assert.deepEqual(f.session.getSnapshot(), before);
@@ -129,7 +130,7 @@ test('floor-wide midline thickness changes solve all adjoining faces atomically'
   const f = fixture(false, 'midline');
   const floor = f.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.4 });
   assert.deepEqual(
-    floor.rooms[0].vertices.map(({ x, y }) => [x, y]),
+    originalVertices(floor.rooms[0]).map(({ x, y }) => [x, y]),
     [
       [0.1, 0.1],
       [4.9, 0.1],
@@ -178,7 +179,7 @@ for (const angle of [Math.PI / 2, 0.37])
         apply({ type: 'resize_face', faceId: f.faceB, distance: 0.2 });
         apply({
           type: 'resize_face',
-          faceId: snapshot.floors[0].rooms[1].faces[3].id,
+          faceId: originalFaces(snapshot.floors[0].rooms[1])[3].id,
           distance: 0.6,
         });
         assert.deepEqual(intrusions(session.getSnapshot().floors[0]), []);
@@ -218,7 +219,7 @@ for (const anchor of ['room_face', 'midline'])
     const result = editor.updateRow('wall', row);
     assert.equal(result.status, 'applied', JSON.stringify(result.issues));
     assert.equal(
-      editor.getSnapshot().floors[0].rooms[0].vertices[2].y,
+      originalVertices(editor.getSnapshot().floors[0].rooms[0])[2].y,
       anchor === 'midline' ? 2.9 : 3
     );
     assert.equal(editor.cancelRow('wall').status, 'cancelled');
@@ -254,11 +255,11 @@ test('canvas proposals and commits use the current thickness anchor without pers
   };
   const proposal = controller.previewOperation(operation);
   assert.equal(proposal.status, 'ready');
-  assert.equal(proposal.snapshot.floors[0].rooms[0].vertices[2].y, 2.9);
+  assert.equal(originalVertices(proposal.snapshot.floors[0].rooms[0])[2].y, 2.9);
   assert.deepEqual(record, before);
   assert.equal((await controller.apply(operation)).status, 'applied');
   assert.equal(
-    readBuildingPlanRecord({ meta: f.meta, record }).floors[0].rooms[0].vertices[2].y,
+    originalVertices(readBuildingPlanRecord({ meta: f.meta, record }).floors[0].rooms[0])[2].y,
     2.9
   );
   controller.dispose();
@@ -273,7 +274,7 @@ for (const grouped of [false, true])
     f.apply({
       type: 'move_corner',
       roomId: room.id,
-      vertexId: room.vertices[0].id,
+      vertexId: originalVertices(room)[0].id,
       point: { x: 3, y: 2.8 },
     });
     const before = f.session.getSnapshot(),
@@ -300,10 +301,12 @@ for (const grouped of [false, true])
     f.apply({ type: 'resize_face', faceId: f.faceA, distance: -0.6 });
     assert.deepEqual(intrusions(f.coherent()), []);
     const g = fixture(grouped);
-    g.apply({ type: 'split_face', faceId: g.faceB, offset: 2 });
+    g.apply({ type: 'split_face', faceId: g.faceB, offset: 1.5 });
     const face = g.session
       .getSnapshot()
-      .floors[0].rooms[1].faces.find((face) => face.wallId === g.wallId && face.id !== g.faceB);
+      .floors[0].rooms[1].faces.find(
+        (face) => face.lineage?.editingOriginFaceId === g.faceB && face.id !== g.faceB
+      );
     g.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
     g.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.3 });
     assert.deepEqual(intrusions(g.coherent()), []);
@@ -312,7 +315,7 @@ for (const grouped of [false, true])
 test('corner position input cannot replace vertex identity or cut metadata', () => {
   const f = fixture(),
     room = f.initial.floors[0].rooms[1],
-    vertex = room.vertices[2];
+    vertex = originalVertices(room)[2];
   const floor = f.apply({
     type: 'move_corner',
     roomId: room.id,
@@ -356,18 +359,15 @@ for (const direction of [-1, 1])
       f.apply({ ...operation, point: { x: vertex.x, y: vertex.y } });
       const restored = f.coherent();
       for (const [i, room] of restored.rooms.entries()) {
-        assert.deepEqual(
-          room.vertices.map((v) => v.id),
-          before.floors[0].rooms[i].vertices.map((v) => v.id)
-        );
-        for (const [j, v] of room.vertices.entries()) {
-          const old = before.floors[0].rooms[i].vertices[j];
-          assert.ok(Math.abs(v.x - old.x) < 1e-6 && Math.abs(v.y - old.y) < 1e-6);
+        for (const old of before.floors[0].rooms[i].vertices.filter((v) => !v.physicalBoundaryId)) {
+          const vertex = room.vertices.find((v) => v.id === old.id);
+          assert.ok(vertex, 'Original corners and deliberate cut identities survive realignment.');
+          assert.ok(Math.abs(vertex.x - old.x) < 1e-6 && Math.abs(vertex.y - old.y) < 1e-6);
         }
         assert.ok(room.vertices.some((v) => v.editingCutId === cut));
       }
       f.apply({ type: 'rejoin_cut', cutId: cut });
       assert.ok(
-        f.session.getSnapshot().floors[0].rooms.every((room) => room.vertices.length === 4)
+        f.session.getSnapshot().floors[0].rooms.every((room) => originalVertices(room).length === 4)
       );
     });

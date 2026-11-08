@@ -12,7 +12,10 @@ import {
   reconcileBuildingPlanProperties,
   validateBuildingPlanSnapshot,
 } from './model.js';
-import { applyBuildingPlanOperation } from './operations.js';
+import { createUIRequestRegistry } from '../utilities/ui-requests.js';
+import { normalizePhysicalPieces } from './physical-pieces.js';
+import { reconcileWallLabels } from './wall-labels.js';
+import { applyBuildingPlanOperation, applyThicknessChanges } from './operations.js';
 
 const entityArray = (value) =>
   Array.isArray(value) &&
@@ -158,7 +161,7 @@ function validate(snapshot) {
 /**
  * Own immutable candidate operations, accepted history, and nested editor scopes.
  * Hosts own rendering, form lifecycle events, and actual record persistence.
- * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {preserveWallGrouping?: boolean, snapping?: boolean, edgeAutoPan?: boolean, thicknessAnchor?: 'room_face'|'midline'}}} [options]
+ * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {inheritedChangePolicy?: 'ask'|'apply', copyCustomAnswersAutomatically?: boolean, snapping?: boolean, edgeAutoPan?: boolean, thicknessAnchor?: 'room_face'|'midline'}}} [options]
  * @returns {Object} Portable building-plan session.
  */
 export function createBuildingPlanSession({
@@ -171,11 +174,14 @@ export function createBuildingPlanSession({
   editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
   const specifications = copy({ ...BUILDING_PLAN_PROPERTIES, ...properties });
   let current = copy(snapshot);
+  for (const floor of current?.floors || []) reconcileWallLabels(floor);
   let revision = 0;
   let past = [];
   let future = [];
   const proposals = new WeakMap();
   const scopes = new Map();
+  const questions = createUIRequestRegistry({ createId });
+  let pendingGeneration = 0;
   const initialIssues = [
     ...reconcileBuildingPlanProperties(current, specifications),
     ...validate(current),
@@ -207,18 +213,97 @@ export function createBuildingPlanSession({
     if (readOnly) return locked();
     if (!scopeExists(scopeId)) return stale();
     try {
+      pendingGeneration++;
+      questions.cancelAll();
+      let divisions = [],
+        defaultConflicts = [];
       const { candidate, result } = prepareBuildingPlanEdit(
         current,
         copy(operation),
         (candidate, edit) =>
           applyBuildingPlanOperation(candidate, edit, { createId, specifications, editingPolicy }),
-        (candidate) => [
-          ...buildingPlanPinIssues(current, candidate, operation.pinnedFaceIds),
-          ...reconcileBuildingPlanProperties(candidate, specifications),
-          ...validate(candidate),
-        ]
+        (candidate) => {
+          const changedFloors = new Set(
+            candidate.floors
+              .filter(
+                (floor) =>
+                  !equalValue(
+                    floor,
+                    current.floors.find((entry) => entry.id === floor.id)
+                  )
+              )
+              .map((floor) => floor.id)
+          );
+          divisions = candidate.floors
+            .filter((floor) => changedFloors.has(floor.id))
+            .flatMap((floor) =>
+              normalizePhysicalPieces(
+                floor,
+                createId,
+                current.floors.find((old) => old.id === floor.id)
+              ).map((division) => ({
+                ...division,
+                floorId: floor.id,
+              }))
+            );
+          const beforeDefaults = copy(candidate);
+          const resolvedIssues = reconcileBuildingPlanProperties(candidate, specifications);
+          defaultConflicts = resolvedIssues.filter(
+            (issue) => issue.code === 'conflicting_room_defaults'
+          );
+          const issues = resolvedIssues.filter(
+            (issue) => issue.code !== 'conflicting_room_defaults'
+          );
+          if (issues.length) return issues;
+          for (const floor of candidate.floors) {
+            if (!changedFloors.has(floor.id)) continue;
+            const previous = beforeDefaults.floors.find((entry) => entry.id === floor.id);
+            if (previous)
+              applyThicknessChanges(
+                floor,
+                previous,
+                operation.activeRoomId,
+                createId,
+                {
+                  ...operation,
+                  thicknessAnchor: editingPolicy.thicknessAnchor,
+                },
+                specifications
+              );
+            normalizePhysicalPieces(
+              floor,
+              createId,
+              current.floors.find((old) => old.id === floor.id)
+            );
+          }
+          for (const floor of candidate.floors)
+            reconcileWallLabels(
+              floor,
+              current.floors.find((entry) => entry.id === floor.id)
+            );
+          return [
+            ...buildingPlanPinIssues(current, candidate, operation.pinnedFaceIds),
+            ...reconcileBuildingPlanProperties(candidate, specifications).filter(
+              (issue) => issue.code !== 'conflicting_room_defaults'
+            ),
+            ...validate(candidate),
+          ];
+        }
       );
 
+      for (const floor of candidate.floors)
+        for (const wall of floor.walls) {
+          if (
+            !wall.lineage?.copiedFromWallId ||
+            current.floors.some((entry) => entry.walls.some((old) => old.id === wall.id))
+          )
+            continue;
+          const source = current.floors
+            .find((entry) => entry.id === floor.id)
+            ?.walls.find((entry) => entry.id === wall.lineage.copiedFromWallId);
+          if (source && !divisions.some((entry) => entry.source.id === source.id))
+            divisions.push({ source, floorId: floor.id, walls: [wall] });
+        }
       const changes = diffBuildingPlanSnapshots(current, candidate);
       const proposal = response('ready', [], {
         snapshot: copy(candidate),
@@ -232,6 +317,9 @@ export function createBuildingPlanSession({
         changes,
         scopeId,
         result,
+        divisions,
+        defaultConflicts,
+        generation: pendingGeneration,
       });
       return proposal;
     } catch (error) {
@@ -239,12 +327,238 @@ export function createBuildingPlanSession({
     }
   }
 
-  function commit(proposal) {
+  function transferRequirements(prepared) {
+    const affected = [];
+    for (const { source, floorId } of prepared.divisions || []) {
+      for (const subject of [source, ...(source.sides || [])]) {
+        const scope = subject === source ? 'physical_wall' : 'wall_face';
+        const explicit = Object.keys(subject.overrides || {}).filter((property) => {
+          const spec = Object.values(specifications).find(
+            (entry) => entry.scope === scope && (entry.property || property) === property
+          );
+          return (
+            spec &&
+            !['wall_thickness_m', 'wall_height_m'].includes(property) &&
+            spec.on_split !== 'copy'
+          );
+        });
+        const collections = Object.keys(subject.repeatable || {}).filter(
+          (name) =>
+            subject.repeatable[name]?.length &&
+            !Object.values(specifications).some(
+              (entry) =>
+                entry.kind === 'collection' &&
+                entry.scope === scope &&
+                entry.property === name &&
+                entry.on_split === 'copy'
+            )
+        );
+        if (explicit.length || collections.length)
+          affected.push({ floorId, subjectId: subject.id, properties: explicit, collections });
+      }
+    }
+    return affected;
+  }
+
+  function inheritedChanges(prepared) {
+    const changes = [];
+    // A property-only edit is already an explicit request, not an implicit topology transition.
+    const types =
+      prepared.operation.type === 'batch'
+        ? prepared.operation.operations.map((entry) => entry.type)
+        : [prepared.operation.type];
+    if (
+      types.every((type) =>
+        ['set_property', 'set_defaults', 'set_provider', 'set_values', 'set_custom_rows'].includes(
+          type
+        )
+      )
+    )
+      return changes;
+    for (const floor of prepared.candidate.floors)
+      for (const wall of floor.walls) {
+        const previousWalls = current.floors.find((entry) => entry.id === floor.id)?.walls || [];
+        const parentIds = [
+          wall.id,
+          wall.lineage?.dividedFromWallId,
+          wall.lineage?.profileSource?.wallId,
+          wall.lineage?.copiedFromWallId,
+          wall.lineage?.splitFromWallId,
+        ];
+        const old = parentIds
+          .map((id) => previousWalls.find((entry) => entry.id === id))
+          .find(Boolean);
+        if (!old) continue;
+        for (const [property, value] of Object.entries(wall.properties || {})) {
+          if (own(wall.overrides, property) || equalValue(value, old.properties[property]))
+            continue;
+          changes.push({
+            floorId: floor.id,
+            wallId: wall.id,
+            property,
+            before: copy(old.properties[property]),
+            after: copy(value),
+          });
+        }
+      }
+    return changes;
+  }
+
+  function commit(proposal, decision = null) {
     if (readOnly) return locked();
     const prepared = proposals.get(proposal);
     if (!prepared || prepared.revision !== revision || !scopeExists(prepared.scopeId))
       return stale();
+    if (prepared.generation !== pendingGeneration) return stale();
+    const conflict = prepared.defaultConflicts?.[0];
+    if (conflict) {
+      if (decision?.startsWith('candidate:')) {
+        const value = conflict.candidates[Number(decision.slice(10))]?.value;
+        const owner = prepared.candidate.floors
+          .flatMap((floor) => [
+            floor,
+            ...floor.rooms,
+            ...floor.rooms.flatMap((room) => [...room.columns, ...room.beams, ...room.objects]),
+            ...floor.walls.flatMap((wall) => [wall, ...wall.sides, ...wall.doors, ...wall.windows]),
+          ])
+          .find((subject) => subject.id === conflict.subject.id);
+        if (!owner || Number(decision.slice(10)) >= conflict.candidates.length) return stale();
+        const before = copy(prepared.candidate);
+        owner.overrides ||= {};
+        owner.overrides[conflict.property] = copy(value);
+        prepared.defaultConflicts.shift();
+        const conflicts = reconcileBuildingPlanProperties(
+          prepared.candidate,
+          specifications
+        ).filter((issue) => issue.code !== 'conflicting_room_defaults');
+        try {
+          for (const floor of prepared.candidate.floors)
+            applyThicknessChanges(
+              floor,
+              before.floors.find((entry) => entry.id === floor.id),
+              prepared.operation.activeRoomId,
+              createId,
+              {
+                ...prepared.operation,
+                thicknessAnchor: editingPolicy.thicknessAnchor,
+              },
+              specifications
+            );
+          conflicts.push(...validate(prepared.candidate));
+        } catch (error) {
+          return response(
+            'conflict',
+            error.issues || [planIssue('invalid_operation', error.message)]
+          );
+        }
+        if (conflicts.length) return response('conflict', conflicts);
+        prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+        decision = null;
+      } else {
+        const question = questions.create(
+          {
+            title: 'Resolve shared defaults',
+            message: `Applicable defaults disagree for ${conflict.property}. Choose the common physical value.`,
+            buttons: [
+              ...conflict.candidates.map((candidate, index) => ({
+                id: `candidate:${index}`,
+                label: `${JSON.stringify(candidate.value)} (source ${candidate.id})`,
+              })),
+              { id: 'cancel', label: 'Cancel operation' },
+            ],
+            context: { revision, scopeId: prepared.scopeId },
+          },
+          (reply) => ({ proposal, reply }),
+          () =>
+            !readOnly &&
+            revision === prepared.revision &&
+            pendingGeneration === prepared.generation &&
+            scopeExists(prepared.scopeId)
+        );
+        return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
+      }
+      if (prepared.defaultConflicts.length) return commit(proposal);
+    }
+    const transfers = editingPolicy.copyCustomAnswersAutomatically
+      ? []
+      : transferRequirements(prepared);
+    const inherited = inheritedChanges(prepared);
+    if (
+      !decision &&
+      (transfers.length || (editingPolicy.inheritedChangePolicy === 'ask' && inherited.length))
+    ) {
+      const question = questions.create(
+        {
+          title: 'Review wall changes',
+          message: [
+            inherited.length ? `${inherited.length} inherited physical value(s) would change.` : '',
+            transfers.length
+              ? 'This split copies explicit custom answers and records to the resulting pieces. Confirm that copying is appropriate.'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+          buttons: inherited.length
+            ? [
+                {
+                  id: 'apply',
+                  label: 'Use new defaults' + (transfers.length ? ' and copy answers' : ''),
+                },
+                {
+                  id: 'preserve',
+                  label: 'Keep previous values' + (transfers.length ? ' and copy answers' : ''),
+                },
+                { id: 'cancel', label: 'Cancel operation' },
+              ]
+            : [
+                { id: 'apply', label: 'Copy answers' },
+                { id: 'cancel', label: 'Cancel operation' },
+              ],
+          context: { revision, scopeId: prepared.scopeId },
+        },
+        (reply) => ({ proposal, reply }),
+        () =>
+          !readOnly &&
+          revision === prepared.revision &&
+          prepared.generation === pendingGeneration &&
+          scopeExists(prepared.scopeId)
+      );
+      return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
+    }
+    if (decision === 'preserve') {
+      const before = copy(prepared.candidate);
+      for (const change of inherited) {
+        const wall = prepared.candidate.floors
+          .find((entry) => entry.id === change.floorId)
+          .walls.find((entry) => entry.id === change.wallId);
+        wall.overrides[change.property] = copy(change.before);
+      }
+      const issues = reconcileBuildingPlanProperties(prepared.candidate, specifications);
+      try {
+        for (const floor of prepared.candidate.floors)
+          applyThicknessChanges(
+            floor,
+            before.floors.find((entry) => entry.id === floor.id),
+            prepared.operation.activeRoomId,
+            createId,
+            {
+              ...prepared.operation,
+              thicknessAnchor: editingPolicy.thicknessAnchor,
+            },
+            specifications
+          );
+        issues.push(...validate(prepared.candidate));
+      } catch (error) {
+        return response(
+          'conflict',
+          error.issues || [planIssue('invalid_operation', error.message)]
+        );
+      }
+      if (issues.length) return response('conflict', issues);
+      prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+    }
     proposals.delete(proposal);
+    questions.cancelAll();
     if (prepared.changes.length) {
       current = prepared.candidate;
       past.push({
@@ -276,6 +590,8 @@ export function createBuildingPlanSession({
           'The editor scope must be unique and have an open parent.'
         ),
       ]);
+    questions.cancelAll();
+    pendingGeneration++;
     scopes.set(id, { id, parentScopeId, subject: copy(subject) });
     return response('opened', [], { scopeId: id });
   }
@@ -305,6 +621,8 @@ export function createBuildingPlanSession({
       ]);
     for (const entry of past) if (entry.scopeId === scopeId) entry.scopeId = scope.parentScopeId;
     scopes.delete(scopeId);
+    questions.cancelAll();
+    pendingGeneration++;
     future = [];
     revision++;
     return response('accepted', [], { snapshot: getSnapshot() });
@@ -314,6 +632,8 @@ export function createBuildingPlanSession({
     if (readOnly) return locked();
     if (!scopes.has(scopeId)) return stale();
     const owned = descendants(scopeId);
+    questions.cancelAll();
+    pendingGeneration++;
     const candidate = copy(current);
     const entries = past.filter((entry) => owned.has(entry.scopeId));
     for (const entry of [...entries].reverse())
@@ -362,6 +682,27 @@ export function createBuildingPlanSession({
 
   return {
     getSnapshot,
+    resolveUIRequest(requestId, responseValue) {
+      try {
+        const result = questions.resolve(requestId, responseValue);
+        if (!result || !result.reply) return stale();
+        if (result.reply.cancelled || result.reply.value === 'cancel') {
+          proposals.delete(result.proposal);
+          return response('unchanged', [], { snapshot: getSnapshot() });
+        }
+        return commit(result.proposal, result.reply.value);
+      } catch (error) {
+        return response(
+          'conflict',
+          error.issues || [planIssue('invalid_ui_response', error.message)]
+        );
+      }
+    },
+    isUIRequestCurrent: questions.has,
+    cancelUIRequests() {
+      questions.cancelAll();
+      pendingGeneration++;
+    },
     /** Editor preferences affect future proposals, never the accepted record or history. */
     setEditingPolicy(policy) {
       editingPolicy = normalizeBuildingPlanEditingPolicy(policy);
@@ -372,6 +713,11 @@ export function createBuildingPlanSession({
     /** Adopt a validated host draft without manufacturing a gesture or lifecycle event. */
     synchronize(snapshot) {
       const candidate = copy(snapshot);
+      for (const floor of candidate.floors || [])
+        reconcileWallLabels(
+          floor,
+          current.floors.find((entry) => entry.id === floor.id)
+        );
       const issues = [
         ...reconcileBuildingPlanProperties(candidate, specifications),
         ...validate(candidate),

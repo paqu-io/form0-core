@@ -27,3 +27,5 @@ export {
   getBuildingPlanFieldState,
   resolveBuildingPlanRow,
 } from './transactions.js';
+
+export { settleBuildingPlanQuestions } from './questions.js';

@@ -51,6 +51,63 @@ their immutable binary content and standard file metadata in defensive copies; a
 properties on the handles are outside their native serialization contract. Async schema handlers
 remain unsupported. This media compatibility correction requires the core patch following 0.5.0.
 
+## Managed questions
+
+`MESSAGEBOX(options, callback)` queues a question and returns synchronously. Options support `title`,
+`message`, `buttons` (strings or `{ id, label }`), optional `input: true`, `placeholder`, and an explicit
+portable object `context`. Button IDs must be unique nonempty strings; use stable IDs for translated
+labels. The callback receives `{ value, input, cancelled, context }`. Dismissal sets `value` and
+`input` to null and `cancelled` to true. Context is defensively copied and is not sent to the presenter.
+
+```js
+ON('blur', 'amount', function () {
+  MESSAGEBOX(
+    {
+      title: 'Confirm amount',
+      message: 'Apply this amount?',
+      buttons: [
+        { id: 'apply', label: 'Apply' },
+        { id: 'cancel', label: 'Cancel' },
+      ],
+      context: { requested: $amount },
+    },
+    function (reply) {
+      if (!reply.cancelled && reply.value === 'apply')
+        SETVALUE('approved', reply.context.requested);
+    }
+  );
+});
+```
+
+Callbacks are compiled managed handlers, with current field reads and the originating scope's write
+permissions. They cannot capture outer handler variables. Pass required values through `context`.
+Callback source is retained for Hermes; arbitrary async handlers remain unsupported. Validation and
+cancel/unload handlers cannot show questions. Readonly questions may read values; writes remain
+prohibited. Builtin operations remain synchronous, including `trigger()` and `triggerDetailed()`.
+
+The engine returns serializable `UI_OPERATION` descriptors with `operation: 'MESSAGEBOX'` and a
+`params.requestId`. Callbacks stay private in the originating runtime. The host first settles the
+originating operation batch, then presents questions in order. `engine.resolveUIRequest(requestId,
+{ value, input?, cancelled? })` consumes one valid response and returns the same detailed result
+structure as `triggerDetailed`. Invalid responses can be corrected; duplicate or stale responses
+produce execution issues. A callback can queue another question. Process those responses inside the
+active operation flow, never behind the dispatch waiting for the response. Cancelling a dialog does
+not undo earlier unrelated event writes. `engine.cancelUIRequests()` invalidates outstanding work
+without executing callbacks. Hosts call it when an editor closes, a subject disappears, a mode changes
+or the target generation is replaced, and recheck scope/permissions before applying replies.
+
+Bindings expose `engineOptions.onMessageBox(question, { isCurrent })` as a presenter returning a
+response promise. React worker transport keeps the registry and authored callbacks in the worker;
+only descriptors and replies cross the boundary. Built-in React/Native and CLI editors use their
+existing dialog presentation. Hosts with custom presenters must dismiss obsolete questions when
+`isCurrent()` becomes false.
+
+Normal text/numeric `change` and `blur` behavior is unchanged. Blur fires on every focus departure.
+Internal BuildingPlan completion separately requires a changed, valid value; it does not suppress
+ordinary authored MESSAGEBOX calls. Save finishes focused edits and decisions; Cancel closes its
+draft without forcing a new internal blur question. No Done/Enter control is added. Required
+BuildingPlan questions use the shared internal question service and are never editable event code.
+
 ## Engine-bound ownership
 
 Root engines default to `eventScope: { instancePath: [] }`. A headless row engine must explicitly
@@ -224,3 +281,5 @@ finding review. Fresh browser main-thread, actual browser-worker and Android/Her
 is required for binding adoption; earlier diagnostic acceptance does not count as event acceptance.
 iOS remains deferred. Preserve `development → main`; version bumps, publication, merges, deployment
 and issue/card closure remain maintainer steps. Core alone does not make #98/#102 closure-eligible.
+
+BuildingPlan auto-copy authorization is a domain editing preference, not a MESSAGEBOX filter. `editingPolicy.copyCustomAnswersAutomatically` permits custom-answer/collection transfers without their copy question; it does not suppress authored MESSAGEBOX calls, shared-default conflicts, inherited-value ask mode, readonly guards or opening recovery. React and React Native start with auto-copy enabled; CLI/core sessions start disabled. Cancelled canvas candidates clear local preview geometry as well as leaving accepted domain state unchanged.

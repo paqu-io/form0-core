@@ -49,16 +49,15 @@ export function createBuildingPlanExample() {
             rooms: { extra_elements: [field('TextField', 'room_note', 'Room note')] },
             walls: {
               extra_elements: [
-                field('TextField', 'finish', 'Room-side finish'),
+                field('TextField', 'finish', 'Room-side finish', {
+                  building_plan: { scope: 'wall_face', on_split: 'copy' },
+                }),
                 field('TextField', 'material', 'Construction material', {
                   default_value: 'Masonry',
+                  building_plan: { scope: 'physical_wall', on_split: 'copy' },
                 }),
                 field('NumericField', 'measured_thickness', 'Observed thickness (m)'),
               ],
-              field_bindings: {
-                material: { scope: 'physical_wall', inherit: true },
-                measured_thickness: { scope: 'observation' },
-              },
             },
           },
         },
@@ -109,19 +108,10 @@ export function createBuildingPlanExample() {
     floorId,
     wallId,
     kind: 'door',
-    offset: 3.5,
+    offset: 0.5,
     width: 0.9,
     height: 2,
     values: { door_label: 'Shared door' },
-  });
-  apply({
-    type: 'add_observation',
-    floorId,
-    subject: { type: 'room_face', id: faceA },
-    observedAt: '2026-11-02',
-    coverage: { interval: [3, 5], unit: 'm' },
-    evidence: ['fixture-photo-reference'],
-    values: { measured_thickness: 0.19 },
   });
   const record = writeBuildingPlanRecord({
     meta,

@@ -25,7 +25,7 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
         ? [edit.openingId]
         : [];
   const editedOpenings = new Set(targets(base));
-  const run = (ids, allowObservationDeletion) => {
+  const run = (ids) => {
     const candidate = copy(current);
     for (const id of ids) {
       const opening = openings.get(id);
@@ -34,7 +34,6 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
         floorId: opening.floorId,
         wallId: opening.wallId,
         openingId: id,
-        allowObservationDeletion,
       });
     }
     const result = apply(candidate, base);
@@ -63,10 +62,14 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
   for (let attempt = 0; attempt <= openings.size; attempt++) {
     let discovered = [];
     try {
-      prepared = run(affected, true);
+      prepared = run(affected);
       discovered = prepared.idsToRemove;
     } catch (error) {
-      if (error.issues?.some((issue) => issue.code === 'opening_crosses_edit_boundary'))
+      if (
+        error.issues?.some((issue) =>
+          ['opening_crosses_edit_boundary', 'opening_crosses_split'].includes(issue.code)
+        )
+      )
         discovered = error.issues.flatMap((issue) => issue.openingIds || [issue.subject?.id]);
       else throw error;
     }
@@ -118,11 +121,6 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
     });
   if (!ids.length) return prepared;
   if (requested === undefined) {
-    const observationIds = current.floors.flatMap((floor) =>
-      floor.observations
-        .filter((observation) => affected.has(observation.subject?.id))
-        .map((observation) => observation.id)
-    );
     const items = ids.map((id) => {
       const item = openings.get(id);
       return { id, type: item.type, label: item.values?.[`${item.type}_label`] || item.type };
@@ -132,11 +130,10 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
       issues: [
         planIssue('opening_cut_requires_confirmation', message, null, {
           openingIds: ids,
-          observationIds,
           openings: items,
         }),
       ],
     });
   }
-  return run(affected, operation.allowObservationDeletion === true);
+  return run(affected);
 }

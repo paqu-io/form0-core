@@ -85,7 +85,8 @@
                 "pattern_description": null,
                 "supporting_image": false,
                 "supporting_image_path": null,
-                "supporting_image_display": null
+                "supporting_image_display": null,
+                "building_plan": { "scope": "wall_face", "on_split": "copy" }
               },
               {
                 "type": "TextField",
@@ -106,7 +107,8 @@
                 "pattern_description": null,
                 "supporting_image": false,
                 "supporting_image_path": null,
-                "supporting_image_display": null
+                "supporting_image_display": null,
+                "building_plan": { "scope": "physical_wall", "on_split": "copy" }
               },
               {
                 "type": "NumericField",
@@ -130,11 +132,7 @@
                 "supporting_image_path": null,
                 "supporting_image_display": null
               }
-            ],
-            "field_bindings": {
-              "material": { "scope": "physical_wall", "inherit": true },
-              "measured_thickness": { "scope": "observation" }
-            }
+            ]
           }
         }
       }

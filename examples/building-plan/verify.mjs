@@ -21,9 +21,10 @@ assert.deepEqual(decoded, expected, 'The saved record must decode to the documen
 assert.deepEqual(validateBuildingPlanSnapshot(decoded), []);
 const floor = decoded.floors[0];
 assert.equal(floor.rooms.length, 2);
-assert.equal(floor.walls.length, 7);
+assert.equal(floor.walls.length, 9);
+assert.ok(floor.walls.every((wall) => wall.segments.length === 1 && wall.sides.length === 2));
 assert.equal(floor.walls.flatMap((wall) => wall.doors).length, 1);
-assert.equal(floor.observations.length, 1);
+assert.equal(Object.hasOwn(floor, 'observations'), false);
 const [a, b] = floor.rooms.map((room) =>
   room.faces.find((face) =>
     floor.rooms.some(
@@ -38,5 +39,5 @@ assert.equal(
   2
 );
 console.log(
-  'BuildingPlan example verified: 2 rooms, 7 walls, 2 m partial sharing, 1 door, 1 observation.'
+  'BuildingPlan example verified: 2 rooms, 9 straight physical pieces, 2 m sharing, 1 door, canonical sides.'
 );

@@ -1,3 +1,4 @@
+import { originalVertices, originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -26,26 +27,39 @@ function fixture() {
   return { ...f, session, apply };
 }
 
-test('an editing cut adds shared facing rows while retaining one physical wall and original evidence', () => {
+test('an editing cut divides physical ownership and copies accepted surface answers', () => {
   const f = fixture();
   f.apply({ type: 'set_property', faceId: f.faceA, property: 'finish', value: 'painted' });
   f.apply({ type: 'set_property', faceId: f.faceB, property: 'finish', value: 'paper' });
   const before = f.session.getSnapshot().floors[0];
   const result = f.apply({ type: 'split_face', faceId: f.faceA, offset: 1.5 });
   const after = f.session.getSnapshot().floors[0];
-  assert.equal(after.walls.length, 7);
-  assert.deepEqual(after.walls, before.walls);
+  assert.equal(after.walls.length, before.walls.length + 1);
+  assert.ok(after.walls.every((wall) => wall.segments.length === 1));
+  assert.deepEqual(
+    after.walls.flatMap((wall) => wall.doors),
+    before.walls.flatMap((wall) => wall.doors)
+  );
   assert.deepEqual(after.observations, before.observations);
   for (const room of after.rooms) {
-    assert.equal(room.faces.length, 5);
+    assert.equal(room.faces.length, 6);
     const cut = room.vertices.find((point) => point.editingCutId === result.created.id);
     assert.ok(cut);
     assert.equal(cut.x, 3.5);
     assert.equal(cut.y, room.id === after.rooms[0].id ? 3 : 3.2);
-    assert.equal(room.faces.filter((face) => face.wallId === f.wallId).length, 2);
+    assert.equal(
+      room.faces.filter(
+        (face) =>
+          face.id === (room.id === after.rooms[0].id ? f.faceA : f.faceB) ||
+          face.lineage?.editingOriginFaceId === (room.id === after.rooms[0].id ? f.faceA : f.faceB)
+      ).length,
+      3
+    );
     assert.ok(
       room.faces
-        .filter((face) => face.wallId === f.wallId)
+        .filter(
+          (face) => after.walls.find((wall) => wall.id === face.wallId)?.exposure === 'interior'
+        )
         .every(
           (face) => face.overrides.finish === (room.id === after.rooms[0].id ? 'painted' : 'paper')
         )
@@ -87,10 +101,10 @@ test('moving a split portion creates an orthogonal local jog and keeps the expli
   f.apply({ type: 'resize_face', faceId: movingFace.id, distance: -0.6 });
   for (const restored of f.session.getSnapshot().floors[0].rooms) {
     assert.ok(restored.vertices.some((v) => v.editingCutId === cut));
-    assert.equal(restored.vertices.length, 5);
+    assert.equal(originalVertices(restored).length, 5);
   }
   f.apply({ type: 'rejoin_cut', cutId: cut });
-  assert.ok(f.session.getSnapshot().floors[0].rooms.every((room) => room.faces.length === 4));
+  assert.ok(f.session.getSnapshot().floors[0].rooms.every((room) => room.faces.length === 5));
 });
 
 test('Rejoin removes a compatible shared cut atomically and Undo restores its rows and identity', () => {
@@ -100,10 +114,13 @@ test('Rejoin removes a compatible shared cut atomically and Undo restores its ro
   f.apply({ type: 'rejoin_cut', cutId });
   const joined = f.session.getSnapshot();
   for (const room of joined.floors[0].rooms) {
-    assert.equal(room.vertices.length, 4);
-    assert.equal(room.faces.length, 4);
+    assert.equal(room.vertices.length, 5);
+    assert.equal(room.faces.length, 5);
   }
-  assert.deepEqual(joined.floors[0].walls, f.snapshot.floors[0].walls);
+  assert.deepEqual(
+    joined.floors[0].walls.map(({ lineage, ...wall }) => wall),
+    f.snapshot.floors[0].walls.map(({ lineage, ...wall }) => wall)
+  );
   assert.deepEqual(joined.floors[0].observations, f.snapshot.floors[0].observations);
   assert.equal(f.session.undo().status, 'undone');
   assert.deepEqual(f.session.getSnapshot(), split);
@@ -123,9 +140,14 @@ test('Rejoin rejects a jog and differing room-side answers without dropping eith
   f.session.undo();
   assert.deepEqual(f.session.getSnapshot(), cut);
   const other = cut.floors[0].rooms[0].faces.find(
-    (face) => face.wallId === f.wallId && face.id !== f.faceA
+    (face) => face.lineage?.editingOriginFaceId === f.faceA && face.id !== f.faceA
   );
-  f.apply({ type: 'set_values', faceId: other.id, values: { finish: 'painted' } });
+  f.apply({
+    type: 'set_values',
+    faceId: other.id,
+    scope: 'wall_face',
+    values: { finish: 'painted' },
+  });
   const answers = f.session.getSnapshot();
   rejected = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId });
   assert.equal(rejected.issues[0].code, 'cut_answer_conflict');
@@ -134,17 +156,16 @@ test('Rejoin rejects a jog and differing room-side answers without dropping eith
 
 test('Rejoin targets only the chosen cut and preserves a second explicit division', () => {
   const f = fixture();
-  const faceId = f.snapshot.floors[0].rooms[0].faces[0].id;
+  const faceId = originalFaces(f.snapshot.floors[0].rooms[0])[0].id;
   const first = f.apply({ type: 'split_face', faceId, offset: 2 }).created.id;
   const room = f.session.getSnapshot().floors[0].rooms[0];
   const secondFace = room.faces.find(
-    (face) =>
-      face.id !== faceId && face.wallId === room.faces.find((face) => face.id === faceId).wallId
+    (face) => face.id !== faceId && face.lineage?.editingOriginFaceId === faceId
   );
   const second = f.apply({ type: 'split_face', faceId: secondFace.id, offset: 1 }).created.id;
   f.apply({ type: 'rejoin_cut', cutId: first });
   const joined = f.session.getSnapshot().floors[0].rooms[0];
-  assert.equal(joined.vertices.length, 5);
+  assert.equal(joined.vertices.length, 6);
   assert.ok(!joined.vertices.some((point) => point.editingCutId === first));
   assert.ok(joined.vertices.some((point) => point.editingCutId === second && point.x === 3));
 });
@@ -168,7 +189,16 @@ test('cuts through openings and at endpoints are rejected atomically; an opening
     assert.deepEqual(f.session.getSnapshot(), before);
   }
   f.apply({ type: 'split_face', faceId: f.faceA, offset: 0.5 });
-  assert.deepEqual(f.session.getSnapshot().floors[0].walls, before.floors[0].walls);
+  assert.equal(f.session.getSnapshot().floors[0].walls.length, before.floors[0].walls.length + 1);
+  assert.deepEqual(
+    f.session
+      .getSnapshot()
+      .floors[0].walls.flatMap((wall) => wall.doors)
+      .map(({ segmentId, offset, values, ...opening }) => opening),
+    before.floors[0].walls
+      .flatMap((wall) => wall.doors)
+      .map(({ segmentId, offset, values, ...opening }) => opening)
+  );
 });
 
 test('an internal straight partition supports editing cuts and Rejoin without duplicating construction', () => {
@@ -185,7 +215,7 @@ test('an internal straight partition supports editing cuts and Rejoin without du
   const faceId = before.rooms[0].faces.find((face) => face.wallId === wallId).id;
   const cutId = f.apply({ type: 'split_face', faceId, offset: 1 }).created.id;
   const divided = f.session.getSnapshot().floors[0];
-  assert.equal(divided.walls.length, before.walls.length);
+  assert.equal(divided.walls.length, before.walls.length + 1);
   assert.equal(divided.rooms[0].faces.length, before.rooms[0].faces.length + 1);
   f.apply({ type: 'rejoin_cut', cutId });
   assert.equal(
@@ -203,7 +233,7 @@ test('detaching a room gives its copied cuts independent identities and Rejoin l
   const copied = floor.rooms[0].vertices.find((v) => v.editingCutId).editingCutId;
   assert.notEqual(copied, cutId);
   f.apply({ type: 'rejoin_cut', cutId: copied });
-  assert.equal(f.session.getSnapshot().floors[0].rooms[0].vertices.length, 4);
+  assert.equal(originalVertices(f.session.getSnapshot().floors[0].rooms[0]).length, 4);
   assert.ok(
     f.session.getSnapshot().floors[0].rooms[1].vertices.some((v) => v.editingCutId === cutId)
   );
@@ -226,7 +256,7 @@ test('canvas split placement projects magnetic nodes, supports precise bypass, a
     readOnly: () => locked,
   });
   const roomId = f.snapshot.floors[0].rooms[0].id;
-  const faceId = f.snapshot.floors[0].rooms[0].faces[0].id;
+  const faceId = originalFaces(f.snapshot.floors[0].rooms[0])[0].id;
   const snapped = controller.getCutPlacement({ x: 58, y: 0 }, { roomId, wallId: faceId });
   assert.deepEqual(snapped.point, { x: 60, y: 0 });
   assert.equal(snapped.offset, 3);
@@ -271,91 +301,30 @@ test('a child Cancel restores shared cuts without losing earlier floor defaults'
   assert.deepEqual(f.session.getSnapshot(), before);
 });
 
-test('Rejoin remaps retired facing and vertex observations while preserving captured evidence', () => {
+test('removed observation operations are rejected without affecting ordinary rows or geometry', () => {
   const f = fixture();
-  const cutId = f.apply({ type: 'split_face', faceId: f.faceA, offset: 1.5 }).created.id;
-  const room = f.session.getSnapshot().floors[0].rooms[0];
-  const other = room.faces.find((face) => face.wallId === f.wallId && face.id !== f.faceA);
-  const vertex = room.vertices.find((v) => v.editingCutId === cutId);
-  for (const subject of [
-    { type: 'room_face', id: other.id },
-    { type: 'vertex', id: vertex.id },
-  ])
-    f.apply({
-      type: 'add_observation',
-      subject,
-      observedAt: '2026-11-04T12:00:00Z',
-      evidence: [{ reference: 'fixture://cut' }],
-      values: { note: 'original' },
+  const before = f.session.getSnapshot();
+  for (const type of ['add_observation', 'update_observation', 'remove_observation']) {
+    const result = f.session.apply({
+      type,
+      floorId: f.floorId,
+      subject: { type: 'wall', id: f.wallId },
     });
-  const original = f.session.getSnapshot().floors[0].observations.slice(-2);
-  f.apply({ type: 'rejoin_cut', cutId });
-  const after = f.session.getSnapshot().floors[0].observations.slice(-2);
-  for (let i = 0; i < 2; i++) {
-    assert.deepEqual(after[i].sourceSubject, original[i].sourceSubject);
-    assert.deepEqual(after[i].sourceGeometry, original[i].sourceGeometry);
-    assert.deepEqual(after[i].evidence, original[i].evidence);
-    assert.deepEqual(after[i].values, original[i].values);
-    assert.equal(after[i].subject.id, f.faceA);
+    assert.equal(result.status, 'conflict');
+    assert.equal(result.issues[0].code, 'unknown_operation');
+    assert.deepEqual(f.session.getSnapshot(), before);
   }
-  assert.deepEqual(f.session.validate(), []);
 });
-
-for (const partition of [false, true])
-  test(`Split retains observations targeting the replaced edge (partition=${partition})`, () => {
-    const f = fixture();
-    let faceId = f.faceA;
-    if (partition) {
-      const wallId = f.apply({
-        type: 'create_wall',
-        roomId: f.snapshot.floors[0].rooms[0].id,
-        vertices: [
-          { x: 1, y: 1 },
-          { x: 4, y: 1 },
-        ],
-      }).created.id;
-      faceId = f.session
-        .getSnapshot()
-        .floors[0].rooms[0].faces.find((face) => face.wallId === wallId).id;
-    }
-    const face = f.session
-      .getSnapshot()
-      .floors[0].rooms[0].faces.find((face) => face.id === faceId);
-    const edgeId = (face.freeEdges || face.edgeIds)[0];
-    f.apply({
-      type: 'add_observation',
-      subject: { type: 'edge', id: edgeId },
-      observedAt: '2026-11-04T12:00:00Z',
-      evidence: [{ reference: 'fixture://original-edge' }],
-      values: { measured_thickness: 0.19 },
-      sourceGeometry: {
-        basis: 'survey',
-        vertices: face.freePath || f.snapshot.floors[0].rooms[0].vertices,
-      },
-    });
-    const original = f.session.getSnapshot().floors[0].observations.at(-1);
-    const cutId = f.apply({ type: 'split_face', faceId, offset: 1.5 }).created.id;
-    const after = f.session.getSnapshot().floors[0].observations.at(-1);
-    assert.deepEqual(after.subject, { type: 'room_face', id: faceId });
-    for (const key of ['sourceSubject', 'sourceGeometry', 'evidence', 'values', 'observedAt'])
-      assert.deepEqual(after[key], original[key]);
-    const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
-    assert.deepEqual(
-      readBuildingPlanRecord({ meta: f.meta, record }).floors[0].observations.at(-1),
-      after
-    );
-    f.apply({ type: 'rejoin_cut', cutId });
-    assert.deepEqual(f.session.getSnapshot().floors[0].observations.at(-1), after);
-    assert.deepEqual(f.session.validate(), []);
-  });
 
 test('the existing Thickness field edits only a split unshared span and child Cancel restores it', () => {
   const f = fixture();
-  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 });
   const nodes = f.meta.repeatablesByNodeKey;
   const before = f.session.getSnapshot();
   const face = before.floors[0].rooms[1].faces.find(
-    (face) => face.wallId === f.wallId && face.id !== f.faceB
+    (face) =>
+      face.lineage?.editingOriginFaceId === f.faceB &&
+      before.floors[0].walls.find((wall) => wall.id === face.wallId)?.exposure === 'exterior'
   );
   const record = writeBuildingPlanRecord({ meta: f.meta, plan: before });
   const editor = createBuildingPlanEditor({ meta: f.meta, record });
@@ -380,7 +349,7 @@ test('the existing Thickness field edits only a split unshared span and child Ca
   assert.equal(changed.status, 'applied', JSON.stringify(changed.issues));
   const after = editor.getSnapshot();
   const physical = after.floors[0].walls.find((wall) => wall.id === f.wallId);
-  assert.equal(after.floors[0].walls.length, 7);
+  assert.ok(after.floors[0].walls.every((wall) => wall.segments.length === 1));
   assert.equal(physical.properties.wall_thickness_m, 0.2);
   assert.deepEqual(
     after.floors[0].rooms.map((room) => room.vertices),
@@ -399,7 +368,7 @@ test('the existing Thickness field edits only a split unshared span and child Ca
   assert.equal(valueFor(f.faceA), 0.2);
   assert.equal(valueFor(f.faceB), 0.2);
   const state = editor.fieldState(path, thicknessField);
-  assert.equal(state.source.scope, 'construction_segment');
+  assert.equal(state.source.scope, 'physical_wall');
   assert.equal(state.source.mode, 'override');
   assert.deepEqual(readBuildingPlanRecord({ meta: f.meta, record: editor.getRecord() }), after);
   assert.equal(editor.cancelRow('local-thickness').status, 'cancelled');
@@ -408,7 +377,7 @@ test('the existing Thickness field edits only a split unshared span and child Ca
 
 test('shared portion thickness anchors the active face, updates both room sides and resets without a micro-jog', () => {
   const f = fixture();
-  const cutId = f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 }).created.id;
+  const cutId = f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 }).created.id;
   const before = f.session.getSnapshot();
   f.apply({
     type: 'set_property',
@@ -419,24 +388,22 @@ test('shared portion thickness anchors the active face, updates both room sides 
   });
   const after = f.session.getSnapshot();
   const floor = after.floors[0];
-  assert.equal(floor.walls.length, 7);
+  assert.ok(floor.walls.every((wall) => wall.segments.length === 1));
   assert.deepEqual(floor.rooms[1].vertices, before.floors[0].rooms[1].vertices);
+  assert.ok(floor.rooms[0].vertices.some((vertex) => vertex.x === 3 && vertex.y === 2.8));
+  assert.ok(floor.rooms[0].vertices.some((vertex) => vertex.x === 4.5 && vertex.y === 2.8));
+  const selected = floor.rooms[1].faces.find((face) => face.id === f.faceB);
+  const counterpart = floor.rooms[0].faces.find((face) => face.wallId === selected.wallId);
+  const wall = floor.walls.find((wall) => wall.id === selected.wallId);
+  assert.equal(wall.properties.wall_thickness_m, 0.4);
+  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).properties.wall_thickness_m, 0.2);
   assert.deepEqual(
-    floor.rooms[0].vertices.map(({ x, y }) => [x, y]),
-    [
-      [0, 0],
-      [5, 0],
-      [5, 2.8],
-      [3, 2.8],
-      [3, 3],
-      [0, 3],
-    ]
-  );
-  const wall = floor.walls.find((wall) => wall.id === f.wallId);
-  assert.equal(wall.properties.wall_thickness_m, 0.2);
-  assert.equal(
-    wall.doors[0].width,
-    before.floors[0].walls.find((wall) => wall.id === f.wallId).doors[0].width
+    floor.walls
+      .flatMap((wall) => wall.doors)
+      .map(({ id, width, height }) => ({ id, width, height })),
+    before.floors[0].walls
+      .flatMap((wall) => wall.doors)
+      .map(({ id, width, height }) => ({ id, width, height }))
   );
   assert.deepEqual(floor.observations, before.floors[0].observations);
   const projection = buildingPlanCanvasSnapshot({
@@ -445,7 +412,7 @@ test('shared portion thickness anchors the active face, updates both room sides 
     plan: after,
     gridSize: 20,
   });
-  assert.equal(projection.walls.find((face) => face.id === f.faceA).thickness, 0.4);
+  assert.equal(projection.walls.find((face) => face.id === counterpart.id).thickness, 0.4);
   assert.equal(projection.walls.find((face) => face.id === f.faceB).thickness, 0.4);
   const incompatible = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId });
   assert.equal(incompatible.status, 'conflict');
@@ -471,13 +438,15 @@ test('shared portion thickness anchors the active face, updates both room sides 
 
 test('portion overrides keep live defaults, explicit unknown and readonly intent through round trips', () => {
   const f = fixture();
-  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 });
   const face = f.session
     .getSnapshot()
-    .floors[0].rooms[1].faces.find((face) => face.wallId === f.wallId && face.id !== f.faceB);
+    .floors[0].rooms[1].faces.find(
+      (face) => face.lineage?.editingOriginFaceId === f.faceB && face.id !== f.faceB
+    );
   f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
   f.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.3 });
-  assert.equal(f.session.getSnapshot().floors[0].walls.length, 7);
+  assert.ok(f.session.getSnapshot().floors[0].walls.every((wall) => wall.segments.length === 1));
   const view = () =>
     buildingPlanCanvasSnapshot({
       meta: f.meta,
@@ -485,7 +454,7 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
       record: writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() }),
       plan: f.session.getSnapshot(),
     });
-  assert.equal(view().walls.find((wall) => wall.id === f.faceA).thickness, 0.3);
+  assert.equal(view().walls.find((wall) => wall.id === f.faceB).thickness, 0.3);
   assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, 0.4);
   f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: null });
   assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, null);
@@ -495,13 +464,11 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
     record: writeBuildingPlanRecord({ meta: f.meta, plan: before }),
   });
   assert.ok(
-    restored.floors[0].walls
-      .flatMap((wall) => wall.segments)
-      .some(
-        (segment) =>
-          Object.hasOwn(segment.overrides || {}, 'wall_thickness_m') &&
-          segment.overrides.wall_thickness_m === null
-      )
+    restored.floors[0].walls.some(
+      (wall) =>
+        Object.hasOwn(wall.overrides || {}, 'wall_thickness_m') &&
+        wall.overrides.wall_thickness_m === null
+    )
   );
   const invalid = f.session.apply({
     type: 'set_property',
@@ -533,7 +500,7 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
 
 test('a portion-property batch infers the selected room anchor without touching another floor', () => {
   const f = fixture();
-  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 });
   f.apply({ type: 'create_floor', defaults: { wall_thickness_m: 0.25 } });
   const before = f.session.getSnapshot();
   f.apply({
@@ -557,21 +524,23 @@ test('a portion-property batch infers the selected room anchor without touching 
 
 test('Rejoin checks the selected portions rather than an unrelated thickness profile elsewhere', () => {
   const f = fixture();
-  const source = f.snapshot.floors[0].rooms[0].faces[0];
+  const source = originalFaces(f.snapshot.floors[0].rooms[0])[0];
   const first = f.apply({ type: 'split_face', faceId: source.id, offset: 2 }).created.id;
   const secondFace = f.session
     .getSnapshot()
     .floors[0].rooms[0].faces.find(
-      (face) => face.wallId === source.wallId && face.id !== source.id
+      (face) => face.lineage?.editingOriginFaceId === source.id && face.id !== source.id
     );
   const second = f.apply({ type: 'split_face', faceId: secondFace.id, offset: 1 }).created.id;
   const thirdFace = f.session
     .getSnapshot()
-    .floors[0].rooms[0].faces.filter((face) => face.wallId === source.wallId)
+    .floors[0].rooms[0].faces.filter(
+      (face) => face.id === source.id || face.lineage?.editingOriginFaceId === source.id
+    )
     .at(-1);
   f.apply({ type: 'set_property', faceId: thirdFace.id, property: 'wall_thickness_m', value: 0.4 });
   f.apply({ type: 'rejoin_cut', cutId: first });
-  assert.equal(f.session.getSnapshot().floors[0].rooms[0].faces.length, 5);
+  assert.equal(f.session.getSnapshot().floors[0].rooms[0].faces.length, 6);
   assert.ok(
     f.session
       .getSnapshot()
@@ -607,9 +576,9 @@ test('partition Rejoin retains incompatible local thickness and its explicit cut
   assert.deepEqual(f.session.getSnapshot(), before);
 });
 
-test('resetting shared thickness cannot retire another open wall editor', () => {
+test('thickness profiles do not own rows or retire another open split-piece editor', () => {
   const f = fixture();
-  f.apply({ type: 'split_face', faceId: f.faceB, offset: 2 });
+  f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 });
   f.apply({
     type: 'set_property',
     faceId: f.faceB,
@@ -638,30 +607,23 @@ test('resetting shared thickness cannot retire another open wall editor', () => 
     },
   ];
   const shared = editor.openRow({ path: path(1, f.faceB), scopeId: 'shared' });
-  const sibling = editor.getSnapshot().floors[0].rooms[0].faces.find(
+  const floor = editor.getSnapshot().floors[0];
+  assert.ok(floor.walls.every((wall) => !wall.segments[0].junction));
+  const selected = floor.rooms[1].faces.find((face) => face.id === f.faceB);
+  const sibling = floor.rooms[0].faces.find(
     (face) =>
-      face.wallId === f.wallId &&
-      face.id !== f.faceA &&
-      !face.bindings.some(
-        (binding) =>
-          f.session
-            .getSnapshot()
-            .floors[0].walls.find((wall) => wall.id === f.wallId)
-            .segments.find((segment) => segment.id === binding.segmentId)?.junction
-      )
+      face.wallId !== selected.wallId &&
+      floor.walls.find((wall) => wall.id === face.wallId).sides.every((side) => side.roomId)
   );
   assert.ok(sibling);
   editor.openRow({ path: path(0, sibling.id), scopeId: 'sibling' });
-  const before = editor.getSnapshot();
-  const blocked = editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness_m'] });
-  assert.equal(blocked.status, 'conflict');
-  assert.equal(blocked.issues[0].code, 'wall_editor_active');
-  assert.deepEqual(editor.getSnapshot(), before);
-  editor.cancelRow('sibling');
   assert.equal(
     editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness_m'] }).status,
     'applied'
   );
+  assert.ok(editor.hasEditor('sibling'));
+  assert.ok(editor.getSnapshot().floors[0].walls.some((wall) => wall.id === sibling.wallId));
+  assert.equal(editor.getSnapshot().floors[0].walls.length, floor.walls.length);
 });
 
 test('live thickness changes preserve explicit cuts and readonly sessions refuse both commands', () => {
@@ -706,7 +668,7 @@ test('malformed persisted cut identities are rejected in boundary and partition 
     const room = invalid.floors[0].rooms[0];
     const point = partition
       ? room.faces.find((face) => face.freePath).freePath[0]
-      : room.vertices[0];
+      : originalVertices(room)[0];
     point.editingCutId = 42;
     assert.throws(
       () => createBuildingPlanSession({ snapshot: invalid, properties: f.meta.properties }),
@@ -717,15 +679,15 @@ test('malformed persisted cut identities are rejected in boundary and partition 
 
 test('an editing cut can revisit a previously joined straight wall position', () => {
   const f = fixture();
-  const wallId = f.snapshot.floors[0].rooms[0].faces[0].wallId;
-  f.apply({ type: 'split_wall', wallId, offset: 2 });
+  const wallId = originalFaces(f.snapshot.floors[0].rooms[0])[0].wallId;
+  const initialSplit = f.apply({ type: 'split_wall', wallId, offset: 2 });
   const other = f.session
     .getSnapshot()
-    .floors[0].walls.find((wall) => wall.lineage?.splitFromWallId === wallId);
-  f.apply({ type: 'join_walls', wallId, otherWallId: other.id });
+    .floors[0].walls.find((wall) => wall.id !== wallId && wall.lineage?.splitFromWallId === wallId);
+  f.apply({ type: 'rejoin_cut', cutId: initialSplit.created.id });
   f.apply({
     type: 'resize_face',
-    faceId: f.snapshot.floors[0].rooms[0].faces[3].id,
+    faceId: originalFaces(f.snapshot.floors[0].rooms[0])[3].id,
     distance: 0.1,
   });
   const cutFace = f.session
@@ -746,11 +708,16 @@ test('a wall editor opened by position retains its subject when Split inserts an
   const path = [
     { key: nodes.floors.preferredKey, index: 0 },
     { key: nodes.rooms.preferredKey, index: 0 },
-    { key: nodes.walls.preferredKey, index: 3 },
+    {
+      key: nodes.walls.preferredKey,
+      index: f.snapshot.floors[0].rooms[0].faces.findIndex(
+        (face) => face.id === originalFaces(f.snapshot.floors[0].rooms[0])[3].id
+      ),
+    },
   ];
   const opened = editor.openRow({ path, scopeId: 'west' });
   assert.equal(opened.status, 'opened');
-  const westId = f.snapshot.floors[0].rooms[0].faces[3].id;
+  const westId = originalFaces(f.snapshot.floors[0].rooms[0])[3].id;
   assert.equal(
     editor.apply({ type: 'split_face', floorId: f.floorId, faceId: f.faceA, offset: 1.5 }).status,
     'applied'
@@ -770,7 +737,7 @@ test('a wall editor opened by position retains its subject when Split inserts an
       .finish,
     undefined
   );
-  assert.ok(editor.getSnapshot().floors[0].rooms.every((room) => room.faces.length === 5));
+  assert.ok(editor.getSnapshot().floors[0].rooms.every((room) => room.faces.length === 6));
 });
 
 test('Rejoin cannot retire a wall row with an open editor, and succeeds after that editor closes', () => {
@@ -827,7 +794,9 @@ for (const preserveWallGrouping of [false, true])
       const cutId = f.apply({ type: 'split_face', faceId: first.id, offset: 1 }).created.id;
       const second = f.session
         .getSnapshot()
-        .floors[0].rooms[0].faces.find((face) => face.wallId === wallId && face.id !== first.id);
+        .floors[0].rooms[0].faces.find(
+          (face) => face.lineage?.editingOriginFaceId === first.id && face.id !== first.id
+        );
       const moving = movingRight ? second : first,
         stationary = movingRight ? first : second;
       const xs = movingRight ? [2, 4] : [1, 2];
@@ -839,7 +808,7 @@ for (const preserveWallGrouping of [false, true])
       });
       let floor = f.session.getSnapshot().floors[0];
       assert.equal(floor.rooms[0].faces.filter((face) => face.freePath).length, 3);
-      assert.equal(floor.walls.length, preserveWallGrouping ? 8 : 10);
+      assert.equal(floor.walls.length, 12);
       assert.ok(
         floor.rooms[0].faces
           .find((face) => face.id === stationary.id)
@@ -896,7 +865,7 @@ for (const preserveWallGrouping of [false, true])
         f.session.getSnapshot().floors[0].rooms[0].faces.filter((face) => face.freePath).length,
         1
       );
-      assert.equal(f.session.getSnapshot().floors[0].walls.length, 8);
+      assert.equal(f.session.getSnapshot().floors[0].walls.length, 10);
       const opening = f.session
         .getSnapshot()
         .floors[0].walls.flatMap((wall) => wall.windows)
@@ -922,7 +891,9 @@ test('straightening a partition return offers the existing explicit opening-remo
   f.apply({ type: 'split_face', faceId: first.id, offset: 1 });
   const second = f.session
     .getSnapshot()
-    .floors[0].rooms[0].faces.find((face) => face.wallId === wallId && face.id !== first.id);
+    .floors[0].rooms[0].faces.find(
+      (face) => face.lineage?.editingOriginFaceId === first.id && face.id !== first.id
+    );
   f.apply({
     type: 'update_wall',
     wallId,

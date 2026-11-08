@@ -43,6 +43,7 @@ import { DAYS, DAYS_METADATA } from './date/days.js';
 import { UPPER, UPPER_METADATA } from './string/upper.js';
 
 import { ALERT, ALERT_METADATA } from './event/ui/alert.js';
+import { MESSAGEBOX, MESSAGEBOX_METADATA } from './event/ui/messagebox.js';
 import { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 import { ON, ON_METADATA } from './event/control/on.js';
 import { OFF, OFF_METADATA } from './event/control/off.js';
@@ -86,6 +87,7 @@ export { DAYS, DAYS_METADATA } from './date/days.js';
 export { UPPER, UPPER_METADATA } from './string/upper.js';
 
 export { ALERT, ALERT_METADATA } from './event/ui/alert.js';
+export { MESSAGEBOX, MESSAGEBOX_METADATA } from './event/ui/messagebox.js';
 export { SETVALUE, SETVALUE_METADATA } from './event/field/setvalue.js';
 export { ON, ON_METADATA } from './event/control/on.js';
 export { OFF, OFF_METADATA } from './event/control/off.js';
@@ -120,6 +122,7 @@ const RUNTIME_ENTRIES = Object.freeze([
   { implementation: REPEATABLEVALUES, definition: REPEATABLEVALUES_METADATA },
   { implementation: REPEATABLESUM, definition: REPEATABLESUM_METADATA },
   { implementation: ALERT, definition: ALERT_METADATA },
+  { implementation: MESSAGEBOX, definition: MESSAGEBOX_METADATA },
   { implementation: SETVALUE, definition: SETVALUE_METADATA },
   { implementation: ON, definition: ON_METADATA },
   { implementation: OFF, definition: OFF_METADATA },

@@ -4,33 +4,7 @@ import { getEventFieldReferences } from './event-field-references.js';
 import { eventOperationIssue, reportEventOperationIssue } from './event-policy.js';
 import { assertWritableField } from '../utilities/field-value-normalization.js';
 
-// Portable defensive copies also work in runtimes without structuredClone (including Hermes).
-function copy(value, seen = new Map()) {
-  if (typeof value === 'function' || typeof value === 'symbol')
-    throw new Error('Event data must not contain functions or symbols.');
-  if (value === null || typeof value !== 'object') return value;
-  if (seen.has(value)) return seen.get(value);
-  if (value instanceof Date) return new Date(value.getTime());
-  // Media controls retain native binary handles. Copy their immutable data and standard metadata
-  // without serializing custom properties or loading the bytes into JavaScript memory.
-  if (typeof File === 'function' && value instanceof File)
-    return new File([value], value.name, { type: value.type, lastModified: value.lastModified });
-  if (typeof Blob === 'function' && value instanceof Blob)
-    return Blob.prototype.slice.call(value, 0, value.size, value.type);
-  if (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
-    throw new Error('Event data must use plain objects, arrays, dates or native media handles.');
-  const result = Array.isArray(value) ? [] : {};
-  seen.set(value, result);
-  for (const key of Object.keys(value)) {
-    Object.defineProperty(result, key, {
-      value: copy(value[key], seen),
-      enumerable: true,
-      writable: true,
-      configurable: true,
-    });
-  }
-  return result;
-}
+import { copyEventData as copy } from '../utilities/event-data.js';
 
 const managedReferenceCaches = new WeakMap();
 const managedFieldCaches = new WeakMap();
@@ -87,7 +61,7 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
   const ownedField = (name) => fields.get(name) || resolver.repeatableSectionTree.get(name);
   if (!managedReferenceCaches.has(manager)) managedReferenceCaches.set(manager, new WeakMap());
   const referenceCache = managedReferenceCaches.get(manager);
-  return function dispatch(eventType, fieldKey, metadata = {}) {
+  return function dispatch(eventType, fieldKey, metadata = {}, uiResponse = null) {
     const mode = getMode();
     const result = { operations: [], validationIssues: [], issues: [] };
     const issue = (code, message) =>
@@ -146,8 +120,11 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
       return result;
     }
     const registrations = [];
+    const createdRequests = [];
     const eventMap = manager.listeners.get(eventType);
-    const listeners = [...(eventMap?.get(fieldKey) || []), ...(eventMap?.get('*') || [])];
+    const listeners = uiResponse
+      ? [uiResponse.callback]
+      : [...(eventMap?.get(fieldKey) || []), ...(eventMap?.get('*') || [])];
     for (const callback of listeners) {
       const scope = createEventOperationScope((operationName) => {
         // Late async work cannot mutate this completed result or break another dispatch.
@@ -196,6 +173,7 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
         returned = manager.executeHandlerWithContext(callback, event, scope, {
           source,
           context,
+          reply: uiResponse?.reply,
           reporting: {
             suppressConsoleWarning: true,
             onDiagnostic: (diagnostic) => issue('handler_failed', diagnostic.message),
@@ -257,7 +235,10 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
           }
         } else {
           try {
-            result.operations.push(copy(operation));
+            const prepared = manager.prepareUIOperation(operation, event);
+            if (prepared.operation === 'MESSAGEBOX')
+              createdRequests.push(prepared.params.requestId);
+            result.operations.push(copy(prepared));
           } catch {
             issue('invalid_operation', 'Event operations must contain portable data.');
           }
@@ -265,8 +246,13 @@ export function createManagedEventDispatcher(manager, constructionScope, getMode
       }
     }
     // A failed managed dispatch is not a partially applicable operation batch.
-    if (result.issues.length) result.operations = [];
-    else manager.processEventOperations(registrations);
+    if (result.issues.length) {
+      result.operations = [];
+      for (const id of createdRequests) {
+        manager.uiRequests.cancel(id);
+        manager.uiRequestOrigins.delete(id);
+      }
+    } else manager.processEventOperations(registrations);
     return copy(result);
   };
 }

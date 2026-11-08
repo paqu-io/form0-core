@@ -97,7 +97,7 @@ export function buildingPlanJunctionAllowance(floor, room, edge, vertex, thickne
     : 0;
 }
 
-function connection(moving, stationary, reference, end, sign) {
+export function resolveBuildingPlanConnection(moving, stationary, reference, end, sign) {
   if (!(reference.thickness > EPS)) return null;
   for (const opposite of [true, false]) {
     const referenceAxis =
@@ -150,7 +150,8 @@ function prepareConnections(room, edits, references) {
       // helper must not replace one of those explicit constraints with its old line.
       if (
         !partial &&
-        (end ? edge.end : edge.start).editingCutId &&
+        ((end ? edge.end : edge.start).editingCutId ||
+          (end ? edge.end : edge.start).physicalBoundaryId) &&
         edits.some((other) => {
           if (other === edit || other.edgeId === edge.id) return false;
           const adjacent = edges.find((e) => e.id === other.edgeId);
@@ -190,7 +191,8 @@ function prepareConnections(room, edits, references) {
         });
       }
       let stationary = edge,
-        adjacent = null;
+        adjacent = null,
+        adjacentRun = [];
       if (partial && (end ? edge.length - edit.interval[end] : edit.interval[end]) <= gap) {
         const id = end ? edge.end.id : edge.start.id;
         const neighbour = edges.find(
@@ -232,13 +234,38 @@ function prepareConnections(room, edits, references) {
           stationary = edges.find(
             (e) => e.id !== adjacent.id && (e.start.id === outer || e.end.id === outer)
           );
+          adjacentRun = [adjacent];
+          let endpoint = outer;
+          while (
+            stationary &&
+            Math.abs(dot(active.old.normal, active.edge.tangent)) <= EPS &&
+            !room.vertices.find((vertex) => vertex.id === endpoint)?.editingCutId &&
+            Math.abs(dot(adjacent.normal, stationary.tangent)) <= EPS
+          ) {
+            const run = reference.network?.runs.find(
+              (run) => run.room.id === room.id && run.edge.id === stationary.id
+            );
+            if (
+              run &&
+              reference.oldAxis &&
+              !reference.network.collinear(run.axis, reference.oldAxis)
+            )
+              break;
+            adjacentRun.push(stationary);
+            endpoint = end ? stationary.end.id : stationary.start.id;
+            stationary = edges.find(
+              (candidate) =>
+                !adjacentRun.includes(candidate) &&
+                (candidate.start.id === endpoint || candidate.end.id === endpoint)
+            );
+          }
         } else {
           stationary = adjacent;
           adjacent = null;
         }
       }
       if (!stationary) continue;
-      const junction = connection(
+      const junction = resolveBuildingPlanConnection(
         segmentFrame(edit.start, edit.end),
         stationary,
         reference,
@@ -253,16 +280,32 @@ function prepareConnections(room, edits, references) {
           Math.min(edge.length, project(edge, junction.fixed).along)
         );
       } else if (adjacent) {
-        let replacement = edits.find((e) => e.edgeId === adjacent.id);
-        if (!replacement) {
-          replacement = { edgeId: adjacent.id };
-          edits.push(replacement);
+        const run = adjacentRun.length ? adjacentRun : [adjacent];
+        const frame = segmentFrame(
+          end ? run[0].start : run.at(-1).start,
+          end ? run.at(-1).end : run[0].end
+        );
+        const start = end ? junction.point : junction.fixed;
+        const finish = end ? junction.fixed : junction.point;
+        const mapped = (point) => {
+          const ratio = project(frame, point).along / frame.length;
+          return {
+            x: start.x + (finish.x - start.x) * ratio,
+            y: start.y + (finish.y - start.y) * ratio,
+          };
+        };
+        for (const segment of run) {
+          let replacement = edits.find((e) => e.edgeId === segment.id);
+          if (!replacement) {
+            replacement = { edgeId: segment.id };
+            edits.push(replacement);
+          }
+          Object.assign(replacement, {
+            interval: [0, segment.length],
+            start: mapped(segment.start),
+            end: mapped(segment.end),
+          });
         }
-        Object.assign(replacement, {
-          interval: [0, adjacent.length],
-          start: end ? junction.point : junction.fixed,
-          end: end ? junction.fixed : junction.point,
-        });
       } else if (distance(junction.point, junction.fixed) > EPS) {
         edit[end ? 'joinEnd' : 'joinStart'] = junction;
       }
@@ -278,7 +321,9 @@ function prepareCutConnections(room, edits, cutReferences) {
     for (const end of [0, 1]) {
       if (!near(edit.interval[end], end ? edge.length : 0)) continue;
       const vertex = end ? edge.end : edge.start;
-      const reference = cutReferences.find((r) => r.cutId === vertex.editingCutId);
+      const reference = cutReferences.find(
+        (r) => r.cutId === (vertex.editingCutId || vertex.physicalBoundaryId)
+      );
       if (!reference) continue;
       const fixedEdge = edges.find(
         (e) => e.id !== edge.id && (e.start.id === vertex.id || e.end.id === vertex.id)
@@ -312,6 +357,39 @@ export function reshapeBuildingPlanBoundary(
   cutReferences = []
 ) {
   const edges = polygonEdges(room);
+  // Separate physical owners can cover adjacent intervals of the same room edge.
+  // Their common geometric transform is one boundary edit, not several return paths.
+  const pointAt = (edit, station) => {
+    const ratio = (station - edit.interval[0]) / (edit.interval[1] - edit.interval[0]);
+    return {
+      x: edit.start.x + (edit.end.x - edit.start.x) * ratio,
+      y: edit.start.y + (edit.end.y - edit.start.y) * ratio,
+    };
+  };
+  for (let i = 0; i < edits.length; i++)
+    for (let j = edits.length - 1; j > i; j--) {
+      const a = edits[i],
+        b = edits[j];
+      if (
+        a.edgeId !== b.edgeId ||
+        Math.min(a.interval[1], b.interval[1]) < Math.max(a.interval[0], b.interval[0]) - EPS
+      )
+        continue;
+      const low = Math.min(a.interval[0], b.interval[0]),
+        high = Math.max(a.interval[1], b.interval[1]);
+      const station = Math.max(a.interval[0], b.interval[0]);
+      if (
+        distance(pointAt(a, station), pointAt(b, station)) > EPS ||
+        distance(pointAt(a, station + 1), pointAt(b, station + 1)) > EPS
+      )
+        continue;
+      const start = pointAt(a, low),
+        end = pointAt(a, high);
+      a.interval = [low, high];
+      a.start = start;
+      a.end = end;
+      edits.splice(j, 1);
+    }
   prepareCutConnections(room, edits, cutReferences);
   prepareConnections(room, edits, references);
   const targets = new Map(),
@@ -344,19 +422,26 @@ export function reshapeBuildingPlanBoundary(
     if (!collapsed) {
       const moving = segmentFrame(lines[0].start, lines[0].end);
       const cut = cutReferences.find(
-        (reference) => reference.half === 0 && reference.cutId === vertices.get(id).editingCutId
+        (reference) =>
+          reference.half === 0 &&
+          reference.cutId === (vertices.get(id).editingCutId || vertices.get(id).physicalBoundaryId)
       );
       // Straight incident lines still share one explicit cut station.
-      if (cut && lines.length > 1) point = junctionIntersection(moving, cut.axis);
+      const stationary =
+        lines.length === 1 &&
+        edges.find((e) => e.id !== lines[0].edgeId && (e.start.id === id || e.end.id === id));
+      if (
+        cut &&
+        (lines.length > 1 ||
+          (stationary && Math.abs(dot(moving.normal, stationary.tangent)) <= EPS))
+      )
+        point = junctionIntersection(moving, cut.axis);
       else {
-        const stationary =
-          lines.length === 1 &&
-          edges.find((e) => e.id !== lines[0].edgeId && (e.start.id === id || e.end.id === id));
         if (stationary) {
           point = junctionIntersection(moving, stationary);
           if (!point && Math.abs(project(stationary, lines[0].start).offset) <= EPS)
             point = at(stationary, project(stationary, lines[0].start).along);
-          if (!point && vertices.get(id).editingCutId) {
+          if (!point && (vertices.get(id).editingCutId || vertices.get(id).physicalBoundaryId)) {
             held.set(id, lines[0]);
             continue;
           }
@@ -388,7 +473,7 @@ export function reshapeBuildingPlanBoundary(
     for (const edit of edits
       .filter((e) => e.edgeId === edge.id)
       .sort((a, b) => a.interval[0] - b.interval[0])) {
-      if (edit.joinStart) push(edit.joinStart.point);
+      if (edit.joinStart) push({ ...edge.start, ...edit.joinStart.point });
       if (edit.interval[0] > EPS) {
         push(at(edge, edit.interval[0]));
         push(edit.start);
@@ -397,7 +482,7 @@ export function reshapeBuildingPlanBoundary(
         push(edit.end);
         push(at(edge, edit.interval[1]));
       }
-      if (edit.joinEnd) push(edit.joinEnd.point);
+      if (edit.joinEnd) push({ ...edge.end, ...edit.joinEnd.point });
       if (near(edit.interval[0], 0) && !held.has(edge.start.id) && !edit.joinStart)
         edit.start = vertices.get(edge.start.id);
       if (near(edit.interval[1], edge.length) && !held.has(edge.end.id) && !edit.joinEnd)

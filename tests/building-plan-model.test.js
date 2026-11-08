@@ -1,3 +1,4 @@
+import { originalFaces, originalVertices } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -56,40 +57,44 @@ test('room creation allocates stable physical/face/vertex IDs and does not mutat
   assert.deepEqual(f.session.validate(), []);
 });
 
-test('staggered five-metre room faces share only two metres of one eight-metre wall', () => {
-  const f = staggered();
-  const floor = f.floor();
-  assert.equal(floor.walls.length, 7);
-  const a = floor.rooms.find((room) => room.id === f.a).faces.find((face) => face.id === f.faceA);
-  const b = floor.rooms.find((room) => room.id === f.b).faces.find((face) => face.id === f.faceB);
+test('staggered faces share one two-metre physical piece between two exterior owners', () => {
+  const f = staggered(),
+    floor = f.floor();
+  assert.equal(floor.walls.length, 9);
+  const a = floor.rooms[0].faces.find((face) => face.id === f.faceA),
+    b = floor.rooms[1].faces.find((face) => face.id === f.faceB);
   assert.equal(a.wallId, b.wallId);
-  const wall = floor.walls.find((entry) => entry.id === a.wallId);
-  assert.ok(Math.abs(distance(wall.segments[0].start, wall.segments[0].end) - 8) < 1e-6);
-  const [ra, rb] = [a.bindings[0].interval, b.bindings[0].interval];
-  assert.equal(ra[1] - ra[0], 5);
-  assert.equal(rb[1] - rb[0], 5);
-  assert.equal(Math.min(ra[1], rb[1]) - Math.max(ra[0], rb[0]), 2);
+  const wall = floor.walls.find((wall) => wall.id === a.wallId);
+  assert.equal(distance(wall.segments[0].start, wall.segments[0].end), 2);
+  assert.equal(a.bindings[0].interval[1] - a.bindings[0].interval[0], 2);
+  assert.equal(b.bindings[0].interval[1] - b.bindings[0].interval[0], 2);
+  assert.equal(wall.exposure, 'interior');
+  assert.ok(floor.walls.every((wall) => wall.segments.length === 1));
 });
 
-test('partial shared-face edits create a local jog, preserve subject IDs, and undo atomically', () => {
-  const f = staggered();
-  const before = f.session.getSnapshot();
+test('a shared-piece edit creates local returns and leaves exterior siblings stationary', () => {
+  const f = staggered(),
+    before = f.session.getSnapshot();
   f.apply({ type: 'resize_face', floorId: f.floorId, faceId: f.faceA, distance: 0.2 });
-  const floor = f.floor();
-  const a = floor.rooms.find((room) => room.id === f.a);
-  const b = floor.rooms.find((room) => room.id === f.b);
-  assert.equal(a.vertices.length, 4);
-  assert.equal(b.vertices.length, 6);
-  assert.ok(Math.abs(Math.abs(polygonArea(a.vertices)) - 16) < 1e-6);
-  assert.ok(Math.abs(Math.abs(polygonArea(b.vertices)) - 14.56) < 1e-6);
+  const floor = f.floor(),
+    a = floor.rooms[0],
+    b = floor.rooms[1];
+  assert.ok(a.vertices.length > 4);
+  assert.ok(b.vertices.length > 4);
+  assert.ok(Math.abs(Math.abs(polygonArea(a.vertices)) - 15.4) < 1e-6);
+  assert.ok(
+    a.vertices.some((v) => v.x === 0 && v.y === 3),
+    'The exterior part of the original side stays at y=3'
+  );
   assert.equal(
     a.faces.find((face) => face.id === f.faceA).wallId,
     b.faces.find((face) => face.id === f.faceB).wallId
   );
+  const after = f.session.getSnapshot();
   assert.equal(f.session.undo().status, 'undone');
   assert.deepEqual(f.session.getSnapshot(), before);
   assert.equal(f.session.redo().status, 'redone');
-  assert.equal(f.floor().rooms.find((room) => room.id === f.b).vertices.length, 6);
+  assert.deepEqual(f.session.getSnapshot(), after);
 });
 
 test('a collapsing face edit is rejected without changing any data', () => {
@@ -105,36 +110,28 @@ test('a collapsing face edit is rejected without changing any data', () => {
   assert.deepEqual(f.session.getSnapshot(), before);
 });
 
-test('moving a shared room detaches it without copying openings or survey evidence', () => {
-  const f = staggered();
-  const wall = f.floor().walls.find((entry) => entry.referenceFaceId === f.faceA);
-  f.apply({
+test('moving a shared room keeps the original opening on the stationary owner', () => {
+  const f = staggered(),
+    wall = f.floor().walls.find((entry) => entry.referenceFaceId === f.faceA);
+  const openingId = f.apply({
     type: 'create_opening',
     floorId: f.floorId,
     wallId: wall.id,
     kind: 'door',
-    offset: 4,
+    offset: 0.5,
     width: 0.9,
-  });
-  f.apply({
-    type: 'add_observation',
-    floorId: f.floorId,
-    subject: { type: 'wall', id: wall.id },
-    observedAt: '2026-11-02',
-    values: { cracks: true },
-    evidence: ['photo-1'],
-  });
-  const observation = f.floor().observations[0];
+  }).created.id;
+  const before = f.session.getSnapshot();
   f.apply({ type: 'move_room', floorId: f.floorId, roomId: f.b, delta: { x: 10, y: 0 } });
-  const floor = f.floor();
-  const stationary = floor.walls.find((entry) => entry.id === wall.id);
-  const movedFace = floor.rooms
-    .find((room) => room.id === f.b)
-    .faces.find((face) => face.id === f.faceB);
-  assert.notEqual(movedFace.wallId, wall.id);
-  assert.equal(stationary.doors.length, 1);
-  assert.equal(floor.walls.find((entry) => entry.id === movedFace.wallId).doors.length, 0);
-  assert.deepEqual(floor.observations, [observation]);
+  const floor = f.floor(),
+    stationary = floor.walls.find((entry) => entry.id === wall.id),
+    face = floor.rooms[1].faces.find((face) => face.id === f.faceB);
+  assert.notEqual(face.wallId, wall.id);
+  assert.equal(stationary.doors[0].id, openingId);
+  assert.equal(floor.walls.find((w) => w.id === face.wallId).doors.length, 0);
+  assert.equal(Object.hasOwn(floor, 'observations'), false);
+  f.session.undo();
+  assert.deepEqual(f.session.getSnapshot(), before);
 });
 
 test('live inherited values update through floor, room, and wall override/reset without fake measurements', () => {
@@ -169,7 +166,7 @@ test('live inherited values update through floor, room, and wall override/reset 
     reset: true,
   });
   assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.25);
-  assert.equal(f.floor().observations.length, 0);
+  assert.equal(Object.hasOwn(f.floor(), 'observations'), false);
 });
 
 test('conflicting room defaults require one shared wall resolution', () => {
@@ -189,7 +186,8 @@ test('conflicting room defaults require one shared wall resolution', () => {
     property: 'wall_height_m',
     value: 3,
   });
-  assert.equal(conflict.issues[0].code, 'conflicting_room_defaults');
+  assert.equal(conflict.status, 'pending');
+  f.session.resolveUIRequest(conflict.uiOperations[0].params.requestId, { cancelled: true });
   assert.deepEqual(f.session.getSnapshot(), before);
   const wallId = f
     .floor()
@@ -212,7 +210,7 @@ test('conflicting room defaults require one shared wall resolution', () => {
   assert.equal(f.floor().walls.find((wall) => wall.id === wallId).properties.wall_height_m, 2.8);
 });
 
-test('shared thickness change anchors at the active room and preserves explicit observations', () => {
+test('shared thickness change anchors the active face and moves only its opposite piece', () => {
   const f = staggered();
   const wallId = f
     .floor()
@@ -227,9 +225,15 @@ test('shared thickness change anchors at the active room and preserves explicit 
     property: 'wall_thickness_m',
     value: 0.25,
   });
-  assert.deepEqual(f.floor().rooms.find((room) => room.id === f.a).vertices, a.vertices);
+  assert.deepEqual(
+    originalVertices(f.floor().rooms.find((room) => room.id === f.a)),
+    originalVertices(a)
+  );
   assert.ok(
-    Math.abs(roomBounds(f.floor().rooms.find((room) => room.id === f.b)).height - 2.95) < 1e-6
+    f
+      .floor()
+      .rooms.find((room) => room.id === f.b)
+      .vertices.some((vertex) => Math.abs(vertex.y - 3.25) < 1e-6)
   );
 });
 
@@ -325,7 +329,7 @@ test('readonly sessions reject operations without opening scopes', () => {
 test('ordinary stretches keep opening width and distance from the unchanged end', () => {
   const f = fixture();
   const roomId = f.room({ x: 0, y: 0, width: 5, height: 3 });
-  const wallId = f.floor().rooms[0].faces[0].wallId;
+  const wallId = originalFaces(f.floor().rooms[0])[0].wallId;
   f.apply({
     type: 'create_opening',
     floorId: f.floorId,
@@ -358,7 +362,7 @@ test('ordinary stretches keep opening width and distance from the unchanged end'
 test('construction split and join preserve distinct facing extents, questions and opening identities', () => {
   const f = fixture();
   f.room({ x: 0, y: 0, width: 5, height: 3 });
-  const face = f.floor().rooms[0].faces[0];
+  const face = originalFaces(f.floor().rooms[0])[0];
   const wallId = face.wallId;
   const openingId = f.apply({
     type: 'create_opening',
@@ -368,23 +372,28 @@ test('construction split and join preserve distinct facing extents, questions an
     offset: 3,
     width: 0.9,
   }).created.id;
-  f.apply({ type: 'set_values', floorId: f.floorId, faceId: face.id, values: { finish: 'paint' } });
+  f.apply({
+    type: 'set_values',
+    floorId: f.floorId,
+    faceId: face.id,
+    scope: 'wall_face',
+    values: { finish: 'paint' },
+  });
   const before = f.session.getSnapshot();
   const split = f.session.apply({ type: 'split_wall', floorId: f.floorId, wallId, offset: 2.5 });
   assert.equal(split.status, 'applied', JSON.stringify(split.issues));
   let floor = f.floor();
-  const other = floor.walls.find((wall) => wall.lineage?.splitFromWallId === wallId);
+  const other = floor.walls.find(
+    (wall) => wall.id !== wallId && wall.lineage?.splitFromWallId === wallId
+  );
   assert.equal(other.doors[0].id, openingId);
   assert.equal(other.doors[0].offset, 0.5);
-  f.apply({ type: 'join_walls', floorId: f.floorId, wallId, otherWallId: other.id });
+  f.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: split.created.id });
   floor = f.floor();
   const portions = floor.rooms[0].faces.filter((entry) => entry.wallId === wallId);
-  assert.equal(portions.length, 2);
+  assert.equal(portions.length, 1);
   const extents = portions.map((entry) => entry.bindings[0].interval).sort((a, b) => a[0] - b[0]);
-  assert.deepEqual(extents, [
-    [0, 2.5],
-    [2.5, 5],
-  ]);
+  assert.deepEqual(extents, [[0, 5]]);
   assert.ok(portions.every((entry) => entry.values.finish === 'paint'));
   assert.equal(floor.walls.find((wall) => wall.id === wallId).doors[0].id, openingId);
   assert.equal(f.session.undo().status, 'undone');
@@ -398,19 +407,19 @@ test('bounded size preservation propagates only through the explicitly supplied 
   const b = f.room({ x: 5.2, y: 0, width: 4, height: 3 });
   const c = f.room({ x: 9.4, y: 0, width: 4, height: 3 });
   let floor = f.floor();
-  const faceA = floor.rooms[0].faces[1].id;
+  const faceA = originalFaces(floor.rooms[0])[1].id;
   f.apply({
     type: 'bind_faces',
     floorId: f.floorId,
     referenceFaceId: faceA,
-    faceId: floor.rooms[1].faces[3].id,
+    faceId: originalFaces(floor.rooms[1])[3].id,
   });
   floor = f.floor();
   f.apply({
     type: 'bind_faces',
     floorId: f.floorId,
-    referenceFaceId: floor.rooms[1].faces[1].id,
-    faceId: floor.rooms[2].faces[3].id,
+    referenceFaceId: originalFaces(floor.rooms[1])[1].id,
+    faceId: originalFaces(floor.rooms[2])[3].id,
   });
   const before = f.session.getSnapshot();
   const operation = {
@@ -436,78 +445,70 @@ test('bounded size preservation propagates only through the explicitly supplied 
 
 test('room snapping reattaches a moved room to the stationary subject without duplicating its evidence', () => {
   const f = staggered();
-  const stationaryId = f.floor().rooms[0].faces[2].wallId;
+  const stationaryId = originalFaces(f.floor().rooms[0])[2].wallId;
   f.apply({ type: 'move_room', floorId: f.floorId, roomId: f.b, delta: { x: 10, y: 0 } });
   f.apply({ type: 'move_room', floorId: f.floorId, roomId: f.b, delta: { x: -10, y: 0 } });
-  assert.equal(f.floor().rooms[1].faces[0].wallId, stationaryId);
-  assert.equal(f.floor().walls.length, 7);
+  assert.equal(originalFaces(f.floor().rooms[1])[0].wallId, stationaryId);
+  assert.equal(f.floor().walls.length, 9);
 });
 
-test('meaningful segment overrides resolve before wall defaults and survive a construction join', () => {
+test('physical owners preserve distinct overrides and reject a lossy Rejoin', () => {
   const f = fixture();
   f.room({ x: 0, y: 0, width: 5, height: 3 });
-  const wallId = f.floor().rooms[0].faces[0].wallId;
-  f.apply({ type: 'split_wall', floorId: f.floorId, wallId, offset: 2.5 });
-  const other = f.floor().walls.find((wall) => wall.lineage?.splitFromWallId === wallId);
+  const wallId = f.floor().walls[0].id;
+  const cut = f.apply({ type: 'split_wall', floorId: f.floorId, wallId, offset: 2.5 }).created.id;
+  const other = f
+    .floor()
+    .walls.find((w) => w.id !== wallId && w.lineage?.splitFromWallId === wallId);
   f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 2.4 });
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: other.id,
-    segmentId: other.segments[0].id,
     property: 'wall_height_m',
     value: 3,
   });
-  f.apply({ type: 'join_walls', floorId: f.floorId, wallId, otherWallId: other.id });
-  const wall = f.floor().walls.find((wall) => wall.id === wallId);
-  assert.equal(wall.segments.length, 2);
-  assert.deepEqual(
-    wall.segments.map((segment) => segment.properties.wall_height_m),
-    [2.4, 3]
-  );
-  assert.equal(wall.segments[1].provenance.wall_height_m.scope, 'construction_segment');
-  assert.equal(wall.properties.wall_height_m, 2.4);
+  const before = f.session.getSnapshot();
+  const rejected = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: cut });
+  assert.equal(rejected.status, 'conflict');
+  assert.deepEqual(f.session.getSnapshot(), before);
+  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height_m, 2.4);
+  assert.equal(other.segments.length, 1);
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
-    wallId,
-    segmentId: wall.segments[1].id,
+    wallId: other.id,
     property: 'wall_height_m',
     reset: true,
   });
-  assert.ok(
-    f
-      .floor()
-      .walls.find((wall) => wall.id === wallId)
-      .segments.every((segment) => segment.properties.wall_height_m === 2.4)
-  );
+  f.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: cut });
+  assert.equal(f.floor().walls.length, 4);
+  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height_m, 2.4);
 });
 
-test('segment thickness anchors its captured face and explicit unknown retains valid geometry', () => {
+test('physical thickness anchors its captured face and explicit unknown retains valid geometry', () => {
   const f = fixture();
   f.room({ x: 0, y: 0, width: 5, height: 3 });
-  const wall = f.floor().walls[0];
-  const before = f.floor().rooms[0].vertices;
+  const wall = f.floor().walls[0],
+    before = f.floor().rooms[0].vertices;
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: wall.id,
-    segmentId: wall.segments[0].id,
     property: 'wall_thickness_m',
     value: 0.4,
   });
   assert.deepEqual(f.floor().rooms[0].vertices, before);
-  assert.equal(f.floor().walls[0].segments[0].properties.wall_thickness_m, 0.4);
+  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.4);
   const geometry = f.floor().walls[0].segments[0];
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: wall.id,
-    segmentId: wall.segments[0].id,
     property: 'wall_thickness_m',
     value: null,
   });
-  assert.equal(f.floor().walls[0].segments[0].properties.wall_thickness_m, null);
+  assert.equal(f.floor().walls[0].properties.wall_thickness_m, null);
   assert.deepEqual(f.floor().walls[0].segments[0].start, geometry.start);
   assert.deepEqual(f.session.validate(), []);
 });
@@ -523,7 +524,7 @@ test('observation writes cannot target another floor and malformed room topology
     subject: { type: 'room', id: roomId },
   });
   assert.equal(result.status, 'conflict');
-  assert.ok(result.issues.some((issue) => issue.code === 'dangling_observation'));
+  assert.ok(result.issues.some((issue) => issue.code === 'unknown_operation'));
   assert.deepEqual(f.session.getSnapshot(), before);
   const malformed = structuredClone(before);
   malformed.floors[0].rooms[0].edges[0].endId = 'missing-vertex';

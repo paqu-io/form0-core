@@ -1,3 +1,4 @@
+import { originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -57,11 +58,13 @@ function coherent(f, plan) {
 }
 
 for (const preserveWallGrouping of [false, true]) {
-  test(`a jog exposes six straight facing rows and respects physical grouping (${preserveWallGrouping})`, () => {
+  test(`a jog exposes one straight span per physical owner (${preserveWallGrouping})`, () => {
     const f = fixture({ preserveWallGrouping });
     const plan = coherent(f, f.move(0.2));
     assert.equal(plan.floors[0].rooms[1].faces.length, 6);
-    assert.equal(plan.floors[0].walls.length, preserveWallGrouping ? 7 : 9);
+    assert.equal(plan.floors[0].walls.length, 11);
+    assert.ok(plan.floors[0].rooms.some((room) => room.edges.some((edge) => edge.profile)));
+    assert.ok(plan.floors[0].walls.every((wall) => wall.segments.length === 1));
     const shared = plan.floors[0].rooms.map((room) =>
       room.faces.find(
         (face) => face.id === (room.id === f.snapshot.floors[0].rooms[0].id ? f.faceA : f.faceB)
@@ -81,13 +84,13 @@ for (const preserveWallGrouping of [false, true]) {
     assert.deepEqual(f.session.getSnapshot(), final);
   });
 
-  test(`straight realignment removes automatic returns and restores four facing rows (${preserveWallGrouping})`, () => {
+  test(`straight realignment removes automatic returns and retains adjacency boundaries (${preserveWallGrouping})`, () => {
     const f = fixture({ preserveWallGrouping });
     f.move(-0.2);
     const plan = coherent(f, f.move(0.2));
-    assert.equal(plan.floors[0].rooms[1].vertices.length, 4);
-    assert.equal(plan.floors[0].rooms[1].faces.length, 4);
-    assert.equal(plan.floors[0].walls.length, 7);
+    assert.equal(plan.floors[0].rooms[1].vertices.length, 5);
+    assert.equal(plan.floors[0].rooms[1].faces.length, 5);
+    assert.equal(plan.floors[0].walls.length, 9);
   });
 }
 
@@ -106,37 +109,19 @@ test('rejected shared-face collapse remains atomic and explains how to recover',
   assert.match(result.issues[0].message, /shorter|smaller|back|cancel/i);
 });
 
-test('explicit physical separation retains source observations and opening identities', () => {
-  const f = fixture({ preserveWallGrouping: true });
-  const plan = f.move(0.2);
-  const wall = plan.floors[0].walls.find((entry) => entry.segments.length > 1);
-  const added = f.session.apply({
-    type: 'add_observation',
-    floorId: f.floorId,
-    subject: { type: 'wall', id: wall.id },
-    observedAt: '2026-11-03',
-    values: { measured_thickness: 0.19 },
-    evidence: ['photo-1'],
-  });
-  assert.equal(added.status, 'applied');
+test('jog ownership and canonical opening identities survive record round trips and Undo', () => {
+  const f = fixture();
   const before = f.session.getSnapshot();
-  const result = f.session.apply({ type: 'separate_wall', floorId: f.floorId, wallId: wall.id });
-  assert.equal(result.status, 'applied', JSON.stringify(result.issues));
-  const after = f.session.getSnapshot();
-  assert.deepEqual(validateBuildingPlanSnapshot(after), []);
-  assert.equal(after.floors[0].walls.length, 9);
+  const after = f.move(0.2);
+  coherent(f, after);
+  assert.ok(after.floors[0].walls.every((wall) => wall.segments.length === 1));
   assert.deepEqual(
-    after.floors[0].walls.flatMap((entry) => entry.doors),
-    before.floors[0].walls.flatMap((entry) => entry.doors)
-  );
-  const observation = after.floors[0].observations.at(-1);
-  assert.deepEqual(observation.subject, before.floors[0].observations.at(-1).subject);
-  assert.equal(observation.relatedSubjects.length, 3);
-  assert.deepEqual(observation.evidence, ['photo-1']);
-  const record = writeBuildingPlanRecord({ meta: f.meta, plan: after, record: f.record });
-  assert.deepEqual(
-    readBuildingPlanRecord({ meta: f.meta, record }).floors[0].observations,
-    after.floors[0].observations
+    after.floors[0].walls
+      .flatMap((wall) => wall.doors)
+      .map(({ id, width, height }) => ({ id, width, height })),
+    before.floors[0].walls
+      .flatMap((wall) => wall.doors)
+      .map(({ id, width, height }) => ({ id, width, height }))
   );
   f.session.undo();
   assert.deepEqual(f.session.getSnapshot(), before);
@@ -144,44 +129,40 @@ test('explicit physical separation retains source observations and opening ident
   assert.deepEqual(f.session.getSnapshot(), after);
 });
 
-test('validation rejects a facing edge with no binding and a dangling related observation subject', () => {
+test('validation rejects a facing edge with no physical binding', () => {
   const f = fixture({ preserveWallGrouping: true });
   const plan = f.move(0.2);
-  const face = plan.floors[0].rooms[1].faces[0];
+  const face = originalFaces(plan.floors[0].rooms[1])[0];
   face.edgeIds.push(plan.floors[0].rooms[1].edges[2].id);
-  plan.floors[0].observations[0].relatedSubjects = [{ type: 'wall', id: 'missing-wall' }];
   const issues = validateBuildingPlanSnapshot(plan);
   assert.ok(issues.some((issue) => issue.code === 'unbound_facing_edge'));
-  assert.ok(issues.some((issue) => issue.code === 'dangling_observation'));
 });
 
 test('changing editor policy preserves accepted data and applies only to future operations', () => {
   const f = fixture({ preserveWallGrouping: true });
   const before = f.session.getSnapshot();
   const history = f.session.getState();
-  f.session.setEditingPolicy({ preserveWallGrouping: false });
+  f.session.setEditingPolicy({ inheritedChangePolicy: 'apply' });
   assert.deepEqual(f.session.getSnapshot(), before);
   assert.deepEqual(f.session.getState(), history);
-  assert.equal(f.move(0.2).floors[0].walls.length, 9);
+  assert.equal(f.move(0.2).floors[0].walls.length, 11);
   f.move(-0.2);
-  f.session.setEditingPolicy({ preserveWallGrouping: true });
-  assert.equal(f.move(0.2).floors[0].walls.length, 7);
+  f.session.setEditingPolicy({ inheritedChangePolicy: 'ask' });
+  assert.equal(f.move(0.2).floors[0].walls.length, 11);
 });
 
 for (const preserveWallGrouping of [false, true])
   test(`realignment retains distinct construction answers (${preserveWallGrouping})`, () => {
     const f = fixture({ preserveWallGrouping });
-    const plan = f.move(0.2);
+    const plan = f.move(0.6);
     const wall = plan.floors[0].walls.find((entry) =>
       entry.segments.some((segment) => segment.junction)
     );
-    const segment = wall.segments.find((entry) => entry.junction);
     assert.equal(
       f.session.apply({
         type: 'set_property',
         floorId: f.floorId,
         wallId: wall.id,
-        ...(preserveWallGrouping ? { segmentId: segment.id } : {}),
         property: 'wall_height_m',
         value: 2.6,
       }).status,
@@ -192,9 +173,9 @@ for (const preserveWallGrouping of [false, true])
       type: 'resize_face',
       floorId: f.floorId,
       faceId: f.faceA,
-      distance: -0.2,
+      distance: -0.6,
     });
     assert.equal(result.status, 'conflict');
-    assert.match(result.issues[0].message, /answers|overrides/i);
+    assert.match(result.issues[0].message, /answers|overrides|smaller/i);
     assert.deepEqual(f.session.getSnapshot(), before);
   });

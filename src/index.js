@@ -131,3 +131,8 @@ export { INVALID } from './builtins/event/control/invalid.js';
 
 export { createRecordEvaluator } from './engine/record-evaluator.js';
 export { validateSubmission, isFieldValueEmpty } from './engine/submission-validation.js';
+
+export { MESSAGEBOX } from './builtins/event/ui/messagebox.js';
+export { createUIRequestRegistry } from './utilities/ui-requests.js';
+
+export { settleBuildingPlanQuestions } from './building-plan/questions.js';

@@ -1,3 +1,4 @@
+import { sharedFaceId, originalVertices } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -18,6 +19,7 @@ function fixture(editingPolicy) {
   return { ...f, controller, plan: () => readBuildingPlanRecord({ meta: f.meta, record }) };
 }
 async function move(f, id, y, snapping = false, zoom = 1) {
+  id = sharedFaceId(f.plan(), id);
   const wall = f.controller.getSnapshot().walls.find((wall) => wall.id === id);
   const original = wall.points;
   f.controller.interaction.begin();
@@ -107,16 +109,24 @@ test('short jog centres remain wall targets while their endpoint remains a corne
 });
 
 for (const zoom of [1, 2.5, 4, 6])
-  test(`W3.2 snaps to physical contact when the pointer reaches the other room face (zoom=${zoom})`, async () => {
+  test(`an exterior piece snaps to physical contact when the pointer reaches the other room face (zoom=${zoom})`, async () => {
     const f = fixture();
     try {
       await move(f, f.faceB, 2.6);
       await move(f, f.faceB, 3.8);
-      const left = f.controller.getSnapshot().walls.find((wall) => wall.displayLabel === 'W3.2');
+      const left = f.controller
+        .getSnapshot()
+        .walls.find(
+          (wall) =>
+            wall.roomId === f.plan().floors[0].rooms[0].id &&
+            wall.points.length === 2 &&
+            wall.points.every((point) => Math.abs(point.y - 60) < 1e-6) &&
+            wall.points.some((point) => Math.abs(point.x) < 1e-6)
+        );
       assert.ok(left);
       const y = await move(f, left.id, 3.8, true, zoom);
       assert.equal(y, 3.6, 'Align the physical band while preserving the 0.20 m face separation');
-      assert.equal(f.plan().floors[0].rooms[0].vertices.length, 4);
+      assert.equal(originalVertices(f.plan().floors[0].rooms[0]).length, 4);
     } finally {
       f.controller.dispose();
     }

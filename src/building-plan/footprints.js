@@ -69,6 +69,20 @@ function subtractConvex(subject, clip) {
   return result;
 }
 
+/** Area coverage by derived convex material, allowing only boundary round-off. */
+export function buildingPlanMaterialCovered(polygon, material) {
+  let remaining = [polygon];
+  for (const clip of material) {
+    remaining = remaining.flatMap((piece) => subtractConvex(piece, clip));
+    if (!remaining.length) return true;
+  }
+  const perimeter = polygon.reduce(
+    (length, point, i) => length + distance(point, polygon[(i + 1) % polygon.length]),
+    0
+  );
+  return remaining.reduce((total, piece) => total + area(piece), 0) <= EPS * perimeter;
+}
+
 function triangles(vertices) {
   const points = vertices.map(({ x, y }) => ({ x, y }));
   const side = Math.sign(polygonArea(points));

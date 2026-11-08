@@ -1,14 +1,22 @@
+import { settleBuildingPlanQuestions } from './questions.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
 import { getBuildingPlanFieldState } from './transactions.js';
 import { readBuildingPlanRecord, writeBuildingPlanRecord } from './records.js';
 import { buildingPlanFaceSegments, copyBuildingPlanData as copy } from './model.js';
-import { distance, polygonArea, project, roomBounds, segmentFrame } from './geometry.js';
+import {
+  distance,
+  dot,
+  polygonArea,
+  polygonEdges,
+  project,
+  roomBounds,
+  segmentFrame,
+} from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
-import { portionThicknessState } from './portion-properties.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -69,10 +77,21 @@ export function buildingPlanCanvasSnapshot({
         ...room.vertices,
         ...room.faces.flatMap((face) => face.freePath || []),
       ]) {
-        const token = `${point.editingCutId}:${point.x}:${point.y}`;
-        if (!point.editingCutId || cuts.has(token)) continue;
+        const marker = point.editingCutId || point.physicalBoundaryId;
+        const edges = polygonEdges(room).filter(
+          (edge) => edge.start.id === point.id || edge.end.id === point.id
+        );
+        const automatic =
+          !point.editingCutId &&
+          edges.length === 2 &&
+          dot(edges[0].tangent, edges[1].tangent) > 1 - 1e-6 &&
+          edges.every((edge) =>
+            room.faces.some((face) => face.bindings.some((binding) => binding.edgeId === edge.id))
+          );
+        const token = `${marker}:${point.x}:${point.y}`;
+        if (!marker || (!point.editingCutId && !automatic) || cuts.has(token)) continue;
         cuts.add(token);
-        output.editingCuts.push({ id: point.editingCutId, roomId: room.id, point: pixels(point) });
+        output.editingCuts.push({ id: marker, automatic, roomId: room.id, point: pixels(point) });
       }
       const roomIndex = roomRows.findIndex((row) => subjectId(meta, 'rooms', row) === room.id);
       const roomRow = roomRows[roomIndex];
@@ -107,7 +126,7 @@ export function buildingPlanCanvasSnapshot({
         const faceRow = faceRows[faceIndex];
         const wallPath = [...roomPath, { key: key(meta, 'walls'), index: faceIndex }];
         const physical = floor.walls.find((wall) => wall.id === face.wallId);
-        const thickness = portionThicknessState(physical, face);
+
         const portions = buildingPlanFaceSegments(floor, room, face).map((part) =>
           part.direction > 0 ? part : { ...part, start: part.end, end: part.start }
         );
@@ -133,8 +152,8 @@ export function buildingPlanCanvasSnapshot({
           doors: [],
           windows: [],
           label: physical.values.wall_label || '',
-          displayLabel: physical.values.wall_label || `W#${faceIndex + 1}`,
-          thickness: thickness ? thickness.value : physical.properties.wall_thickness_m,
+          displayLabel: physical.values.wall_label || physical.autoLabel || `W#${faceIndex + 1}`,
+          thickness: physical.properties.wall_thickness_m,
           height: physical.properties.wall_height_m,
           provenance: copy(physical.provenance),
         };
@@ -253,6 +272,8 @@ export class BuildingPlanCanvasController {
     scopeId = () => null,
     editingPolicy = {},
     confirmOpeningRemoval = () => false,
+    managedTransactions = false,
+    presentQuestion,
   }) {
     Object.assign(this, {
       meta,
@@ -264,6 +285,8 @@ export class BuildingPlanCanvasController {
       createId,
       scopeId,
       confirmOpeningRemoval,
+      managedTransactions,
+      presentQuestion,
     });
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
     this.interaction = createBuildingPlanInteraction({
@@ -378,6 +401,7 @@ export class BuildingPlanCanvasController {
   }
   dispose() {
     this.disposed = true;
+    this.session?.cancelUIRequests();
     this.listeners.clear();
     this.interaction.reset();
     this.pinnedFaceIds.clear();
@@ -400,8 +424,6 @@ export class BuildingPlanCanvasController {
     operation = {
       ...operation,
       pinnedFaceIds: [...this.pinnedFaceIds],
-      preserveWallGrouping:
-        operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
       thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
     };
     this.previewView = null;
@@ -429,7 +451,6 @@ export class BuildingPlanCanvasController {
       operation = {
         ...operation,
         removeOpeningIds: cut.openingIds,
-        allowObservationDeletion: cut.observationIds.length > 0,
       };
       proposal = this.session.preview(operation, { scopeId: this.scopeId() });
     }
@@ -439,23 +460,64 @@ export class BuildingPlanCanvasController {
       this.emitUpdate();
       return null;
     }
-    const next = writeBuildingPlanRecord({
-      meta: this.meta,
-      record: this.record,
-      plan: proposal.snapshot,
-    });
     this.busy = true;
     this.emitUpdate();
+    const before = this.session.getSnapshot();
+    const observedRecord = JSON.stringify(this.readRecord());
+    let committed = null;
     try {
+      if (!this.managedTransactions) {
+        committed = await settleBuildingPlanQuestions(
+          this.session,
+          this.session.commit(proposal),
+          typeof this.presentQuestion === 'function'
+            ? async (question, lifetime) => {
+                const response = await this.presentQuestion(question, {
+                  ...lifetime,
+                  isCurrent: () =>
+                    lifetime.isCurrent() &&
+                    !this.disposed &&
+                    observedRecord === JSON.stringify(this.readRecord()),
+                });
+                if (this.disposed || observedRecord !== JSON.stringify(this.readRecord()))
+                  this.session.cancelUIRequests();
+                return response;
+              }
+            : undefined
+        );
+        if (
+          this.disposed ||
+          (typeof this.readOnly === 'function' ? this.readOnly() : this.readOnly) ||
+          committed.status !== 'applied'
+        ) {
+          this.session.synchronize(before);
+          this.reportIssues(committed.issues || []);
+          return null;
+        }
+      }
+      const next = writeBuildingPlanRecord({
+        meta: this.meta,
+        record: this.record,
+        plan: committed?.snapshot || proposal.snapshot,
+      });
       this.pending = Promise.resolve(
         this.writeRecord(next, { operation, proposal, floorId: operation.floorId })
       );
       const accepted = await this.pending;
-      if (this.disposed || accepted === false || accepted?.issues?.length) {
+      if (
+        this.disposed ||
+        accepted === false ||
+        accepted?.issues?.length ||
+        accepted?.status === 'pending' ||
+        accepted?.status === 'cancelled' ||
+        accepted?.status === 'unchanged' ||
+        accepted?.status === 'conflict'
+      ) {
+        if (committed) this.session.synchronize(before);
         if (accepted?.issues) this.reportIssues(accepted.issues);
         return null;
       }
-      let result;
+      let result = committed;
       if (accepted?.record) {
         const synchronized = this.session.synchronize(
           readBuildingPlanRecord({ meta: this.meta, record: accepted.record })
@@ -465,7 +527,7 @@ export class BuildingPlanCanvasController {
           status: synchronized.status === 'synchronized' ? 'applied' : 'conflict',
           issues: synchronized.issues,
         };
-      } else result = this.session.commit(proposal);
+      } else if (!result) result = this.session.commit(proposal);
       if (result.status !== 'applied') {
         this.reportIssues(result.issues);
         return null;
@@ -505,8 +567,6 @@ export class BuildingPlanCanvasController {
       {
         ...operation,
         pinnedFaceIds: [...this.pinnedFaceIds],
-        preserveWallGrouping:
-          operation.preserveWallGrouping ?? this.editingPolicy.preserveWallGrouping,
         thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
       },
       { scopeId: this.scopeId() }

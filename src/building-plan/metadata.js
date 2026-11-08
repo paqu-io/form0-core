@@ -3,7 +3,7 @@ export function getBuildingPlanMetadata(schema) {
   const result = [];
   function visit(elements) {
     for (const field of elements || []) {
-      if (field.type === 'BuildingPlanSection' && field.building_plan?.meta?.version === 1)
+      if (field.type === 'BuildingPlanSection' && field.building_plan?.meta?.version === 2)
         result.push(field.building_plan.meta);
       else if (field.elements) visit(field.elements);
     }
@@ -18,8 +18,15 @@ export function getBuildingPlanProjectionNames(schema) {
   for (const meta of getBuildingPlanMetadata(schema)) {
     for (const entry of meta.repeatables) {
       if (entry.role === 'projection') repeatables.add(entry.preferredKey);
-      for (const field of entry.fields || [])
-        if (['projection', 'derived'].includes(field.binding?.role)) fields.add(field.dataName);
+      const visit = (entries, projected = false) => {
+        for (const field of entries || []) {
+          const mirror = projected || field.binding?.role === 'projection';
+          if (mirror && field.type === 'RepeatableSection') repeatables.add(field.preferredKey);
+          else if (mirror || field.binding?.role === 'derived') fields.add(field.dataName);
+          visit(field.children, mirror);
+        }
+      };
+      visit(entry.fields);
     }
   }
   return { fields, repeatables };
@@ -31,15 +38,11 @@ export function getBuildingPlanFieldBinding(meta, dataName) {
 
 /**
  * Keep canonical storage out of row editors and navigation, without changing
- * engine visibility, validation, or serialization. Observation editors are opt-in.
+ * engine visibility, validation, or serialization.
  */
 export function isBuildingPlanInternalCollection(meta, dataName) {
-  if (meta?.version !== 1) return false;
+  if (meta?.version !== 2) return false;
   const node = meta.repeatables.find((entry) => entry.dataName === dataName);
   if (!node) return false;
-  if (['physical_walls', 'observations'].includes(node.role)) return true;
-  return (
-    node.sourceNode === 'observations' &&
-    !(node.fields || []).some((field) => field.binding?.storageRole !== 'storage')
-  );
+  return ['physical_walls', 'wall_sides'].includes(node.role);
 }

@@ -137,14 +137,19 @@ function fixture(policy = {}) {
     }),
   });
 }
-test('editor policy defaults are independent, typed and do not force grouping', () => {
+test('editor policy defaults are independent, typed and default to reviewing inherited changes', () => {
   assert.deepEqual(normalizeBuildingPlanEditingPolicy(), {
-    preserveWallGrouping: false,
+    inheritedChangePolicy: 'ask',
+    copyCustomAnswersAutomatically: false,
     snapping: true,
     edgeAutoPan: true,
     thicknessAnchor: 'room_face',
   });
   assert.throws(() => normalizeBuildingPlanEditingPolicy({ snapping: 'yes' }), /boolean/);
+  assert.throws(
+    () => normalizeBuildingPlanEditingPolicy({ copyCustomAnswersAutomatically: 'yes' }),
+    /boolean/
+  );
 });
 test('magnetic wall alignment respects thickness and releases with a temporary bypass', () => {
   const interaction = fixture();

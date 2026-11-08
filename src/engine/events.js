@@ -3,6 +3,9 @@ import { eventBuiltins } from '../builtins/registry.js';
 import { ContextResolver } from './context-resolver.js';
 import { WarningSystem } from './warning-system.js';
 import { createEventSourceRegistry } from './event-source.js';
+import { createUIRequestRegistry } from '../utilities/ui-requests.js';
+import { copyEventData } from '../utilities/event-data.js';
+import { getMessageBoxContinuation } from '../builtins/event/ui/messagebox.js';
 import { eventOperationIssue, reportEventOperationIssue } from './event-policy.js';
 import {
   bindEventBuiltins,
@@ -31,6 +34,8 @@ export class EventManager {
     this.compilationCache = preparation.compilationCache;
     this.referenceSourceCache = preparation.referenceSourceCache;
     this.initializationIssues = [];
+    this.uiRequests = createUIRequestRegistry();
+    this.uiRequestOrigins = new Map();
   }
 
   /**
@@ -103,6 +108,35 @@ export class EventManager {
         operationName
       );
     });
+  }
+
+  prepareUIOperation(operation, event) {
+    if (operation.operation !== 'MESSAGEBOX') return operation;
+    const continuation = getMessageBoxContinuation(operation);
+    if (!continuation) throw new TypeError('MESSAGEBOX requires a registered callback.');
+    // Capture authored source now, while Hermes callback metadata is available.
+    this.callbackSources.getSource(continuation.callback);
+    const origin = copyEventData(event);
+    const prepared = this.uiRequests.create(continuation.options, (reply) => ({
+      callback: continuation.callback,
+      event: origin,
+      reply,
+    }));
+    this.uiRequestOrigins.set(prepared.params.requestId, origin.fieldKey);
+    return prepared;
+  }
+
+  cancelUIRequests(fieldKey) {
+    if (fieldKey === undefined) {
+      this.uiRequests.cancelAll();
+      this.uiRequestOrigins.clear();
+      return;
+    }
+    for (const [id, field] of this.uiRequestOrigins)
+      if (field === fieldKey) {
+        this.uiRequests.cancel(id);
+        this.uiRequestOrigins.delete(id);
+      }
   }
 
   emitHandlerWarning(reason, executionContext, handlerName, operationName = null) {
@@ -307,7 +341,8 @@ export class EventManager {
 
     // Execute the callback function with the scoped context
     // This ensures EVAL() and other builtins have access to field values
-    const functionCall = `(${callbackCode})(event)`;
+    if (managed?.reply) contextWithEvent.__form0UIReply = managed.reply;
+    const functionCall = `(${callbackCode})(${managed?.reply ? '__form0UIReply' : 'event'})`;
     // Retain nested ON callbacks created during a handler without depending on toString (Hermes).
     const prepared = this.callbackSources.prepare(functionCall, contextWithEvent, true);
     return runInEventOperationScope(scope, () =>
@@ -579,7 +614,20 @@ export class EventManager {
 
     if (rejectedBatch) return [];
     this.processEventOperations(registrations);
-    return operations;
+    const created = [];
+    try {
+      return operations.map((operation) => {
+        const prepared = this.prepareUIOperation(operation, event);
+        if (prepared.operation === 'MESSAGEBOX') created.push(prepared.params.requestId);
+        return prepared;
+      });
+    } catch {
+      for (const id of created) {
+        this.uiRequests.cancel(id);
+        this.uiRequestOrigins.delete(id);
+      }
+      return [];
+    }
   }
 
   /**

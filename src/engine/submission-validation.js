@@ -112,18 +112,22 @@ export function validateSubmissionWithContext(snapshot, context, customIssues = 
   }
   visitRecordScopes(snapshot, context, (scope) => {
     scopes.push(scope);
-    orderedIssues.push(...validateScope(scope, options));
+    orderedIssues.push(
+      ...validateScope(scope, options).filter(
+        (finding) => !context.buildingPlanProjections.fields.has(finding.fieldName)
+      )
+    );
     if (scope.participating)
       for (const custom of issuesByScope.get(JSON.stringify(scope.instancePath)) || [])
         orderedIssues.push({ ...custom, instancePath: scope.instancePath, kind: 'custom' });
   });
-  if (!context.buildingPlanMeta?.some((meta) => meta.version === 1))
+  if (!context.buildingPlanMeta?.some((meta) => meta.version === 2))
     return summarizeSubmissionFindings(orderedIssues);
   // Physical records own validation, while their questions are edited through the ordinary
   // room-side rows. Point navigation at one visible row without duplicating the finding.
   const preferred = new WeakMap();
   for (const meta of context.buildingPlanMeta || []) {
-    if (meta.version !== 1) continue;
+    if (meta.version !== 2) continue;
     const links = getBuildingPlanProjectionLinks({ meta, record: snapshot });
     for (const scope of scopes) {
       if (!scope.participating) continue;

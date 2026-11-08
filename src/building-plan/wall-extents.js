@@ -9,11 +9,10 @@ import {
   segmentFrame,
 } from './geometry.js';
 import { buildingPlanSegmentThickness, facesOfWall } from './model.js';
-import { remapSubject } from './topology.js';
 
 /** Reconcile current captured construction with its declared faces, retaining subject identity.
  * Interior construction divisions and independently authored partitions are preserved. Openings
- * keep their metric locations; dated source geometry belongs to observations and is not rewritten.
+ * keep their metric locations.
  */
 export function reconcileWallExtents(floor, wallIds, { retireUnbound = false } = {}) {
   for (const wall of floor.walls.filter((entry) => wallIds.has(entry.id))) {
@@ -48,8 +47,9 @@ export function reconcileWallExtents(floor, wallIds, { retireUnbound = false } =
             continue;
           const from = Math.max(minimum, Math.min(a.along, b.along));
           const to = Math.min(maximum, Math.max(a.along, b.along));
-          if (to - from > EPS && Math.min(to, frame.length) - Math.max(from, 0) > EPS)
-            ranges.push([from, to]);
+          // A resolved return can move beyond its former interval. Its declared,
+          // collinear facing edge remains authoritative even after a spike is trimmed.
+          if (to - from > EPS) ranges.push([from, to]);
         }
       const openings = [...wall.doors, ...wall.windows].filter(
         (entry) => entry.segmentId === segment.id
@@ -71,7 +71,6 @@ export function reconcileWallExtents(floor, wallIds, { retireUnbound = false } =
       segment.end = at(frame, to);
       for (const opening of openings) opening.offset -= from;
     }
-    for (const id of retired) remapSubject(floor, id, wall.id, 'wall');
     wall.segments = wall.segments.filter((segment) => !retired.has(segment.id));
   }
 }

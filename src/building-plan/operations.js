@@ -1,3 +1,8 @@
+import { renewBuildingPlanRowIdentities } from './custom-rows.js';
+import { materializeBuildingPlanProfiles } from './material-profiles.js';
+import { mergeWalls } from './wall-merge.js';
+import { createWallSides, wallSide } from './wall-sides.js';
+import { propertySpecification, nodeSubjects } from './inheritance.js';
 import { repairSharedWallExtents } from './boundary-edits.js';
 import { buildingPlanBoundaryClearanceIssues } from './footprints.js';
 import {
@@ -45,7 +50,7 @@ import {
 import { reconcileWallExtents } from './wall-extents.js';
 import { rejoinEditingCut, splitEditingFace } from './editing-cuts.js';
 import { movePartitionPortion } from './partition-edits.js';
-import { preparePortionThickness } from './portion-properties.js';
+
 import { reshapeBuildingPlanAxes, reshapeBuildingPlanAxisThickness } from './axis-edits.js';
 import { reshapeBuildingPlanBoundary } from './junction-edits.js';
 
@@ -206,15 +211,22 @@ function splitGeometrySegment(wall, segment, low, high, delta, createId) {
   wall.segments.splice(index, 1, ...pieces);
 }
 
-function addJogGeometry(floor, wall, changedEdges, createId) {
+function addJogGeometry(floor, wall, changedEdges, createId, thicknessProfile = false) {
   rebindBuildingPlanFaces(floor, createId);
-  for (const { roomId, edgeIds } of changedEdges) {
+  for (const { roomId } of changedEdges) {
     const room = findRoom(floor, roomId);
-    const face = room.faces.find((entry) => entry.wallId === wall.id);
-    if (!face) continue;
+    const faces = room.faces.filter((entry) => entry.wallId === wall.id && !entry.freePath);
+    if (!faces.length) continue;
     const side = Math.sign(polygonArea(room.vertices));
     const half = (wall.properties.wall_thickness_m ?? 0) / 2;
-    for (const edge of polygonEdges(room).filter((entry) => edgeIds.includes(entry.id))) {
+    // Normalization can replace a temporary connector's edge identity or reverse
+    // its room-facing side. Rebuild only the extents declared by this owner,
+    // including those replacement edges, from the accepted room orientation.
+    for (const edge of polygonEdges(room).filter(
+      (entry) =>
+        faces.some((face) => face.edgeIds?.includes(entry.id)) &&
+        !faces.some((face) => face.bindings.some((binding) => binding.edgeId === entry.id))
+    )) {
       if (
         room.faces.some((entry) =>
           entry.bindings.some(
@@ -232,6 +244,7 @@ function addJogGeometry(floor, wall, changedEdges, createId) {
         end: at(edge, edge.length, -side * half),
         referenceOffset: half,
         junction: true,
+        ...(thicknessProfile ? { thicknessProfile: true } : {}),
       });
     }
   }
@@ -252,7 +265,8 @@ function resizeFace(floor, operation, createId, specifications) {
       transformedSegments: edit.transformed,
     },
     createId,
-    specifications
+    specifications,
+    edit.fittedRoomIds
   );
 }
 
@@ -263,7 +277,9 @@ function finishBoundaryEdit(
   affectedWalls,
   operation,
   createId,
-  specifications
+  specifications,
+  fittedRoomIds = [],
+  thicknessProfile = false
 ) {
   if (!changedEdges.length && !affectedWalls.length) return;
   // A thickness update can move both sides of an explicit cut in one operation.
@@ -298,7 +314,21 @@ function finishBoundaryEdit(
   repairSharedWallExtents(floor, before);
   reconcileWallExtents(floor, new Set(affectedWalls.map((wall) => wall.id)));
   rebindBuildingPlanFaces(floor, createId);
-  for (const wall of affectedWalls) addJogGeometry(floor, wall, changedEdges, createId);
+  for (const { roomId } of changedEdges) {
+    const room = findRoom(floor, roomId);
+    for (const face of room.faces) {
+      if (
+        face.freePath ||
+        !face.edgeIds.some((id) => !face.bindings.some((binding) => binding.edgeId === id))
+      )
+        continue;
+      const wall = findWall(floor, face.wallId);
+      if (!affectedWalls.includes(wall)) affectedWalls.push(wall);
+    }
+  }
+  for (const wall of affectedWalls)
+    addJogGeometry(floor, wall, changedEdges, createId, thicknessProfile);
+  reconcileWallExtents(floor, new Set(affectedWalls.map((wall) => wall.id)));
   for (const wall of affectedWalls) {
     const referenced = new Set(
       facesOfWall(floor, wall.id).flatMap(({ face }) =>
@@ -313,48 +343,29 @@ function finishBoundaryEdit(
         [...wall.doors, ...wall.windows].some((opening) => opening.segmentId === segment.id)
     );
   }
-  pruneAutomaticReturns(floor);
-  // Automatically introduced divisions can rejoin when their original alignment returns.
-  for (const reference of [...floor.walls]) {
-    if (
-      !floor.walls.includes(reference) ||
-      !reference.lineage?.jogOriginWallId ||
-      reference.lineage.explicitPhysicalSeparation ||
-      reference.segments.length !== 1
-    )
-      continue;
-    for (const other of [...floor.walls]) {
-      if (
-        other === reference ||
-        !floor.walls.includes(other) ||
-        other.lineage?.explicitPhysicalSeparation ||
-        other.segments.length !== 1 ||
-        wallTopologyOrigin(other) !== wallTopologyOrigin(reference) ||
-        !equalValue(reference.overrides, other.overrides)
-      )
-        continue;
-      const a = segmentFrame(reference.segments[0].start, reference.segments[0].end);
-      const b = segmentFrame(other.segments[0].start, other.segments[0].end);
-      if (Math.abs(dot(a.normal, b.tangent)) > EPS || Math.abs(project(a, b.start).offset) > EPS)
-        continue;
-      const range = [project(a, b.start).along, project(a, b.end).along];
-      if (Math.min(a.length, Math.max(...range)) < Math.max(0, Math.min(...range)) - EPS) continue;
-      mergeWalls(floor, reference, other, {}, createId);
-    }
-  }
+  pruneAutomaticReturns(floor, before);
+  // Version-2 owner coalescence is performed after adjacency and answer compatibility
+  // have been reconciled; geometric lineage alone cannot join physical subjects.
   coalesceAutomaticSegments(floor);
   coalesceFacingRows(floor);
   for (const wall of affectedWalls.filter(
     (wall) => floor.walls.includes(wall) && wall.segments.length > 1
   )) {
     wall.lineage = { ...wall.lineage, jogOriginWallId: wallTopologyOrigin(wall) };
-    if (!operation.preserveWallGrouping) separatePhysicalWallRuns(floor, wall, createId);
   }
   splitFacingRows(floor, createId, new Map(), new Set(affectedWalls.map((wall) => wall.id)));
   rebindBuildingPlanFaces(floor, createId);
   // Attach only the newly aligned neighbour first, retaining the active room's existing
   // physical subject. Ordinary later wall contacts keep their usual stationary ownership.
   for (const roomId of alignedRooms)
+    attachRoom(
+      floor,
+      findRoom(floor, roomId),
+      { ...operation, attachmentTolerance: 0 },
+      createId,
+      specifications
+    );
+  for (const roomId of fittedRoomIds)
     attachRoom(
       floor,
       findRoom(floor, roomId),
@@ -383,11 +394,23 @@ function detachRoom(floor, room, createId) {
       ...copy(wall),
       id: createId(),
       referenceFaceId: face.id,
-      overrides: { ...copy(wall.properties) },
+      overrides: copy(wall.overrides),
+      sides: wall.sides.map((side) => ({
+        ...copy(side),
+        id: createId(),
+        roomId: side.roomId === room.id ? room.id : null,
+      })),
       doors: [],
       windows: [],
-      lineage: { copiedFromWallId: wall.id, reason: 'room_detach' },
+      lineage: {
+        ...copy(wall.lineage || {}),
+        copiedFromWallId: wall.id,
+        dividedFromWallId: wall.id,
+        reason: 'room_detach',
+      },
     };
+    renewBuildingPlanRowIdentities(replacement, createId);
+    for (const side of replacement.sides) renewBuildingPlanRowIdentities(side, createId);
     replacement.segments = wall.segments
       .filter((segment) => roomBindings.some((binding) => binding.segmentId === segment.id))
       .map((segment) => {
@@ -432,154 +455,34 @@ function detachRoom(floor, room, createId) {
   reconcileWallExtents(floor, stationaryWalls, { retireUnbound: true });
 }
 
-function mergeWalls(floor, reference, other, resolutions, createId) {
-  if (reference.id === other.id) return reference;
-  if (reference.segments.length !== 1 || other.segments.length !== 1)
-    failOperation(
-      'complex_wall_merge',
-      'Join one pair of straight construction segments at a time.'
-    );
-  const a = reference.segments[0],
-    b = other.segments[0];
-  const frame = segmentFrame(a.start, a.end);
-  const otherFrame = segmentFrame(b.start, b.end);
-  if (
-    Math.abs(dot(frame.normal, otherFrame.tangent)) > EPS ||
-    Math.abs(project(frame, b.start).offset) > EPS
-  )
-    failOperation('unaligned_walls', 'The wall axes must align before joining.');
-  const keys = new Set([...Object.keys(reference.overrides), ...Object.keys(other.overrides)]);
-  for (const key of keys) {
-    if (own(resolutions, key)) reference.overrides[key] = copy(resolutions[key]);
-    else if (
-      own(reference.overrides, key) &&
-      own(other.overrides, key) &&
-      !equalValue(reference.overrides[key], other.overrides[key])
-    )
-      failOperation(
-        'conflicting_wall_properties',
-        'Choose one value before joining the physical walls.',
-        { type: 'wall', id: reference.id },
-        { property: key, values: [reference.overrides[key], other.overrides[key]] }
-      );
-    else if (!own(reference.overrides, key)) reference.overrides[key] = copy(other.overrides[key]);
-  }
-  for (const [key, value] of Object.entries(resolutions || {})) {
-    propertyKey(key);
-    reference.overrides[key] = copy(value);
-  }
-  const projectedB = [project(frame, b.start).along, project(frame, b.end).along];
-  const from = Math.min(0, ...projectedB),
-    to = Math.max(frame.length, ...projectedB);
-  if (Math.min(frame.length, Math.max(...projectedB)) < Math.max(0, Math.min(...projectedB)) - EPS)
-    failOperation(
-      'disconnected_walls',
-      'Only touching or overlapping wall segments can be joined.'
-    );
-  if (!equalValue(a.overrides || {}, b.overrides || {})) {
-    const overlap =
-      Math.min(frame.length, Math.max(...projectedB)) - Math.max(0, Math.min(...projectedB));
-    if (overlap > EPS)
-      failOperation(
-        'conflicting_construction_segments',
-        'Overlapping construction segments require an explicit common property resolution.'
-      );
-    reference.segments.push(copy(b));
-    reference.doors.push(...copy(other.doors));
-    reference.windows.push(...copy(other.windows));
-    reference.lineage = {
-      ...(reference.lineage || {}),
-      mergedWallIds: [...(reference.lineage?.mergedWallIds || []), other.id],
-    };
-    for (const room of floor.rooms)
-      for (const face of room.faces) if (face.wallId === other.id) face.wallId = reference.id;
-    for (const observation of floor.observations)
-      if (observation.subject?.id === other.id) {
-        observation.sourceSubject ||= copy(observation.subject);
-        observation.subject.id = reference.id;
-      }
-    floor.walls = floor.walls.filter((wall) => wall.id !== other.id);
-    return reference;
-  }
-  for (const collection of ['doors', 'windows']) {
-    for (const opening of reference[collection]) opening.offset -= from;
-    for (const opening of other[collection]) {
-      const start = project(frame, at(otherFrame, opening.offset)).along;
-      const end = project(frame, at(otherFrame, opening.offset + opening.width)).along;
-      reference[collection].push({
-        ...copy(opening),
-        segmentId: a.id,
-        offset: Math.min(start, end) - from,
-      });
-    }
-  }
-  a.start = at(frame, from);
-  a.end = at(frame, to);
-  reference.lineage = {
-    ...(reference.lineage || {}),
-    mergedWallIds: [...(reference.lineage?.mergedWallIds || []), other.id],
-  };
-  for (const room of floor.rooms)
-    for (const face of room.faces) if (face.wallId === other.id) face.wallId = reference.id;
-  for (const observation of floor.observations)
-    if (observation.subject?.id === other.id || observation.subject?.id === b.id) {
-      observation.sourceSubject ||= copy(observation.subject);
-      observation.subject.id = observation.subject.id === b.id ? a.id : reference.id;
-    }
-  for (const observation of floor.observations)
-    if (observation.relatedSubjects)
-      observation.relatedSubjects = observation.relatedSubjects.map((subject) =>
-        subject.id === other.id
-          ? { ...subject, id: reference.id }
-          : subject.id === b.id
-            ? { ...subject, id: a.id }
-            : subject
-      );
-  floor.walls = floor.walls.filter((wall) => wall.id !== other.id);
-  return reference;
-}
-
 function mergeBoundSegments(floor, reference, other, referenceId, otherId, resolutions, createId) {
   if (reference.segments.length === 1 && other.segments.length === 1)
     return mergeWalls(floor, reference, other, resolutions, createId);
-  const a = reference.segments.find((segment) => segment.id === referenceId),
-    b = other.segments.find((segment) => segment.id === otherId);
-  const remaining = [
-    ...reference.segments.filter((segment) => segment !== a),
-    ...other.segments.filter((segment) => segment !== b),
-  ];
-  const hosted = {};
-  for (const collection of ['doors', 'windows']) {
-    hosted[collection] = [
-      ...reference[collection].filter((opening) => opening.segmentId !== a.id),
-      ...other[collection].filter((opening) => opening.segmentId !== b.id),
-    ];
-    reference[collection] = reference[collection].filter((opening) => opening.segmentId === a.id);
-    other[collection] = other[collection].filter((opening) => opening.segmentId === b.id);
-  }
-  reference.segments = [a];
-  other.segments = [b];
-  const merged = mergeWalls(floor, reference, other, resolutions, createId);
-  merged.segments.push(...remaining);
-  for (const collection of ['doors', 'windows']) merged[collection].push(...hosted[collection]);
-  return merged;
+  // Temporary axis runs can still belong to one planning subject. Separate
+  // them before binding so the joined span cannot take ownership of unrelated
+  // runs with different accepted thicknesses or custom answers.
+  if (reference.segments.length > 1) separatePhysicalWallRuns(floor, reference, createId);
+  if (other.segments.length > 1) separatePhysicalWallRuns(floor, other, createId);
+  const a = floor.walls.find((wall) => wall.segments.some((segment) => segment.id === referenceId));
+  const b = floor.walls.find((wall) => wall.segments.some((segment) => segment.id === otherId));
+  return mergeWalls(floor, a, b, resolutions, createId);
 }
 
 /** Rejoin only automatic divisions of the same original straight construction. */
 function coalesceAutomaticSegments(floor) {
   for (const wall of floor.walls) {
-    if (wall.lineage?.explicitPhysicalSeparation) continue;
     let changed = true;
     while (changed) {
       changed = false;
       for (const initial of wall.segments) {
         let a = initial;
-        if (!a.lineage?.segmentId) continue;
+        if (!a.lineage?.segmentId && !a.junction) continue;
         let frame = segmentFrame(a.start, a.end);
         let b = wall.segments.find(
           (segment) =>
             segment !== a &&
-            segment.lineage?.segmentId === a.lineage.segmentId &&
+            ((a.junction && segment.junction) ||
+              (a.lineage?.segmentId && segment.lineage?.segmentId === a.lineage.segmentId)) &&
             equalValue(segment.overrides || {}, a.overrides || {}) &&
             Math.abs(dot(frame.normal, segmentFrame(segment.start, segment.end).tangent)) <= EPS &&
             Math.abs(project(frame, segment.start).offset) <= EPS &&
@@ -594,7 +497,7 @@ function coalesceAutomaticSegments(floor) {
                 EPS
         );
         if (!b) continue;
-        if (b.id === b.lineage.segmentId && a.id !== a.lineage.segmentId) {
+        if (b.id === b.lineage?.segmentId && a.id !== a.lineage?.segmentId) {
           [a, b] = [b, a];
           frame = segmentFrame(a.start, a.end);
         }
@@ -611,21 +514,12 @@ function coalesceAutomaticSegments(floor) {
             opening.offset = Math.min(start, end) - from;
           }
         }
-        for (const observation of floor.observations) {
-          if (observation.subject?.id === b.id) {
-            observation.sourceSubject ||= copy(observation.subject);
-            observation.subject.id = a.id;
-          }
-          if (observation.relatedSubjects)
-            observation.relatedSubjects = observation.relatedSubjects.map((subject) =>
-              subject.id === b.id ? { ...subject, id: a.id } : subject
-            );
-        }
+
         a.start = at(frame, from);
         a.end = at(frame, to);
         a.lineage = {
           ...a.lineage,
-          mergedSegmentIds: [...(a.lineage.mergedSegmentIds || []), b.id],
+          mergedSegmentIds: [...(a.lineage?.mergedSegmentIds || []), b.id],
         };
         wall.segments = wall.segments.filter((segment) => segment !== b);
         changed = true;
@@ -708,7 +602,9 @@ function bindFaces(floor, operation, createId, specifications) {
     operation.resolutions || {},
     createId
   );
-  const conflicts = reconcileBuildingPlanProperties({ floors: [floor] }, specifications);
+  const conflicts = reconcileBuildingPlanProperties({ floors: [floor] }, specifications).filter(
+    (issue) => issue.code !== 'conflicting_room_defaults'
+  );
   if (conflicts.length) {
     const error = new Error(conflicts[0].message);
     error.issues = conflicts;
@@ -727,6 +623,7 @@ function attachRoom(floor, room, operation, createId, specifications) {
   for (const face of [...room.faces]) {
     if (
       face.freePath ||
+      !face.bindings.length ||
       facesOfWall(floor, face.wallId).some(
         (entry) =>
           entry.room.id !== room.id &&
@@ -742,15 +639,43 @@ function attachRoom(floor, room, operation, createId, specifications) {
       )
     )
       continue;
-    if (findWall(floor, face.wallId).lineage?.explicitPhysicalSeparation) continue;
+    const owner = findWall(floor, face.wallId);
     const edge = sourceEdges(room, face)[0];
     if (!edge) continue;
     const matches = [];
     for (const neighbour of floor.rooms.filter((entry) => entry.id !== room.id))
-      for (const reference of neighbour.faces.filter((entry) => !entry.freePath)) {
+      for (const reference of neighbour.faces.filter(
+        (entry) => !entry.freePath && entry.bindings.length
+      )) {
         const wall = findWall(floor, reference.wallId);
         const thickness = wall.properties.wall_thickness_m;
-        if (!Number.isFinite(thickness) || wall.lineage?.explicitPhysicalSeparation) continue;
+        if (!Number.isFinite(thickness)) continue;
+        if (owner.lineage?.explicitPhysicalSeparation || wall.lineage?.explicitPhysicalSeparation) {
+          const a = owner.segments[0],
+            b = wall.segments[0];
+          if (owner.segments.length !== 1 || wall.segments.length !== 1) continue;
+          const frame = segmentFrame(a.start, a.end);
+          const positions = [project(frame, b.start), project(frame, b.end)];
+          if (positions.some((point) => Math.abs(point.offset) > EPS)) continue;
+          const from = Math.min(0, ...positions.map((point) => point.along));
+          const to = Math.max(frame.length, ...positions.map((point) => point.along));
+          // Opposite faces may bind up to a deliberate cut. They may not merge
+          // across one, even when their accepted values happen to agree.
+          const crossesCut = floor.rooms.some((room) =>
+            [...room.vertices, ...room.faces.flatMap((face) => face.freePath || [])].some(
+              (vertex) => {
+                if (!vertex.editingCutId) return false;
+                const point = project(frame, vertex);
+                return (
+                  point.along > from + EPS &&
+                  point.along < to - EPS &&
+                  near(Math.abs(point.offset), thickness / 2)
+                );
+              }
+            )
+          );
+          if (crossesCut) continue;
+        }
         for (const otherEdge of sourceEdges(neighbour, reference)) {
           if (dot(edge.tangent, otherEdge.tangent) > -1 + EPS) continue;
           const gap = project(otherEdge, edge.start).offset;
@@ -790,7 +715,7 @@ function attachRoom(floor, room, operation, createId, specifications) {
   }
 }
 
-function applyThicknessChanges(
+export function applyThicknessChanges(
   floor,
   before,
   activeRoomId,
@@ -798,6 +723,17 @@ function applyThicknessChanges(
   operation = {},
   specifications
 ) {
+  if (
+    floor.walls.some((wall) => {
+      const old = before.walls.find((other) => other.id === wall.id);
+      return old && wall.properties.wall_thickness_m !== old.properties.wall_thickness_m;
+    })
+  ) {
+    before = copy(before);
+    const identities = new Map();
+    materializeBuildingPlanProfiles(before, createId, identities);
+    materializeBuildingPlanProfiles(floor, createId, identities);
+  }
   const edit = reshapeBuildingPlanAxisThickness(
     floor,
     before,
@@ -805,13 +741,6 @@ function applyThicknessChanges(
     createId
   );
   const { changedEdges, affectedWalls: affected } = edit;
-  const hasThicknessProfile = affected.some(
-    (wall) =>
-      wall.lineage?.thicknessProfile ||
-      [...wall.segments, ...(before.walls.find((old) => old.id === wall.id)?.segments || [])].some(
-        (segment) => own(segment.overrides, 'wall_thickness_m')
-      )
-  );
   finishBoundaryEdit(
     floor,
     before,
@@ -821,23 +750,82 @@ function applyThicknessChanges(
       ...operation,
       activeRoomId,
       transformedSegments: edit.transformed,
-      preserveWallGrouping: operation.preserveWallGrouping || hasThicknessProfile,
     },
     createId,
-    specifications
+    specifications,
+    [],
+    true
   );
 }
 
-function removeWithObservations(floor, ids, allowObservationDeletion) {
-  const observations = floor.observations.filter((entry) => ids.has(entry.subject?.id));
-  if (observations.length && !allowObservationDeletion)
+function operationSubject(floor, operation, specification = {}) {
+  if (operation.nodeKey && !['walls', 'physical_walls', 'wall_sides'].includes(operation.nodeKey)) {
+    const subject = nodeSubjects(floor, operation.nodeKey).find(
+      ({ subject }) => subject.id === (operation.elementId || operation.roomId || floor.id)
+    )?.subject;
+    if (!subject) failOperation('missing_subject', 'The selected element no longer exists.');
+    return subject;
+  }
+  if (operation.faceId) {
+    const { face, wall } = findFace(floor, operation.faceId);
+    return ['wall_face', 'room_face'].includes(operation.scope || specification.scope)
+      ? wallSide(floor, face, operation.outside)
+      : wall;
+  }
+  if (operation.wallId) {
+    const wall = findWall(floor, operation.wallId);
+    if (operation.sideId) return wall.sides.find((side) => side.id === operation.sideId);
+    return wall;
+  }
+  return operation.roomId ? findRoom(floor, operation.roomId) : floor;
+}
+function applyProperty(floor, operation, specifications) {
+  propertyKey(operation.property);
+  if (operation.segmentId)
     failOperation(
-      'observation_deletion_requires_confirmation',
-      'This removal also deletes observations. Confirm the destructive cascade using the existing Remove confirmation.',
-      null,
-      { observationIds: observations.map((entry) => entry.id) }
+      'segment_property_removed',
+      'Physical properties belong to one complete wall piece in version 2.'
     );
-  floor.observations = floor.observations.filter((entry) => !ids.has(entry.subject?.id));
+  const specification = propertySpecification(
+    specifications,
+    operation.property,
+    operation.nodeKey || 'walls',
+    operation.scope
+  );
+  if (!specification && operation.type !== 'set_provider')
+    failOperation('unknown_property', 'Choose a declared property.');
+  const subject = operationSubject(floor, operation, specification);
+  if (!subject) failOperation('missing_surface', 'This wall has no uncovered outside surface.');
+  if (operation.type === 'set_provider') {
+    const declared = Object.values(specifications).some((spec) =>
+      spec.providers?.some(
+        (provider) =>
+          provider.sourceNode === operation.nodeKey &&
+          provider.property === operation.property &&
+          provider.sourceOriginalDataName === operation.fieldName
+      )
+    );
+    if (!declared)
+      failOperation('unknown_provider', 'Choose a declared BuildingPlan source field.');
+    subject.providerOverrides ||= {};
+    subject.values ||= {};
+    const name = operation.fieldName;
+    propertyKey(name);
+    if (operation.reset) {
+      delete subject.providerOverrides[name];
+      delete subject.values[name];
+    } else {
+      subject.providerOverrides[name] = copy(operation.value);
+      subject.values[name] = copy(operation.value);
+    }
+    return;
+  }
+  const target =
+    operation.type === 'set_defaults' ? (subject.defaults ||= {}) : (subject.overrides ||= {});
+  if (operation.type === 'set_defaults' && !specification.inherit)
+    failOperation('property_not_inheritable', 'This property does not accept inherited defaults.');
+  if (operation.reset) delete target[operation.property];
+  else target[operation.property] = copy(operation.value);
 }
 
 /** Mutates only a private session candidate. Public callers always receive copies. */
@@ -850,12 +838,14 @@ export function applyBuildingPlanOperation(
     failOperation('invalid_operation', 'A building-plan operation type is required.');
   operation = {
     ...operation,
-    preserveWallGrouping:
-      operation.preserveWallGrouping ?? editingPolicy.preserveWallGrouping ?? false,
     thicknessAnchor: operation.thicknessAnchor ?? editingPolicy.thicknessAnchor ?? 'room_face',
   };
-  if (typeof operation.preserveWallGrouping !== 'boolean')
-    failOperation('invalid_editing_policy', 'preserveWallGrouping must be boolean.');
+  if (
+    ['resize_face', 'resize_room', 'resize_preserve_group', 'move_corner', 'move_room'].includes(
+      operation.type
+    )
+  )
+    materializeBuildingPlanProfiles(findBuildingPlanFloor(snapshot, operation.floorId), createId);
   if (!['room_face', 'midline'].includes(operation.thicknessAnchor))
     failOperation('invalid_editing_policy', 'thicknessAnchor must be room_face or midline.');
   if (operation.type === 'batch') {
@@ -865,90 +855,34 @@ export function applyBuildingPlanOperation(
     )
       failOperation('invalid_batch', 'A batch requires a flat list of operations.');
     const propertyOperations = operation.operations.filter((entry) =>
-      ['set_property', 'set_defaults'].includes(entry.type)
-    );
-    const portions = new Set(
-      propertyOperations.filter(
-        (entry) =>
-          entry.type === 'set_property' && entry.faceId && entry.property === 'wall_thickness_m'
-      )
-    );
-    const preparedPortions = [...portions].map((entry) =>
-      preparePortionThickness(
-        findBuildingPlanFloor(snapshot, entry.floorId),
-        entry.faceId,
-        createId,
-        splitGeometrySegment
-      )
+      ['set_property', 'set_defaults', 'set_provider'].includes(entry.type)
     );
     const before = copy(snapshot);
+    const activeRoomsByWall = {};
     for (const entry of propertyOperations) {
-      propertyKey(entry.property);
-      const specification = specifications[entry.property];
-      if (!specification || specification.scope === 'observation')
-        failOperation('unknown_property', 'Choose a declared property.');
+      if (entry.faceId) {
+        const selected = findFace(findBuildingPlanFloor(snapshot, entry.floorId), entry.faceId);
+        activeRoomsByWall[selected.wall.id] = entry.activeRoomId || selected.room.id;
+      }
       const floor = findBuildingPlanFloor(snapshot, entry.floorId);
-      if (portions.has(entry)) {
-        const { face, wall } = findFace(floor, entry.faceId);
-        for (const segment of wall.segments.filter((segment) =>
-          face.bindings.some((binding) => binding.segmentId === segment.id)
-        )) {
-          segment.overrides ||= {};
-          if (entry.reset) delete segment.overrides[entry.property];
-          else segment.overrides[entry.property] = copy(entry.value);
-        }
-        continue;
-      }
-      let target;
-      if (entry.type === 'set_defaults') {
-        if (!specification.inherit)
-          failOperation(
-            'property_not_inheritable',
-            'This property does not support inherited defaults.'
-          );
-        target = (entry.roomId ? findRoom(floor, entry.roomId) : floor).defaults;
-      } else
-        target =
-          specification.scope === 'room_face'
-            ? findFace(floor, entry.faceId).face
-            : findWall(floor, entry.wallId);
-      if (entry.type !== 'set_defaults') {
-        if (entry.segmentId) {
-          const segment = target.segments?.find((segment) => segment.id === entry.segmentId);
-          if (!segment)
-            failOperation('missing_segment', 'The construction segment no longer exists.');
-          target = segment;
-        }
-        target = target.overrides ||= {};
-      }
-      if (entry.reset) delete target[entry.property];
-      else target[entry.property] = copy(entry.value);
+      applyProperty(floor, entry, specifications);
     }
-    const issues = reconcileBuildingPlanProperties(snapshot, specifications);
-    if (issues.length) {
-      const error = new Error(issues[0].message);
-      error.issues = issues;
-      throw error;
-    }
+    const issues = reconcileBuildingPlanProperties(snapshot, specifications).filter(
+      (issue) => issue.code !== 'conflicting_room_defaults'
+    );
+    if (issues.length) throw Object.assign(new Error(issues[0].message), { issues });
     for (const floor of snapshot.floors) {
-      const old = before.floors.find((entry) => entry.id === floor.id);
-      const local = [...portions].find((entry) => entry.floorId === floor.id);
-      if (old)
+      const previous = before.floors.find((entry) => entry.id === floor.id);
+      if (previous)
         applyThicknessChanges(
           floor,
-          old,
-          operation.activeRoomId ||
-            propertyOperations.find((entry) => entry.floorId === floor.id)?.activeRoomId ||
-            (local && findFace(floor, local.faceId).room.id) ||
-            (operation.floorId === floor.id &&
-              operation.faceId &&
-              findFace(floor, operation.faceId).room.id),
+          previous,
+          operation.activeRoomId,
           createId,
-          local ? { ...operation, preserveWallGrouping: true } : operation,
+          { ...operation, activeRoomsByWall },
           specifications
         );
     }
-    for (const prepared of preparedPortions) prepared.releaseCuts();
     const created = [];
     for (const entry of operation.operations.filter((item) => !propertyOperations.includes(item))) {
       const result = applyBuildingPlanOperation(snapshot, entry, {
@@ -956,7 +890,6 @@ export function applyBuildingPlanOperation(
         specifications,
         editingPolicy: {
           ...editingPolicy,
-          preserveWallGrouping: operation.preserveWallGrouping,
           thicknessAnchor: operation.thicknessAnchor,
         },
       });
@@ -992,6 +925,7 @@ export function applyBuildingPlanOperation(
         provenance: {},
         values: copy(operation.values || {}),
         segments: [],
+        sides: createWallSides(createId),
         doors: [],
         windows: [],
       };
@@ -1163,7 +1097,6 @@ export function applyBuildingPlanOperation(
               faceId: face.id,
               edgeId: edge.id,
               distance: -Math.sign(polygonArea(currentRoom.vertices)) * dot(vector, edge.normal),
-              preserveWallGrouping: operation.preserveWallGrouping,
             },
             createId,
             specifications
@@ -1220,101 +1153,43 @@ export function applyBuildingPlanOperation(
     }
     case 'split_wall': {
       const wall = findWall(floor, operation.wallId);
-      if (wall.segments.length !== 1)
-        failOperation('complex_wall_split', 'Split one straight construction segment at a time.');
-      const segment = wall.segments[0],
-        frame = segmentFrame(segment.start, segment.end);
+      const segment = wall.segments[0];
+      const frame = segmentFrame(segment.start, segment.end);
       const cut = operation.offset;
       if (!Number.isFinite(cut) || cut <= EPS || cut >= frame.length - EPS)
         failOperation('invalid_split', 'Choose an interior wall position.');
-      for (const opening of [...wall.doors, ...wall.windows])
-        if (opening.offset < cut - EPS && opening.offset + opening.width > cut + EPS)
-          failOperation(
-            'opening_crosses_split',
-            'The construction split passes through an opening.'
-          );
-      const other = {
-        ...copy(wall),
-        id: operation.newWallId || createId(),
-        overrides: { ...copy(wall.overrides), ...copy(operation.overrides || {}) },
-        doors: [],
-        windows: [],
-        segments: [
-          { ...copy(segment), id: createId(), start: at(frame, cut), end: at(frame, frame.length) },
-        ],
-        lineage: { splitFromWallId: wall.id, interval: [cut, frame.length] },
-      };
-      segment.end = at(frame, cut);
-      wall.lineage = {
-        ...(wall.lineage || {}),
-        splitWallIds: [...(wall.lineage?.splitWallIds || []), other.id],
-      };
-      floor.walls.push(other);
-      for (const room of floor.rooms) {
-        for (const face of [...room.faces.filter((entry) => entry.wallId === wall.id)]) {
-          const intervals = face.bindings
-            .filter((entry) => entry.segmentId === segment.id)
-            .map((entry) => entry.interval);
-          const left = intervals.some((range) => range[0] < cut - EPS),
-            right = intervals.some((range) => range[1] > cut + EPS);
-          if (left && right) {
-            for (const binding of face.bindings.filter(
-              (entry) =>
-                entry.segmentId === segment.id &&
-                entry.interval[0] < cut - EPS &&
-                entry.interval[1] > cut + EPS
-            )) {
-              const edge = polygonEdges(room).find((entry) => entry.id === binding.edgeId);
-              const point = at(
-                frame,
-                cut,
-                (binding.side * (wall.properties.wall_thickness_m ?? 0)) / 2
-              );
-              const index = room.vertices.findIndex((entry) => entry.id === edge.start.id);
-              const vertex = { ...point, id: createId() };
-              const previous = room.edges;
-              room.vertices.splice(index + 1, 0, vertex);
-              assignRoomEdges(room, createId, previous);
-              const replacement = room.edges
-                .filter((entry) => entry.startId === edge.start.id || entry.startId === vertex.id)
-                .map((entry) => entry.id);
-              for (const portion of room.faces)
-                if (portion.edgeIds?.includes(edge.id))
-                  portion.edgeIds = portion.edgeIds.flatMap((id) =>
-                    id === edge.id ? replacement : [id]
-                  );
-            }
-            const edges = sourceEdges(room, face);
-            const leftEdges = edges
-              .filter((edge) => project(frame, at(edge, edge.length / 2)).along < cut + EPS)
-              .map((edge) => edge.id);
-            const rightEdges = edges
-              .filter((edge) => project(frame, at(edge, edge.length / 2)).along > cut - EPS)
-              .map((edge) => edge.id);
-            room.faces.push({
-              ...copy(face),
-              id: createId(),
-              wallId: other.id,
-              edgeIds: rightEdges,
-              bindings: [],
-              lineage: { splitFromFaceId: face.id },
-            });
-            face.edgeIds = leftEdges;
-          } else if (right) face.wallId = other.id;
-        }
-      }
-      for (const collection of ['doors', 'windows']) {
-        for (const opening of wall[collection].filter((entry) => entry.offset >= cut - EPS))
-          other[collection].push({
-            ...copy(opening),
-            offset: opening.offset - cut,
-            segmentId: other.segments[0].id,
-          });
-        wall[collection] = wall[collection].filter((entry) => entry.offset < cut - EPS);
-      }
-      other.referenceFaceId = facesOfWall(floor, other.id)[0]?.face.id || null;
-      wall.referenceFaceId = facesOfWall(floor, wall.id)[0]?.face.id || null;
-      break;
+      const target = facesOfWall(floor, wall.id).find(({ face }) =>
+        face.bindings.some(
+          (binding) =>
+            binding.segmentId === segment.id &&
+            binding.interval[0] < cut - EPS &&
+            binding.interval[1] > cut + EPS
+        )
+      );
+      if (!target) failOperation('invalid_split', 'Choose a captured interior wall position.');
+      const binding = target.face.bindings.find(
+        (binding) =>
+          binding.segmentId === segment.id &&
+          binding.interval[0] < cut - EPS &&
+          binding.interval[1] > cut + EPS
+      );
+      const low = Math.min(
+        ...target.face.bindings
+          .filter((entry) => entry.edgeId === binding.edgeId)
+          .map((entry) => entry.roomInterval[0])
+      );
+      return splitEditingFace(
+        floor,
+        {
+          faceId: target.face.id,
+          edgeId: binding.edgeId,
+          offset:
+            binding.roomInterval[0] -
+            low +
+            (binding.direction > 0 ? cut - binding.interval[0] : binding.interval[1] - cut),
+        },
+        createId
+      );
     }
     case 'resize_preserve_group': {
       if (!Array.isArray(operation.affectedRoomIds) || !operation.affectedRoomIds.length)
@@ -1379,75 +1254,37 @@ export function applyBuildingPlanOperation(
       break;
     }
     case 'set_property':
-    case 'set_defaults': {
-      propertyKey(operation.property);
-      const specification = specifications[operation.property];
-      if (!specification || specification.scope === 'observation')
-        failOperation('unknown_property', 'Choose a declared inheritable property.');
-      const portion =
-        operation.type === 'set_property' &&
-        operation.faceId &&
-        operation.property === 'wall_thickness_m'
-          ? preparePortionThickness(floor, operation.faceId, createId, splitGeometrySegment)
-          : null;
+    case 'set_defaults':
+    case 'set_provider': {
       const before = copy(floor);
-      if (operation.type === 'set_property') {
-        let subject =
-          portion?.wall ||
-          (specification.scope === 'room_face'
-            ? findFace(floor, operation.faceId).face
-            : findWall(floor, operation.wallId));
-        if (operation.segmentId) {
-          subject = subject.segments?.find((segment) => segment.id === operation.segmentId);
-          if (!subject)
-            failOperation('missing_segment', 'The construction segment no longer exists.');
-        }
-        for (const target of portion?.segments || [subject]) {
-          target.overrides ||= {};
-          if (operation.reset) delete target.overrides[operation.property];
-          else target.overrides[operation.property] = copy(operation.value);
-        }
-      } else {
-        if (!specification.inherit)
-          failOperation(
-            'property_not_inheritable',
-            'This property does not support inherited defaults.'
-          );
-        const subject = operation.roomId ? findRoom(floor, operation.roomId) : floor;
-        if (operation.reset) delete subject.defaults[operation.property];
-        else subject.defaults[operation.property] = copy(operation.value);
-      }
-      const conflicts = reconcileBuildingPlanProperties(snapshot, specifications);
-      if (conflicts.length) {
-        const error = new Error(conflicts[0].message);
-        error.issues = conflicts;
-        throw error;
-      }
+      applyProperty(floor, operation, specifications);
+      const issues = reconcileBuildingPlanProperties(snapshot, specifications).filter(
+        (issue) => issue.code !== 'conflicting_room_defaults'
+      );
+      if (issues.length) throw Object.assign(new Error(issues[0].message), { issues });
       applyThicknessChanges(
         floor,
         before,
         operation.activeRoomId ||
           operation.roomId ||
-          (portion && findFace(floor, operation.faceId).room.id),
+          (operation.faceId ? findFace(floor, operation.faceId).room.id : null),
         createId,
-        portion ? { ...operation, preserveWallGrouping: true } : operation,
+        operation,
         specifications
       );
-      portion?.releaseCuts();
       break;
     }
-    case 'set_values': {
-      const subject = operation.faceId
-        ? findFace(floor, operation.faceId).face
-        : operation.wallId
-          ? findWall(floor, operation.wallId)
-          : operation.roomId
-            ? findRoom(floor, operation.roomId)
-            : floor;
-      for (const [key, value] of Object.entries(operation.values || {})) {
-        propertyKey(key);
-        subject.values[key] = copy(value);
-      }
+    case 'set_values':
+    case 'set_custom_rows': {
+      const subject = operationSubject(floor, operation);
+      if (operation.type === 'set_custom_rows')
+        subject.repeatable = copy(operation.repeatable || {});
+      else
+        for (const [key, value] of Object.entries(operation.values || {})) {
+          propertyKey(key);
+          subject.values ||= {};
+          subject.values[key] = copy(value);
+        }
       break;
     }
     case 'create_opening': {
@@ -1475,60 +1312,12 @@ export function applyBuildingPlanOperation(
       );
       if (!opening) failOperation('missing_opening', 'The opening no longer exists.');
       if (operation.type === 'remove_opening') {
-        removeWithObservations(floor, new Set([opening.id]), operation.allowObservationDeletion);
         wall[opening.type === 'door' ? 'doors' : 'windows'] = wall[
           opening.type === 'door' ? 'doors' : 'windows'
         ].filter((entry) => entry.id !== opening.id);
       } else
         for (const key of ['offset', 'width', 'height', 'sillHeight', 'segmentId', 'values'])
           if (own(operation, key)) opening[key] = copy(operation[key]);
-      break;
-    }
-    case 'add_observation': {
-      const subject = operation.subject;
-      const wall = floor.walls.find((entry) => entry.id === subject?.id);
-      const room = floor.rooms.find((entry) => entry.id === subject?.id);
-      const constructionSegment = floor.walls
-        .flatMap((entry) => entry.segments)
-        .find((entry) => entry.id === subject?.id);
-      const facing = floor.rooms
-        .flatMap((room) => room.faces.map((face) => ({ room, face })))
-        .find(({ face }) => face.id === subject?.id);
-      const context = constructionSegment
-        ? { basis: 'accepted_layout', segments: [copy(constructionSegment)] }
-        : wall
-          ? { basis: 'accepted_layout', segments: copy(wall.segments) }
-          : room
-            ? { basis: 'accepted_layout', vertices: copy(room.vertices) }
-            : facing
-              ? {
-                  basis: 'accepted_layout',
-                  portions: buildingPlanFaceSegments(floor, facing.room, facing.face),
-                }
-              : null;
-      const observation = {
-        id: operation.id || createId(),
-        subject: copy(operation.subject),
-        observedAt: operation.observedAt ?? null,
-        coverage: copy(operation.coverage ?? null),
-        method: operation.method ?? null,
-        evidence: copy(operation.evidence || []),
-        values: copy(operation.values || {}),
-        sourceSubject: copy(subject),
-        sourceGeometry: copy(operation.sourceGeometry ?? context),
-      };
-      floor.observations.push(observation);
-      return { created: { type: 'observation', id: observation.id } };
-    }
-    case 'update_observation':
-    case 'remove_observation': {
-      const observation = floor.observations.find((entry) => entry.id === operation.observationId);
-      if (!observation) failOperation('missing_observation', 'The observation no longer exists.');
-      if (operation.type === 'remove_observation')
-        floor.observations = floor.observations.filter((entry) => entry !== observation);
-      else
-        for (const key of ['observedAt', 'coverage', 'method', 'evidence', 'values'])
-          if (own(operation, key)) observation[key] = copy(operation[key]);
       break;
     }
     case 'remove_face': {
@@ -1542,7 +1331,7 @@ export function applyBuildingPlanOperation(
           ...wall.windows.map((entry) => entry.id),
         ])
           ids.add(id);
-      removeWithObservations(floor, ids, operation.allowObservationDeletion);
+
       room.faces = room.faces.filter((entry) => entry.id !== face.id);
       if (exclusive) floor.walls = floor.walls.filter((entry) => entry.id !== wall.id);
       else if (wall.referenceFaceId === face.id)
@@ -1550,11 +1339,6 @@ export function applyBuildingPlanOperation(
       break;
     }
     case 'remove_floor': {
-      if (floor.observations.length && !operation.allowObservationDeletion)
-        failOperation(
-          'observation_deletion_requires_confirmation',
-          'Removing this floor deletes its survey observations.'
-        );
       snapshot.floors = snapshot.floors.filter((entry) => entry.id !== floor.id);
       break;
     }
@@ -1575,7 +1359,7 @@ export function applyBuildingPlanOperation(
           ...wall.windows.map((entry) => entry.id),
         ])
           ids.add(id);
-      removeWithObservations(floor, ids, operation.allowObservationDeletion);
+
       floor.rooms = floor.rooms.filter((entry) => entry.id !== room.id);
       floor.walls = floor.walls.filter((entry) => !exclusive.includes(entry));
       for (const wall of floor.walls)
@@ -1602,7 +1386,6 @@ export function applyBuildingPlanOperation(
       const item = list.find((entry) => entry.id === operation.elementId);
       if (!item) failOperation('missing_element', 'The room element no longer exists.');
       if (operation.type === 'remove_element') {
-        removeWithObservations(floor, new Set([item.id]), operation.allowObservationDeletion);
         room[operation.collection] = list.filter((entry) => entry !== item);
       } else Object.assign(item, copy(operation.element || {}), { id: item.id });
       break;
@@ -1617,7 +1400,9 @@ export function applyBuildingPlanOperation(
   )
     for (const room of floor.rooms)
       attachRoom(floor, room, { ...operation, attachmentTolerance: 0 }, createId, specifications);
-  const conflicts = reconcileBuildingPlanProperties(snapshot, specifications);
+  const conflicts = reconcileBuildingPlanProperties(snapshot, specifications).filter(
+    (issue) => issue.code !== 'conflicting_room_defaults'
+  );
   if (conflicts.length) {
     const error = new Error(conflicts[0].message);
     error.issues = conflicts;

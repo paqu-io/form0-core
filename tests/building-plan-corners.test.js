@@ -1,3 +1,4 @@
+import { originalVertices, originalFaces } from './helpers/building-plan-v2.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
@@ -28,14 +29,14 @@ for (const axis of ['x', 'y'])
   test(`one corner reshapes adjoining walls while a pinned opposite wall stays fixed (${axis})`, () => {
     const f = fixture(),
       room = f.snapshot.floors[0].rooms[1],
-      corner = room.vertices[2];
+      corner = originalVertices(room)[2];
     const before = f.session.getSnapshot();
     f.apply({
       type: 'move_corner',
       roomId: room.id,
       vertexId: corner.id,
       point: { x: corner.x + (axis === 'x' ? 1 : 0), y: corner.y + (axis === 'y' ? 1 : 0) },
-      pinnedFaceIds: [room.faces[0].id],
+      pinnedFaceIds: [originalFaces(room)[0].id],
     });
     const after = f.session.getSnapshot(),
       next = after.floors[0].rooms[1];
@@ -55,7 +56,7 @@ for (const axis of ['x', 'y'])
 test('a shared corner rotates only the bound neighbour extent with coherent physical bindings', () => {
   const f = fixture(),
     room = f.snapshot.floors[0].rooms[1],
-    corner = room.vertices[0];
+    corner = originalVertices(room)[0];
   f.apply({
     type: 'move_corner',
     roomId: room.id,
@@ -75,7 +76,8 @@ test('a shared corner rotates only the bound neighbour extent with coherent phys
 test('a split vertex can make two diagonals and return to a compatible explicit Rejoin', () => {
   const f = fixture(),
     room = f.snapshot.floors[0].rooms[0];
-  const cut = f.apply({ type: 'split_face', faceId: room.faces[0].id, offset: 2 }).created.id;
+  const cut = f.apply({ type: 'split_face', faceId: originalFaces(room)[0].id, offset: 2 }).created
+    .id;
   const vertex = f.session
     .getSnapshot()
     .floors[0].rooms[0].vertices.find((v) => v.editingCutId === cut);
@@ -93,7 +95,7 @@ test('a split vertex can make two diagonals and return to a compatible explicit 
     point: { x: vertex.x, y: 0 },
   });
   f.apply({ type: 'rejoin_cut', cutId: cut });
-  assert.equal(f.session.getSnapshot().floors[0].rooms[0].vertices.length, 4);
+  assert.equal(originalVertices(f.session.getSnapshot().floors[0].rooms[0]).length, 4);
 });
 
 test('child Cancel restores a corner and its shared neighbour while keeping earlier floor answers', () => {
@@ -111,7 +113,7 @@ test('child Cancel restores a corner and its shared neighbour while keeping earl
       type: 'move_corner',
       floorId: f.floorId,
       roomId: room.id,
-      vertexId: room.vertices[0].id,
+      vertexId: originalVertices(room)[0].id,
       point: { x: 3, y: 2.6 },
     },
     { scopeId: 'room' }
@@ -124,15 +126,18 @@ test('pins reject direct and propagated corner movement atomically', () => {
   const f = fixture(),
     before = f.session.getSnapshot(),
     room = before.floors[0].rooms[1];
-  for (const pinnedFaceIds of [[room.faces[1].id], [before.floors[0].rooms[0].faces[2].id]]) {
-    const vertex = room.vertices[pinnedFaceIds[0] === room.faces[1].id ? 2 : 0];
+  for (const pinnedFaceIds of [
+    [originalFaces(room)[1].id],
+    [originalFaces(before.floors[0].rooms[0])[2].id],
+  ]) {
+    const vertex = room.vertices[pinnedFaceIds[0] === originalFaces(room)[1].id ? 2 : 0];
     const result = f.session.apply({
       type: 'move_corner',
       floorId: f.floorId,
       roomId: room.id,
       vertexId: vertex.id,
       point:
-        pinnedFaceIds[0] === room.faces[1].id
+        pinnedFaceIds[0] === originalFaces(room)[1].id
           ? { x: vertex.x + 1, y: vertex.y }
           : { x: vertex.x, y: vertex.y - 0.4 },
       pinnedFaceIds,
@@ -173,7 +178,7 @@ test('corner edits preserve explicit cuts in complex rooms and reject collapse',
     floorId: f.floorId,
     roomId: room.id,
     vertexId: corner.id,
-    point: room.vertices[1],
+    point: originalVertices(room)[1],
   });
   assert.equal(result.status, 'conflict');
   assert.deepEqual(f.session.getSnapshot(), after);
@@ -205,7 +210,7 @@ for (const preserveWallGrouping of [false, true])
         f.apply({
           type: 'move_corner',
           roomId: room.id,
-          vertexId: room.vertices[0].id,
+          vertexId: originalVertices(room)[0].id,
           point: { x: 3, y: targetY },
           pinnedFaceIds,
         });
@@ -215,7 +220,11 @@ for (const preserveWallGrouping of [false, true])
           fixed,
           'The unshared stationary wall must not tilt.'
         );
-        assert.deepEqual(next.rooms[1].vertices.slice(1), room.vertices.slice(1));
+        for (const vertex of originalVertices(room).slice(1))
+          assert.deepEqual(
+            next.rooms[1].vertices.find((point) => point.id === vertex.id),
+            vertex
+          );
         const east = floor.rooms[0].vertices.filter((v) => v.x === 5);
         for (const old of east)
           assert.equal(
@@ -230,15 +239,18 @@ for (const preserveWallGrouping of [false, true])
         f.apply({
           type: 'move_corner',
           roomId: room.id,
-          vertexId: room.vertices[0].id,
+          vertexId: originalVertices(room)[0].id,
           point: { x: 3, y: 2.2 },
           pinnedFaceIds,
         });
         for (const [index, original] of floor.rooms.entries())
-          assert.deepEqual(
-            f.session.getSnapshot().floors[0].rooms[index].vertices,
-            original.vertices
-          );
+          for (const vertex of originalVertices(original)) {
+            const current = f.session
+              .getSnapshot()
+              .floors[0].rooms[index].vertices.find((point) => point.id === vertex.id);
+            assert.ok(current);
+            assert.ok(Math.hypot(current.x - vertex.x, current.y - vertex.y) < 1e-6);
+          }
         const returned = f.session.getSnapshot();
         f.session.undo();
         assert.deepEqual(f.session.getSnapshot(), moved);
