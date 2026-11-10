@@ -18,6 +18,11 @@ import {
   buildingPlanEditContext,
   reconcileBuildingPlanCandidate,
 } from './candidate-reconciliation.js';
+import {
+  keepingContactThickness,
+  keepsContactThickness,
+  seatsAttachedRoom,
+} from './attachment-seating.js';
 
 const entityArray = (value) =>
   Array.isArray(value) &&
@@ -460,6 +465,18 @@ export function createBuildingPlanSession({
           scopeExists(prepared.scopeId)
       );
       return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
+    }
+    if (
+      decision === 'preserve' &&
+      seatsAttachedRoom(prepared.operation) &&
+      !keepsContactThickness(prepared.operation)
+    ) {
+      // Keeping previous widths changes where the attached room must sit. Prepare the
+      // attachment again instead of refitting rooms that were already in place.
+      const replacement = preview(keepingContactThickness(prepared.operation), {
+        scopeId: prepared.scopeId,
+      });
+      return replacement.status === 'ready' ? commit(replacement, 'preserve') : replacement;
     }
     if (decision === 'preserve') {
       for (const change of inherited) {

@@ -3,6 +3,7 @@ import { materializeBuildingPlanProfiles } from './material-profiles.js';
 import { buildingPlanEditingCutStations } from './wall-divisions.js';
 import { mergeWalls } from './wall-merge.js';
 import { isolateBuildingPlanContact } from './physical-pieces.js';
+import { attachmentSeatingDelta } from './attachment-seating.js';
 import { createWallSides, wallSide } from './wall-sides.js';
 import { propertySpecification, nodeSubjects, resolveInheritedProperty } from './inheritance.js';
 import { repairSharedWallExtents } from './boundary-edits.js';
@@ -756,6 +757,11 @@ function roomContacts(floor, room, operation, specifications) {
             referenceFaceId: reference.id,
             referenceEdgeId: otherEdge.id,
             contactThickness,
+            seatThickness: operation.keepContactThickness
+              ? thickness
+              : Number.isFinite(inherited) && inherited > 0
+                ? inherited
+                : contactThickness,
             mismatch: Math.abs(gap - expected),
           });
         }
@@ -776,7 +782,21 @@ function roomContacts(floor, room, operation, specifications) {
 }
 
 function attachRoom(floor, room, operation, createId, specifications) {
-  for (const contact of roomContacts(floor, room, operation, specifications))
+  const contacts = roomContacts(floor, room, operation, specifications);
+  if (contacts.some((contact) => contact.align)) {
+    // Rooms already in place keep their faces: seat the attached room once, at each
+    // contact's resolved shared thickness, before any binding makes it connected.
+    const delta = attachmentSeatingDelta(floor, room, contacts);
+    if (!delta)
+      failOperation(
+        'attachment_fit_conflict',
+        'This room cannot meet all of its neighbours at their shared wall thickness. Attach it to fewer rooms or adjust its size.'
+      );
+    if (Math.hypot(delta.x, delta.y) > EPS) translateUnsharedRoom(floor, room, delta);
+    rebindBuildingPlanFaces(floor, createId);
+    for (const contact of contacts) contact.contactThickness = contact.seatThickness;
+  }
+  for (const contact of contacts)
     bindFaces(floor, contact, createId, specifications, contact.contactThickness);
 }
 

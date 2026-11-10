@@ -5,6 +5,7 @@ import {
   copyBuildingPlanData as copy,
   equalValue,
   findFace,
+  own,
   planIssue,
   reconcileBuildingPlanProperties,
   validateBuildingPlanSnapshot,
@@ -13,6 +14,7 @@ import { normalizePhysicalPieces, buildingPlanOwnershipIssues } from './physical
 import { reconcileWallLabels } from './wall-labels.js';
 import { applyThicknessChanges, reconcileBuildingPlanContacts } from './operations.js';
 import { normalizeBuildingPlanMaterialCaps } from './material-profiles.js';
+import { keepsContactThickness } from './attachment-seating.js';
 
 const CONTACT_EDITS = new Set([
   'resize_face',
@@ -51,6 +53,31 @@ export function buildingPlanEditContext(snapshot, operation, editingPolicy) {
     if (rooms.size === 1) context.activeRoomId ??= [...rooms][0];
   }
   return context;
+}
+
+/**
+ * "Keep previous values" for an attached room: record each width that inheritance would
+ * change as an override, so the seated geometry is kept rather than refitted.
+ * Returns whether any override was added.
+ */
+function keepGeometricWidths(floors, geometry) {
+  let kept = false;
+  for (const floor of floors) {
+    const previous = geometry.floors.find((entry) => entry.id === floor.id);
+    for (const wall of floor.walls) {
+      const width = previous.walls.find((entry) => entry.id === wall.id)?.properties
+        .wall_thickness_m;
+      if (
+        !Number.isFinite(width) ||
+        width === wall.properties.wall_thickness_m ||
+        own(wall.overrides, 'wall_thickness_m')
+      )
+        continue;
+      wall.overrides = { ...wall.overrides, wall_thickness_m: width };
+      kept = true;
+    }
+  }
+  return kept;
 }
 
 // Convergence concerns geometry/coverage, not disposable binding IDs or provenance maps.
@@ -118,7 +145,9 @@ export function reconcileBuildingPlanCandidate(
       );
     }
     const geometry = copy(candidate);
-    const resolved = reconcileBuildingPlanProperties(candidate, specifications);
+    let resolved = reconcileBuildingPlanProperties(candidate, specifications);
+    if (keepsContactThickness(operation) && keepGeometricWidths(floors, geometry))
+      resolved = reconcileBuildingPlanProperties(candidate, specifications);
     defaultConflicts = resolved.filter((issue) => issue.code === 'conflicting_room_defaults');
     const issues = resolved.filter((issue) => issue.code !== 'conflicting_room_defaults');
     if (issues.length) return { divisions, defaultConflicts, issues };
