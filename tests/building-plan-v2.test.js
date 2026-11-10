@@ -78,12 +78,13 @@ function adjacent(f) {
     faceId: floor.rooms[1].faces[0].id,
   };
 }
+// Topology transitions review inherited changes here; 'apply' is the editor default.
 function transition(policy = {}) {
   const f = fixture(
     {
       floors: { extra_elements: [source('external', 'exterior'), source('internal', 'interior')] },
     },
-    policy
+    { inheritedChangePolicy: 'ask', ...policy }
   );
   f.apply({ type: 'set_values', floorId: f.floorId, values: { external: 0.4, internal: 0.2 } });
   return { f, operation: adjacent(f) };
@@ -751,6 +752,7 @@ for (const value of ['apply', 'preserve', 'cancel'])
       questions = 0;
     const controller = new BuildingPlanCanvasController({
       meta: f.meta,
+      editingPolicy: { inheritedChangePolicy: 'ask' },
       readRecord: () => record,
       writeRecord: (next) => {
         writes++;

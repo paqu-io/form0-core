@@ -1,5 +1,5 @@
 export const BUILDING_PLAN_EDITING_DEFAULTS = Object.freeze({
-  inheritedChangePolicy: 'ask',
+  inheritedChangePolicy: 'apply',
   copyCustomAnswersAutomatically: false,
   snapping: true,
   edgeAutoPan: true,

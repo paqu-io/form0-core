@@ -137,9 +137,9 @@ function fixture(policy = {}) {
     }),
   });
 }
-test('editor policy defaults are independent, typed and default to reviewing inherited changes', () => {
+test('editor policy defaults are independent, typed and default to applying inherited changes', () => {
   assert.deepEqual(normalizeBuildingPlanEditingPolicy(), {
-    inheritedChangePolicy: 'ask',
+    inheritedChangePolicy: 'apply',
     copyCustomAnswersAutomatically: false,
     snapping: true,
     edgeAutoPan: true,
