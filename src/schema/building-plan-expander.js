@@ -105,6 +105,7 @@ function buildRepeatableTree(
     path: scopePath,
     canvas: mergedNode.canvas || null,
     role: mergedNode.role || nodeKey,
+    fieldLabel: repeatable.label,
     sourceNode: mergedNode.sourceNode || null,
     fields: [],
     fieldsByOriginalDataName: {},
@@ -159,8 +160,7 @@ function buildRepeatableTree(
   const extraElements = compileFields(mergedNode.extra_elements || []);
   const applicability = [];
   for (const entry of [...repeatableMeta.fields]) {
-    if (entry.binding?.system || !['physical_walls', 'wall_sides', 'walls'].includes(nodeKey))
-      continue;
+    if (!['physical_walls', 'wall_sides', 'walls'].includes(nodeKey)) continue;
     if (!entry.binding?.outside && !Object.keys(entry.binding?.applies_to || {}).length) continue;
     const flagName = `applicable_${fieldCounter++}`;
     const template = deepClone(

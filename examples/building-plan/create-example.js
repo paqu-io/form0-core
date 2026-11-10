@@ -45,7 +45,7 @@ export function createBuildingPlanExample() {
           read_only: false,
           read_only_conditions: null,
           node_overrides: {
-            floors: { extra_elements: [field('TextField', 'floor_note', 'Floor note')] },
+            floors: { extra_elements: [field('TextField', 'floor_note', 'Notes')] },
             rooms: { extra_elements: [field('TextField', 'room_note', 'Room note')] },
             walls: {
               extra_elements: [
@@ -80,12 +80,14 @@ export function createBuildingPlanExample() {
   const floorId = apply({
     type: 'create_floor',
     values: {
-      floor_name: choice('ground_floor', 'Ground Floor'),
-      floor_elevation_m: 0,
-      floor_height_m: 3,
+      floor_name: choice('ground_floor', 'Ground floor'),
+      floor_elevation: 0,
+      floor_height: 3,
+      floor_interior_wall_thickness: 0.2,
+      floor_exterior_wall_thickness: 0.2,
       floor_note: 'Keep this earlier floor answer',
     },
-    defaults: { wall_height_m: 3, wall_thickness_m: 0.2, material: 'Masonry' },
+    defaults: { wall_height_m: 3, material: 'Masonry' },
   }).created.id;
   for (const rectangle of [
     { x: 0, y: 0, width: 5, height: 3 },

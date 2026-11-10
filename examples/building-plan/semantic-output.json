@@ -7,17 +7,25 @@
       "id": "acceptance-subject-1",
       "values": {
         "floor_name": {
-          "choice": [{ "value": "ground_floor", "label": "Ground Floor" }],
+          "choice": [{ "value": "ground_floor", "label": "Ground floor" }],
           "other": []
         },
-        "floor_elevation_m": 0,
-        "floor_height_m": 3,
+        "floor_upper_number": null,
+        "floor_basement_number": null,
+        "floor_elevation": 0,
+        "floor_height": 3,
+        "floor_interior_wall_thickness": 0.2,
+        "floor_interior_wall_plaster": { "choice": [], "other": [] },
+        "floor_interior_wall_plaster_thickness": null,
+        "floor_exterior_wall_thickness": 0.2,
+        "floor_exterior_wall_plaster": { "choice": [], "other": [] },
+        "floor_exterior_wall_plaster_thickness": null,
         "floor_note": "Keep this earlier floor answer"
       },
       "overrides": {},
       "providerOverrides": {},
       "repeatable": {},
-      "defaults": { "wall_height_m": 3, "wall_thickness_m": 0.2, "material": "Masonry" },
+      "defaults": { "wall_height_m": 3, "material": "Masonry" },
       "rooms": [
         {
           "id": "acceptance-subject-2",
@@ -63,7 +71,9 @@
           "defaults": {},
           "values": {
             "room_name": { "choice": [{ "value": "bedroom", "label": "Bedroom" }], "other": [] },
-            "room_note": null
+            "room_note": null,
+            "room_elevation": 0,
+            "room_structural_clear_height": 3
           },
           "overrides": {},
           "providerOverrides": {},
@@ -87,10 +97,17 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-7"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -111,10 +128,17 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-8"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -123,8 +147,8 @@
               "sideId": "acceptance-subject-24",
               "bindings": [
                 {
-                  "id": "acceptance-subject-85",
-                  "segmentId": "acceptance-subject-83",
+                  "id": "acceptance-subject-81",
+                  "segmentId": "acceptance-subject-25",
                   "edgeId": "acceptance-subject-78",
                   "interval": [0, 2],
                   "roomInterval": [0, 2],
@@ -136,19 +160,26 @@
               "values": {},
               "edgeIds": ["acceptance-subject-78"],
               "lineage": { "editingOriginFaceId": "acceptance-subject-22" },
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
               "id": "acceptance-subject-80",
-              "wallId": "acceptance-subject-91",
-              "sideId": "acceptance-subject-93",
+              "wallId": "acceptance-subject-90",
+              "sideId": "acceptance-subject-92",
               "bindings": [
                 {
-                  "id": "acceptance-subject-86",
+                  "id": "acceptance-subject-85",
                   "segmentId": "acceptance-subject-84",
                   "edgeId": "acceptance-subject-79",
                   "interval": [0, 3],
@@ -161,10 +192,17 @@
               "values": {},
               "edgeIds": ["acceptance-subject-79"],
               "lineage": { "editingOriginFaceId": "acceptance-subject-22" },
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -185,16 +223,38 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-10"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             }
           ],
           "columns": [],
           "beams": [],
-          "objects": []
+          "objects": [],
+          "properties": { "room_elevation": 0, "room_structural_clear_height": 3 },
+          "provenance": {
+            "room_elevation": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [{ "id": "acceptance-subject-1", "field": "floor_elevation" }],
+              "mode": "inherit"
+            },
+            "room_structural_clear_height": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [{ "id": "acceptance-subject-1", "field": "floor_height" }],
+              "mode": "inherit"
+            }
+          }
         },
         {
           "id": "acceptance-subject-35",
@@ -240,7 +300,9 @@
           "defaults": {},
           "values": {
             "room_name": { "choice": [{ "value": "bedroom", "label": "Bedroom" }], "other": [] },
-            "room_note": null
+            "room_note": null,
+            "room_elevation": 0,
+            "room_structural_clear_height": 3
           },
           "overrides": {},
           "providerOverrides": {},
@@ -252,8 +314,8 @@
               "sideId": "acceptance-subject-23",
               "bindings": [
                 {
-                  "id": "acceptance-subject-87",
-                  "segmentId": "acceptance-subject-83",
+                  "id": "acceptance-subject-74",
+                  "segmentId": "acceptance-subject-25",
                   "edgeId": "acceptance-subject-71",
                   "interval": [0, 2],
                   "roomInterval": [0, 2],
@@ -265,20 +327,27 @@
               "values": {},
               "edgeIds": ["acceptance-subject-71"],
               "lineage": { "editingOriginFaceId": "acceptance-subject-45" },
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
               "id": "acceptance-subject-73",
-              "wallId": "acceptance-subject-88",
-              "sideId": "acceptance-subject-89",
+              "wallId": "acceptance-subject-87",
+              "sideId": "acceptance-subject-88",
               "bindings": [
                 {
-                  "id": "acceptance-subject-75",
-                  "segmentId": "acceptance-subject-25",
+                  "id": "acceptance-subject-86",
+                  "segmentId": "acceptance-subject-83",
                   "edgeId": "acceptance-subject-72",
                   "interval": [0, 3],
                   "roomInterval": [0, 3],
@@ -290,10 +359,17 @@
               "values": {},
               "edgeIds": ["acceptance-subject-72"],
               "lineage": { "editingOriginFaceId": "acceptance-subject-45" },
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -314,10 +390,17 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-41"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -338,10 +421,17 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-42"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             },
             {
@@ -362,16 +452,38 @@
               "overrides": {},
               "values": {},
               "edgeIds": ["acceptance-subject-43"],
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               }
             }
           ],
           "columns": [],
           "beams": [],
-          "objects": []
+          "objects": [],
+          "properties": { "room_elevation": 0, "room_structural_clear_height": 3 },
+          "provenance": {
+            "room_elevation": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [{ "id": "acceptance-subject-1", "field": "floor_elevation" }],
+              "mode": "inherit"
+            },
+            "room_structural_clear_height": {
+              "scope": "floor",
+              "ids": ["acceptance-subject-1"],
+              "providers": [{ "id": "acceptance-subject-1", "field": "floor_height" }],
+              "mode": "inherit"
+            }
+          }
         }
       ],
       "walls": [
@@ -400,7 +512,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -417,10 +531,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -430,10 +551,17 @@
               "roomId": "acceptance-subject-2",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -465,7 +593,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -482,10 +612,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -495,10 +632,17 @@
               "roomId": "acceptance-subject-2",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -506,13 +650,13 @@
           "exposure": "exterior"
         },
         {
-          "id": "acceptance-subject-88",
+          "id": "acceptance-subject-87",
           "autoLabel": "W3.1",
           "referenceFaceId": "acceptance-subject-73",
           "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-25",
+              "id": "acceptance-subject-83",
               "start": { "x": 8, "y": 3.1 },
               "end": { "x": 5, "y": 3.1 },
               "referenceOffset": 0.1
@@ -530,7 +674,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -547,28 +693,42 @@
           "repeatable": {},
           "sides": [
             {
-              "id": "acceptance-subject-89",
+              "id": "acceptance-subject-88",
               "sign": -1,
               "roomId": "acceptance-subject-35",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
             {
-              "id": "acceptance-subject-90",
+              "id": "acceptance-subject-89",
               "sign": 1,
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -582,7 +742,7 @@
           "providerOverrides": {},
           "segments": [
             {
-              "id": "acceptance-subject-83",
+              "id": "acceptance-subject-25",
               "start": { "x": 5, "y": 3.1 },
               "end": { "x": 3, "y": 3.1 },
               "referenceOffset": 0.1
@@ -600,7 +760,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_interior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -608,9 +770,9 @@
           "values": {},
           "doors": [
             {
-              "id": "acceptance-subject-94",
+              "id": "acceptance-subject-93",
               "type": "door",
-              "segmentId": "acceptance-subject-83",
+              "segmentId": "acceptance-subject-25",
               "offset": 0.5,
               "width": 0.9,
               "height": 2,
@@ -641,10 +803,17 @@
               "roomId": "acceptance-subject-35",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -654,10 +823,17 @@
               "roomId": "acceptance-subject-2",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -665,7 +841,7 @@
           "exposure": "interior"
         },
         {
-          "id": "acceptance-subject-91",
+          "id": "acceptance-subject-90",
           "autoLabel": "W3.2",
           "referenceFaceId": "acceptance-subject-80",
           "providerOverrides": {},
@@ -689,7 +865,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -706,28 +884,42 @@
           "repeatable": {},
           "sides": [
             {
-              "id": "acceptance-subject-92",
+              "id": "acceptance-subject-91",
               "sign": -1,
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
             {
-              "id": "acceptance-subject-93",
+              "id": "acceptance-subject-92",
               "sign": 1,
               "roomId": "acceptance-subject-2",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -759,7 +951,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -776,10 +970,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -789,10 +990,17 @@
               "roomId": "acceptance-subject-2",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -824,7 +1032,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -841,10 +1051,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -854,10 +1071,17 @@
               "roomId": "acceptance-subject-35",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -889,7 +1113,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -906,10 +1132,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -919,10 +1152,17 @@
               "roomId": "acceptance-subject-35",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }
@@ -954,7 +1194,9 @@
             "wall_thickness_m": {
               "scope": "floor",
               "ids": ["acceptance-subject-1"],
-              "providers": [],
+              "providers": [
+                { "id": "acceptance-subject-1", "field": "floor_exterior_wall_thickness" }
+              ],
               "mode": "inherit"
             },
             "material": { "scope": "schema", "mode": "inherit" }
@@ -971,10 +1213,17 @@
               "roomId": null,
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             },
@@ -984,10 +1233,17 @@
               "roomId": "acceptance-subject-35",
               "overrides": {},
               "values": {},
-              "properties": { "finish": null, "measured_thickness": null },
+              "properties": {
+                "finish": null,
+                "measured_thickness": null,
+                "wall_plaster": { "choice": [], "other": [] },
+                "wall_plaster_thickness": null
+              },
               "provenance": {
                 "finish": { "scope": "schema", "mode": "inherit" },
-                "measured_thickness": { "scope": "schema", "mode": "inherit" }
+                "measured_thickness": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster": { "scope": "schema", "mode": "inherit" },
+                "wall_plaster_thickness": { "scope": "schema", "mode": "inherit" }
               },
               "repeatable": {}
             }

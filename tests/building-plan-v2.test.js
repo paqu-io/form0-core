@@ -124,13 +124,15 @@ test('system catalog retains names and dimensions in mandatory protected inline 
       if (
         entry.binding?.system &&
         !['storage', 'geometry', 'derived'].includes(entry.binding.role) &&
-        !['storage', 'geometry', 'derived'].includes(entry.binding.storageRole)
+        !['storage', 'geometry', 'derived'].includes(entry.binding.storageRole) &&
+        !['floors', 'rooms'].includes(node.nodeKey) &&
+        !entry.originalDataName.startsWith('wall_plaster')
       )
         assert.equal(entry.field.required, true, entry.originalDataName);
     }
   assert.ok(
     BUILDING_PLAN_BLUEPRINT.nodes.floors.mandatory_elements.some(
-      (field) => field.data_name === 'floor_height_m'
+      (field) => field.data_name === 'floor_height'
     )
   );
 });

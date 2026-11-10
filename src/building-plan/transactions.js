@@ -111,7 +111,12 @@ export function buildingPlanOperationsForRow({
     const flags = isDefault ? editedModel.defaultProperties : editedModel.overrideProperties;
     const modeChanged =
       (previousFlags || []).includes(property) !== (flags || []).includes(property);
-    if (!reset && equalValue(before, value) && !modeChanged) continue;
+    if (
+      !reset &&
+      !modeChanged &&
+      equalValue(normalizeFieldValue(field.field, before), normalizeFieldValue(field.field, value))
+    )
+      continue;
     if (binding && ['storage', 'geometry', 'derived', 'reference'].includes(binding.role)) continue;
     if (
       binding?.role === 'projection' &&
@@ -467,11 +472,11 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
     dataName,
     scope: binding.scope,
     property,
-    inheritable: Boolean(
-      binding.inherit || binding.role === 'provider' || binding.role === 'default'
-    ),
+    inheritable:
+      !(binding.system && binding.role === 'provider') &&
+      Boolean(binding.inherit || binding.role === 'provider' || binding.role === 'default'),
     value: copy(selected.row.values[dataName]),
-    source: copy(source || null),
+    source: binding.system && binding.role === 'provider' ? null : copy(source || null),
     subjectId: subject?.id,
     outside: binding.outside === true && Boolean(subject) && subject.roomId == null,
     opposite: binding.outside === true && Boolean(subject?.roomId),

@@ -1,5 +1,6 @@
 import { evaluateConditions } from '../engine/conditions.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
+import { isFieldValueEmpty } from '../utilities/field-value-empty.js';
 import { copyEventData as copy } from '../utilities/event-data.js';
 
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
@@ -99,9 +100,10 @@ export function resolveInheritedProperty(context, property, specification = {}) 
                 : own(owner.properties, provider.property)
                   ? owner.properties[provider.property]
                   : owner.values?.[name];
-            if (!explicit && (value == null || value === '')) continue;
+            const normalizedValue = normalizeFieldValue(provider.field, value);
+            if (!explicit && isFieldValueEmpty(provider.field, normalizedValue)) continue;
             candidates.push({
-              value: normalizeFieldValue(provider.field, value),
+              value: normalizedValue,
               id: owner.id,
               field: name,
               ...(owner !== source ? { scope: 'wall_face' } : {}),

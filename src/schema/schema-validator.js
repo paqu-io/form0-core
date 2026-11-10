@@ -97,6 +97,11 @@ export function validateSchemaWithContext(form, contextResolver) {
   const duplicateKeys = new Set();
   const errors = [...invalidBuildingPlanSettings];
   if (
+    form.measurement_system !== undefined &&
+    !['si', 'imperial'].includes(form.measurement_system)
+  )
+    errors.push('form.measurement_system must be si or imperial');
+  if (
     form.repeatable_recalculation !== undefined &&
     !['automatic', 'confirm'].includes(form.repeatable_recalculation)
   )

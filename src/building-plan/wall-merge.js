@@ -53,6 +53,21 @@ export function mergeWalls(floor, reference, other, resolutions, createId) {
       );
     else if (!own(reference.values, key)) reference.values[key] = copy(other.values[key]);
   }
+  reference.repeatable ||= {};
+  for (const [name, rows] of Object.entries(other.repeatable || {})) {
+    if (
+      reference.repeatable[name]?.length &&
+      rows.length &&
+      !equalValue(reference.repeatable[name], rows)
+    )
+      failOperation(
+        'conflicting_wall_records',
+        'Resolve custom records on these physical walls before joining them.',
+        { type: 'wall', id: reference.id },
+        { collection: name }
+      );
+    if (rows.length) reference.repeatable[name] = copy(rows);
+  }
   reference.providerOverrides ||= {};
   for (const [key, value] of Object.entries(other.providerOverrides || {})) {
     if (

@@ -1,5 +1,4 @@
 import { prepareBuildingPlanEdit } from './opening-edits.js';
-import { buildingPlanPinIssues } from './corner-edits.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import {
@@ -13,9 +12,12 @@ import {
   validateBuildingPlanSnapshot,
 } from './model.js';
 import { createUIRequestRegistry } from '../utilities/ui-requests.js';
-import { normalizePhysicalPieces } from './physical-pieces.js';
 import { reconcileWallLabels } from './wall-labels.js';
-import { applyBuildingPlanOperation, applyThicknessChanges } from './operations.js';
+import { applyBuildingPlanOperation } from './operations.js';
+import {
+  buildingPlanEditContext,
+  reconcileBuildingPlanCandidate,
+} from './candidate-reconciliation.js';
 
 const entityArray = (value) =>
   Array.isArray(value) &&
@@ -215,6 +217,7 @@ export function createBuildingPlanSession({
     try {
       pendingGeneration++;
       questions.cancelAll();
+      operation = buildingPlanEditContext(current, copy(operation), editingPolicy);
       let divisions = [],
         defaultConflicts = [];
       const { candidate, result } = prepareBuildingPlanEdit(
@@ -223,71 +226,13 @@ export function createBuildingPlanSession({
         (candidate, edit) =>
           applyBuildingPlanOperation(candidate, edit, { createId, specifications, editingPolicy }),
         (candidate) => {
-          const changedFloors = new Set(
-            candidate.floors
-              .filter(
-                (floor) =>
-                  !equalValue(
-                    floor,
-                    current.floors.find((entry) => entry.id === floor.id)
-                  )
-              )
-              .map((floor) => floor.id)
-          );
-          divisions = candidate.floors
-            .filter((floor) => changedFloors.has(floor.id))
-            .flatMap((floor) =>
-              normalizePhysicalPieces(
-                floor,
-                createId,
-                current.floors.find((old) => old.id === floor.id)
-              ).map((division) => ({
-                ...division,
-                floorId: floor.id,
-              }))
-            );
-          const beforeDefaults = copy(candidate);
-          const resolvedIssues = reconcileBuildingPlanProperties(candidate, specifications);
-          defaultConflicts = resolvedIssues.filter(
-            (issue) => issue.code === 'conflicting_room_defaults'
-          );
-          const issues = resolvedIssues.filter(
-            (issue) => issue.code !== 'conflicting_room_defaults'
-          );
-          if (issues.length) return issues;
-          for (const floor of candidate.floors) {
-            if (!changedFloors.has(floor.id)) continue;
-            const previous = beforeDefaults.floors.find((entry) => entry.id === floor.id);
-            if (previous)
-              applyThicknessChanges(
-                floor,
-                previous,
-                operation.activeRoomId,
-                createId,
-                {
-                  ...operation,
-                  thicknessAnchor: editingPolicy.thicknessAnchor,
-                },
-                specifications
-              );
-            normalizePhysicalPieces(
-              floor,
-              createId,
-              current.floors.find((old) => old.id === floor.id)
-            );
-          }
-          for (const floor of candidate.floors)
-            reconcileWallLabels(
-              floor,
-              current.floors.find((entry) => entry.id === floor.id)
-            );
-          return [
-            ...buildingPlanPinIssues(current, candidate, operation.pinnedFaceIds),
-            ...reconcileBuildingPlanProperties(candidate, specifications).filter(
-              (issue) => issue.code !== 'conflicting_room_defaults'
-            ),
-            ...validate(candidate),
-          ];
+          const reconciled = reconcileBuildingPlanCandidate(candidate, current, operation, {
+            createId,
+            specifications,
+          });
+          divisions = reconciled.divisions;
+          defaultConflicts = reconciled.defaultConflicts;
+          return reconciled.issues;
         }
       );
 
@@ -404,6 +349,23 @@ export function createBuildingPlanSession({
     return changes;
   }
 
+  function reconcilePrepared(prepared) {
+    try {
+      const reconciled = reconcileBuildingPlanCandidate(
+        prepared.candidate,
+        current,
+        prepared.operation,
+        { createId, specifications }
+      );
+      prepared.divisions.push(...reconciled.divisions);
+      prepared.defaultConflicts = reconciled.defaultConflicts;
+      prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+      return reconciled.issues;
+    } catch (error) {
+      return error.issues || [planIssue('invalid_operation', error.message)];
+    }
+  }
+
   function commit(proposal, decision = null) {
     if (readOnly) return locked();
     const prepared = proposals.get(proposal);
@@ -423,36 +385,10 @@ export function createBuildingPlanSession({
           ])
           .find((subject) => subject.id === conflict.subject.id);
         if (!owner || Number(decision.slice(10)) >= conflict.candidates.length) return stale();
-        const before = copy(prepared.candidate);
         owner.overrides ||= {};
         owner.overrides[conflict.property] = copy(value);
-        prepared.defaultConflicts.shift();
-        const conflicts = reconcileBuildingPlanProperties(
-          prepared.candidate,
-          specifications
-        ).filter((issue) => issue.code !== 'conflicting_room_defaults');
-        try {
-          for (const floor of prepared.candidate.floors)
-            applyThicknessChanges(
-              floor,
-              before.floors.find((entry) => entry.id === floor.id),
-              prepared.operation.activeRoomId,
-              createId,
-              {
-                ...prepared.operation,
-                thicknessAnchor: editingPolicy.thicknessAnchor,
-              },
-              specifications
-            );
-          conflicts.push(...validate(prepared.candidate));
-        } catch (error) {
-          return response(
-            'conflict',
-            error.issues || [planIssue('invalid_operation', error.message)]
-          );
-        }
-        if (conflicts.length) return response('conflict', conflicts);
-        prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+        const issues = reconcilePrepared(prepared);
+        if (issues.length) return response('conflict', issues);
         decision = null;
       } else {
         const question = questions.create(
@@ -526,36 +462,15 @@ export function createBuildingPlanSession({
       return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
     }
     if (decision === 'preserve') {
-      const before = copy(prepared.candidate);
       for (const change of inherited) {
         const wall = prepared.candidate.floors
           .find((entry) => entry.id === change.floorId)
           .walls.find((entry) => entry.id === change.wallId);
         wall.overrides[change.property] = copy(change.before);
       }
-      const issues = reconcileBuildingPlanProperties(prepared.candidate, specifications);
-      try {
-        for (const floor of prepared.candidate.floors)
-          applyThicknessChanges(
-            floor,
-            before.floors.find((entry) => entry.id === floor.id),
-            prepared.operation.activeRoomId,
-            createId,
-            {
-              ...prepared.operation,
-              thicknessAnchor: editingPolicy.thicknessAnchor,
-            },
-            specifications
-          );
-        issues.push(...validate(prepared.candidate));
-      } catch (error) {
-        return response(
-          'conflict',
-          error.issues || [planIssue('invalid_operation', error.message)]
-        );
-      }
+      const issues = reconcilePrepared(prepared);
       if (issues.length) return response('conflict', issues);
-      prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+      if (prepared.defaultConflicts.length) return commit(proposal);
     }
     proposals.delete(proposal);
     questions.cancelAll();

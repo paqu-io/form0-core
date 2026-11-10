@@ -1,4 +1,5 @@
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
+import { FLOOR_SYSTEM_ROUTES } from './building-plan-floors.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const NODE_KEYS = Object.keys(BUILDING_PLAN_BLUEPRINT.nodes);
@@ -21,6 +22,13 @@ const SCALAR_TYPES = new Set([
   'TimeField',
 ]);
 const WALL_PROPERTIES = new Set(['wall_thickness_m', 'wall_height_m']);
+const systemDestination = (node, property) =>
+  Object.values(FLOOR_SYSTEM_ROUTES).some(
+    (route) =>
+      route.inherit_to === node &&
+      (route.property === property ||
+        (route.scope === 'wall_face' && `${route.property}_outside` === property))
+  );
 const validProperty = (name) =>
   typeof name === 'string' &&
   /^[a-zA-Z][a-zA-Z0-9_]*$/.test(name) &&
@@ -126,6 +134,7 @@ export function validateBuildingPlanBindings(overrides) {
         !field ||
         typeof field !== 'object' ||
         field.type === 'BuildingPlanSection' ||
+        systemDestination(node, field.data_name) ||
         /^~?bp_/.test(field.key || '') ||
         BUILDING_PLAN_BLUEPRINT.nodes[node].mandatory_elements.some(
           (managed) =>
@@ -217,6 +226,7 @@ export function validateBuildingPlanBindings(overrides) {
     }
     for (const [property, override] of Object.entries(config.property_overrides || {})) {
       if (
+        systemDestination(node, property) ||
         BUILDING_PLAN_BLUEPRINT.nodes[node].mandatory_elements.some(
           (field) =>
             field.data_name === property && !(node === 'objects' && property === 'object_category')
@@ -278,10 +288,12 @@ export function createBuildingPlanBlueprint(overrides = {}) {
     );
     for (const field of node.mandatory_elements) {
       const internal = internalField(field);
-      field.required = !internal;
-      field.required_conditions = null;
-      field.visible = !internal;
-      field.visible_conditions = null;
+      if (name !== 'floors' || internal) {
+        field.required = !internal;
+        field.required_conditions = null;
+        field.visible = !internal;
+        field.visible_conditions = null;
+      }
       if (internal && field.read_only !== undefined) field.read_only = true;
       node.fieldRoles[field.data_name] = {
         role: field.data_name.endsWith('_model')
@@ -413,7 +425,8 @@ export function createBuildingPlanBlueprint(overrides = {}) {
       const prior = specification.field;
       if (
         prior.type !== field.type ||
-        JSON.stringify(prior.choices || null) !== JSON.stringify(field.choices || null)
+        JSON.stringify(prior.choices?.map((choice) => choice.value) || null) !==
+          JSON.stringify(field.choices?.map((choice) => choice.value) || null)
       )
         throw new TypeError(
           `Default providers for ${property} need one compatible field definition.`
@@ -439,6 +452,20 @@ export function createBuildingPlanBlueprint(overrides = {}) {
     definitions.set(key, { nodeKey, field, binding, scope, property, specification });
     return specification;
   };
+  for (const [name, route] of Object.entries(FLOOR_SYSTEM_ROUTES)) {
+    const field = blueprint.nodes.floors.mandatory_elements.find(
+      (field) => field.data_name === name
+    );
+    providers.push({
+      sourceNode: 'floors',
+      sourceOriginalDataName: name,
+      ...clone(route),
+      destination: route.inherit_to,
+      field: clone(field),
+      system: true,
+      conditionFields: clone(sourceConditionFields(overrides, 'floors')),
+    });
+  }
   for (const nodeKey of NODE_KEYS) {
     const source = overrides[nodeKey]?.extra_elements || blueprint.nodes[nodeKey].extra_elements;
     const conditionFields = clone(sourceConditionFields(overrides, nodeKey));
@@ -480,24 +507,33 @@ export function createBuildingPlanBlueprint(overrides = {}) {
       const field = BUILDING_PLAN_BLUEPRINT.nodes[nodeKey].mandatory_elements.find(
         (entry) => entry.data_name === name
       );
-      if (binding.inherit_to)
+      if (binding.inherit_to) {
+        const fixed = providers.findIndex(
+          (provider) =>
+            provider.system &&
+            provider.sourceNode === nodeKey &&
+            provider.sourceOriginalDataName === name
+        );
+        if (fixed >= 0) providers.splice(fixed, 1);
         providers.push({
           sourceNode: nodeKey,
           sourceOriginalDataName: name,
           property: binding.property || name,
           field: clone(field),
-          scope: 'physical_wall',
+          scope: FLOOR_SYSTEM_ROUTES[name]?.scope || 'physical_wall',
+          system: true,
           applies_to: clone(binding.applies_to || {}),
           conditionFields,
           destination: binding.inherit_to,
         });
+      }
     }
   }
   for (const provider of providers)
     register(
       provider.destination,
       provider.field,
-      { property: provider.property, scope: provider.scope },
+      { property: provider.property, scope: provider.scope, on_split: provider.on_split },
       provider
     );
   // Build canonical custom field trees and their editing projections without flattening authored layout.
@@ -595,7 +631,8 @@ export function createBuildingPlanBlueprint(overrides = {}) {
   ];
   for (const [key, definition] of definitions) {
     const { nodeKey, property, scope, specification } = definition;
-    const source = definition.field;
+    const source =
+      specification.providers.find((provider) => provider.system)?.field || definition.field;
     const target =
       nodeKey === 'walls'
         ? scope === 'physical_wall'
@@ -623,15 +660,35 @@ export function createBuildingPlanBlueprint(overrides = {}) {
       field.key = `bp_custom_${property}`;
       field.visible = true;
       field.visible_conditions = null;
+      const managed = specification.providers.some((provider) => provider.system);
+      if (managed && property === 'wall_plaster') {
+        field.label = 'Plaster';
+        field.choices = [
+          { value: 'plastered', label: 'Plastered' },
+          { value: 'not_plastered', label: 'Not plastered' },
+        ];
+        field.required = false;
+      }
+      if (managed && property === 'wall_plaster_thickness') {
+        field.label = 'Plaster thickness [mm]';
+        field.required = false;
+        field.visible = false;
+        field.required_conditions = field.visible_conditions = {
+          field_id: 'bp_custom_wall_plaster',
+          operator: 'equal_to',
+          value: 'plastered',
+        };
+      }
       field.read_only = false;
       field.read_only_conditions = null;
-      target.extra_elements.push(field);
+      (managed ? target.mandatory_elements : target.extra_elements).push(field);
       target.fieldRoles[property] = {
         role: 'property',
         property,
         scope,
         inherit: specification.inherit,
         on_split: specification.on_split || 'confirm',
+        ...(managed ? { system: true } : {}),
       };
       if (nodeKey === 'walls') {
         for (const outside of scope === 'wall_face' ? [false, true] : [false]) {
@@ -640,7 +697,14 @@ export function createBuildingPlanBlueprint(overrides = {}) {
             projected.data_name = `${property}_outside`;
             projected.key += '_outside';
           }
-          face.extra_elements.push(projected);
+          if (managed && property === 'wall_plaster_thickness' && outside) {
+            projected.required_conditions = projected.visible_conditions = {
+              field_id: 'bp_custom_wall_plaster_outside',
+              operator: 'equal_to',
+              value: 'plastered',
+            };
+          }
+          (managed ? face.mandatory_elements : face.extra_elements).push(projected);
           face.fieldRoles[projected.data_name] = {
             role: 'projection',
             sourceNode: scope === 'physical_wall' ? 'physical_walls' : 'wall_sides',
@@ -650,6 +714,7 @@ export function createBuildingPlanBlueprint(overrides = {}) {
             storageRole: 'property',
             inherit: true,
             outside,
+            ...(managed ? { system: true } : {}),
           };
         }
       }

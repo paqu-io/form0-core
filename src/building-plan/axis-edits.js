@@ -165,7 +165,6 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
       );
       if (!cap || Math.abs(dot(old.normal, cap.tangent)) > EPS) continue;
       const far = cap.start.id === vertex.id ? cap.end : cap.start;
-      if (far.editingCutId) continue;
       const run = network.runs.find((run) => run.room.id === room.id && run.edge.id === cap.id);
       if (!run) continue;
       const reach = buildingPlanJunctionAllowance(before, oldRoom, cap, far, run.half * 2);
@@ -174,16 +173,44 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
         (edge) => edge.id !== cap.id && (edge.start.id === far.id || edge.end.id === far.id)
       );
       if (!shoulder) continue;
-      const outside = shoulder.start.id === far.id ? shoulder.end : shoulder.start;
-      const continuation = oldEdges.find(
+      let outside = shoulder.start.id === far.id ? shoulder.end : shoulder.start;
+      let continuation = oldEdges.find(
         (edge) =>
           edge.id !== shoulder.id && (edge.start.id === outside.id || edge.end.id === outside.id)
       );
+      // A shoulder may contain several automatic ownership stations. Walk its
+      // straight continuation before deciding whether the returning cap aligns.
+      const shoulderEdges = new Set([cap.id, shoulder.id]);
+      while (
+        continuation &&
+        outside.physicalBoundaryId &&
+        !outside.editingCutId &&
+        Math.abs(dot(shoulder.normal, continuation.tangent)) <= EPS
+      ) {
+        shoulderEdges.add(continuation.id);
+        outside = continuation.start.id === outside.id ? continuation.end : continuation.start;
+        continuation = oldEdges.find(
+          (edge) =>
+            !shoulderEdges.has(edge.id) &&
+            (edge.start.id === outside.id || edge.end.id === outside.id)
+        );
+      }
       const target = segmentFrame(activeEdits[0].start, activeEdits[0].end);
+      const shoulderRun = segmentFrame(far, outside);
+      const joint = junctionIntersection(target, shoulderRun);
+      // A short collinear cap follows this supporting line while its adjoining
+      // run can extend or shorten. Crossing the far corner changes incidence;
+      // leave that collapse to the ordinary return/realignment projection.
+      const coupledCap =
+        run.segment.junction &&
+        joint &&
+        project(shoulderRun, joint).along <= shoulderRun.length + EPS;
+      if (far.editingCutId && !coupledCap) continue;
       if (
-        !continuation ||
-        Math.abs(dot(target.normal, continuation.tangent)) > EPS ||
-        Math.abs(project(target, continuation.start).offset) > EPS
+        !coupledCap &&
+        (!continuation ||
+          Math.abs(dot(target.normal, continuation.tangent)) > EPS ||
+          Math.abs(project(target, continuation.start).offset) > EPS)
       )
         continue;
       // A short collinear material cap belongs to the connected junction. Move
@@ -412,6 +439,19 @@ export function reshapeBuildingPlanAxes(floor, operation, createId) {
         !network.runs.some((run) => run.wall.id === source.wall.id && run.room.id !== room.id);
       for (const end of [0, 1]) {
         const vertex = end ? old.end : old.start;
+        // Explicitly supplied incident lines (including a returning material cap)
+        // are solved together; do not pin their common station to its old junction.
+        if (
+          activeEdits.some((other) => {
+            if (other === edit) return false;
+            const edge = oldEdges.find((entry) => entry.id === other.edgeId);
+            return (
+              (edge.start.id === vertex.id && near(other.interval[0], 0)) ||
+              (edge.end.id === vertex.id && near(other.interval[1], edge.length))
+            );
+          })
+        )
+          continue;
         if (
           !vertex.physicalBoundaryId ||
           vertex.editingCutId ||
@@ -655,7 +695,9 @@ export function reshapeBuildingPlanAxisThickness(floor, before, operation, creat
           (r) => r.room.id === (operation.activeRoomsByWall?.[wall.id] || operation.activeRoomId)
         ) ||
         users.find((r) => r.face.id === wall.referenceFaceId) ||
-        users[0];
+        [...users].sort(
+          (a, b) => a.room.id.localeCompare(b.room.id) || a.face.id.localeCompare(b.face.id)
+        )[0];
       if (!anchor) continue;
       const frame = segmentFrame(old.start, old.end),
         delta = nextT - oldT;

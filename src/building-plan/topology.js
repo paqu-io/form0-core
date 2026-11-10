@@ -12,6 +12,62 @@ import { renewBuildingPlanRowIdentities, sameBuildingPlanCustomRows } from './cu
 export const wallTopologyOrigin = (wall) =>
   wall.lineage?.jogOriginWallId || wall.lineage?.splitFromWallId || wall.id;
 
+/** A material shoulder can pass the fixed corner at the end of its coverage.
+ * Contract only its automatic arc, retaining the true corner and both surviving
+ * supporting lines. Ownership/answer retirement is checked separately below.
+ */
+function contractAutomaticLoop(floor, room, vertices, runs) {
+  const profiles = new Set(room.edges.filter((edge) => edge.profile).map((edge) => edge.id));
+  for (const face of room.faces)
+    if (findWall(floor, face.wallId).lineage?.profileSource)
+      for (const id of face.edgeIds || []) profiles.add(id);
+  const automatic = (index) => {
+    if (runs[index].sources.some((id) => profiles.has(id))) return true;
+    const owners = room.faces.filter((face) =>
+      face.edgeIds?.some((id) => runs[index].sources.includes(id))
+    );
+    return (
+      owners.length > 0 &&
+      owners.every((face) => {
+        const wall = findWall(floor, face.wallId);
+        return wall.lineage?.automaticDivision && !wall.lineage.explicitPhysicalSeparation;
+      })
+    );
+  };
+  for (let i = 0; i < vertices.length; i++)
+    for (let step = 2; step < vertices.length - 1; step++) {
+      const j = (i + step) % vertices.length;
+      if (vertices[j].editingCutId) continue;
+      const arc = Array.from({ length: step - 1 }, (_, n) => (i + n + 1) % vertices.length);
+      if (
+        !arc.every(
+          (index) => vertices[index].physicalBoundaryId && !vertices[index].editingCutId
+        ) ||
+        !arc.every(automatic)
+      )
+        continue;
+      const a = subtract(vertices[(i + 1) % vertices.length], vertices[i]);
+      const b = subtract(vertices[(j + 1) % vertices.length], vertices[j]);
+      const denominator = cross(a, b);
+      if (Math.abs(denominator) <= EPS) continue;
+      const delta = subtract(vertices[j], vertices[i]);
+      const along = cross(delta, b) / denominator,
+        other = cross(delta, a) / denominator;
+      if (along < -EPS || along > 1 + EPS || other < -EPS || other > 1 + EPS) continue;
+      vertices[j] = {
+        ...vertices[j],
+        x: vertices[i].x + along * a.x,
+        y: vertices[i].y + along * a.y,
+      };
+      for (const index of arc.sort((a, b) => b - a)) {
+        vertices.splice(index, 1);
+        runs.splice(index, 1);
+      }
+      return true;
+    }
+  return false;
+}
+
 /** Remove only geometrically redundant automatic topology, preserving meaningful divisions. */
 export function normalizeRoomBoundary(floor, room, createId) {
   const previous = room.edges;
@@ -113,18 +169,31 @@ export function normalizeRoomBoundary(floor, room, createId) {
       )
         continue;
       if (!mayMerge(runs[prev], runs[i], true)) {
-        // Trim the zero-area cap without merging its owner's answers into the
-        // preceding physical piece. Its facing row must retain another extent.
-        const survives = owners(runs[i]).every((face) =>
+        // Contract the shorter, retraced interval. Choosing the outgoing edge
+        // unconditionally would move a disappearing owner's answers onto the
+        // surviving construction when the moving corner passes this station.
+        const retired =
+          distance(vertices[prev], vertices[i]) < distance(vertices[i], vertices[next]) - EPS
+            ? prev
+            : i;
+        const target = retired === prev ? prev : next;
+        const survives = owners(runs[retired]).every((face) =>
           runs.some(
             (run, index) =>
-              index !== i &&
+              index !== retired &&
               run.sources.some((id) => face.edgeIds?.includes(id)) &&
               distance(vertices[index], vertices[(index + 1) % vertices.length]) > EPS
           )
         );
-        if (!survives || vertices[next].editingCutId) continue;
-        vertices[i] = { ...vertices[i], x: vertices[next].x, y: vertices[next].y };
+        const automatic = owners(runs[retired]).every((face) => {
+          const wall = findWall(floor, face.wallId);
+          return (
+            !wall.lineage?.explicitPhysicalSeparation &&
+            (wall.lineage?.automaticDivision || wall.lineage?.profileSource)
+          );
+        });
+        if ((!survives && !automatic) || vertices[target].editingCutId) continue;
+        vertices[i] = { ...vertices[i], x: vertices[target].x, y: vertices[target].y };
         changed = true;
         break;
       }
@@ -136,6 +205,10 @@ export function normalizeRoomBoundary(floor, room, createId) {
       break;
     }
     if (changed) continue;
+    if (contractAutomaticLoop(floor, room, vertices, runs)) {
+      changed = true;
+      continue;
+    }
     for (let i = 0; i < vertices.length; i++) {
       const prev = (i + vertices.length - 1) % vertices.length;
       const next = (i + 1) % vertices.length;

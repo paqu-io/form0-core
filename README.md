@@ -348,3 +348,19 @@ For a server, use `prepareSubmission(snapshot, { validateHiddenValues: true })` 
 errors from retained hidden values. The same option is supported by validateSubmission(). Hidden
 requirements/custom handlers stay excluded; draft eligibility remains separate. Use the same option
 when resuming a review. This is value validation, not unknown-field sanitization or authorization.
+
+## BuildingPlan measurement presentation
+
+The form setting `measurement_system` accepts `si` (default) or `imperial`. Canonical system
+measurements and geometry remain metres. SI controls display ordinary lengths in m and wall/plaster
+thickness in mm; Imperial controls use decimal ft/in. Unitless counts and ordinary custom numeric
+fields retain their values. Protected Floor providers supply room elevation/structural clear height
+and physical-wall thickness or face-owned plaster defaults; receivers retain live override/reset.
+
+Custom hosts can use `createBuildingPlanPresentation({ metadata, measurementSystem, locale })`,
+exported from the main package and `form0-core/building-plan`. Pass compiled BuildingPlan metadata
+and use `field(field)` for translated display definitions, `toDisplay(field, value)` for measurements
+and `fromDisplay(field, value)` before managed updates. EN/FR/IT/ES regional locales normalize with
+English fallback. These helpers do not mutate schemas, stored values or stored choice labels;
+actual choice changes are normalized back to the canonical definition. React/Native expose the
+same behavior through the dynamic FormRenderer `locale` prop; CLI uses its configured language.

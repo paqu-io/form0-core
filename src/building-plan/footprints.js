@@ -211,6 +211,19 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
               ),
             };
           }
+      // Derived end geometry still supplies incidence for the retained band's
+      // corner. It has no independent wall row or longitudinal face binding.
+      if (edge.profile) {
+        const wall = floor.walls.find((wall) => wall.id === edge.profile.wallId);
+        const segment = wall?.segments[0];
+        if (segment)
+          return {
+            wall,
+            profile: edge.profile,
+            axis: segmentFrame(segment.start, segment.end),
+            thickness: buildingPlanSegmentThickness(wall, segment),
+          };
+      }
       return null;
     };
     for (let i = 0; !boundaryOnly && i < edges.length; i++) {
@@ -220,7 +233,15 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
       addWallCorner(walls, edges[previous], edges[i], room.vertices[i], a, b, side, (polygon) => {
         const joint = a?.axis && b?.axis && junctionIntersection(a.axis, b.axis);
         clipsByPolygon.set(polygon, [
-          ...new Set([room.id, ...(joint ? network.roomsAtJunction(a, b, joint) : [])]),
+          ...new Set([
+            room.id,
+            ...(joint ? network.roomsAtJunction(a, b, joint) : []),
+            ...[a, b]
+              .filter((reference) => reference?.profile)
+              .flatMap((reference) =>
+                reference.wall.sides.map((side) => side.roomId).filter(Boolean)
+              ),
+          ]),
         ]);
         axesByPolygon.set(polygon, [a?.axis, b?.axis].filter(Boolean));
       });

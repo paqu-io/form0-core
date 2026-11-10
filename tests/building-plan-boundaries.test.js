@@ -102,11 +102,7 @@ test('the supplied W3/W2 contact sequence establishes sharing and avoids the nar
   assert.ok(a, 'The contact has a shared physical piece.');
   const b = aligned.rooms[1].faces.find((face) => face.wallId === a.wallId);
   assert.equal(a.wallId, b.wallId, 'A completed compatible contact must be shared');
-  const beforeCrossing = f.session.getSnapshot();
-  const rejected = edit(f, f.faceA, -0.8);
-  assert.equal(rejected.status, 'conflict');
-  assert.ok(rejected.issues.some((issue) => issue.code === 'invalid_room_geometry'));
-  assert.deepEqual(f.session.getSnapshot(), beforeCrossing);
+  assert.equal(edit(f, f.faceA, -0.8).status, 'applied');
   const after = f.session.getSnapshot();
   assert.ok(after.floors[0].walls.every((wall) => wall.segments.length === 1));
   coverage(after);
@@ -262,19 +258,29 @@ for (const up of [-0.2, -0.6, -0.8])
       [right, 0.2],
       [f.faceA, up],
     ]) {
-      const before = f.session.getSnapshot();
       const result = edit(f, face, distance);
-      if (face === f.faceA && distance === up && up <= -0.6) {
-        assert.equal(result.status, 'conflict');
-        assert.equal(result.issues[0].code, 'invalid_room_geometry');
-        assert.deepEqual(f.session.getSnapshot(), before);
-        break;
-      }
       assert.equal(result.status, 'applied', JSON.stringify(result.issues));
     }
     coverage(f.session.getSnapshot());
     assert.deepEqual(validateBuildingPlanSnapshot(f.session.getSnapshot()), []);
     assert.equal(f.session.getSnapshot().floors[0].walls.flatMap((w) => w.doors).length, 1);
+  });
+
+for (const distance of [-0.6, -0.8])
+  test(`an explicitly pinned adjoining wall still rejects a return (${distance})`, () => {
+    const f = fixture(),
+      right = originalFaces(f.snapshot.floors[0].rooms[0])[1].id;
+    for (const [face, amount] of [
+      [f.faceA, 0.6],
+      [right, -0.4],
+      [right, 0.2],
+    ])
+      assert.equal(edit(f, face, amount).status, 'applied');
+    const before = f.session.getSnapshot();
+    const result = edit(f, f.faceA, distance, { pinnedFaceIds: [right] });
+    assert.equal(result.status, 'conflict');
+    assert.equal(result.issues[0].code, 'pinned_wall_conflict');
+    assert.deepEqual(f.session.getSnapshot(), before);
   });
 
 test('new contact conflicts preserve both physical answers until an explicit common resolution', () => {
@@ -499,7 +505,7 @@ test('confirmed removal cannot discard a separately open opening editor', async 
 });
 
 for (const up of [-0.2, -0.6, -0.8])
-  test(`local physical pieces preserve contacts and reject crossing a held neighbour (${up})`, () => {
+  test(`local physical pieces reconcile automatic contacts during return movement (${up})`, () => {
     const f = fixture();
     f.session.setEditingPolicy({ preserveWallGrouping: true });
     const right = originalFaces(f.snapshot.floors[0].rooms[0])[1].id;
@@ -510,14 +516,7 @@ for (const up of [-0.2, -0.6, -0.8])
       [f.faceA, up],
       [f.faceA, 0.1],
     ]) {
-      const before = f.session.getSnapshot();
       const r = edit(f, face, distance);
-      if (face === f.faceA && distance === up && up <= -0.6) {
-        assert.equal(r.status, 'conflict');
-        assert.equal(r.issues[0].code, 'invalid_room_geometry');
-        assert.deepEqual(f.session.getSnapshot(), before);
-        break;
-      }
       assert.equal(r.status, 'applied', JSON.stringify(r.issues));
       const plan = f.session.getSnapshot();
       coverage(plan);

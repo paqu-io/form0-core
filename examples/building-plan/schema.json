@@ -20,7 +20,7 @@
                 "type": "TextField",
                 "key": "floor_note",
                 "data_name": "floor_note",
-                "label": "Floor note",
+                "label": "Notes",
                 "display": "default",
                 "description": null,
                 "description_mode": null,

@@ -97,11 +97,24 @@ export function buildingPlanCanvasSnapshot({
       const roomRow = roomRows[roomIndex];
       const roomPath = [...floorPath, { key: key(meta, 'rooms'), index: roomIndex }];
       output.corners.push(
-        ...room.vertices.map((point) => ({
-          id: point.id,
-          roomId: room.id,
-          point: pixels(point),
-        }))
+        ...room.vertices
+          .filter((point) => {
+            if (point.editingCutId) return true;
+            const edges = polygonEdges(room).filter(
+              (edge) => edge.start.id === point.id || edge.end.id === point.id
+            );
+            const derived = edges.some(
+              (edge) => room.edges.find((stored) => stored.id === edge.id)?.profile
+            );
+            return (
+              !derived || edges.length !== 2 || dot(edges[0].tangent, edges[1].tangent) < 1 - 1e-6
+            );
+          })
+          .map((point) => ({
+            id: point.id,
+            roomId: room.id,
+            point: pixels(point),
+          }))
       );
       const bounds = roomBounds(room);
       output.rooms.push({

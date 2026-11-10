@@ -128,7 +128,17 @@ for (const anchor of ['room_face', 'midline'])
 
 test('floor-wide midline thickness changes solve all adjoining faces atomically', () => {
   const f = fixture(false, 'midline');
-  const floor = f.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.4 });
+  const floor = f.apply({
+    type: 'batch',
+    operations: ['interior', 'exterior'].map((exposure) => ({
+      type: 'set_provider',
+      floorId: f.floorId,
+      nodeKey: 'floors',
+      fieldName: `floor_${exposure}_wall_thickness`,
+      property: 'wall_thickness_m',
+      value: 0.4,
+    })),
+  });
   assert.deepEqual(
     originalVertices(floor.rooms[0]).map(({ x, y }) => [x, y]),
     [
@@ -308,7 +318,17 @@ for (const grouped of [false, true])
         (face) => face.lineage?.editingOriginFaceId === g.faceB && face.id !== g.faceB
       );
     g.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
-    g.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.3 });
+    g.apply({
+      type: 'batch',
+      operations: ['interior', 'exterior'].map((exposure) => ({
+        type: 'set_provider',
+        floorId: g.floorId,
+        nodeKey: 'floors',
+        fieldName: `floor_${exposure}_wall_thickness`,
+        property: 'wall_thickness_m',
+        value: 0.3,
+      })),
+    });
     assert.deepEqual(intrusions(g.coherent()), []);
   });
 

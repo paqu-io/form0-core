@@ -445,7 +445,17 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
       (face) => face.lineage?.editingOriginFaceId === f.faceB && face.id !== f.faceB
     );
   f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
-  f.apply({ type: 'set_defaults', property: 'wall_thickness_m', value: 0.3 });
+  f.apply({
+    type: 'batch',
+    operations: ['interior', 'exterior'].map((exposure) => ({
+      type: 'set_provider',
+      floorId: f.floorId,
+      nodeKey: 'floors',
+      fieldName: `floor_${exposure}_wall_thickness`,
+      property: 'wall_thickness_m',
+      value: 0.3,
+    })),
+  });
   assert.ok(f.session.getSnapshot().floors[0].walls.every((wall) => wall.segments.length === 1));
   const view = () =>
     buildingPlanCanvasSnapshot({

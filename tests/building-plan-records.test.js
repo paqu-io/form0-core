@@ -78,7 +78,7 @@ function fixture(custom = {}) {
   };
   const floorId = apply({
     type: 'create_floor',
-    values: { floor_elevation_m: 0, floor_height_m: 3 },
+    values: { floor_elevation: 0, floor_height: 3 },
   }).created.id;
   const a = apply({ type: 'create_room', floorId, rectangle: { x: 0, y: 0, width: 5, height: 3 } })
     .created.id;

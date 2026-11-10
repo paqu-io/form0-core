@@ -86,14 +86,17 @@ export function buildingPlanJunctionAllowance(floor, room, edge, vertex, thickne
       b.roomInterval[1] >= along - EPS
   );
   const wall = face && findWall(floor, face.wallId);
+  const profile = room.edges.find((edge) => edge.id === adjacent.id)?.profile;
   const other =
     binding &&
     buildingPlanSegmentThickness(
       wall,
       wall.segments.find((s) => s.id === binding.segmentId)
     );
-  return other > EPS
-    ? (other + thickness * Math.abs(dot(edge.tangent, adjacent.tangent))) / sine
+  const adjoining =
+    other ?? floor.walls.find((wall) => wall.id === profile?.wallId)?.properties.wall_thickness_m;
+  return adjoining > EPS
+    ? (adjoining + thickness * Math.abs(dot(edge.tangent, adjacent.tangent))) / sine
     : 0;
 }
 

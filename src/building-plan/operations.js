@@ -1,10 +1,11 @@
 import { renewBuildingPlanRowIdentities } from './custom-rows.js';
 import { materializeBuildingPlanProfiles } from './material-profiles.js';
+import { buildingPlanEditingCutStations } from './wall-divisions.js';
 import { mergeWalls } from './wall-merge.js';
+import { isolateBuildingPlanContact } from './physical-pieces.js';
 import { createWallSides, wallSide } from './wall-sides.js';
-import { propertySpecification, nodeSubjects } from './inheritance.js';
+import { propertySpecification, nodeSubjects, resolveInheritedProperty } from './inheritance.js';
 import { repairSharedWallExtents } from './boundary-edits.js';
-import { buildingPlanBoundaryClearanceIssues } from './footprints.js';
 import {
   GEOMETRY_EPSILON as EPS,
   add,
@@ -390,8 +391,6 @@ function finishBoundaryEdit(
       createId,
       specifications
     );
-  const clearance = buildingPlanBoundaryClearanceIssues(floor);
-  if (clearance.length) throw Object.assign(new Error(clearance[0].message), { issues: clearance });
 }
 
 function detachRoom(floor, room, createId) {
@@ -546,16 +545,16 @@ function coalesceAutomaticSegments(floor) {
   }
 }
 
-function bindFaces(floor, operation, createId, specifications) {
-  const a = findFace(floor, operation.referenceFaceId);
-  const b = findFace(floor, operation.faceId);
+function bindFaces(floor, operation, createId, specifications, contactThickness = null) {
+  let a = findFace(floor, operation.referenceFaceId);
+  let b = findFace(floor, operation.faceId);
   if (a.room.id === b.room.id || a.face.freePath || b.face.freePath)
     failOperation('invalid_binding_request', 'Choose opposite faces of two different rooms.');
   if (a.wall.id === b.wall.id) return;
-  const aBinding = a.face.bindings.find(
+  let aBinding = a.face.bindings.find(
     (binding) => !operation.referenceEdgeId || binding.edgeId === operation.referenceEdgeId
   );
-  const bBinding = b.face.bindings.find(
+  let bBinding = b.face.bindings.find(
     (binding) => !operation.edgeId || binding.edgeId === operation.edgeId
   );
   if (!aBinding || !bBinding)
@@ -567,9 +566,11 @@ function bindFaces(floor, operation, createId, specifications) {
       'opposite_faces_required',
       'Shared room boundaries must face in opposite directions.'
     );
-  const thickness = own(operation.resolutions, 'wall_thickness_m')
-    ? operation.resolutions.wall_thickness_m
-    : a.wall.properties.wall_thickness_m;
+  const thickness =
+    contactThickness ??
+    (own(operation.resolutions, 'wall_thickness_m')
+      ? operation.resolutions.wall_thickness_m
+      : a.wall.properties.wall_thickness_m);
   if (!Number.isFinite(thickness) || thickness <= 0)
     failOperation(
       'unknown_wall_thickness',
@@ -596,6 +597,24 @@ function bindFaces(floor, operation, createId, specifications) {
       );
     translateUnsharedRoom(floor, b.room, multiply(aEdge.normal, expected - actual));
   }
+  const referenceAxis = a.wall.segments.find((segment) => segment.id === aBinding.segmentId);
+  const otherAxis = b.wall.segments.find((segment) => segment.id === bBinding.segmentId);
+  const referenceFrame = segmentFrame(referenceAxis.start, referenceAxis.end);
+  const changesReferenceWidth =
+    Math.abs((a.wall.properties.wall_thickness_m ?? thickness) - thickness) > EPS;
+  const hasTemporaryRuns = a.wall.segments.length > 1 || b.wall.segments.length > 1;
+  // A generated cap can share its planning subject with a long stationary run.
+  // Resolve the contacted extent before fitting the width or an offset run;
+  // otherwise the fit moves construction outside that contact and loses bindings.
+  if (
+    changesReferenceWidth ||
+    (hasTemporaryRuns && Math.abs(project(referenceFrame, otherAxis.start).offset) > EPS)
+  ) {
+    a = isolateBuildingPlanContact(floor, a, aBinding.segmentId, bEdge, createId);
+    b = isolateBuildingPlanContact(floor, b, bBinding.segmentId, aEdge, createId);
+    aBinding = a.face.bindings.find((binding) => binding.segmentId === a.contactSegmentId);
+    bBinding = b.face.bindings.find((binding) => binding.segmentId === b.contactSegmentId);
+  }
   const axis = a.wall.segments.find((segment) => segment.id === aBinding.segmentId);
   const direction = segmentFrame(axis.start, axis.end);
   const side = aBinding.side;
@@ -610,7 +629,7 @@ function bindFaces(floor, operation, createId, specifications) {
   bSegment.end = add(bSegment.end, multiply(direction.normal, -target));
   if (Math.abs(dot(frameB.tangent, direction.tangent)) < 1 - EPS)
     failOperation('unaligned_walls', 'Only parallel wall segments can be bound.');
-  mergeBoundSegments(
+  const merged = mergeBoundSegments(
     floor,
     a.wall,
     b.wall,
@@ -619,6 +638,14 @@ function bindFaces(floor, operation, createId, specifications) {
     operation.resolutions || {},
     createId
   );
+  if (contactThickness != null) {
+    // Keep the geometric width until the session has divided the combined run
+    // by adjacency. Resolving one value on the whole run here loses the metric
+    // change needed for its newly interior and remaining exterior pieces.
+    merged.properties.wall_thickness_m = thickness;
+    rebindBuildingPlanFaces(floor, createId);
+    return;
+  }
   const conflicts = reconcileBuildingPlanProperties({ floors: [floor] }, specifications).filter(
     (issue) => issue.code !== 'conflicting_room_defaults'
   );
@@ -630,14 +657,29 @@ function bindFaces(floor, operation, createId, specifications) {
   rebindBuildingPlanFaces(floor, createId);
 }
 
-function attachRoom(floor, room, operation, createId, specifications) {
+function prospectiveContactThickness(floor, wall, owner, room, neighbour, specifications) {
+  const prospective = {
+    ...wall,
+    exposure: 'interior',
+    overrides: { ...owner.overrides, ...wall.overrides },
+    sides: wall.sides.map((side, index) => ({ ...side, roomId: index ? room.id : neighbour.id })),
+  };
+  return resolveInheritedProperty(
+    { floor, subject: prospective, wall: prospective, nodeKey: 'walls' },
+    'wall_thickness_m',
+    propertySpecification(specifications, 'wall_thickness_m')
+  ).value;
+}
+
+function roomContacts(floor, room, operation, specifications) {
   const tolerance = operation.attachmentTolerance ?? 0;
   if (!Number.isFinite(tolerance) || tolerance < 0 || tolerance > 0.5)
     failOperation(
       'invalid_snap_tolerance',
       'Room attachment tolerance must be between zero and half a metre.'
     );
-  for (const face of [...room.faces]) {
+  const contacts = [];
+  for (const face of room.faces) {
     if (
       face.freePath ||
       !face.bindings.length ||
@@ -678,25 +720,29 @@ function attachRoom(floor, room, operation, createId, specifications) {
           const to = Math.max(frame.length, ...positions.map((point) => point.along));
           // Opposite faces may bind up to a deliberate cut. They may not merge
           // across one, even when their accepted values happen to agree.
-          const crossesCut = floor.rooms.some((room) =>
-            [...room.vertices, ...room.faces.flatMap((face) => face.freePath || [])].some(
-              (vertex) => {
-                if (!vertex.editingCutId) return false;
-                const point = project(frame, vertex);
-                return (
-                  point.along > from + EPS &&
-                  point.along < to - EPS &&
-                  near(Math.abs(point.offset), thickness / 2)
-                );
-              }
-            )
+          const crossesCut = buildingPlanEditingCutStations(floor, frame, thickness / 2).some(
+            (station) => station > from + EPS && station < to - EPS
           );
           if (crossesCut) continue;
         }
         for (const otherEdge of sourceEdges(neighbour, reference)) {
           if (dot(edge.tangent, otherEdge.tangent) > -1 + EPS) continue;
           const gap = project(otherEdge, edge.start).offset;
-          const expected = -Math.sign(polygonArea(neighbour.vertices)) * thickness;
+          const inherited = prospectiveContactThickness(
+            floor,
+            wall,
+            owner,
+            room,
+            neighbour,
+            specifications
+          );
+          const widths = [...new Set([thickness, inherited])].filter(
+            (value) => Number.isFinite(value) && value > 0
+          );
+          const contactThickness = widths.sort(
+            (a, b) => Math.abs(Math.abs(gap) - a) - Math.abs(Math.abs(gap) - b)
+          )[0];
+          const expected = -Math.sign(polygonArea(neighbour.vertices)) * contactThickness;
           const extent = [
             project(otherEdge, edge.start).along,
             project(otherEdge, edge.end).along,
@@ -709,6 +755,7 @@ function attachRoom(floor, room, operation, createId, specifications) {
           matches.push({
             referenceFaceId: reference.id,
             referenceEdgeId: otherEdge.id,
+            contactThickness,
             mismatch: Math.abs(gap - expected),
           });
         }
@@ -717,18 +764,46 @@ function attachRoom(floor, room, operation, createId, specifications) {
       (a, b) => a.mismatch - b.mismatch || a.referenceFaceId.localeCompare(b.referenceFaceId)
     );
     if (matches.length)
-      bindFaces(
-        floor,
-        {
-          ...matches[0],
-          faceId: face.id,
-          edgeId: edge.id,
-          align: tolerance > 0,
-          resolutions: operation.resolutions,
-        },
-        createId,
-        specifications
-      );
+      contacts.push({
+        ...matches[0],
+        faceId: face.id,
+        edgeId: edge.id,
+        align: tolerance > 0,
+        resolutions: operation.resolutions,
+      });
+  }
+  return contacts;
+}
+
+function attachRoom(floor, room, operation, createId, specifications) {
+  for (const contact of roomContacts(floor, room, operation, specifications))
+    bindFaces(floor, contact, createId, specifications, contact.contactThickness);
+}
+
+/** Discover every prospective contact before binding any of them. */
+export function reconcileBuildingPlanContacts(floor, operation, createId, specifications) {
+  const contacts = floor.rooms.flatMap((room) =>
+    roomContacts(floor, room, { ...operation, attachmentTolerance: 0 }, specifications)
+  );
+  const roomOf = (id) => floor.rooms.find((room) => room.faces.some((face) => face.id === id))?.id;
+  // Retain the selected room's construction as the reference when a new
+  // contact is assembled; choosing the opposite reference changes its anchor.
+  contacts.sort(
+    (a, b) =>
+      Number(roomOf(b.referenceFaceId) === operation.activeRoomId) -
+        Number(roomOf(a.referenceFaceId) === operation.activeRoomId) ||
+      a.referenceFaceId.localeCompare(b.referenceFaceId) ||
+      a.faceId.localeCompare(b.faceId)
+  );
+  const seen = new Set();
+  for (const contact of contacts) {
+    const key = JSON.stringify([contact.faceId, contact.referenceFaceId].sort());
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const a = findFace(floor, contact.faceId),
+      b = findFace(floor, contact.referenceFaceId);
+    if (a.wall === b.wall) continue;
+    bindFaces(floor, contact, createId, specifications, contact.contactThickness);
   }
 }
 
@@ -1410,16 +1485,13 @@ export function applyBuildingPlanOperation(
     default:
       failOperation('unknown_operation', `Unsupported building-plan operation: ${operation.type}`);
   }
-  if (
-    ['resize_face', 'resize_room', 'move_corner', 'set_property', 'set_defaults'].includes(
-      operation.type
-    )
+  const conflicts = ['resize_face', 'resize_room', 'move_corner', 'move_room'].includes(
+    operation.type
   )
-    for (const room of floor.rooms)
-      attachRoom(floor, room, { ...operation, attachmentTolerance: 0 }, createId, specifications);
-  const conflicts = reconcileBuildingPlanProperties(snapshot, specifications).filter(
-    (issue) => issue.code !== 'conflicting_room_defaults'
-  );
+    ? []
+    : reconcileBuildingPlanProperties(snapshot, specifications).filter(
+        (issue) => issue.code !== 'conflicting_room_defaults'
+      );
   if (conflicts.length) {
     const error = new Error(conflicts[0].message);
     error.issues = conflicts;
@@ -1427,9 +1499,14 @@ export function applyBuildingPlanOperation(
   }
   rebindBuildingPlanFaces(floor, createId);
   if (
-    ['move_corner', 'resize_face', 'resize_room', 'set_property', 'set_defaults'].includes(
-      operation.type
-    )
+    [
+      'move_corner',
+      'resize_face',
+      'resize_room',
+      'set_property',
+      'set_defaults',
+      'set_provider',
+    ].includes(operation.type)
   )
     for (const wall of floor.walls)
       for (const opening of [...wall.doors, ...wall.windows]) {

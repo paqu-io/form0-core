@@ -1,7 +1,9 @@
 import { copyBuildingPlanData as copy, planIssue, equalValue } from './model.js';
-import { partialOpeningCuts, capturedBoundaryIssues } from './boundary-edits.js';
+import { partialOpeningCuts } from './boundary-edits.js';
 
-/** Discover an exact, reviewable removal set before retrying an edit. All attempts are private candidates. */
+/** Discover an exact, reviewable removal set before retrying an edit. All attempts are private
+ * candidates; the callback settles and validates the complete candidate, including captured extents.
+ */
 export function prepareBuildingPlanEdit(current, operation, apply, validate) {
   const openings = new Map(
     current.floors.flatMap((floor) =>
@@ -37,7 +39,7 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
       });
     }
     const result = apply(candidate, base);
-    const issues = [...validate(candidate), ...capturedBoundaryIssues(current, candidate)];
+    const issues = validate(candidate);
     const other = issues.filter((issue) => issue.code !== 'opening_outside_wall');
     if (other.length) throw Object.assign(new Error(other[0].message), { issues: other });
     const cuts = partialOpeningCuts(candidate).filter(

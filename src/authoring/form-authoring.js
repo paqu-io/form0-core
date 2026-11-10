@@ -578,6 +578,7 @@ export function getFormAuthoringContext({ schema, coreVersion = null }) {
       },
     },
     formSettings: {
+      measurement_system: { values: ['si', 'imperial'], default: 'si' },
       repeatable_recalculation: { values: ['automatic', 'confirm'], default: 'automatic' },
     },
     eventBuiltins: getFormEventBuiltinCatalog(),
