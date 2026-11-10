@@ -72,7 +72,10 @@ export {
   normalizeBuildingPlanEditingPolicy,
   BUILDING_PLAN_EDITING_DEFAULTS,
 } from './building-plan/editing-policy.js';
-export { createBuildingPlanInteraction } from './building-plan/interaction.js';
+export {
+  createBuildingPlanInteraction,
+  BUILDING_PLAN_ZOOM_LIMITS,
+} from './building-plan/interaction.js';
 export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,

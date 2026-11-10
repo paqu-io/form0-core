@@ -5,6 +5,9 @@ import { copyBuildingPlanData } from './model.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+/** Canvas zoom range shared by every host; 1 is the default 20 px per metre. */
+export const BUILDING_PLAN_ZOOM_LIMITS = Object.freeze({ min: 0.25, max: 20 });
+
 /** Shared magnetic guides and edge-pan timing in canvas-world/screen coordinates. */
 export function createBuildingPlanInteraction({ scene = () => ({}), policy = () => ({}) } = {}) {
   let latch = new Set();
