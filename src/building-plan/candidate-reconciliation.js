@@ -15,6 +15,7 @@ import { reconcileWallLabels } from './wall-labels.js';
 import { applyThicknessChanges, reconcileBuildingPlanContacts } from './operations.js';
 import { normalizeBuildingPlanMaterialCaps } from './material-profiles.js';
 import { keepsContactThickness } from './attachment-seating.js';
+import { buildingPlanContactHolds } from './contact-holds.js';
 
 const CONTACT_EDITS = new Set([
   'resize_face',
@@ -148,6 +149,18 @@ export function reconcileBuildingPlanCandidate(
     let resolved = reconcileBuildingPlanProperties(candidate, specifications);
     if (keepsContactThickness(operation) && keepGeometricWidths(floors, geometry))
       resolved = reconcileBuildingPlanProperties(candidate, specifications);
+    // A dragged face adapts on its own new contacts; the neighbour keeps its face.
+    const heldRooms = new Map(
+      floors.map((floor) => [
+        floor.id,
+        buildingPlanContactHolds(
+          floor,
+          geometry.floors.find((entry) => entry.id === floor.id),
+          before.floors.find((entry) => entry.id === floor.id),
+          operation
+        ),
+      ])
+    );
     defaultConflicts = resolved.filter((issue) => issue.code === 'conflicting_room_defaults');
     const issues = resolved.filter((issue) => issue.code !== 'conflicting_room_defaults');
     if (issues.length) return { divisions, defaultConflicts, issues };
@@ -166,7 +179,10 @@ export function reconcileBuildingPlanCandidate(
         previous,
         operation.activeRoomId,
         createId,
-        operation,
+        {
+          ...operation,
+          activeRoomsByWall: { ...operation.activeRoomsByWall, ...heldRooms.get(floor.id) },
+        },
         specifications
       );
     }
