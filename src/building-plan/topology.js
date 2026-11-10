@@ -130,16 +130,30 @@ export function normalizeRoomBoundary(floor, room, createId) {
       );
     });
   };
+  const retiredCutCorners = new Set();
   let changed = true;
   while (changed && vertices.length > 2) {
     changed = false;
     for (let i = 0; i < vertices.length; i++) {
       const next = (i + 1) % vertices.length;
       if (distance(vertices[i], vertices[next]) > EPS) continue;
-      // A generated connector can collapse onto an intentional editing cut. Keep
-      // that stable cut vertex rather than deleting its identity with the connector.
-      if (vertices[next].editingCutId && !vertices[i].editingCutId) {
-        const retired = vertices[i].id;
+      const corner = [vertices[i], vertices[next]].find(
+        (vertex) => !vertex.editingCutId && !vertex.physicalBoundaryId
+      );
+      const cutId = vertices[i].editingCutId || vertices[next].editingCutId;
+      if (cutId && corner) {
+        // A Split portion ending at an ordinary corner has collapsed, so the Split no
+        // longer separates two portions in this room. Retire it and keep the corner.
+        vertices[i] = corner;
+        retiredCutCorners.add(corner.id);
+        for (const [index, vertex] of vertices.entries())
+          if (vertex.editingCutId === cutId) {
+            const { editingCutId, ...retained } = vertex;
+            vertices[index] = retained;
+          }
+      } else if (vertices[next].editingCutId && !vertices[i].editingCutId) {
+        // A generated connector can collapse onto an intentional editing cut. Keep
+        // that stable cut vertex rather than deleting its identity with the connector.
         vertices[i] = { ...vertices[next] };
       }
       // The collapsed edge has no surviving extent. Its answers are remapped below.
@@ -228,6 +242,15 @@ export function normalizeRoomBoundary(floor, room, createId) {
       changed = true;
       break;
     }
+  }
+  // A corner left on a straight line by a retired Split now separates physical walls
+  // that could not merge above. Mark it as an automatic boundary, which Rejoin accepts.
+  for (const [index, vertex] of vertices.entries()) {
+    if (!retiredCutCorners.has(vertex.id) || vertex.physicalBoundaryId) continue;
+    const a = subtract(vertex, vertices[(index + vertices.length - 1) % vertices.length]);
+    const b = subtract(vertices[(index + 1) % vertices.length], vertex);
+    if (Math.abs(cross(a, b)) <= EPS && dot(a, b) > 0)
+      vertices[index] = { ...vertex, physicalBoundaryId: createId() };
   }
   room.vertices = vertices;
   assignRoomEdges(room, createId, previous);
