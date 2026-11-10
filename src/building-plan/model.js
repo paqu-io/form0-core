@@ -217,7 +217,8 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
         for (const segment of wall.segments) {
           const thickness = wall.properties.wall_thickness_m;
           const frame = segmentFrame(segment.start, segment.end);
-          if (Math.abs(dot(frame.normal, edge.tangent)) > EPS) continue;
+          // Parallelism is judged by endpoint offsets (metres), not by edge direction:
+          // a micron-scale edge's direction is rounding noise and depends on world axes.
           const a = project(frame, edge.start);
           const b = project(frame, edge.end);
           const half = typeof thickness === 'number' ? thickness / 2 : segment.referenceOffset || 0;
