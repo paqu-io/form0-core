@@ -122,6 +122,7 @@ export function joinPieceSubjects(context) {
     rank(b) - rank(a) ||
     preferred(b) - preferred(a) ||
     compareSubjects(context, a.subject, b.subject);
+  const bare = [];
   for (const piece of context.pieces) {
     const members = [];
     for (const { subjectId, roomId } of piece.anchored) {
@@ -130,18 +131,30 @@ export function joinPieceSubjects(context) {
         members.push({ subject, roomId });
     }
     if (!members.length) {
-      piece.subjectId = newSubject(context).id;
+      bare.push(piece);
       continue;
     }
     const [survivor, ...others] = members.sort(order);
     for (const { subject } of others) absorbSubject(context, survivor.subject, subject);
     piece.subjectId = survivor.subject.id;
   }
+  // New walls are numbered around each room in edge order, as a created room's walls are today.
+  const roomOrder = new Map(context.primary.rooms.map((room, index) => [room.id, index]));
+  const position = (piece) => {
+    const [entry] = [...piece.lines].sort(
+      (a, b) => roomOrder.get(a.roomId) - roomOrder.get(b.roomId)
+    );
+    return [roomOrder.get(entry.roomId), entry.index, entry.from];
+  };
+  const before = (a, b) => {
+    const [x, y] = [position(a), position(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  };
+  for (const piece of bare.sort(before)) piece.subjectId = newSubject(context).id;
 }
 
-const root = (subject) => subject.lineage?.splitFromWallId || subject.id;
-const automatic = (a, b) =>
-  a.lineage?.automaticDivision && (b.lineage?.automaticDivision || root(a) === root(b));
+/** A wall the user deliberately separated (Separate wall) never joins its neighbour again. */
+const separated = (subject) => Boolean(subject.lineage?.explicitPhysicalSeparation);
 const SUBJECT_KEYS = ['overrides', 'providerOverrides', 'values', 'repeatable'];
 const sameAnswers = (a, b) => SUBJECT_KEYS.every((key) => equalValue(a[key] || {}, b[key] || {}));
 
@@ -165,14 +178,20 @@ function touching(context, p, q) {
 }
 
 /**
- * Automatic divisions join again when they meet with the same rooms, no explicit cut between
- * them, the same width and the same answers (today's rule). The split root survives, then a
- * subject that already existed, then the lower label.
+ * Pieces join again when they meet with the same rooms, no explicit cut between them, the same
+ * width and the same answers: a boundary that no room, cut or answer explains does not survive.
+ * Today's engine only re-joined automatic divisions of one root; under the derived identities a
+ * remainder keeps its own identity, so the rule covers any compatible neighbour except a wall
+ * the user separated explicitly. A subject that existed survives, then the longer piece, then the
+ * split root, then the lower label.
  */
 export function rejoinAutomaticPieces(context) {
-  const order = (a, b) =>
-    Number(b.id === b.lineage?.splitFromWallId) - Number(a.id === a.lineage?.splitFromWallId) ||
+  // Identity stays with what did not change: a wall that existed, then the longer piece.
+  const length = (piece) => Math.max(...piece.lines.map((entry) => entry.to - entry.from));
+  const order = ([a, p], [b, q]) =>
     Number(context.original.has(b.id)) - Number(context.original.has(a.id)) ||
+    length(q) - length(p) ||
+    Number(b.id === b.lineage?.splitFromWallId) - Number(a.id === a.lineage?.splitFromWallId) ||
     compareSubjects(context, a, b);
   for (let joined = true; joined; ) {
     joined = false;
@@ -181,14 +200,17 @@ export function rejoinAutomaticPieces(context) {
         if (p === q || p.subjectId === q.subjectId || p.width !== q.width) continue;
         if (p.thickness !== q.thickness || !touching(context, p, q)) continue;
         const [a, b] = [p, q].map((piece) => context.subjects.get(piece.subjectId));
-        if (!(automatic(a, b) || automatic(b, a)) || !sameAnswers(a, b)) continue;
+        if (separated(a) || separated(b) || !sameAnswers(a, b)) continue;
         const direction = relativeDirection(context, a, b);
         const sidesMatch = a.sides.every((side) => {
           const match = b.sides.find((entry) => entry.sign === side.sign * direction);
           return match && sameAnswers(side, match);
         });
         if (!sidesMatch) continue;
-        const [survivor, other] = [a, b].sort(order);
+        const [[survivor], [other]] = [
+          [a, p],
+          [b, q],
+        ].sort(order);
         absorbSubject(context, survivor, other);
         for (const entry of p.lines) {
           const line = q.lines.find((x) => x.roomId === entry.roomId && x.index === entry.index);

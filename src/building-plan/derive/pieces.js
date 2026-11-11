@@ -60,6 +60,12 @@ export function deriveBuildingPlanPieces(primary, specifications) {
   };
   // An explicitly unknown thickness keeps the subject's last geometric width.
   const width = (id, value) => (value > 0 ? value : lastWidth(subject(id)));
+  // A command may give a new contact an explicit width ("Keep previous values" on attach).
+  const lineKeyOf = (line) => `${line.roomId}:${line.index}`;
+  const explicitWidth = (a, b) =>
+    (primary.contactWidths || []).find((entry) =>
+      [lineKeyOf(a), lineKeyOf(b)].every((key) => entry.lines.includes(key))
+    )?.width ?? null;
 
   for (const { a, b, interval } of facingPairs(lines)) {
     const stations = stationsWithin(
@@ -73,14 +79,13 @@ export function deriveBuildingPlanPieces(primary, specifications) {
       const anchorA = anchorAt(a, from, to);
       const anchorB = anchorAt(b, ...onB);
       const subjectId = anchorA?.subjectId ?? anchorB?.subjectId ?? null;
-      const value = thickness(subjectId, [a.roomId, b.roomId]);
+      const explicit = explicitWidth(a, b);
+      const value = explicit ?? thickness(subjectId, [a.roomId, b.roomId]);
       const anchoredBoth = anchorA && anchorA.subjectId === anchorB?.subjectId;
       const matches = value > 0 && Math.abs(gap - value) <= GAP_TOLERANCE;
-      // One subject on both faces is a contact even when the gap disagrees (reported) or the
-      // thickness is unknown (the gap is then the geometric width).
-      if (!matches && !anchoredBoth) continue;
-      if (!matches && value > 0)
-        issues.push({ code: 'gap_mismatch', subjectId, gap, thickness: value });
+      // One subject on both faces whose thickness is explicitly unknown is a contact at the
+      // geometric width. With a known thickness, a gap that disagrees means the rooms separated.
+      if (!matches && !(anchoredBoth && !(value > 0))) continue;
       if (anchorA && anchorB && anchorA.subjectId !== anchorB.subjectId)
         issues.push({
           code: 'subject_mismatch',
@@ -98,6 +103,7 @@ export function deriveBuildingPlanPieces(primary, specifications) {
         width: value > 0 ? value : gap,
         faceIds: [anchorA?.faceId ?? null, anchorB?.faceId ?? null],
         other: { line: b, from: onB[0], to: onB[1] },
+        ...(explicit ? { explicitWidth: explicit } : {}),
       });
     }
   }
@@ -179,6 +185,7 @@ function withAxis(part) {
   const distance = part.line.outward * ((part.width ?? 0) / 2);
   return {
     subjectId: part.subjectId,
+    ...(part.explicitWidth ? { explicitWidth: part.explicitWidth } : {}),
     roomIds: part.roomIds,
     exposure: part.roomIds.every(Boolean) ? 'interior' : 'exterior',
     thickness: part.thickness,

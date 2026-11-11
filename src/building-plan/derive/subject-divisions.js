@@ -59,15 +59,19 @@ const pieceLength = (piece) => Math.max(...piece.lines.map((entry) => entry.to -
 /**
  * The piece that keeps a dividing subject: identity stays with what did not change. Among the
  * pieces with the same rooms as before (the rooms the subject's rows were in, plus the outside
- * for an exterior wall), the longest; failing that, the longest piece. Ties go to the piece
- * holding the start of the reference row.
+ * for an exterior wall), the longest; failing that, a piece of a stationary room (the room the
+ * command did not move), then the longest piece. Ties go to the piece holding the start of the
+ * reference row.
  */
 function keptPiece(context, subject, pieces) {
   const anchors = context.anchorsBySubject.get(subject.id) || [];
   const before = new Set(anchors.map((anchor) => anchor.roomId));
   if (before.size === 1) before.add(null);
   const unchanged = pieces.filter((piece) => rooms(piece.roomIds) === rooms(before));
-  const pool = unchanged.length ? unchanged : pieces;
+  const stationary = pieces.filter((piece) =>
+    piece.roomIds.some((id) => context.preferredRoomIds.includes(id))
+  );
+  const pool = unchanged.length ? unchanged : stationary.length ? stationary : pieces;
   const longest = Math.max(...pool.map(pieceLength));
   const tied = pool.filter((piece) => pieceLength(piece) >= longest - SAME);
   const anchor = context.anchorByFace.get(subject.referenceFaceId);

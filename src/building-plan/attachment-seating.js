@@ -54,6 +54,17 @@ export function attachmentSeatingDelta(floor, room, contacts) {
       shift: expected - project(referenceEdge, edge.start).offset,
     };
   });
+  return solveSeatingDelta(constraints);
+}
+
+/**
+ * The single translation `delta` with `delta·normal = shift` for every constraint (unit normals),
+ * or null when no translation satisfies them all; {0, 0} without constraints.
+ *
+ * @param {Array<{normal: {x: number, y: number}, shift: number}>} constraints
+ * @returns {{x: number, y: number} | null}
+ */
+export function solveSeatingDelta(constraints) {
   if (!constraints.length) return { x: 0, y: 0 };
   // Solve delta·normal = shift for the first two independent directions, then
   // require every remaining contact to agree with that single translation.

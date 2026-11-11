@@ -116,3 +116,17 @@ export function assertRoundTrip(floor, specifications) {
   assertClose(result.floor, canonicalFloor(floor));
   return result;
 }
+
+/**
+ * The shared wall between two rooms and each room's row on it. Rooms one thickness apart share a
+ * wall as soon as both exist, so fixtures find these rows by geometry rather than by row index.
+ */
+export function sharedRows(floor, roomA = floor.rooms[0], roomB = floor.rooms[1]) {
+  const wall = floor.walls.find(
+    (entry) =>
+      entry.exposure === 'interior' &&
+      [roomA.id, roomB.id].every((id) => entry.sides.some((side) => side.roomId === id))
+  );
+  const rowOf = (room) => room.faces.find((face) => face.wallId === wall?.id);
+  return { wallId: wall?.id, faceA: rowOf(roomA)?.id, faceB: rowOf(roomB)?.id };
+}

@@ -23,6 +23,17 @@ import {
   keepsContactThickness,
   seatsAttachedRoom,
 } from './attachment-seating.js';
+import {
+  applyDerivedOperation,
+  derivedCandidateIssues,
+  rederiveFloor,
+  usesDerivedPath,
+} from './derive/derived-edit.js';
+
+/** A room command on the derived core seats the room again for "Keep previous values". */
+const reseatsDerivedRoom = (operation) =>
+  (operation.type === 'create_room' && operation.attach === true) ||
+  (operation.type === 'move_room' && operation.attach !== false);
 
 const entityArray = (value) =>
   Array.isArray(value) &&
@@ -168,7 +179,7 @@ function validate(snapshot) {
 /**
  * Own immutable candidate operations, accepted history, and nested editor scopes.
  * Hosts own rendering, form lifecycle events, and actual record persistence.
- * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, editingPolicy?: {inheritedChangePolicy?: 'ask'|'apply', copyCustomAnswersAutomatically?: boolean, snapping?: boolean, edgeAutoPan?: boolean, thicknessAnchor?: 'room_face'|'midline'}}} [options]
+ * @param {{snapshot?: Object, properties?: Object, createId?: () => string, readOnly?: boolean, derivedCommands?: boolean, editingPolicy?: {inheritedChangePolicy?: 'ask'|'apply', copyCustomAnswersAutomatically?: boolean, snapping?: boolean, edgeAutoPan?: boolean, thicknessAnchor?: 'room_face'|'midline'}}} [options]
  * @returns {Object} Portable building-plan session.
  */
 export function createBuildingPlanSession({
@@ -177,8 +188,13 @@ export function createBuildingPlanSession({
   createId = generateUuidV7,
   readOnly = false,
   editingPolicy = {},
+  derivedCommands = false,
 } = {}) {
   editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
+  // Room commands on the derived core (redesign step 3). Off until every geometry command family
+  // runs there: today's engine branches on lineage markers the derived identity rules write
+  // differently, so the two engines must not edit geometry on the same floor.
+  const derived = (operation) => derivedCommands && usesDerivedPath(operation);
   const specifications = copy({ ...BUILDING_PLAN_PROPERTIES, ...properties });
   let current = copy(snapshot);
   for (const floor of current?.floors || []) reconcileWallLabels(floor);
@@ -224,13 +240,31 @@ export function createBuildingPlanSession({
       questions.cancelAll();
       operation = buildingPlanEditContext(current, copy(operation), editingPolicy);
       let divisions = [],
-        defaultConflicts = [];
+        defaultConflicts = [],
+        derivedIssues = [];
+      // Room commands run on the derived core; other operations stay on today's engine.
+      const derivedPath = derived(operation);
       const { candidate, result } = prepareBuildingPlanEdit(
         current,
         copy(operation),
-        (candidate, edit) =>
-          applyBuildingPlanOperation(candidate, edit, { createId, specifications, editingPolicy }),
+        (candidate, edit) => {
+          if (!derivedPath || edit.type === 'remove_opening')
+            return applyBuildingPlanOperation(candidate, edit, {
+              createId,
+              specifications,
+              editingPolicy,
+            });
+          const applied = applyDerivedOperation(candidate, edit, { createId, specifications });
+          divisions = applied.divisions;
+          derivedIssues = applied.issues;
+          return applied.result;
+        },
         (candidate) => {
+          if (derivedPath) {
+            const checked = derivedCandidateIssues(current, candidate, operation, derivedIssues);
+            defaultConflicts = checked.defaultConflicts;
+            return checked.issues;
+          }
           const reconciled = reconcileBuildingPlanCandidate(candidate, current, operation, {
             createId,
             specifications,
@@ -356,6 +390,22 @@ export function createBuildingPlanSession({
 
   function reconcilePrepared(prepared) {
     try {
+      if (derived(prepared.operation)) {
+        const written = rederiveFloor(prepared.candidate, prepared.operation.floorId, {
+          createId,
+          specifications,
+        });
+        prepared.divisions.push(...written.divisions);
+        const checked = derivedCandidateIssues(
+          current,
+          prepared.candidate,
+          prepared.operation,
+          written.issues
+        );
+        prepared.defaultConflicts = checked.defaultConflicts;
+        prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
+        return checked.issues;
+      }
       const reconciled = reconcileBuildingPlanCandidate(
         prepared.candidate,
         current,
@@ -468,7 +518,9 @@ export function createBuildingPlanSession({
     }
     if (
       decision === 'preserve' &&
-      seatsAttachedRoom(prepared.operation) &&
+      (derived(prepared.operation)
+        ? reseatsDerivedRoom(prepared.operation)
+        : seatsAttachedRoom(prepared.operation)) &&
       !keepsContactThickness(prepared.operation)
     ) {
       // Keeping previous widths changes where the attached room must sit. Prepare the

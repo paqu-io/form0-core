@@ -37,6 +37,7 @@ function createContext(primary, derived, createId, preferredRoomIds) {
     anchorsBySubject.get(anchor.subjectId).push(anchor);
   }
   const context = {
+    primary,
     createId,
     preferredRoomIds,
     lines,
@@ -108,6 +109,12 @@ export function writeBackBuildingPlanFloor(primary, derived, options = {}) {
   collectPieceSubjects(context);
   divideSubjects(context);
   joinPieceSubjects(context);
+  // An explicit contact width (kept on attach) is an answer on that physical piece.
+  for (const piece of context.pieces)
+    if (piece.explicitWidth > 0) {
+      const subject = context.subjects.get(piece.subjectId);
+      subject.overrides = { ...subject.overrides, wall_thickness_m: piece.explicitWidth };
+    }
   rejoinAutomaticPieces(context);
   retireSubjects(context);
 
