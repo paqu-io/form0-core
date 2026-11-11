@@ -19,6 +19,8 @@ const windowOf = (entry) => [entry.from, entry.to];
  * identity on the part that kept the edge's ID (else the longest part); other parts get new rows
  * that copy its lineage, as divisions do. An old jog that was relocated keeps its anchors.
  *
+ * Stations of a stretch turned by a corner drag scale with it (the provenance `ratio`).
+ *
  * Openings keep their place along the moved or stationary part they lie on; one that an edit
  * boundary would cut is refused (`opening_crosses_edit_boundary`).
  *
@@ -52,7 +54,13 @@ export function remapRoomSpans(primary, room, provenance, lengths, createId) {
       const high = Math.min(b >= length - SAME ? Math.max(b, to) : b, to);
       if (high - low <= SAME) continue;
       const whole = low <= from + SAME && high >= to - SAME;
-      found.push({ part, from: low - from, to: whole && anchor.to == null ? null : high - from });
+      const ratio = part.ratio ?? 1;
+      found.push({
+        part,
+        old: low,
+        from: (low - from) * ratio,
+        to: whole && anchor.to == null ? null : (high - from) * ratio,
+      });
     }
     const keeper =
       found.find((entry) => entry.part.id === anchor.edgeId) ||
@@ -75,7 +83,7 @@ export function remapRoomSpans(primary, room, provenance, lengths, createId) {
               },
             }),
         window: entry.part.jog ? null : windowOf(entry.part),
-        oldFrom: entry.part.jog ? null : entry.from + entry.part.from,
+        oldFrom: entry.part.jog ? null : entry.old,
       };
     });
     remapped.set(anchor, mapped);

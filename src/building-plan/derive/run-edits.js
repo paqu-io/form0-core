@@ -34,8 +34,9 @@ export function prepareEnds(derived, runs) {
 }
 
 /**
- * Move each run (by `delta`, or by its own `map`), reconnect its ends, carry anchors and openings,
- * and anchor the edges the edit created. `seatJog` may place a jog again (R1).
+ * Move each run (by `delta`, or by its own `map`), reconnect its ends (as planned, or as its
+ * `ownEnds` say), carry anchors and openings, and anchor the edges the edit created. `seatJog`
+ * may place a jog again (R1).
  */
 export function editRuns(primary, derived, runs, delta, { createId, specifications, seatJog }) {
   const additions = [];
@@ -55,6 +56,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
     const ends =
       run.fixedEnds ||
       [false, true].map((atEnd) => {
+        if (run.ownEnds?.[atEnd ? 1 : 0]) return run.ownEnds[atEnd ? 1 : 0];
         const plan = planEnd(derived, run, atEnd, delta, primary);
         return seatJog ? seatJog(run, plan, atEnd) : plan;
       });
@@ -192,8 +194,11 @@ function refreshRun(primary, run, specifications) {
       [p, q].every((point) => Math.abs(offset(entry.frame, point)) <= SAME)
   );
   if (!line) return null;
-  const from = Math.max(0, along(line.frame, p));
-  const to = Math.min(line.frame.length, along(line.frame, q));
+  // An end planned at the line's end (a wrapped corner) still reaches it.
+  const from = run.ownEnds?.[0] ? 0 : Math.max(0, along(line.frame, p));
+  const to = run.ownEnds?.[1]
+    ? line.frame.length
+    : Math.min(line.frame.length, along(line.frame, q));
   if (to - from <= SAME) return null;
   const next = { ...run, line, from, to };
   const partner = run.ends.map((end) => end.partner);

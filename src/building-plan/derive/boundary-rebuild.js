@@ -74,6 +74,8 @@ export function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
       edgeId: best.edge.id,
       from: best.from,
       to: best.to,
+      // A turned stretch also stretches: new stations are old ones times this ratio.
+      ratio: run && plan.map ? gap(a.vertex, b.vertex) / (best.to - best.from) : 1,
       moved: run,
       extension: !stations
         ? null

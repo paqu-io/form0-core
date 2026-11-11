@@ -3,6 +3,8 @@ import { SAME, along, lineFrame, offset } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { signedArea } from './room-lines.js';
 import { editRuns, prepareEnds } from './run-edits.js';
+import { cornerNeighbourRuns } from './corner-neighbours.js';
+import { dropPassedStations, snapStations } from './corner-stations.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -48,6 +50,12 @@ function turnMap(fixed, corner, point) {
   };
 }
 
+/** The corner moves along the run's own line: the line keeps its place, only its length changes. */
+function keepsLine(fixed, corner, point) {
+  const before = lineFrame(fixed, corner);
+  return Math.abs(offset(before, point)) <= SAME && along(before, point) > SAME;
+}
+
 /**
  * An anchor or opening span on an edge whose ends moved: kept from the end that stayed (or in
  * proportion when both moved); a span reaching an end that moved follows that end.
@@ -83,70 +91,14 @@ export function moveCorner(primary, operation, { createId, specifications }) {
   const sides = [cornerRun(room, index, 1), cornerRun(room, index, -1)].map((run) => ({
     ...run,
     ...turnMap(run.fixed, corner, operation.point),
+    keepsLine: keepsLine(run.fixed, corner, operation.point),
   }));
 
-  // Neighbours sharing a run: their facing stretch follows the run's turn.
-  const runs = [];
-  for (const side of sides) {
-    const line = derived.lines.find(
-      (entry) =>
-        entry.roomId === room.id &&
-        side.ids.slice(0, 2).every((id) => {
-          const vertex = room.vertices.find((v) => v.id === id);
-          return Math.abs(offset(entry.frame, vertex)) <= SAME;
-        }) &&
-        entry.edges.some((edge) => {
-          const found = room.edges.find((e) => e.id === edge.id);
-          return found && side.ids.includes(found.startId) && side.ids.includes(found.endId);
-        })
-    );
-    if (!line) continue;
-    const span = side.ids
-      .map((id) =>
-        along(
-          line.frame,
-          room.vertices.find((v) => v.id === id)
-        )
-      )
-      .sort((a, b) => a - b);
-    for (const piece of derived.pieces) {
-      if (piece.partition || piece.lines.length < 2) continue;
-      const own = piece.lines.find((e) => e.roomId === room.id && e.index === line.index);
-      const other = piece.lines.find((e) => e !== own);
-      if (!own || !other) continue;
-      const from = Math.max(own.from, span[0]);
-      const to = Math.min(own.to, span.at(-1));
-      if (to - from <= SAME) continue;
-      const theirs = derived.lines.find(
-        (e) => e.roomId === other.roomId && e.index === other.index
-      );
-      const [a, b] = [from, to]
-        .map((s) =>
-          along(theirs.frame, {
-            x: line.frame.start.x + line.frame.tangent.x * s,
-            y: line.frame.start.y + line.frame.tangent.y * s,
-          })
-        )
-        .sort((x, y) => x - y);
-      const anchorRun = { roomId: room.id, line, from, to, width: piece.width, stationary: true };
-      const run = {
-        roomId: theirs.roomId,
-        line: theirs,
-        from: a,
-        to: b,
-        width: piece.width,
-        map: side.map,
-        unmap: side.unmap,
-        partnerRun: anchorRun,
-      };
-      anchorRun.partnerRun = run;
-      runs.push(anchorRun, run);
-    }
-  }
+  const runs = cornerNeighbourRuns(derived, room, sides);
   prepareEnds(derived, runs);
 
   // The corner's own room: its runs turn; rows and openings keep their place from the end that
-  // stayed.
+  // stayed. On a side whose line keeps its place, stations stay (or leave once passed).
   const lengths = new Map();
   const ends = (current) =>
     new Map(
@@ -156,20 +108,24 @@ export function moveCorner(primary, operation, { createId, specifications }) {
       ])
     );
   const before = ends(room);
+  const outline = room.vertices;
   const moved = new Map();
   for (const side of sides)
-    for (const id of side.ids.slice(0, -1))
+    for (const id of side.keepsLine ? [] : side.ids.slice(1, -1))
       moved.set(id, side.map(room.vertices.find((v) => v.id === id)));
   moved.set(corner.id, operation.point);
   room.vertices = room.vertices.map((v) =>
     moved.has(v.id) ? { ...v, ...cleanPoint({ x: moved.get(v.id).x, y: moved.get(v.id).y }) } : v
   );
+  for (const side of sides)
+    if (side.keepsLine) dropPassedStations(primary, room, side, operation.point);
   const problem = polygonIssue(room.vertices);
   const turned = signedArea(room.vertices);
-  if (problem || Math.sign(turned) !== Math.sign(signedArea([...before.values()].map((e) => e[0]))))
+  if (problem || Math.sign(turned) !== Math.sign(signedArea(outline)))
     refuse('invalid_room_geometry', problem || 'This corner would turn the room inside out.');
   const after = ends(room);
   for (const [id, [p, q]] of before) {
+    if (!after.has(id)) continue;
     const [p2, q2] = after.get(id);
     lengths.set(id, [gap(p, q), gap(p2, q2), gap(p, p2) <= 1e-12, gap(q, q2) <= 1e-12]);
   }
@@ -228,62 +184,3 @@ function respanRoom(primary, room, lengths) {
       opening.from = start;
     }
 }
-
-/**
- * Shared extents transform together: an automatic station of the corner's runs that bounded a
- * shared wall moves along its line to where that wall now ends (the neighbour's corner seen from
- * this room), and the rows on either side follow it.
- */
-function snapStations(primary, room, sides, specifications) {
-  const inner = new Set(sides.flatMap((side) => side.ids.slice(1, -1)));
-  const stations = room.vertices.filter(
-    (v) => inner.has(v.id) && v.physicalBoundaryId && !v.editingCutId
-  );
-  if (!stations.length) return;
-  const derived = deriveBuildingPlanPieces(primary, specifications);
-  for (const vertex of stations) {
-    const line = derived.lines.find(
-      (entry) =>
-        entry.roomId === room.id &&
-        Math.abs(offset(entry.frame, vertex)) <= SAME &&
-        along(entry.frame, vertex) > SAME &&
-        along(entry.frame, vertex) < entry.frame.length - SAME
-    );
-    if (!line) continue;
-    const here = along(line.frame, vertex);
-    let best = null;
-    for (const piece of derived.pieces) {
-      if (piece.lines.length < 2) continue;
-      for (const entry of piece.lines)
-        if (entry.roomId === room.id && entry.index === line.index)
-          for (const end of [entry.from, entry.to]) {
-            const distance = Math.abs(end - here);
-            if (distance > SAME && distance <= piece.width && (!best || distance < best.distance))
-              best = { end, distance };
-          }
-    }
-    if (!best) continue;
-    const point = {
-      x: line.frame.start.x + line.frame.tangent.x * best.end,
-      y: line.frame.start.y + line.frame.tangent.y * best.end,
-    };
-    const before = room.edges.find((edge) => edge.endId === vertex.id);
-    const after = room.edges.find((edge) => edge.startId === vertex.id);
-    const shift = best.end - here;
-    for (const anchor of primary.anchors) {
-      if (anchor.roomId !== room.id || anchor.to == null) continue;
-      if (anchor.edgeId === before?.id && anchor.to >= lengthOf(room, before) - SAME)
-        anchor.to += shift;
-      if (anchor.edgeId === after?.id) {
-        if (anchor.from > SAME) anchor.from -= shift;
-        anchor.to -= shift;
-      }
-    }
-    room.vertices = room.vertices.map((v) => (v === vertex ? { ...v, ...cleanPoint(point) } : v));
-  }
-}
-
-const lengthOf = (room, edge) => {
-  const [p, q] = [edge.startId, edge.endId].map((id) => room.vertices.find((v) => v.id === id));
-  return gap(p, q);
-};
