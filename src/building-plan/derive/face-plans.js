@@ -7,6 +7,7 @@ const refuse = (code, message, subject) => {
 };
 import { anchorAt } from './line-spans.js';
 import { retreatStation } from './jog-retreat.js';
+import { planTurnedEnd } from './turn-ends.js';
 
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 
@@ -217,6 +218,8 @@ const minus = (p, q) => ({ x: p.x - q.x, y: p.y - q.y });
  * wall). F1: a new jog copies the adjacent part with its own exposure, else the moved part.
  */
 export function planEnd(derived, run, atEnd, delta, primary = null) {
+  const bend = planTurnedEnd(run, atEnd);
+  if (bend) return bend;
   const { line, situation } = run.ends[atEnd ? 1 : 0];
   const station = atEnd ? run.to : run.from;
   const sign = atEnd ? 1 : -1;

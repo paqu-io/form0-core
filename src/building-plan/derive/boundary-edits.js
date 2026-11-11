@@ -36,6 +36,9 @@ export function lineVertexIds(room, line) {
  * - `shift` to `station`: the line ends at a jog that leads to a parallel continuation; the jog is
  *   placed at `station` (the moved line ends there, the continuation's first vertex slides along
  *   its line), or removed when `station` is null (the moved line joins the continuation).
+ * - `bend` at `station` to `point`: a turned stretch ends where it crosses the line beyond; the
+ *   vertex at the station moves to that point, no jog. With no station the line's end vertex
+ *   stays where the turn carries it (the moved line lies on the adjoining line).
  *
  * The room is edited in place. Returns, per resulting edge, its provenance: the old edge it is
  * part of with the old stations it spans (beyond the old ends when lengthened) and whether it
@@ -72,10 +75,9 @@ export function moveRoomStretch(room, plan, createId) {
   const ids = lineVertexIds(room, line);
   const station = (entry) => along(frame, entry.back);
 
-  // Split the line at the stations where a stationary vertex must exist.
-  const splits = [];
-  if (startEnd.type === 'jog') splits.push(startEnd.station);
-  if (endEnd.type === 'jog') splits.push(endEnd.station);
+  // Split the line at the stations where a vertex must exist (a jog's foot, a bend).
+  const atStation = (end) => ['jog', 'bend'].includes(end.type) && end.station != null;
+  const splits = [startEnd, endEnd].filter(atStation).map((end) => end.station);
   for (const value of splits) {
     if (ids.some((id) => Math.abs(station(list[indexOf(id)]) - value) <= SAME)) continue;
     const after = ids.findIndex((id) => station(list[indexOf(id)]) > value);
@@ -87,8 +89,8 @@ export function moveRoomStretch(room, plan, createId) {
   }
 
   const lineEntries = ids.map((id) => list[indexOf(id)]);
-  const low = startEnd.type === 'jog' ? startEnd.station : -Infinity;
-  const high = endEnd.type === 'jog' ? endEnd.station : Infinity;
+  const low = atStation(startEnd) ? startEnd.station : -Infinity;
+  const high = atStation(endEnd) ? endEnd.station : Infinity;
   const removed = new Set();
   for (const entry of lineEntries) {
     const value = station(entry);
@@ -140,6 +142,20 @@ export function moveRoomStretch(room, plan, createId) {
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
       corner.back = unmap(point);
       corner.out = point;
+      return;
+    }
+    if (end.type === 'bend') {
+      // The vertex at the station (or the line's end) is where the moved line meets the line
+      // beyond: read back on the old line for the moved edge, where it is for the other.
+      const entry = atStation(end)
+        ? lineEntries.find((item) => Math.abs(station(item) - end.station) <= SAME)
+        : corner;
+      if (end.point) {
+        entry.vertex = { ...entry.vertex, ...cleanPoint(end.point) };
+        entry.back = unmap(end.point);
+      }
+      entry.out = { x: entry.vertex.x, y: entry.vertex.y };
+      entry.run = true;
       return;
     }
     if (end.type === 'jog') {

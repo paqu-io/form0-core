@@ -2,15 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanSession } from '../src/index.js';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
+import { rotate } from './helpers/building-plan-derive.js';
 
 const round = (value) => Math.round(value * 1000) / 1000 + 0;
 
-/** The example on today's engine or the derived core (shared walls move with a drag). */
-function example(derived = true) {
+/**
+ * The example on today's engine or the derived core (shared walls move with a drag), turned by
+ * `angle` about the origin. Points passed to `moveB` are in the example's own frame.
+ */
+function example(derived = true, angle = 0) {
   const f = createBuildingPlanExample();
+  const [c, s] = [Math.cos(angle), Math.sin(angle)];
+  const turn = (x, y) => ({ x: x * c - y * s, y: x * s + y * c });
+  // B's corners, followed by their IDs across edits.
+  const cornerOf = ([x, y]) =>
+    f.snapshot.floors[0].rooms[1].vertices.find((v) => v.x === x && v.y === y).id;
+  const cornersB = { west: cornerOf([3, 3.2]), east: cornerOf([8, 3.2]) };
   let serial = 0;
   const session = createBuildingPlanSession({
-    snapshot: f.snapshot,
+    snapshot: angle ? rotate(f.snapshot, angle) : f.snapshot,
     properties: f.meta.properties,
     createId: () => `j-${++serial}`,
     derivedCommands: derived,
@@ -24,14 +34,12 @@ function example(derived = true) {
   };
   const vertexAt = (roomIndex, [x, y]) =>
     floor().rooms[roomIndex].vertices.find((v) => round(v.x) === x && round(v.y) === y);
-  // B's south-west corner (3,3.2), followed by its ID across edits.
-  const cornerId = vertexAt(1, [3, 3.2]).id;
-  const moveB = (x, y) =>
+  const moveB = (x, y, corner = 'west') =>
     applied({
       type: 'move_corner',
       roomId: floor().rooms[1].id,
-      vertexId: cornerId,
-      point: { x, y },
+      vertexId: cornersB[corner],
+      point: turn(x, y),
     });
   return { f, session, floor, applied, vertexAt, moveB };
 }
@@ -50,8 +58,8 @@ function corners(room) {
 }
 
 /** Run the same steps on both engines and compare outlines after each one. */
-function bothEngines(steps) {
-  const [now, derived] = [example(false), example()];
+function bothEngines(steps, angle = 0) {
+  const [now, derived] = [example(false, angle), example(true, angle)];
   for (const step of steps) {
     for (const t of [now, derived]) step(t);
     assert.deepEqual(derived.floor().rooms.map(corners), now.floor().rooms.map(corners));
@@ -111,3 +119,19 @@ test('a corner moved along its own line past a station drops the station', () =>
     a.filter(([x, y]) => !(x === 3 && y === 3))
   );
 });
+
+for (const angle of [0, 0.37])
+  test(`a turned neighbour line bends at the pivot and straightens back (D), angle=${angle}`, () => {
+    // B's east corner turns B's south line about its west corner (3,3.2): A's facing line turns
+    // about a point next to its own station x = 3, where A's north line goes on to the west.
+    const { derived } = bothEngines(
+      [(t) => t.moveB(8, 2.8, 'east'), (t) => t.moveB(8, 3.2, 'east')],
+      angle
+    );
+    const a = derived.floor().rooms[0];
+    const sides = a.vertices.map((v, i) => {
+      const w = a.vertices[(i + 1) % a.vertices.length];
+      return Math.hypot(w.x - v.x, w.y - v.y);
+    });
+    assert.ok(Math.min(...sides) > 0.1, 'no sliver jog at the pivot');
+  });
