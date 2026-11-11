@@ -5,6 +5,7 @@ import { explicitContactWidths, seatDistance, seatJogStation } from './face-cont
 import { keepWallWithStationaryRoom, sharedWallMode, widenPlan } from './shared-wall-drag.js';
 import { followers, inward, locateFace } from './face-plans.js';
 import { editRuns, prepareEnds } from './run-edits.js';
+import { junctionFollowers } from './junction-follow.js';
 
 const refuse = (code, message, subject) => {
   throw Object.assign(new Error(message), {
@@ -69,7 +70,11 @@ export function resizeFace(primary, operation, { createId, specifications, editi
   const out = { x: -inward(stretch.line).x, y: -inward(stretch.line).y };
   const delta = { x: out.x * distance, y: out.y * distance };
 
-  const moving = runs.filter((run) => !run.stationary);
+  // Neighbours whose junction sits at a corner the drag slides along a shared wall follow it.
+  const moving = [
+    ...runs.filter((run) => !run.stationary),
+    ...junctionFollowers(derived, runs, delta),
+  ];
   editRuns(primary, derived, moving, delta, {
     createId,
     specifications,

@@ -390,6 +390,7 @@ export function createBuildingPlanSession({
             property,
             before: copy(old.properties[property]),
             after: copy(value),
+            exposureChanged: wall.exposure !== old.exposure,
           });
         }
       }
@@ -540,6 +541,14 @@ export function createBuildingPlanSession({
     }
     if (decision === 'preserve') {
       for (const change of inherited) {
+        // On the derived core a contact the edit formed or broke has the width its geometry
+        // gives (prepared again at the current widths); only answers are restored.
+        if (
+          derived(prepared.operation) &&
+          change.property === 'wall_thickness_m' &&
+          change.exposureChanged
+        )
+          continue;
         const wall = prepared.candidate.floors
           .find((entry) => entry.id === change.floorId)
           .walls.find((entry) => entry.id === change.wallId);

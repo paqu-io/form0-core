@@ -97,7 +97,7 @@ export function moveCorner(primary, operation, { createId, specifications }) {
         }) &&
         entry.edges.some((edge) => {
           const found = room.edges.find((e) => e.id === edge.id);
-          return side.ids.includes(found.startId) && side.ids.includes(found.endId);
+          return found && side.ids.includes(found.startId) && side.ids.includes(found.endId);
         })
     );
     if (!line) continue;

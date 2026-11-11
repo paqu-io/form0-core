@@ -1,4 +1,4 @@
-import { SAME, pointAt } from './grid.js';
+import { SAME, along, offset, pointAt } from './grid.js';
 import { moveRoomStretch } from './boundary-edits.js';
 import { remapRoomSpans } from './span-remap.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
@@ -39,23 +39,32 @@ export function prepareEnds(derived, runs) {
  */
 export function editRuns(primary, derived, runs, delta, { createId, specifications, seatJog }) {
   const additions = [];
-  for (const run of runs) {
+  const done = new Set();
+  for (let run of runs) {
     const room = primary.rooms.find((entry) => entry.id === run.roomId);
+    // A second stretch of a room already edited: find its line again in the current geometry.
+    if (done.has(room.id)) {
+      run = refreshRun(primary, run, specifications);
+      if (!run) continue;
+    }
+    done.add(room.id);
     const previous = new Map();
     for (const anchor of primary.anchors)
       if (anchor.roomId === room.id && !previous.has(anchor.edgeId))
         previous.set(anchor.edgeId, anchor);
-    const ends = [false, true].map((atEnd) => {
-      const plan = planEnd(derived, run, atEnd, delta);
-      return seatJog ? seatJog(run, plan, atEnd) : plan;
-    });
+    const ends =
+      run.fixedEnds ||
+      [false, true].map((atEnd) => {
+        const plan = planEnd(derived, run, atEnd, delta);
+        return seatJog ? seatJog(run, plan, atEnd) : plan;
+      });
     const edited = moveRoomStretch(
       room,
       {
         line: run.line,
         from: run.from,
         to: run.to,
-        delta,
+        delta: run.fixedEnds ? { x: 0, y: 0 } : delta,
         map: run.map,
         unmap: run.unmap,
         ends,
@@ -164,4 +173,31 @@ function settleBareStretches(primary, additions, specifications, createId) {
       }
     }
   }
+}
+
+/**
+ * A stretch planned on the geometry before an earlier stretch of the same room moved: its line in
+ * the current geometry (collinear, same direction, overlapping), its stretch there, and its ends
+ * planned again from a fresh derivation. Null when the stretch is gone.
+ */
+function refreshRun(primary, run, specifications) {
+  const fresh = deriveBuildingPlanPieces(primary, specifications);
+  const [p, q] = [run.from, run.to].map((station) => pointAt(run.line.frame, station));
+  const line = fresh.lines.find(
+    (entry) =>
+      entry.roomId === run.roomId &&
+      entry.frame.tangent.x * run.line.frame.tangent.x +
+        entry.frame.tangent.y * run.line.frame.tangent.y >
+        0 &&
+      [p, q].every((point) => Math.abs(offset(entry.frame, point)) <= SAME)
+  );
+  if (!line) return null;
+  const from = Math.max(0, along(line.frame, p));
+  const to = Math.min(line.frame.length, along(line.frame, q));
+  if (to - from <= SAME) return null;
+  const next = { ...run, line, from, to };
+  const partner = run.ends.map((end) => end.partner);
+  prepareEnds(fresh, [next]);
+  next.ends.forEach((end, index) => (end.partner = partner[index]));
+  return next;
 }

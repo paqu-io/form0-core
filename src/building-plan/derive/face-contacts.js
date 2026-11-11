@@ -93,10 +93,12 @@ export function seatJogStation(primary, run, plan, atEnd, delta, context) {
   let best = null;
   for (const b of otherLines(primary, [run.roomId])) {
     const found = facingGap(jog, b);
-    if (!found || found.gap <= SAME || (best && best.gap <= found.gap)) continue;
+    if (!found || found.gap < -SAME || (best && best.gap <= found.gap)) continue;
     const window = contactWindow(primary, floor, specifications, run.roomId, b, found.onB, keep);
     const near = matchedWidth(window, found.gap, tolerance);
-    if (near == null) continue;
+    // A jog closer than the contact width would stand in that wall: it lands at the width too.
+    const inside = window.seat != null && found.gap < window.seat - GAP_TOLERANCE;
+    if (near == null && !inside) continue;
     best = { gap: found.gap, b, seat: window.seat ?? near, inherited: window.inherited };
   }
   if (!best) return plan;

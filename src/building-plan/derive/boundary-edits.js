@@ -119,6 +119,17 @@ export function moveRoomStretch(room, plan, createId) {
         minus(corner.back, neighbour.back)
       );
       if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
+      // The corner slides along the whole adjoining line: stations it passes leave the line (the
+      // parts between them collapse); passing the line's far corner is left to the checks.
+      const adjoining = lineFrame(corner.back, neighbour.back);
+      const reach = adjoining ? along(adjoining, point) : 0;
+      for (let k = 1; adjoining && k < list.length - 2; k++) {
+        const passed = list[(position + k * step + 2 * list.length) % list.length];
+        const next = list[(position + (k + 1) * step + 2 * list.length) % list.length];
+        if (Math.abs(offset(adjoining, next.back)) > SAME) break;
+        if (along(adjoining, passed.back) >= reach - SAME) break;
+        removed.add(passed.vertex.id);
+      }
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
       corner.back = unmap(point);
       corner.out = point;
