@@ -1,7 +1,7 @@
 import { GAP_TOLERANCE, SAME, along, offset, overlap, pointAt, stationsWithin } from './grid.js';
 import { roomLines } from './room-lines.js';
 import { anchorAt, annotateLines, lineStations, profileAt } from './line-spans.js';
-import { resolveWallThickness } from './thickness.js';
+import { resolutionFloor, resolveWallThickness } from './thickness.js';
 
 /** Contacts are only searched up to this gap; no wall is thicker. */
 const MAX_GAP = 3;
@@ -43,10 +43,11 @@ function facingPairs(lines) {
  * Derive physical pieces from room geometry: shared pieces where facing room lines are exactly
  * the resolved thickness apart, exterior pieces elsewhere, divided by subject and explicit cuts.
  *
- * @returns {{pieces: Array<Object>, caps: Array<Object>, issues: Array<Object>}}
+ * @returns {{pieces: Array<Object>, caps: Array<Object>, lines: Array<Object>,
+ *   issues: Array<Object>}}
  */
 export function deriveBuildingPlanPieces(primary, specifications) {
-  const { floor } = primary;
+  const floor = resolutionFloor(primary);
   const lines = annotateLines(primary.rooms.flatMap(roomLines), primary);
   const covered = new Map(lines.map((line) => [line, []]));
   const parts = [];
@@ -129,7 +130,7 @@ export function deriveBuildingPlanPieces(primary, specifications) {
       });
     }
   }
-  return { pieces: mergeParts(parts).map(withAxis), caps, issues };
+  return { pieces: mergeParts(parts).map(withAxis), caps, lines, issues };
 }
 
 /** Join contiguous parts of one line with the same subject, rooms and thickness, unless cut. */
@@ -171,11 +172,8 @@ function mergeParts(parts) {
 const lineKey = (part) =>
   `${part.line.roomId}:${part.line.frame.start.x},${part.line.frame.start.y}`;
 
-/** Last geometric width stored for a subject whose thickness is explicitly unknown. */
-function lastWidth(subject) {
-  const offset = subject?.segments?.[0]?.referenceOffset;
-  return Number.isFinite(offset) ? offset * 2 : 0;
-}
+/** Last geometric width of a subject whose thickness is explicitly unknown. */
+const lastWidth = (subject) => subject?.lastWidth || 0;
 
 function withAxis(part) {
   const distance = part.line.outward * ((part.width ?? 0) / 2);
