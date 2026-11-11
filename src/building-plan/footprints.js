@@ -42,7 +42,7 @@ function halfPlane(points, start, end, side) {
 
 // The input and each result are convex. Keeping disjoint pieces avoids a renderer-specific
 // boolean/path API, internal strokes, and a second persisted geometry representation.
-function subtractConvex(subject, clip) {
+export function subtractConvex(subject, clip) {
   const bounds = (points) => ({
     minX: Math.min(...points.map((p) => p.x)),
     maxX: Math.max(...points.map((p) => p.x)),
@@ -86,7 +86,7 @@ export function buildingPlanMaterialCovered(polygon, material) {
   return remaining.reduce((total, piece) => total + area(piece), 0) <= 1e-9 * 16 * perimeter;
 }
 
-function triangles(vertices) {
+export function triangles(vertices) {
   const points = vertices.map(({ x, y }) => ({ x, y }));
   const side = Math.sign(polygonArea(points));
   const turn = (a, b, c) => side * cross(subtract(b, a), subtract(c, b));

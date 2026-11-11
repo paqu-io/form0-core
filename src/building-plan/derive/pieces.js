@@ -96,6 +96,7 @@ export function deriveBuildingPlanPieces(primary, specifications) {
         thickness: value,
         width: value > 0 ? value : gap,
         faceIds: [anchorA?.faceId ?? null, anchorB?.faceId ?? null],
+        other: { line: b, from: onB[0], to: onB[1] },
       });
     }
   }
@@ -110,7 +111,7 @@ export function deriveBuildingPlanPieces(primary, specifications) {
       if (taken.some(([x, y]) => middle > x - SAME && middle < y + SAME)) continue;
       const profile = profileAt(line, from, to);
       if (profile && !anchorAt(line, from, to)) {
-        caps.push({ roomId: line.roomId, sourceId: profile.sourceId, from, to, line });
+        caps.push({ roomId: line.roomId, index: line.index, sourceId: profile.sourceId, from, to });
         continue;
       }
       const anchor = anchorAt(line, from, to);
@@ -153,9 +154,16 @@ function mergeParts(parts) {
       !part.line.cuts.some((cut) => Math.abs(cut.station - part.from) <= SAME)
     ) {
       last.to = part.to;
+      if (last.other && part.other) {
+        last.other = {
+          ...last.other,
+          from: Math.min(last.other.from, part.other.from),
+          to: Math.max(last.other.to, part.other.to),
+        };
+      }
       continue;
     }
-    merged.push({ ...part });
+    merged.push({ ...part, ...(part.other ? { other: { ...part.other } } : {}) });
   }
   return merged;
 }
@@ -178,7 +186,21 @@ function withAxis(part) {
     thickness: part.thickness,
     width: part.width,
     faceIds: part.faceIds,
-    line: { roomId: part.line.roomId, from: part.from, to: part.to },
+    line: { roomId: part.line.roomId, index: part.line.index, from: part.from, to: part.to },
+    // Every room line the piece faces: the first line and, for a shared piece, the other room's.
+    lines: [
+      { roomId: part.line.roomId, index: part.line.index, from: part.from, to: part.to },
+      ...(part.other
+        ? [
+            {
+              roomId: part.other.line.roomId,
+              index: part.other.line.index,
+              from: part.other.from,
+              to: part.other.to,
+            },
+          ]
+        : []),
+    ],
     axis: {
       start: pointAt(part.line.frame, part.from, distance),
       end: pointAt(part.line.frame, part.to, distance),

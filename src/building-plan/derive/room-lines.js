@@ -18,7 +18,7 @@ export function signedArea(vertices) {
  * `outward` is the sign of the frame offset of a point outside the room: a point at distance d
  * beyond the run has `offset(frame, point) === outward * d`.
  *
- * @returns {Array<{roomId: string, frame: Object, outward: number,
+ * @returns {Array<{roomId: string, index: number, frame: Object, outward: number,
  *   edges: Array<{id: string, from: number, to: number}>,
  *   cuts: Array<{station: number, cutId: string}>}>}
  */
@@ -65,7 +65,7 @@ export function roomLines(room) {
       .map((index) => vertices[index])
       .filter((vertex) => vertex.editingCutId)
       .map((vertex) => ({ station: along(frame, vertex), cutId: vertex.editingCutId }));
-    lines.push({ roomId: room.id, frame, outward, edges, cuts });
+    lines.push({ roomId: room.id, index: lines.length, frame, outward, edges, cuts });
   }
   return lines;
 }
