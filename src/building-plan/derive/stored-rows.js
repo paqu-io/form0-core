@@ -1,4 +1,17 @@
 import { copyBuildingPlanData as copy } from '../model.js';
+import { SAME } from './grid.js';
+
+/** The cap covering an output edge without a piece (see `assembleRows`). */
+export function capOf(context, roomId, output) {
+  return context.caps.find(
+    (cap) =>
+      cap.roomId === roomId &&
+      output.line &&
+      cap.index === output.line.index &&
+      cap.from - SAME <= output.from &&
+      output.to <= cap.to + SAME
+  );
+}
 
 /**
  * Room-facing rows: one per straight facing extent (one per output edge covered by a piece, and
@@ -17,8 +30,7 @@ export function assembleRows(context, rebuilt) {
     const roomRows = [];
     outputs.forEach((output, position) => {
       if (!output.piece) {
-        const profile = context.profileByEdge.get(`${room.id}:${output.id}`);
-        if (!profile && output.line)
+        if (output.line && !capOf(context, room.id, output))
           context.issues.push({ code: 'uncovered_edge', roomId: room.id, edgeId: output.id });
         return;
       }

@@ -119,7 +119,6 @@ function removeRoom(primary, operation) {
   for (const id of exclusive) if (!elsewhere.has(id)) primary.subjects.delete(id);
   primary.anchors = primary.anchors.filter((anchor) => anchor.roomId !== room.id);
   primary.partitions = primary.partitions.filter((entry) => entry.roomId !== room.id);
-  primary.profiles = primary.profiles.filter((entry) => entry.roomId !== room.id);
   primary.rooms = primary.rooms.filter((entry) => entry !== room);
   return {};
 }

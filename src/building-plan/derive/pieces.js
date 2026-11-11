@@ -1,6 +1,7 @@
 import { GAP_TOLERANCE, SAME, along, offset, overlap, pointAt, stationsWithin } from './grid.js';
 import { roomLines } from './room-lines.js';
-import { anchorAt, annotateLines, lineStations, profileAt } from './line-spans.js';
+import { anchorAt, annotateLines, lineStations } from './line-spans.js';
+import { separateCaps } from './caps.js';
 import { resolutionFloor, resolveWallThickness } from './thickness.js';
 
 /** Contacts are only searched up to this gap; no wall is thicker. */
@@ -108,7 +109,6 @@ export function deriveBuildingPlanPieces(primary, specifications) {
     }
   }
 
-  const caps = [];
   for (const line of lines) {
     const taken = covered.get(line);
     const stations = stationsWithin([...lineStations(line), ...taken.flat()], 0, line.frame.length);
@@ -116,11 +116,6 @@ export function deriveBuildingPlanPieces(primary, specifications) {
       const [from, to] = [stations[i], stations[i + 1]];
       const middle = (from + to) / 2;
       if (taken.some(([x, y]) => middle > x - SAME && middle < y + SAME)) continue;
-      const profile = profileAt(line, from, to);
-      if (profile && !anchorAt(line, from, to)) {
-        caps.push({ roomId: line.roomId, index: line.index, sourceId: profile.sourceId, from, to });
-        continue;
-      }
       const anchor = anchorAt(line, from, to);
       const subjectId = anchor?.subjectId ?? null;
       const value = thickness(subjectId, [line.roomId, null]);
@@ -136,7 +131,8 @@ export function deriveBuildingPlanPieces(primary, specifications) {
       });
     }
   }
-  return { pieces: mergeParts(parts).map(withAxis), caps, lines, issues };
+  const separated = separateCaps(primary, mergeParts(parts).map(withAxis), lines);
+  return { pieces: separated.pieces, caps: separated.caps, lines, issues };
 }
 
 /** Join contiguous parts of one line with the same subject, rooms and thickness, unless cut. */

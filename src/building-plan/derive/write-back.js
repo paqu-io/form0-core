@@ -7,6 +7,8 @@ import {
   validateBuildingPlanSnapshot,
 } from '../model.js';
 import { reconcileWallLabels } from '../wall-labels.js';
+import { project, segmentFrame } from '../geometry.js';
+import { pointAt } from './grid.js';
 import {
   collectPieceSubjects,
   joinPieceSubjects,
@@ -15,8 +17,32 @@ import {
 } from './subject-joins.js';
 import { divideSubjects, retireSubjects } from './subject-divisions.js';
 import { placeRoomStations } from './room-stations.js';
-import { assembleRows } from './stored-rows.js';
+import { assembleRows, capOf } from './stored-rows.js';
 import { buildStoredWalls } from './stored-walls.js';
+
+/**
+ * Edge profiles for caps: the source wall and the side of it that faces the cap's room, read from
+ * the written wall's axis (today's record shape).
+ */
+function capProfiles(context, rebuilt, room, walls, written) {
+  const profiles = new Map();
+  const outputs = rebuilt.find((entry) => entry.room.id === room.id)?.outputs || [];
+  for (const output of outputs) {
+    if (output.piece) continue;
+    const cap = capOf(context, room.id, output);
+    const wallId = cap && context.resolve(cap.piece?.subjectId);
+    if (!wallId || !written.has(wallId)) continue;
+    const segment = walls.find((wall) => wall.id === wallId).segments[0];
+    const inside = pointAt(
+      output.line.frame,
+      (output.from + output.to) / 2,
+      -output.line.outward * 0.01
+    );
+    const side = project(segmentFrame(segment.start, segment.end), inside).offset < 0 ? -1 : 1;
+    profiles.set(output.id, { wallId, sideSign: side });
+  }
+  return profiles;
+}
 
 function firstBy(entries, key) {
   const map = new Map();
@@ -25,12 +51,16 @@ function firstBy(entries, key) {
 }
 
 function createContext(primary, derived, createId, preferredRoomIds) {
+  const boundary = derived.pieces.filter((piece) => !piece.partition);
+  const pieces = boundary.map((piece) => ({
+    ...piece,
+    lines: piece.lines.map((entry) => ({ ...entry })),
+  }));
   const lines = new Map(derived.lines.map((line) => [`${line.roomId}:${line.index}`, line]));
   const edgeLine = new Map();
   for (const line of derived.lines)
     for (const edge of line.edges) edgeLine.set(`${line.roomId}:${edge.id}`, { line, edge });
   const alias = new Map();
-  const profiles = primary.profiles.map((profile) => ({ ...profile }));
   const anchorsBySubject = new Map();
   for (const anchor of primary.anchors) {
     if (!anchorsBySubject.has(anchor.subjectId)) anchorsBySubject.set(anchor.subjectId, []);
@@ -54,13 +84,12 @@ function createContext(primary, derived, createId, preferredRoomIds) {
     anchorByEdge: firstBy(primary.anchors, (anchor) => `${anchor.roomId}:${anchor.edgeId}`),
     anchorsBySubject,
     partitionByFace: new Map(primary.partitions.map((partition) => [partition.faceId, partition])),
-    profiles,
-    profileByEdge: new Map(
-      profiles.map((profile) => [`${profile.roomId}:${profile.edgeId}`, profile])
-    ),
-    pieces: derived.pieces
-      .filter((piece) => !piece.partition)
-      .map((piece) => ({ ...piece, lines: piece.lines.map((entry) => ({ ...entry })) })),
+    pieces,
+    // Caps refer to the context's copy of their source piece, whose subject the identity rules set.
+    caps: (derived.caps || []).map((cap) => ({
+      ...cap,
+      piece: pieces[boundary.indexOf(cap.source)],
+    })),
     partitionPieces: derived.pieces
       .filter((piece) => piece.partition)
       .map((piece) => ({ ...piece })),
@@ -129,16 +158,12 @@ export function writeBackBuildingPlanFloor(primary, derived, options = {}) {
     id: primary.floorId,
     rooms: rebuilt.map(({ room }) => {
       const { faceOrder, ...rest } = room;
+      const profiles = capProfiles(context, rebuilt, room, walls, written);
       return {
         ...rest,
-        edges: room.edges.map((edge) => {
-          const profile = context.profileByEdge.get(`${room.id}:${edge.id}`);
-          const source = profile && context.resolve(profile.sourceId);
-          const covered = rows.some((row) => row.roomId === room.id && row.edgeId === edge.id);
-          return source && written.has(source) && !covered
-            ? { ...edge, profile: { wallId: source, sideSign: profile.sideSign } }
-            : edge;
-        }),
+        edges: room.edges.map((edge) =>
+          profiles.has(edge.id) ? { ...edge, profile: profiles.get(edge.id) } : edge
+        ),
         faces: rows.filter((row) => row.roomId === room.id && row.face).map((row) => row.face),
       };
     }),

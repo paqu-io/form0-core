@@ -2,6 +2,7 @@ import { renewBuildingPlanRowIdentities } from '../custom-rows.js';
 import { copyBuildingPlanData as copy, equalValue } from '../model.js';
 import { SAME } from './grid.js';
 import { subjectTangent } from './subject-joins.js';
+import { sameCapAnswers } from './caps.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -172,19 +173,26 @@ export function retireSubjects(context) {
         (key) => Object.keys(owner[key] || {}).length
       )
     );
-    const survivor = hasAnswers ? retirementSurvivor(context, subject, live) : null;
+    const survivor = hasAnswers
+      ? capSource(context, subject, live) || retirementSurvivor(context, subject, live)
+      : null;
     if (hasRows || (hasAnswers && !survivor))
       refuse(
         'wall_retirement_conflict',
         'This edit removes a physical piece with unresolved answers or records. Resolve them before continuing.',
         { subject: { type: 'wall', id: subject.id } }
       );
-    for (const profile of context.profiles)
-      if (profile.sourceId === subject.id) profile.sourceId = survivor?.id ?? null;
     context.subjects.delete(subject.id);
     if (survivor) context.alias.set(subject.id, survivor.id);
     context.retired.push(subject.id);
   }
+}
+
+/** A stretch that became a cap retires into its source when their answers agree (F4). */
+function capSource(context, subject, live) {
+  const cap = context.caps.find((entry) => entry.subjectId === subject.id);
+  const source = cap && context.subjects.get(context.resolve(cap.piece.subjectId));
+  return source && live.has(source.id) && sameCapAnswers(subject, source) ? source : null;
 }
 
 function retirementSurvivor(context, subject, live) {

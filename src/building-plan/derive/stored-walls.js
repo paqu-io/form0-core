@@ -78,11 +78,8 @@ export function buildStoredWalls(context, rooms, rows) {
     // (a copy whose row is in the other room, a reference that moved) turns its signs over.
     const tangent = rowTangent(rooms, reference);
     const basis = context.basis.get(subject.id);
-    if (tangent && basis && tangent.x * basis.x + tangent.y * basis.y < 0) {
+    if (tangent && basis && tangent.x * basis.x + tangent.y * basis.y < 0)
       for (const side of subject.sides) side.sign *= -1;
-      for (const profile of context.profiles)
-        if (profile.sourceId === subject.id) profile.sideSign *= -1;
-    }
     const edge = segmentFrame(...frame.ends);
     const half = (piece.width || 0) / 2;
     const ends = [0, edge.length].map((station) => at(edge, station, -frame.bodySign * half));

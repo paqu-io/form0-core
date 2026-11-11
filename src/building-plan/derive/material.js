@@ -40,20 +40,38 @@ const collinear = (a, b) =>
  * @param {Object} floor Stored floor (rooms, openings).
  * @param {{pieces: Array<Object>, caps: Array<Object>}} derived Output of the derivation.
  * @param {{ops?: import('./polygon-ops.js').PolygonOps}} [options]
- * @returns {{bySubject: Map<string|null, Array<Array<{x: number, y: number}>>>}}
+ * @returns {{bySubject: Map<string|null, Array<Array<{x: number, y: number}>>>,
+ *   byPiece: Map<Object, Array<Array<{x: number, y: number}>>>}}
  */
-export function deriveBuildingPlanMaterial(floor, derived, { ops = convexPolygonOps } = {}) {
-  const rooms = new Map(floor.rooms.map((room) => [room.id, room]));
-  const linesByRoom = new Map(floor.rooms.map((room) => [room.id, roomLines(room)]));
-  const openings = openingRects(floor);
+export function deriveBuildingPlanMaterial(floor, derived, options = {}) {
+  const { partitions } = extractBuildingPlanPrimary(floor);
+  return pieceMaterial(
+    { rooms: floor.rooms, partitions, openings: openingRects(floor) },
+    derived,
+    options
+  );
+}
+
+/**
+ * The same from primary geometry: `rooms` (clear polygons), `partitions` (primary partitions)
+ * and `openings` (rectangles with their axis; none to judge solid material).
+ */
+export function pieceMaterial(
+  { rooms: roomList, partitions, openings = [] },
+  derived,
+  { ops = convexPolygonOps } = {}
+) {
+  const rooms = new Map(roomList.map((room) => [room.id, room]));
+  const linesByRoom = new Map(roomList.map((room) => [room.id, roomLines(room)]));
   const bySubject = new Map();
+  const byPiece = new Map();
   // Counter-clockwise, as today's footprints, so overlapping pieces never cancel in a union.
   const oriented = (polygon) => (signedArea(polygon) < 0 ? [...polygon].reverse() : polygon);
-  const add = (subjectId, polygons) =>
-    bySubject.set(subjectId, [
-      ...(bySubject.get(subjectId) || []),
-      ...polygons.filter((polygon) => polygon.length >= 3).map(oriented),
-    ]);
+  const add = (piece, polygons) => {
+    const kept = polygons.filter((polygon) => polygon.length >= 3).map(oriented);
+    bySubject.set(piece.subjectId, [...(bySubject.get(piece.subjectId) || []), ...kept]);
+    byPiece.set(piece, [...(byPiece.get(piece) || []), ...kept]);
+  };
   const clipFor = (polygon, roomIds, axes) => {
     const clips = [...new Set(roomIds)].filter(Boolean).map((id) => rooms.get(id).vertices);
     for (const opening of openings)
@@ -69,10 +87,7 @@ export function deriveBuildingPlanMaterial(floor, derived, { ops = convexPolygon
     if (!axis || !(piece.thickness > 0)) continue;
     // A partition stands inside its room, so its room's clear space does not clip it.
     const clipRooms = piece.partition ? [] : piece.roomIds;
-    add(
-      piece.subjectId,
-      clipFor(band(axis, 0, axis.length, piece.thickness / 2), clipRooms, [axis])
-    );
+    add(piece, clipFor(band(axis, 0, axis.length, piece.thickness / 2), clipRooms, [axis]));
   }
 
   // Corner fills: where line k of a room ends and line k+1 starts.
@@ -92,16 +107,10 @@ export function deriveBuildingPlanMaterial(floor, derived, { ops = convexPolygon
         cap.index === index &&
         Math.abs((atEnd ? cap.to : cap.from) - (atEnd ? length : 0)) <= SAME
     );
-  const sourcePiece = (cap) =>
-    cap.sourceId === undefined
-      ? null
-      : derived.pieces.find((piece) => piece.subjectId === cap.sourceId);
-  const widthOf = (entry) => {
-    if (entry.sourceId === undefined) return entry.thickness;
-    // A supplied cap takes its source's thickness.
-    return derived.pieces.find((piece) => piece.subjectId === entry.sourceId)?.thickness;
-  };
-  for (const room of floor.rooms) {
+  // A supplied cap takes its source's thickness and axis.
+  const sourcePiece = (entry) => (entry.axis ? entry : entry.source);
+  const widthOf = (entry) => sourcePiece(entry)?.thickness;
+  for (const room of roomList) {
     const lines = linesByRoom.get(room.id);
     const side = -(lines[0]?.outward ?? 1);
     for (let k = 0; k < lines.length; k++) {
@@ -119,19 +128,15 @@ export function deriveBuildingPlanMaterial(floor, derived, { ops = convexPolygon
         side
       );
       if (!polygon) continue;
-      const owner = a.subjectId !== undefined ? a.subjectId : a.sourceId;
+      const owner = sourcePiece(a);
+      if (!owner) continue;
       // A supplied cap stands on its source's axis, so openings there clip the corner too.
-      const axes = [a, b]
-        .map((entry) => (entry.axis ? entry : sourcePiece(entry)))
-        .filter(Boolean)
-        .map(axisOf)
-        .filter(Boolean);
+      const axes = [a, b].map(sourcePiece).filter(Boolean).map(axisOf).filter(Boolean);
       add(owner, clipFor(polygon, [room.id, ...(a.roomIds || []), ...(b.roomIds || [])], axes));
     }
   }
 
   // A Split inside a partition can leave a jog; fill its outer corner like a room corner.
-  const partitions = extractBuildingPlanPrimary(floor).partitions;
   for (const a of partitions)
     for (const b of partitions) {
       const point = a.path.at(-1);
@@ -160,7 +165,7 @@ export function deriveBuildingPlanMaterial(floor, derived, { ops = convexPolygon
         pieceB.thickness,
         a.sides.at(-1)
       );
-      if (polygon) add(pieceA.subjectId, [polygon]);
+      if (polygon) add(pieceA, [polygon]);
     }
-  return { bySubject };
+  return { bySubject, byPiece };
 }

@@ -53,7 +53,7 @@ export function relativeDirection(context, a, b) {
 
 /**
  * Join `other` into `survivor`: every answer, side answer and custom row survives, or the edit is
- * refused with today's codes. Openings, rows (through the pieces) and supplied profiles move.
+ * refused with today's codes. Openings and rows (through the pieces) move.
  */
 export function absorbSubject(context, survivor, other) {
   const direction = relativeDirection(context, survivor, other);
@@ -63,11 +63,6 @@ export function absorbSubject(context, survivor, other) {
     mergedWallIds: [...(survivor.lineage?.mergedWallIds || []), other.id],
   };
   survivor.openings.push(...other.openings);
-  for (const profile of context.profiles)
-    if (profile.sourceId === other.id) {
-      profile.sourceId = survivor.id;
-      profile.sideSign *= direction;
-    }
   context.alias.set(other.id, survivor.id);
   context.subjects.delete(other.id);
   context.joins.push({ survivorId: survivor.id, absorbedId: other.id });
