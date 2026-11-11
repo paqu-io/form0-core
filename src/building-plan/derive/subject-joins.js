@@ -8,9 +8,13 @@ const LABEL = /^W\d+(?:\.\d+)*$/;
 const labelParts = (label) =>
   LABEL.test(label || '') ? label.slice(1).split('.').map(Number) : null;
 
+/** A subject's label; a copy made by this write-back goes by its source's label. */
+const labelOf = (context, subject) =>
+  subject.autoLabel ?? context.original.get(context.children.get(subject.id))?.autoLabel;
+
 /** Lower label first (W2 before W7, W3 before W12, W3 before W3.1), then lower ID. */
-export function compareSubjects(a, b) {
-  const [x, y] = [labelParts(a.autoLabel), labelParts(b.autoLabel)];
+export function compareSubjects(context, a, b) {
+  const [x, y] = [labelParts(labelOf(context, a)), labelParts(labelOf(context, b))];
   if (x && !y) return -1;
   if (y && !x) return 1;
   if (x && y)
@@ -21,13 +25,13 @@ export function compareSubjects(a, b) {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-/** The anchors on the room lines a piece faces that overlap its span. */
+/** The anchors on the room lines a piece faces that overlap its span, with their room. */
 export function pieceAnchors(context, piece) {
   const found = [];
   for (const entry of piece.lines)
     for (const anchor of context.lines.get(`${entry.roomId}:${entry.index}`)?.anchors || [])
       if (Math.min(anchor.to, entry.to) - Math.max(anchor.from, entry.from) > SAME)
-        found.push(anchor);
+        found.push({ ...anchor, roomId: entry.roomId });
   return found;
 }
 
@@ -37,9 +41,13 @@ export function subjectTangent(context, subject) {
   return anchor ? rowTangent(context.rooms, anchor) : null;
 }
 
-/** 1 when two subjects run the same way, -1 when they run opposite (side signs then swap). */
+/**
+ * 1 when two subjects run the same way, -1 when they run opposite (side signs then swap). Each
+ * subject's signs are defined against its basis: its reference row's direction, or its source's
+ * for a copy made by this write-back.
+ */
 export function relativeDirection(context, a, b) {
-  const [x, y] = [a, b].map((subject) => subjectTangent(context, subject));
+  const [x, y] = [a, b].map((subject) => context.basis.get(subject.id));
   return x && y && x.x * y.x + x.y * y.y < 0 ? -1 : 1;
 }
 
@@ -85,50 +93,50 @@ function newSubject(context) {
   return subject;
 }
 
-/**
- * Give every boundary piece its subject. A piece whose rows belong to two subjects is an unbound
- * contact: the subjects join. The survivor is the subject of a preferred room (the command's
- * choice), else the lower label. A piece without anchors gets a new subject.
- */
-export function resolvePieceSubjects(context) {
-  const parent = new Map();
-  const find = (id) => {
-    while (parent.get(id) !== id) id = parent.get(id);
-    return id;
-  };
-  const candidates = context.pieces.map((piece) => {
-    const ids = [];
+/** The subjects anchored on each boundary piece, with the room each is anchored from. */
+export function collectPieceSubjects(context) {
+  for (const piece of context.pieces) {
+    piece.anchored = [];
     for (const anchor of pieceAnchors(context, piece)) {
-      const id = context.resolve(anchor.subjectId);
-      if (!context.subjects.has(id)) {
-        context.issues.push({ code: 'dangling_anchor', faceId: anchor.faceId, subjectId: id });
+      if (!context.subjects.has(anchor.subjectId)) {
+        context.issues.push({ code: 'dangling_anchor', faceId: anchor.faceId });
         continue;
       }
-      if (!ids.includes(id)) ids.push(id);
-      if (!parent.has(id)) parent.set(id, id);
+      if (!piece.anchored.some((entry) => entry.subjectId === anchor.subjectId))
+        piece.anchored.push({ subjectId: anchor.subjectId, roomId: anchor.roomId });
     }
-    for (const id of ids.slice(1)) parent.set(find(id), find(ids[0]));
-    return ids;
-  });
-  const groups = new Map();
-  for (const id of parent.keys()) {
-    const root = find(id);
-    if (!groups.has(root)) groups.set(root, []);
-    groups.get(root).push(context.subjects.get(id));
   }
-  for (const members of groups.values()) {
-    if (members.length < 2) continue;
-    const preferred = members.filter((subject) =>
-      context.preferredRoomIds.includes(context.anchorByFace.get(subject.referenceFaceId)?.roomId)
-    );
-    const [survivor] = [...(preferred.length ? preferred : members)].sort(compareSubjects);
-    for (const other of members.filter((subject) => subject !== survivor).sort(compareSubjects))
-      absorbSubject(context, survivor, other);
+}
+
+/**
+ * After divisions every subject lies on one piece. A piece whose rows belong to two subjects is
+ * a new contact: they join. The survivor is a wall that existed before the edit and lies whole on
+ * the piece, then one that existed, then the subject of a preferred room (the room the command did
+ * not move), then the lower label. A piece without anchors gets a new subject.
+ */
+export function joinPieceSubjects(context) {
+  const rank = ({ subject }) =>
+    context.original.has(subject.id) ? (context.divided.has(subject.id) ? 1 : 2) : 0;
+  const preferred = ({ roomId }) => Number(context.preferredRoomIds.includes(roomId));
+  const order = (a, b) =>
+    rank(b) - rank(a) ||
+    preferred(b) - preferred(a) ||
+    compareSubjects(context, a.subject, b.subject);
+  for (const piece of context.pieces) {
+    const members = [];
+    for (const { subjectId, roomId } of piece.anchored) {
+      const subject = context.subjects.get(context.resolve(subjectId));
+      if (subject && !members.some((member) => member.subject === subject))
+        members.push({ subject, roomId });
+    }
+    if (!members.length) {
+      piece.subjectId = newSubject(context).id;
+      continue;
+    }
+    const [survivor, ...others] = members.sort(order);
+    for (const { subject } of others) absorbSubject(context, survivor.subject, subject);
+    piece.subjectId = survivor.subject.id;
   }
-  context.pieces.forEach((piece, index) => {
-    const [id] = candidates[index];
-    piece.subjectId = id ? context.resolve(id) : newSubject(context).id;
-  });
 }
 
 const root = (subject) => subject.lineage?.splitFromWallId || subject.id;
@@ -165,7 +173,7 @@ export function rejoinAutomaticPieces(context) {
   const order = (a, b) =>
     Number(b.id === b.lineage?.splitFromWallId) - Number(a.id === a.lineage?.splitFromWallId) ||
     Number(context.original.has(b.id)) - Number(context.original.has(a.id)) ||
-    compareSubjects(a, b);
+    compareSubjects(context, a, b);
   for (let joined = true; joined; ) {
     joined = false;
     for (const p of context.pieces) {

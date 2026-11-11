@@ -20,7 +20,7 @@ const refusal = (run) => {
 };
 
 /** Two rooms exactly one interior thickness apart, created without binding their faces. */
-function unboundFloor() {
+function unboundFloor(second = { x: 3, y: 3.2, width: 5, height: 3 }) {
   let serial = 0;
   const session = createBuildingPlanSession({
     snapshot: createBuildingPlanSnapshot(),
@@ -31,32 +31,34 @@ function unboundFloor() {
     type: 'create_floor',
     values: { floor_interior_wall_thickness: 0.2, floor_exterior_wall_thickness: 0.2 },
   }).created.id;
-  for (const rectangle of [
-    { x: 0, y: 0, width: 5, height: 3 },
-    { x: 3, y: 3.2, width: 5, height: 3 },
-  ])
+  for (const rectangle of [{ x: 0, y: 0, width: 5, height: 3 }, second])
     session.apply({ type: 'create_room', floorId, rectangle });
   return session.getSnapshot().floors[0];
 }
 
-test('an unbound contact joins its two walls; the lower label survives, as bind_faces does', () => {
+const interior = (plan) => plan.walls.filter((wall) => wall.exposure === 'interior');
+
+test('a partial contact keeps both walls on their remainders; the shared stretch is new', () => {
   const stored = unboundFloor();
   const [w3, w5] = ['W3', 'W5'].map((label) => byLabel(stored, label));
   const result = writeBack(stored, specifications);
   assert.deepEqual(result.issues, []);
-  assert.deepEqual(result.joins, [{ survivorId: w3.id, absorbedId: w5.id }]);
-  const shared = result.floor.walls.filter((wall) => wall.exposure === 'interior');
-  assert.deepEqual(
-    shared.map((wall) => [wall.id, wall.autoLabel]),
-    [[w3.id, 'W3']]
-  );
-  // The remainders copy the survivor and are numbered along its axis, as today.
-  assert.deepEqual(
-    ['W3.1', 'W3.2'].map(
-      (label) => byLabel(result.floor, label).sides.find((s) => s.roomId).roomId
-    ),
-    [stored.rooms[1].id, stored.rooms[0].id]
-  );
+  // W3 and W5 stay on the stretches that did not change (room A's and room B's remainders).
+  for (const [wall, room] of [
+    [w3, stored.rooms[0]],
+    [w5, stored.rooms[1]],
+  ]) {
+    const written = result.floor.walls.find((entry) => entry.id === wall.id);
+    assert.equal(written.autoLabel, wall.autoLabel);
+    assert.equal(written.exposure, 'exterior');
+    assert.equal(written.sides.find((side) => side.roomId).roomId, room.id);
+  }
+  // The shared stretch copies both walls' answers; the lower label's copy survives.
+  const [shared] = interior(result.floor);
+  assert.equal(shared.autoLabel, 'W3.1');
+  assert.deepEqual(result.joins, [
+    { survivorId: shared.id, absorbedId: result.joins[0].absorbedId },
+  ]);
   // Each room gets an automatic station where the contact ends on its edge.
   for (const [room, x] of [
     [result.floor.rooms[0], 3],
@@ -67,7 +69,7 @@ test('an unbound contact joins its two walls; the lower label survives, as bind_
   }
 });
 
-test('a join keeps every answer or is refused; a preferred room keeps its wall', () => {
+test('a join keeps every answer or is refused; the stationary room keeps its wall', () => {
   const stored = unboundFloor();
   const [w3, w5] = ['W3', 'W5'].map((label) => byLabel(stored, label));
   const heights = (a, b) => (primary) => {
@@ -79,9 +81,72 @@ test('a join keeps every answer or is refused; a preferred room keeps its wall',
     'conflicting_wall_properties'
   );
   const merged = writeBack(stored, specifications, { edit: heights(null, 2.7) }).floor;
-  assert.equal(byLabel(merged, 'W3').overrides.wall_height_m, 2.7);
+  assert.equal(interior(merged)[0].overrides.wall_height_m, 2.7);
+  assert.equal(byLabel(merged, 'W3').overrides.wall_height_m, undefined);
   const preferred = writeBack(stored, specifications, { preferredRoomIds: [stored.rooms[1].id] });
-  assert.deepEqual(preferred.joins, [{ survivorId: w5.id, absorbedId: w3.id }]);
+  assert.equal(interior(preferred.floor)[0].autoLabel, 'W5.1');
+
+  // Rooms facing each other over the same extent: whole walls join, and the stationary room's
+  // wall survives (else the lower label).
+  const facing = unboundFloor({ x: 0, y: 3.2, width: 5, height: 3 });
+  const [f3, f5] = ['W3', 'W5'].map((label) => byLabel(facing, label));
+  assert.deepEqual(writeBack(facing, specifications).joins, [
+    { survivorId: f3.id, absorbedId: f5.id },
+  ]);
+  const moved = writeBack(facing, specifications, { preferredRoomIds: [facing.rooms[1].id] });
+  assert.deepEqual(moved.joins, [{ survivorId: f5.id, absorbedId: f3.id }]);
+});
+
+test('a wall wholly in contact becomes the shared wall; the longer wall keeps a remainder', () => {
+  const stored = unboundFloor({ x: 1, y: 3.2, width: 3, height: 3 });
+  const [w3, w5] = ['W3', 'W5'].map((label) => byLabel(stored, label));
+  const result = writeBack(stored, specifications, { preferredRoomIds: [stored.rooms[0].id] });
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(
+    interior(result.floor).map((wall) => wall.id),
+    [w5.id]
+  );
+  assert.equal(result.floor.walls.find((wall) => wall.id === w3.id).exposure, 'exterior');
+});
+
+test('moving a room away and back keeps every wall identity', () => {
+  const away = writeBack(floor, specifications, {
+    edit: (primary) => translateRoom(primary, roomB.id, 0.4),
+  });
+  const back = writeBack(away.floor, specifications, {
+    edit: (primary) => translateRoom(primary, roomB.id, -0.4),
+  });
+  const walls = (plan) => plan.walls.map((wall) => `${wall.id}:${wall.autoLabel}`).sort();
+  assert.deepEqual(walls(back.floor), walls(floor));
+  // Corners keep their identity; an automatic station that left and came back is new.
+  const corners = (plan) =>
+    plan.rooms.map((room) =>
+      room.vertices.filter((vertex) => !vertex.physicalBoundaryId).map((vertex) => vertex.id)
+    );
+  assert.deepEqual(corners(back.floor), corners(floor));
+});
+
+test('a copy whose row is in the other room keeps each surface on its room', () => {
+  const shared = byLabel(floor, 'W3');
+  const finish = { [roomA.id]: 'A plaster', [roomB.id]: 'B paint' };
+  const result = writeBack(floor, specifications, {
+    edit(primary) {
+      const subject = primary.subjects.get(shared.id);
+      for (const side of subject.sides)
+        side.values.finish =
+          side.id === shared.sides.find((s) => s.roomId === roomA.id).id
+            ? finish[roomA.id]
+            : finish[roomB.id];
+      translateRoom(primary, roomB.id, 0.4);
+    },
+  });
+  assert.deepEqual(result.issues, []);
+  const division = result.divisions.find((entry) => entry.source.id === shared.id);
+  const copies = division.walls.filter((wall) => wall.id !== shared.id);
+  assert.ok(copies.some((wall) => wall.sides.some((side) => side.roomId === roomB.id)));
+  for (const wall of copies)
+    for (const side of wall.sides.filter((entry) => entry.roomId))
+      assert.equal(side.values.finish, finish[side.roomId], `${wall.autoLabel} faces its room`);
 });
 
 test('a wall divides when its rooms change: copies keep answers and custom rows', () => {

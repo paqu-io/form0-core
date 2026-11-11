@@ -7,7 +7,12 @@ import {
   validateBuildingPlanSnapshot,
 } from '../model.js';
 import { reconcileWallLabels } from '../wall-labels.js';
-import { rejoinAutomaticPieces, resolvePieceSubjects } from './subject-joins.js';
+import {
+  collectPieceSubjects,
+  joinPieceSubjects,
+  rejoinAutomaticPieces,
+  subjectTangent,
+} from './subject-joins.js';
 import { divideSubjects, retireSubjects } from './subject-divisions.js';
 import { placeRoomStations } from './room-stations.js';
 import { assembleRows } from './stored-rows.js';
@@ -26,7 +31,12 @@ function createContext(primary, derived, createId, preferredRoomIds) {
     for (const edge of line.edges) edgeLine.set(`${line.roomId}:${edge.id}`, { line, edge });
   const alias = new Map();
   const profiles = primary.profiles.map((profile) => ({ ...profile }));
-  return {
+  const anchorsBySubject = new Map();
+  for (const anchor of primary.anchors) {
+    if (!anchorsBySubject.has(anchor.subjectId)) anchorsBySubject.set(anchor.subjectId, []);
+    anchorsBySubject.get(anchor.subjectId).push(anchor);
+  }
+  const context = {
     createId,
     preferredRoomIds,
     lines,
@@ -41,6 +51,7 @@ function createContext(primary, derived, createId, preferredRoomIds) {
     rooms: new Map(primary.rooms.map((room) => [room.id, room])),
     anchorByFace: firstBy(primary.anchors, (anchor) => anchor.faceId),
     anchorByEdge: firstBy(primary.anchors, (anchor) => `${anchor.roomId}:${anchor.edgeId}`),
+    anchorsBySubject,
     partitionByFace: new Map(primary.partitions.map((partition) => [partition.faceId, partition])),
     profiles,
     profileByEdge: new Map(
@@ -53,12 +64,20 @@ function createContext(primary, derived, createId, preferredRoomIds) {
       .filter((piece) => piece.partition)
       .map((piece) => ({ ...piece })),
     children: new Map(),
+    divided: new Set(),
+    basis: new Map(),
     joins: [],
     divisions: [],
     retired: [],
     created: [],
     issues: [],
   };
+  // Side signs are defined against each subject's reference row in the primary geometry.
+  for (const subject of context.subjects.values()) {
+    const tangent = subjectTangent(context, subject);
+    if (tangent) context.basis.set(subject.id, tangent);
+  }
+  return context;
 }
 
 /**
@@ -86,8 +105,9 @@ export function writeBackBuildingPlanFloor(primary, derived, options = {}) {
     preferredRoomIds = [],
   } = options;
   const context = createContext(primary, derived, createId, preferredRoomIds);
-  resolvePieceSubjects(context);
+  collectPieceSubjects(context);
   divideSubjects(context);
+  joinPieceSubjects(context);
   rejoinAutomaticPieces(context);
   retireSubjects(context);
 

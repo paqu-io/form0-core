@@ -1,7 +1,7 @@
 import { copyBuildingPlanData as copy } from '../model.js';
 import { at, dot, project, segmentFrame } from '../geometry.js';
 import { lineFrame, pointAt } from './grid.js';
-import { edgeEnds, rowFrame } from './frames.js';
+import { edgeEnds, rowFrame, rowTangent } from './frames.js';
 
 /** A row's binding to its wall segment, computed directly from the edge (as rebinding does). */
 export function bindingFor(id, segment, edgeId, start, end) {
@@ -73,6 +73,15 @@ export function buildStoredWalls(context, rooms, rows) {
     if (!piece || !frame) {
       context.issues.push({ code: 'unwritten_subject', subjectId: subject.id });
       continue;
+    }
+    // A wall whose reference row now runs against the direction its side signs were defined for
+    // (a copy whose row is in the other room, a reference that moved) turns its signs over.
+    const tangent = rowTangent(rooms, reference);
+    const basis = context.basis.get(subject.id);
+    if (tangent && basis && tangent.x * basis.x + tangent.y * basis.y < 0) {
+      for (const side of subject.sides) side.sign *= -1;
+      for (const profile of context.profiles)
+        if (profile.sourceId === subject.id) profile.sideSign *= -1;
     }
     const edge = segmentFrame(...frame.ends);
     const half = (piece.width || 0) / 2;

@@ -53,35 +53,53 @@ function placeOpenings(context, subject, pieces) {
   return placed;
 }
 
-/** The piece holding the start of the subject's reference row keeps the subject. */
-function referencePiece(context, subject, pieces) {
+const rooms = (ids) => [...ids].map(String).sort().join('|');
+const pieceLength = (piece) => Math.max(...piece.lines.map((entry) => entry.to - entry.from));
+
+/**
+ * The piece that keeps a dividing subject: identity stays with what did not change. Among the
+ * pieces with the same rooms as before (the rooms the subject's rows were in, plus the outside
+ * for an exterior wall), the longest; failing that, the longest piece. Ties go to the piece
+ * holding the start of the reference row.
+ */
+function keptPiece(context, subject, pieces) {
+  const anchors = context.anchorsBySubject.get(subject.id) || [];
+  const before = new Set(anchors.map((anchor) => anchor.roomId));
+  if (before.size === 1) before.add(null);
+  const unchanged = pieces.filter((piece) => rooms(piece.roomIds) === rooms(before));
+  const pool = unchanged.length ? unchanged : pieces;
+  const longest = Math.max(...pool.map(pieceLength));
+  const tied = pool.filter((piece) => pieceLength(piece) >= longest - SAME);
   const anchor = context.anchorByFace.get(subject.referenceFaceId);
   const span = anchor && anchoredSpan(context, anchor.faceId, anchor.from, 0);
   const held =
     span &&
-    pieces.find((piece) => {
+    tied.find((piece) => {
       const entry = entryOn(piece, span.key);
       return entry && span.from > entry.from - SAME && span.from < entry.to - SAME;
     });
-  return held || pieces[0];
+  return held || tied[0];
 }
 
 /**
- * A subject covering several pieces divides. The piece holding its reference span keeps the
- * subject; every other piece gets a new subject copying the answers, the side answers (new side
- * IDs) and the custom rows (new row IDs). Openings follow the piece that contains them.
+ * Divide before joining: a subject anchored on several pieces keeps the piece that did not change
+ * (see `keptPiece`); every other piece gets a new subject copying the answers, the side answers
+ * (new side IDs) and the custom rows (new row IDs), with the source's orientation basis. Openings
+ * follow the piece that contains them; one crossing a boundary refuses the edit.
  */
 export function divideSubjects(context) {
   const bySubject = new Map();
-  for (const piece of context.pieces) {
-    if (!bySubject.has(piece.subjectId)) bySubject.set(piece.subjectId, []);
-    bySubject.get(piece.subjectId).push(piece);
-  }
+  for (const piece of context.pieces)
+    for (const { subjectId } of piece.anchored) {
+      if (!bySubject.has(subjectId)) bySubject.set(subjectId, []);
+      bySubject.get(subjectId).push(piece);
+    }
   for (const [id, pieces] of bySubject) {
     if (pieces.length < 2) continue;
     const subject = context.subjects.get(id);
     const placed = placeOpenings(context, subject, pieces);
-    const kept = referencePiece(context, subject, pieces);
+    const kept = keptPiece(context, subject, pieces);
+    context.divided.add(id);
     const source = copy(subject);
     const division = {
       splitFromWallId: source.lineage?.splitFromWallId || source.id,
@@ -108,11 +126,13 @@ export function divideSubjects(context) {
         for (const side of target.sides) renewBuildingPlanRowIdentities(side, context.createId);
         context.subjects.set(target.id, target);
         context.children.set(target.id, source.id);
+        if (context.basis.has(source.id))
+          context.basis.set(target.id, context.basis.get(source.id));
       }
       target.lineage = { ...source.lineage, ...division };
       delete target.lineage.thicknessProfile;
       target.openings = (piece === kept ? subject : source).openings.filter(onPiece);
-      piece.subjectId = target.id;
+      for (const entry of piece.anchored) if (entry.subjectId === id) entry.subjectId = target.id;
       subjectIds.push(target.id);
     }
     context.divisions.push({ source, subjectIds });
