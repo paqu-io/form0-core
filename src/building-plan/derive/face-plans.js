@@ -185,3 +185,67 @@ export function followers(derived, lines, stretch) {
   }
   return result;
 }
+
+const minus = (p, q) => ({ x: p.x - q.x, y: p.y - q.y });
+
+/**
+ * Plan one end of a moved stretch: slide its corner, or place a jog where the room's clear space
+ * stays out of the partner room's wall material (the partner being the room across the moved
+ * wall). F1: a new jog copies the adjacent part with its own exposure, else the moved part.
+ */
+export function planEnd(derived, run, atEnd, delta) {
+  const { line, situation } = run.ends[atEnd ? 1 : 0];
+  const station = atEnd ? run.to : run.from;
+  const sign = atEnd ? 1 : -1;
+  // How far the line moves into the room at this end (a turned line moves by different amounts).
+  const point = pointAt(line.frame, station);
+  const shift = run.map ? minus(run.map(point), point) : delta;
+  const moved = dot(shift, inward(line));
+  if (situation.kind === 'slide') return { type: 'slide' };
+  const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;
+  const partner = run.ends[atEnd ? 1 : 0].partner;
+  const allowance = relative > SAME ? junctionAllowance(derived, line, partner, run.width ?? 0) : 0;
+  const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
+  const moving = {
+    anchor: subjectNear(line, station, station - sign),
+    exposure: run.partnerRun
+      ? 'interior'
+      : pieceAt(derived, line, station - sign * SAME * 2)?.exposure,
+  };
+  // F1: a new jog copies the adjacent part with its exposure, else the moved part.
+  const choose = (staying) =>
+    [moving, staying].find((part) => part.anchor && part.exposure === jogExposure)?.anchor ||
+    moving.anchor;
+  if (situation.kind === 'shift') {
+    const continuation = situation.continuation;
+    const at = atEnd ? 0 : continuation.frame.length;
+    const staying = {
+      anchor: subjectNear(continuation, at, at + sign),
+      exposure: pieceAt(derived, continuation, at + sign * SAME * 2)?.exposure,
+    };
+    // The moved line runs on again on the continuation: what moved with it there continues it.
+    if (Math.abs(relative) <= SAME)
+      return { type: 'shift', station: null, joinAnchor: staying.anchor };
+    // The old jog's own wall stays with it; a stretch that was another wall's contact does not.
+    const keep = situation.jog.edges
+      .filter((edge) => {
+        const piece = pieceAt(derived, situation.jog, (edge.from + edge.to) / 2);
+        return piece?.subjectId && piece.exposure === 'exterior';
+      })
+      .map((edge) => edge.id);
+    return {
+      type: 'shift',
+      station: station + sign * allowance,
+      keep,
+      jogAnchor: choose(staying),
+    };
+  }
+  const target = station + sign * allowance;
+  // A jog would pass the line's corner: the whole remainder of the line moves instead.
+  if (atEnd ? target >= line.frame.length - SAME : target <= SAME) return { type: 'slide' };
+  const staying = {
+    anchor: subjectNear(line, target, target + sign),
+    exposure: pieceAt(derived, line, target + sign * SAME * 2)?.exposure,
+  };
+  return { type: 'jog', station: target, jogAnchor: choose(staying) };
+}

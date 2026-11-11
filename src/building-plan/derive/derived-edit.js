@@ -5,6 +5,7 @@ import { extractBuildingPlanPrimary } from './extract.js';
 import { deriveBuildingPlanPrimary } from './index.js';
 import { applyRoomCommand } from './room-commands.js';
 import { resizeFace } from './face-commands.js';
+import { moveCorner } from './corner-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
@@ -13,8 +14,9 @@ export const DERIVED_OPERATIONS = Object.freeze([
   'move_room',
   'remove_room',
   'resize_face',
+  'move_corner',
 ]);
-const FACE_COMMANDS = { resize_face: resizeFace };
+const FACE_COMMANDS = { resize_face: resizeFace, move_corner: moveCorner };
 export const usesDerivedPath = (operation) => DERIVED_OPERATIONS.includes(operation?.type);
 
 function writeFloor(snapshot, floor, primary, options) {

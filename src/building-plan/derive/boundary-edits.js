@@ -1,13 +1,13 @@
 import { cleanPoint, polygonIssue } from '../geometry.js';
 import { SAME, along, lineFrame, offset, pointAt } from './grid.js';
 import { signedArea } from './room-lines.js';
+import { mergeCollapsed, rebuildEdges } from './boundary-rebuild.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
 };
 const plus = (p, d) => ({ x: p.x + d.x, y: p.y + d.y });
 const minus = (p, d) => ({ x: p.x - d.x, y: p.y - d.y });
-const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** Intersection of the lines through p (direction u) and q (direction v), or null if parallel. */
 function intersect(p, u, q, v) {
@@ -25,7 +25,8 @@ export function lineVertexIds(room, line) {
 
 /**
  * Move the stretch [from, to] of one room line (stations of `line.frame`, the room's vertex
- * order) by `delta`, perpendicular to the line, and reconnect each end:
+ * order) by `delta`, perpendicular to the line, or by `map` (an affine map of the line's points,
+ * with its inverse `unmap`: a corner drag turns the line), and reconnect each end:
  *
  * - `slide`: the stretch ends at a corner; the corner slides along the adjoining edge, whose
  *   direction stays fixed.
@@ -46,6 +47,14 @@ export function lineVertexIds(room, line) {
 export function moveRoomStretch(room, plan, createId) {
   const { line, delta } = plan;
   const frame = line.frame;
+  const map = plan.map || ((point) => plus(point, delta));
+  const unmap = plan.unmap || ((point) => minus(point, delta));
+  // Where the moved line crosses a line through `point` in `direction` (a jog's line): a jog
+  // stays square to the old line even when the edit turns the moved one.
+  const movedOrigin = map(frame.start);
+  const movedDirection = minus(map(frame.end), movedOrigin);
+  const onMovedLine = (point, direction) =>
+    intersect(movedOrigin, movedDirection, point, direction) || map(point);
   const [startEnd, endEnd] = plan.ends;
   const oldEdges = new Map(
     room.edges.map((edge) => {
@@ -94,7 +103,7 @@ export function moveRoomStretch(room, plan, createId) {
       if (station(entry) > endEnd.station + SAME) removed.add(entry.vertex.id);
 
   for (const entry of lineEntries)
-    if (entry.run) entry.vertex = { ...entry.vertex, ...cleanPoint(plus(entry.back, delta)) };
+    if (entry.run) entry.vertex = { ...entry.vertex, ...cleanPoint(map(entry.back)) };
 
   const jogs = [];
   const reconnect = (end, atEnd) => {
@@ -105,20 +114,20 @@ export function moveRoomStretch(room, plan, createId) {
     if (end.type === 'slide') {
       const point = intersect(
         corner.vertex,
-        frame.tangent,
+        minus(map(frame.end), map(frame.start)),
         neighbour.back,
         minus(corner.back, neighbour.back)
       );
       if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
-      corner.back = minus(point, delta);
+      corner.back = unmap(point);
       corner.out = point;
       return;
     }
     if (end.type === 'jog') {
       // The stationary vertex at the station stays; a moved copy starts the jog.
       const stay = lineEntries.find((entry) => Math.abs(station(entry) - end.station) <= SAME);
-      const point = cleanPoint(plus(stay.back, delta));
+      const point = cleanPoint(onMovedLine(stay.back, frame.normal));
       const moved = { vertex: { id: createId(), ...point }, back: stay.back, run: true };
       const at = indexOf(stay.vertex.id);
       list.splice(atEnd ? at : at + 1, 0, moved);
@@ -157,11 +166,11 @@ export function moveRoomStretch(room, plan, createId) {
       // first vertex, which is read back on the old line like a slid corner.
       removed.add(corner.vertex.id);
       foot.out = foot.back;
-      foot.back = minus(foot.back, delta);
+      foot.back = unmap(foot.back);
       foot.run = true;
       return;
     }
-    const top = plus(pointAt(frame, end.station), delta);
+    const top = onMovedLine(pointAt(frame, end.station), jogDirection);
     const point = intersect(top, jogDirection, foot.back, continuation);
     if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
     corner.vertex = { ...corner.vertex, ...cleanPoint(top) };
@@ -191,110 +200,4 @@ export function moveRoomStretch(room, plan, createId) {
     refuse('invalid_room_geometry', problem || 'This edit would turn the room inside out.');
   const lengths = new Map([...oldEdges].map(([id, edge]) => [id, edge.frame?.length ?? 0]));
   return { edges: rebuildEdges(room, list, oldEdges, jogs, plan, createId), lengths };
-}
-
-/** Drop zero-length edges: a moved vertex that lands on its neighbour merges into it. */
-function mergeCollapsed(list) {
-  for (let i = 0; i < list.length && list.length > 3; ) {
-    const next = (i + 1) % list.length;
-    if (gap(list[i].vertex, list[next].vertex) > SAME) {
-      i++;
-      continue;
-    }
-    // Keep the vertex that did not move, and any explicit cut. A kept stationary vertex now also
-    // ends the moved line: it is read back on the old line for the run's edge.
-    const [keep, drop] = list[i].run && !list[next].run ? [next, i] : [i, next];
-    const [kept, gone] = [list[keep], list[drop]];
-    if (gone.vertex.editingCutId && !kept.vertex.editingCutId)
-      kept.vertex = { ...kept.vertex, editingCutId: gone.vertex.editingCutId };
-    if (gone.run && !kept.run) {
-      kept.out = kept.out || kept.back;
-      kept.back = gone.back;
-      kept.run = true;
-    }
-    list.splice(drop, 1);
-    if (drop < i) i--;
-  }
-  return list;
-}
-
-/**
- * New edges from consecutive vertices, with provenance: a jog, or the old edge whose line holds
- * both ends' old positions (run edges are read back on the old line, other edges where they are).
- */
-function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
-  const provenance = [];
-  for (let i = 0; i < list.length; i++) {
-    const a = list[i];
-    const b = list[(i + 1) % list.length];
-    const pair = [a.vertex.id, b.vertex.id];
-    const jog = jogs.find((entry) => entry.ids[0] === pair[0] && entry.ids[1] === pair[1]);
-    if (jog) {
-      provenance.push({
-        startId: pair[0],
-        endId: pair[1],
-        jog: true,
-        replaces: jog.replaces ?? null,
-        end: jog.end,
-      });
-      continue;
-    }
-    // A run edge is read back on the old line; any other edge where its ends lie (a slid corner
-    // or a slid continuation vertex at its new place on the old edge's line).
-    const run = a.run && b.run;
-    const [p, q] = run ? [a.back, b.back] : [a.out || a.back, b.out || b.back];
-    let best = null;
-    for (const edge of oldEdges.values()) {
-      if (!edge.frame) continue;
-      if (Math.abs(offset(edge.frame, p)) > SAME || Math.abs(offset(edge.frame, q)) > SAME)
-        continue;
-      const [from, to] = [along(edge.frame, p), along(edge.frame, q)];
-      if (to - from <= SAME) continue;
-      const shared = Math.min(to, edge.frame.length) - Math.max(from, 0);
-      if (shared < -SAME || (best && best.shared >= shared)) continue;
-      best = { edge, from, to, shared };
-    }
-    if (!best) refuse('invalid_room_geometry', 'This edit would break the room outline.');
-    const stations = run ? [along(plan.line.frame, p), along(plan.line.frame, q)] : null;
-    provenance.push({
-      startId: pair[0],
-      endId: pair[1],
-      edgeId: best.edge.id,
-      from: best.from,
-      to: best.to,
-      moved: run,
-      extension: !stations
-        ? null
-        : Math.max(...stations) <= plan.from + SAME
-          ? 'start'
-          : Math.min(...stations) >= plan.to - SAME
-            ? 'end'
-            : null,
-    });
-  }
-  // Each old edge's ID stays with one part: the preferred one, else the part covering most of it.
-  const keeper = new Map();
-  for (const entry of provenance) {
-    if (entry.jog) continue;
-    const length =
-      Math.min(entry.to, oldEdges.get(entry.edgeId).frame.length) - Math.max(entry.from, 0);
-    const preferred = plan.preferMoved?.includes(entry.edgeId) && entry.moved;
-    const rank = (preferred ? 1e9 : 0) + length;
-    if (!keeper.has(entry.edgeId) || keeper.get(entry.edgeId).rank < rank)
-      keeper.set(entry.edgeId, { entry, rank });
-  }
-  const result = new Map();
-  const used = new Set();
-  for (const entry of provenance) {
-    let id;
-    if (entry.jog && entry.replaces && !used.has(entry.replaces)) id = entry.replaces;
-    else if (!entry.jog && keeper.get(entry.edgeId).entry === entry) id = entry.edgeId;
-    else id = createId();
-    used.add(id);
-    entry.id = id;
-    result.set(id, entry);
-  }
-  room.vertices = list.map((entry) => entry.vertex);
-  room.edges = provenance.map(({ id, startId, endId }) => ({ id, startId, endId }));
-  return result;
 }
