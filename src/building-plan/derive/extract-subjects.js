@@ -29,11 +29,17 @@ export function referenceFaceOf(floor, wall) {
 
 /**
  * Canonical orientation: a wall runs so that its reference row lies on side +1 (seen from the
- * reference room, the wall runs left to right). Returns -1 for a stored wall that runs the other
- * way: its side signs and profile signs are flipped when read.
+ * reference room, the wall runs left to right). Returns -1 for a stored wall whose reference
+ * row's side is signed -1: its side signs and profile signs are flipped when read.
+ *
+ * The side is read through the row's `sideId` (the surface identity its answers follow), not
+ * through the binding's geometric side: a few stored fixtures (mirrored seeds) disagree.
  */
 export function storedOrientation(floor, wall) {
-  return referenceFaceOf(floor, wall)?.face.bindings?.[0]?.side === -1 ? -1 : 1;
+  const reference = referenceFaceOf(floor, wall)?.face;
+  const side = wall.sides?.find((entry) => entry.id === reference?.sideId);
+  if (side) return side.sign === -1 ? -1 : 1;
+  return reference?.bindings?.[0]?.side === -1 ? -1 : 1;
 }
 
 /**

@@ -6,6 +6,7 @@
 import { extractBuildingPlanPrimary } from './extract.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { derivePartitionPieces } from './partitions.js';
+import { writeBackBuildingPlanFloor } from './write-back.js';
 
 /**
  * @param {Object} primary Primary data (see `extractBuildingPlanPrimary`).
@@ -32,4 +33,4 @@ export function deriveBuildingPlanFloor(floor, specifications) {
   return deriveBuildingPlanPrimary(extractBuildingPlanPrimary(floor), specifications);
 }
 
-export { extractBuildingPlanPrimary };
+export { extractBuildingPlanPrimary, writeBackBuildingPlanFloor };

@@ -9,6 +9,7 @@ import {
 import { deriveBuildingPlanFloor } from '../src/building-plan/derive/index.js';
 import { roomLines } from '../src/building-plan/derive/room-lines.js';
 import { toGrid } from '../src/building-plan/derive/grid.js';
+import { rotate } from './helpers/building-plan-derive.js';
 
 const TOLERANCE = 3.1e-4;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -54,28 +55,6 @@ function assertDerivedMatchesStored(floor, specifications) {
   }
   assert.equal(derived.pieces.filter((piece) => piece.subjectId == null).length, 0);
   return derived;
-}
-
-function rotate(snapshot, angle) {
-  const [c, s] = [Math.cos(angle), Math.sin(angle)];
-  const turn = (point) => ({
-    ...point,
-    x: point.x * c - point.y * s,
-    y: point.x * s + point.y * c,
-  });
-  const copy = structuredClone(snapshot);
-  for (const floor of copy.floors) {
-    for (const room of floor.rooms) {
-      room.vertices = room.vertices.map(turn);
-      for (const face of room.faces) if (face.freePath) face.freePath = face.freePath.map(turn);
-    }
-    for (const wall of floor.walls)
-      for (const segment of wall.segments) {
-        segment.start = turn(segment.start);
-        segment.end = turn(segment.end);
-      }
-  }
-  return copy;
 }
 
 test('the grid rounds to 0.1 mm and room lines keep collinear stations and cuts', () => {

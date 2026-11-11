@@ -9,7 +9,7 @@ import { extractBuildingPlanSubjects, storedOrientation } from './extract-subjec
  * - Rooms: clear polygons with their vertex and edge identities, at their stored coordinates
  *   (no grid rounding: a round trip moves nothing), explicit cuts (`editingCutId`) and automatic
  *   stations (`physicalBoundaryId`), plus room answers and elements. Rows and profiles are read
- *   separately.
+ *   separately; the room keeps its row order (`faceOrder`).
  * - Anchors: which wall subject covers which span of a room edge (the D4 anchor), with the row's
  *   identity: row ID, binding ID and row lineage. A row without bindings anchors its whole edges.
  * - Profiles: room edges whose material a neighbouring wall supplies (no subject of their own),
@@ -74,6 +74,8 @@ export function extractBuildingPlanPrimary(floor) {
     return {
       ...copy(room),
       edges: (room.edges || []).map(({ profile, ...edge }) => ({ ...edge })),
+      // Row order in the room, kept on write-back (it is the order of the form's rows).
+      faceOrder: faces.map((face) => face.id),
     };
   });
   return {
