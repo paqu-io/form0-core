@@ -144,6 +144,7 @@ test('editor policy defaults are independent, typed and default to applying inhe
     snapping: true,
     edgeAutoPan: true,
     thicknessAnchor: 'room_face',
+    sharedWallDrag: 'widen',
   });
   assert.throws(() => normalizeBuildingPlanEditingPolicy({ snapping: 'yes' }), /boolean/);
   assert.throws(

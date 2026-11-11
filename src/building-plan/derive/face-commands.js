@@ -5,11 +5,14 @@ import { deriveBuildingPlanPieces } from './pieces.js';
 import { anchorAt } from './line-spans.js';
 import { resolutionFloor } from './thickness.js';
 import { explicitContactWidths, seatDistance, seatJogStation } from './face-contacts.js';
+import { keepWallWithStationaryRoom, sharedWallMode, widenPlan } from './shared-wall-drag.js';
 import {
   depth,
   endSituation,
+  followers,
   inward,
   junctionAllowance,
+  locateFace,
   pieceAt,
   subjectNear,
 } from './face-plans.js';
@@ -20,73 +23,6 @@ const refuse = (code, message, subject) => {
   });
 };
 const dot = (a, b) => a.x * b.x + a.y * b.y;
-
-/** The dragged stretch: the row's edge (or `interval` of it) as stations of its room line. */
-function locateFace(primary, operation, lines) {
-  if (primary.partitions.some((partition) => partition.faceId === operation.faceId))
-    refuse('unsupported_face_edit', 'Resize the host wall of an internal partition directly.');
-  const anchors = primary.anchors.filter(
-    (anchor) =>
-      anchor.faceId === operation.faceId &&
-      (!operation.edgeId || anchor.edgeId === operation.edgeId)
-  );
-  if (!anchors.length) throw new Error('The wall face no longer exists.');
-  const edgeIds = [...new Set(anchors.map((anchor) => anchor.edgeId))];
-  if (edgeIds.length !== 1)
-    refuse('ambiguous_face_edit', 'Choose the specific straight room edge to edit.', {
-      type: 'room_face',
-      id: operation.faceId,
-    });
-  const roomId = anchors[0].roomId;
-  const line = lines.find(
-    (entry) => entry.roomId === roomId && entry.edges.some((edge) => edge.id === edgeIds[0])
-  );
-  const edge = line.edges.find((entry) => entry.id === edgeIds[0]);
-  const length = edge.to - edge.from;
-  const interval = operation.interval || [
-    Math.min(...anchors.map((anchor) => anchor.from)),
-    Math.max(...anchors.map((anchor) => anchor.to ?? length)),
-  ];
-  if (
-    !Array.isArray(interval) ||
-    !interval.every(Number.isFinite) ||
-    interval[0] < -SAME ||
-    interval[1] > length + SAME ||
-    interval[1] - interval[0] <= SAME
-  )
-    refuse('invalid_dimension', 'The edited extent is outside its room edge.');
-  return {
-    roomId,
-    line,
-    edgeId: edge.id,
-    from: edge.from + Math.max(0, interval[0]),
-    to: edge.from + Math.min(length, interval[1]),
-  };
-}
-
-/** Neighbours sharing the dragged stretch follow it: their facing stretch moves too. */
-function followers(derived, lines, stretch) {
-  const result = [];
-  for (const piece of derived.pieces) {
-    if (piece.partition || piece.lines.length < 2) continue;
-    const own = piece.lines.find(
-      (entry) => entry.roomId === stretch.roomId && entry.index === stretch.line.index
-    );
-    const other = piece.lines.find((entry) => entry !== own);
-    if (!own || !other) continue;
-    const from = Math.max(own.from, stretch.from);
-    const to = Math.min(own.to, stretch.to);
-    if (to - from <= SAME) continue;
-    const line = lines.find(
-      (entry) => entry.roomId === other.roomId && entry.index === other.index
-    );
-    const [a, b] = [from, to]
-      .map((station) => along(line.frame, pointAt(stretch.line.frame, station)))
-      .sort((x, y) => x - y);
-    result.push({ roomId: line.roomId, line, from: a, to: b, width: piece.width });
-  }
-  return result;
-}
 
 /** The physical point of a run end. */
 const endPoint = (run, atEnd) => pointAt(run.line.frame, atEnd ? run.to : run.from);
@@ -205,7 +141,7 @@ function anchorNewEdges(primary, additions, specifications, createId) {
  *
  * @returns {{result: Object, preferredRoomIds: string[]}}
  */
-export function resizeFace(primary, operation, { createId, specifications }) {
+export function resizeFace(primary, operation, { createId, specifications, editingPolicy }) {
   if (!Number.isFinite(operation.distance))
     refuse('invalid_dimension', 'A finite face displacement is required.');
   const derived = deriveBuildingPlanPieces(primary, specifications);
@@ -213,12 +149,30 @@ export function resizeFace(primary, operation, { createId, specifications }) {
   const all = primary.rooms.map((room) => room.id);
   if (Math.abs(operation.distance) <= SAME) return { result: {}, preferredRoomIds: all };
 
+  const floor = resolutionFloor(primary);
   const runs = [{ ...stretch, preferMoved: [stretch.edgeId] }];
-  for (const follower of followers(derived, derived.lines, stretch)) {
-    const run = { ...follower, partnerRun: runs[0] };
+  const sharing = followers(derived, derived.lines, stretch);
+  // sharedWallDrag: towards the neighbour (or `move_wall`) the whole wall moves; away from it
+  // `widen` keeps the neighbour, widens the wall, holds at the limit, then detaches.
+  const plan =
+    sharing.length === 1 &&
+    operation.distance < 0 &&
+    sharedWallMode(operation, editingPolicy) === 'widen'
+      ? widenPlan(primary, floor, specifications, {
+          subjectId: sharing[0].subjectId,
+          roomIds: [stretch.roomId, sharing[0].roomId],
+          width: sharing[0].width,
+          distance: operation.distance,
+        })
+      : { kind: 'move', distance: operation.distance };
+  if (Math.abs(plan.distance) <= SAME) return { result: {}, preferredRoomIds: all };
+  if (plan.kind === 'detach')
+    keepWallWithStationaryRoom(primary, sharing[0].subjectId, stretch.roomId, sharing[0].roomId);
+  for (const follower of plan.kind === 'detach' ? [] : sharing) {
+    const run = { ...follower, partnerRun: runs[0], stationary: plan.kind !== 'move' };
     runs.push(run);
     runs[0].partnerRun = run;
-    runs[0].width = follower.width;
+    runs[0].width = plan.width ?? follower.width;
   }
   for (const run of runs)
     run.ends = [false, true].map((atEnd) => ({
@@ -241,18 +195,23 @@ export function resizeFace(primary, operation, { createId, specifications }) {
 
   // R1: the moved lines and the jogs adapt to the faces already in place.
   const context = {
-    floor: resolutionFloor(primary),
+    floor,
     specifications,
     tolerance: operation.attachmentTolerance ?? 0,
     keep: operation.keepContactThickness === true,
     kept: [],
   };
-  const distance = seatDistance(primary, runs, operation.distance, context);
+  // A widened wall is an explicit value on that piece (decision R1).
+  if (plan.width != null)
+    context.kept.push({ roomId: stretch.roomId, line: runs[1].line, width: plan.width });
+  const distance =
+    plan.kind === 'move' ? seatDistance(primary, runs, plan.distance, context) : plan.distance;
   const out = { x: -inward(stretch.line).x, y: -inward(stretch.line).y };
   const delta = { x: out.x * distance, y: out.y * distance };
 
   const additions = [];
-  for (const run of runs) {
+  const moving = runs.filter((run) => !run.stationary);
+  for (const run of moving) {
     const room = primary.rooms.find((entry) => entry.id === run.roomId);
     const ends = [false, true].map((atEnd) =>
       seatJogStation(primary, run, planEnd(derived, run, atEnd, delta), atEnd, delta, context)
@@ -274,9 +233,9 @@ export function resizeFace(primary, operation, { createId, specifications }) {
   primary.contactWidths = explicitContactWidths(
     primary,
     derived,
-    runs.map((run) => run.roomId),
+    moving.map((run) => run.roomId),
     context
   );
-  const edited = new Set(runs.map((run) => run.roomId));
+  const edited = new Set(moving.map((run) => run.roomId));
   return { result: {}, preferredRoomIds: all.filter((id) => !edited.has(id)) };
 }

@@ -130,7 +130,7 @@ export function explicitContactWidths(primary, before, editedIds, context) {
             Math.abs(entry.width - found.gap) <= GAP_TOLERANCE
         );
         if (keep) {
-          widths.push(key);
+          widths.push({ ...key, width: keep.width });
           continue;
         }
         const window = contactWindow(primary, floor, specifications, roomId, b, found.onB, false);
@@ -138,7 +138,7 @@ export function explicitContactWidths(primary, before, editedIds, context) {
         const current = pieceAt(before, b, (found.onB[0] + found.onB[1]) / 2)?.width;
         if (!(current > 0) || Math.abs(found.gap - current) > GAP_TOLERANCE) continue;
         if (overlapBefore(before, room.id, a, b) >= found.onA[1] - found.onA[0] - SAME) continue;
-        widths.push(key);
+        widths.push({ ...key, width: current });
       }
   }
   return widths;

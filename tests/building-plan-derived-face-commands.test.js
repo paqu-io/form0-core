@@ -78,7 +78,7 @@ test('dragging back restores the walls; a negative drag steps around the neighbo
   const t = example();
   const before = t.floor();
   t.apply({ type: 'resize_face', faceId: t.f.faceA, distance: 0.2 });
-  t.apply({ type: 'resize_face', faceId: t.f.faceA, distance: -0.2 });
+  t.apply({ type: 'resize_face', faceId: t.f.faceA, distance: -0.2, sharedWallDrag: 'move_wall' });
   const back = t.floor();
   for (const room of back.rooms)
     assert.deepEqual(
@@ -94,7 +94,7 @@ test('dragging back restores the walls; a negative drag steps around the neighbo
   );
 
   const u = example();
-  u.apply({ type: 'resize_face', faceId: u.f.faceA, distance: -0.2 });
+  u.apply({ type: 'resize_face', faceId: u.f.faceA, distance: -0.2, sharedWallDrag: 'move_wall' });
   const [a, b] = u.floor().rooms;
   // Today's result: A steps around B's west corner, B's jog sits at A's east wall.
   assert.deepEqual(

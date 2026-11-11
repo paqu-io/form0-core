@@ -1,4 +1,10 @@
 import { SAME, along, offset, parallelTo, pointAt } from './grid.js';
+
+const refuse = (code, message, subject) => {
+  throw Object.assign(new Error(message), {
+    issues: [{ code, message, ...(subject ? { subject } : {}) }],
+  });
+};
 import { anchorAt } from './line-spans.js';
 
 const dot = (a, b) => a.x * b.x + a.y * b.y;
@@ -106,4 +112,76 @@ export function pieceAt(derived, line, station) {
   );
 }
 
-export { pointAt };
+/** The dragged stretch: the row's edge (or `interval` of it) as stations of its room line. */
+export function locateFace(primary, operation, lines) {
+  if (primary.partitions.some((partition) => partition.faceId === operation.faceId))
+    refuse('unsupported_face_edit', 'Resize the host wall of an internal partition directly.');
+  const anchors = primary.anchors.filter(
+    (anchor) =>
+      anchor.faceId === operation.faceId &&
+      (!operation.edgeId || anchor.edgeId === operation.edgeId)
+  );
+  if (!anchors.length) throw new Error('The wall face no longer exists.');
+  const edgeIds = [...new Set(anchors.map((anchor) => anchor.edgeId))];
+  if (edgeIds.length !== 1)
+    refuse('ambiguous_face_edit', 'Choose the specific straight room edge to edit.', {
+      type: 'room_face',
+      id: operation.faceId,
+    });
+  const roomId = anchors[0].roomId;
+  const line = lines.find(
+    (entry) => entry.roomId === roomId && entry.edges.some((edge) => edge.id === edgeIds[0])
+  );
+  const edge = line.edges.find((entry) => entry.id === edgeIds[0]);
+  const length = edge.to - edge.from;
+  const interval = operation.interval || [
+    Math.min(...anchors.map((anchor) => anchor.from)),
+    Math.max(...anchors.map((anchor) => anchor.to ?? length)),
+  ];
+  if (
+    !Array.isArray(interval) ||
+    !interval.every(Number.isFinite) ||
+    interval[0] < -SAME ||
+    interval[1] > length + SAME ||
+    interval[1] - interval[0] <= SAME
+  )
+    refuse('invalid_dimension', 'The edited extent is outside its room edge.');
+  return {
+    roomId,
+    line,
+    edgeId: edge.id,
+    from: edge.from + Math.max(0, interval[0]),
+    to: edge.from + Math.min(length, interval[1]),
+  };
+}
+
+/** Neighbours sharing the dragged stretch follow it: their facing stretch moves too. */
+export function followers(derived, lines, stretch) {
+  const result = [];
+  for (const piece of derived.pieces) {
+    if (piece.partition || piece.lines.length < 2) continue;
+    const own = piece.lines.find(
+      (entry) => entry.roomId === stretch.roomId && entry.index === stretch.line.index
+    );
+    const other = piece.lines.find((entry) => entry !== own);
+    if (!own || !other) continue;
+    const from = Math.max(own.from, stretch.from);
+    const to = Math.min(own.to, stretch.to);
+    if (to - from <= SAME) continue;
+    const line = lines.find(
+      (entry) => entry.roomId === other.roomId && entry.index === other.index
+    );
+    const [a, b] = [from, to]
+      .map((station) => along(line.frame, pointAt(stretch.line.frame, station)))
+      .sort((x, y) => x - y);
+    result.push({
+      roomId: line.roomId,
+      line,
+      from: a,
+      to: b,
+      width: piece.width,
+      subjectId: piece.subjectId,
+    });
+  }
+  return result;
+}

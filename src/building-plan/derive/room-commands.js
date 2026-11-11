@@ -37,10 +37,12 @@ function rowFrame(primary, anchor) {
 /**
  * An opening on a shared wall stays with the room that stays: when a room moves or is removed,
  * an opening anchored to one of its rows is anchored to the other room's row instead, at the
- * same place. Openings on walls only this room faces move with it.
+ * same place. Openings on walls only this room faces move with it. `subjectIds` limits this to
+ * some walls.
  */
-function keepOpeningsWithStationaryRooms(primary, roomId) {
-  for (const subject of primary.subjects.values())
+export function keepOpeningsWithStationaryRooms(primary, roomId, subjectIds = null) {
+  for (const subject of primary.subjects.values()) {
+    if (subjectIds && !subjectIds.includes(subject.id)) continue;
     for (const opening of subject.openings || []) {
       const anchor = primary.anchors.find((entry) => entry.faceId === opening.faceId);
       if (anchor?.roomId !== roomId) continue;
@@ -55,6 +57,7 @@ function keepOpeningsWithStationaryRooms(primary, roomId) {
       opening.faceId = other.faceId;
       opening.from = Math.min(...stations);
     }
+  }
 }
 
 function seat(primary, room, operation, specifications) {
