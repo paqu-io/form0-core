@@ -25,15 +25,69 @@ export function mergeWalls(floor, reference, other, resolutions, createId) {
     Math.abs(project(frame, b.start).offset) > EPS
   )
     failOperation('unaligned_walls', 'The wall axes must align before joining.');
-  const sideMap = mergeWallSides(
+  const sideMap = mergeWallAnswers(
     reference,
     other,
-    dot(frame.tangent, otherFrame.tangent) >= 0 ? 1 : -1
+    dot(frame.tangent, otherFrame.tangent) >= 0 ? 1 : -1,
+    resolutions
   );
   for (const room of floor.rooms)
     for (const face of room.faces)
       if (face.wallId === other.id && sideMap.has(face.sideId))
         face.sideId = sideMap.get(face.sideId);
+  const projectedB = [project(frame, b.start).along, project(frame, b.end).along];
+  const from = Math.min(0, ...projectedB),
+    to = Math.max(frame.length, ...projectedB);
+  if (Math.min(frame.length, Math.max(...projectedB)) < Math.max(0, Math.min(...projectedB)) - EPS)
+    failOperation(
+      'disconnected_walls',
+      'Only touching or overlapping wall segments can be joined.'
+    );
+  for (const collection of ['doors', 'windows']) {
+    for (const opening of reference[collection]) opening.offset -= from;
+    for (const opening of other[collection]) {
+      const start = project(frame, at(otherFrame, opening.offset)).along;
+      const end = project(frame, at(otherFrame, opening.offset + opening.width)).along;
+      reference[collection].push({
+        ...copy(opening),
+        segmentId: a.id,
+        offset: Math.min(start, end) - from,
+      });
+    }
+  }
+  a.start = at(frame, from);
+  a.end = at(frame, to);
+  reference.lineage = {
+    ...(reference.lineage || {}),
+    mergedWallIds: [...(reference.lineage?.mergedWallIds || []), other.id],
+  };
+  for (const room of floor.rooms) {
+    for (const face of room.faces) if (face.wallId === other.id) face.wallId = reference.id;
+    for (const edge of room.edges)
+      if (edge.profile?.wallId === other.id) {
+        edge.profile.wallId = reference.id;
+        edge.profile.sideSign *= dot(frame.tangent, otherFrame.tangent) >= 0 ? 1 : -1;
+      }
+  }
+
+  floor.walls = floor.walls.filter((wall) => wall.id !== other.id);
+  return reference;
+}
+
+/**
+ * Join the answers of two physical walls onto the reference: values, explicit providers,
+ * overrides, custom rows and both canonical sides. Every answer survives or the join is refused
+ * (`conflicting_wall_answers`, `conflicting_wall_properties`, `conflicting_wall_records`,
+ * `conflicting_surface_answers`); `resolutions` settle chosen keys. Geometry is not touched.
+ *
+ * @param {Object} reference Surviving wall; receives the answers.
+ * @param {Object} other Joined wall.
+ * @param {1|-1} direction Whether the other wall runs the same way (1) or opposite (-1).
+ * @param {Object} [resolutions] Chosen values per property, applied as answers.
+ * @returns {Map<string, string>} The other wall's side IDs mapped to the reference's.
+ */
+export function mergeWallAnswers(reference, other, direction, resolutions = {}) {
+  const sideMap = mergeWallSides(reference, other, direction);
   const valueKeys = new Set([
     ...Object.keys(reference.values || {}),
     ...Object.keys(other.values || {}),
@@ -82,7 +136,10 @@ export function mergeWalls(floor, reference, other, resolutions, createId) {
       );
     reference.providerOverrides[key] = copy(value);
   }
-  const keys = new Set([...Object.keys(reference.overrides), ...Object.keys(other.overrides)]);
+  const keys = new Set([
+    ...Object.keys(reference.overrides),
+    ...Object.keys(other.overrides || {}),
+  ]);
   for (const key of keys) {
     if (own(resolutions, key)) reference.overrides[key] = copy(resolutions[key]);
     else if (
@@ -102,41 +159,5 @@ export function mergeWalls(floor, reference, other, resolutions, createId) {
     propertyKey(key);
     if (!valueKeys.has(key)) reference.overrides[key] = copy(value);
   }
-  const projectedB = [project(frame, b.start).along, project(frame, b.end).along];
-  const from = Math.min(0, ...projectedB),
-    to = Math.max(frame.length, ...projectedB);
-  if (Math.min(frame.length, Math.max(...projectedB)) < Math.max(0, Math.min(...projectedB)) - EPS)
-    failOperation(
-      'disconnected_walls',
-      'Only touching or overlapping wall segments can be joined.'
-    );
-  for (const collection of ['doors', 'windows']) {
-    for (const opening of reference[collection]) opening.offset -= from;
-    for (const opening of other[collection]) {
-      const start = project(frame, at(otherFrame, opening.offset)).along;
-      const end = project(frame, at(otherFrame, opening.offset + opening.width)).along;
-      reference[collection].push({
-        ...copy(opening),
-        segmentId: a.id,
-        offset: Math.min(start, end) - from,
-      });
-    }
-  }
-  a.start = at(frame, from);
-  a.end = at(frame, to);
-  reference.lineage = {
-    ...(reference.lineage || {}),
-    mergedWallIds: [...(reference.lineage?.mergedWallIds || []), other.id],
-  };
-  for (const room of floor.rooms) {
-    for (const face of room.faces) if (face.wallId === other.id) face.wallId = reference.id;
-    for (const edge of room.edges)
-      if (edge.profile?.wallId === other.id) {
-        edge.profile.wallId = reference.id;
-        edge.profile.sideSign *= dot(frame.tangent, otherFrame.tangent) >= 0 ? 1 : -1;
-      }
-  }
-
-  floor.walls = floor.walls.filter((wall) => wall.id !== other.id);
-  return reference;
+  return sideMap;
 }
