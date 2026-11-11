@@ -30,10 +30,14 @@ import {
   usesDerivedPath,
 } from './derive/derived-edit.js';
 
-/** A room command on the derived core seats the room again for "Keep previous values". */
+/**
+ * A command on the derived core is prepared again for "Keep previous values": an attached room
+ * is seated, and a dragged face or its jogs land, at the walls' current widths.
+ */
 const reseatsDerivedRoom = (operation) =>
   (operation.type === 'create_room' && operation.attach === true) ||
-  (operation.type === 'move_room' && operation.attach !== false);
+  (operation.type === 'move_room' && operation.attach !== false) ||
+  operation.type === 'resize_face';
 
 const entityArray = (value) =>
   Array.isArray(value) &&

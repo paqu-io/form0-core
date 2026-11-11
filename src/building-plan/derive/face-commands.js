@@ -2,6 +2,9 @@ import { SAME, along, pointAt } from './grid.js';
 import { moveRoomStretch } from './boundary-edits.js';
 import { remapRoomSpans } from './span-remap.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
+import { anchorAt } from './line-spans.js';
+import { resolutionFloor } from './thickness.js';
+import { explicitContactWidths, seatDistance, seatJogStation } from './face-contacts.js';
 import {
   depth,
   endSituation,
@@ -103,60 +106,86 @@ function planEnd(derived, run, atEnd, delta) {
   const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;
   const partner = run.ends[atEnd ? 1 : 0].partner;
   const allowance = relative > SAME ? junctionAllowance(derived, line, partner, run.width ?? 0) : 0;
+  const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
+  const moving = {
+    anchor: subjectNear(line, station, station - sign),
+    exposure: run.partnerRun
+      ? 'interior'
+      : pieceAt(derived, line, station - sign * SAME * 2)?.exposure,
+  };
+  // F1: a new jog copies the adjacent part with its exposure, else the moved part.
+  const choose = (staying) =>
+    [moving, staying].find((part) => part.anchor && part.exposure === jogExposure)?.anchor ||
+    moving.anchor;
   if (situation.kind === 'shift') {
-    if (Math.abs(relative) > SAME) return { type: 'shift', station: station + sign * allowance };
-    // The moved line runs on again on the continuation: what moved with it there continues it.
     const continuation = situation.continuation;
     const at = atEnd ? 0 : continuation.frame.length;
-    return { type: 'shift', station: null, joinAnchor: subjectNear(continuation, at, at + sign) };
+    const staying = {
+      anchor: subjectNear(continuation, at, at + sign),
+      exposure: pieceAt(derived, continuation, at + sign * SAME * 2)?.exposure,
+    };
+    // The moved line runs on again on the continuation: what moved with it there continues it.
+    if (Math.abs(relative) <= SAME)
+      return { type: 'shift', station: null, joinAnchor: staying.anchor };
+    // The old jog's own wall stays with it; a stretch that was another wall's contact does not.
+    const keep = situation.jog.edges
+      .filter((edge) => {
+        const piece = pieceAt(derived, situation.jog, (edge.from + edge.to) / 2);
+        return piece?.subjectId && piece.exposure === 'exterior';
+      })
+      .map((edge) => edge.id);
+    return {
+      type: 'shift',
+      station: station + sign * allowance,
+      keep,
+      jogAnchor: choose(staying),
+    };
   }
   const target = station + sign * allowance;
   // A jog would pass the line's corner: the whole remainder of the line moves instead.
   if (atEnd ? target >= line.frame.length - SAME : target <= SAME) return { type: 'slide' };
-  const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
-  const parts = [
-    {
-      anchor: subjectNear(line, station, station - sign),
-      exposure: run.partnerRun
-        ? 'interior'
-        : pieceAt(derived, line, station - sign * SAME * 2)?.exposure,
-    },
-    {
-      anchor: subjectNear(line, target, target + sign),
-      exposure: pieceAt(derived, line, target + sign * SAME * 2)?.exposure,
-    },
-  ];
-  const chosen = parts.find((part) => part.anchor && part.exposure === jogExposure) || parts[0];
-  return { type: 'jog', station: target, jogAnchor: chosen.anchor };
+  const staying = {
+    anchor: subjectNear(line, target, target + sign),
+    exposure: pieceAt(derived, line, target + sign * SAME * 2)?.exposure,
+  };
+  return { type: 'jog', station: target, jogAnchor: choose(staying) };
 }
 
 /**
- * Anchor the edges the edit created. F2: a new jog lying against another room's existing wall
- * has no wall of its own there (that wall continues over the contact, and what is left of the jog
- * in its corner is a cap); otherwise F1, the jog copies the part chosen for it.
+ * Anchor the edges the edit created. F2: a jog lying against another room's existing wall has no
+ * wall of its own there, whether the edit created it or placed it again (that wall continues over
+ * the contact, and what is left of the jog in its corner is a cap); otherwise F1, a new jog copies
+ * the part chosen for it, and a placed jog keeps its own wall.
  */
 function anchorNewEdges(primary, additions, specifications, createId) {
   if (!additions.length) return;
   const after = deriveBuildingPlanPieces(primary, specifications);
+  const lineOf = (roomId, index) =>
+    after.lines.find((entry) => entry.roomId === roomId && entry.index === index);
   const meetsExistingWall = ({ room, edgeId }) => {
     const line = after.lines.find(
       (entry) => entry.roomId === room.id && entry.edges.some((edge) => edge.id === edgeId)
     );
     const edge = line.edges.find((entry) => entry.id === edgeId);
-    return after.pieces.some(
-      (piece) =>
-        piece.subjectId &&
-        piece.lines.length > 1 &&
-        piece.lines.some(
-          (entry) =>
-            entry.roomId === room.id &&
-            entry.index === line.index &&
-            Math.min(entry.to, edge.to) - Math.max(entry.from, edge.from) > SAME
-        )
-    );
+    return after.pieces.some((piece) => {
+      const own = piece.lines.find(
+        (entry) =>
+          entry.roomId === room.id &&
+          entry.index === line.index &&
+          Math.min(entry.to, edge.to) - Math.max(entry.from, edge.from) > SAME
+      );
+      const other = own && piece.lines.find((entry) => entry !== own);
+      return other && anchorAt(lineOf(other.roomId, other.index), other.from, other.to);
+    });
   };
   for (const addition of additions) {
-    if (addition.jog && meetsExistingWall(addition)) continue;
+    if (addition.jog && meetsExistingWall(addition)) {
+      primary.anchors = primary.anchors.filter(
+        (anchor) => !(anchor.roomId === addition.room.id && anchor.edgeId === addition.edgeId)
+      );
+      continue;
+    }
+    if (!addition.anchor) continue;
     primary.anchors.push({
       subjectId: addition.anchor.subjectId,
       faceId: createId(),
@@ -183,8 +212,6 @@ export function resizeFace(primary, operation, { createId, specifications }) {
   const stretch = locateFace(primary, operation, derived.lines);
   const all = primary.rooms.map((room) => room.id);
   if (Math.abs(operation.distance) <= SAME) return { result: {}, preferredRoomIds: all };
-  const out = { x: -inward(stretch.line).x, y: -inward(stretch.line).y };
-  const delta = { x: out.x * operation.distance, y: out.y * operation.distance };
 
   const runs = [{ ...stretch, preferMoved: [stretch.edgeId] }];
   for (const follower of followers(derived, derived.lines, stretch)) {
@@ -212,10 +239,24 @@ export function resizeFace(primary, operation, { createId, specifications }) {
       end.partner =
         run.partnerRun?.ends?.find((other) => samePlace(other.point, end.point, run.width)) || null;
 
+  // R1: the moved lines and the jogs adapt to the faces already in place.
+  const context = {
+    floor: resolutionFloor(primary),
+    specifications,
+    tolerance: operation.attachmentTolerance ?? 0,
+    keep: operation.keepContactThickness === true,
+    kept: [],
+  };
+  const distance = seatDistance(primary, runs, operation.distance, context);
+  const out = { x: -inward(stretch.line).x, y: -inward(stretch.line).y };
+  const delta = { x: out.x * distance, y: out.y * distance };
+
   const additions = [];
   for (const run of runs) {
     const room = primary.rooms.find((entry) => entry.id === run.roomId);
-    const ends = [planEnd(derived, run, false, delta), planEnd(derived, run, true, delta)];
+    const ends = [false, true].map((atEnd) =>
+      seatJogStation(primary, run, planEnd(derived, run, atEnd, delta), atEnd, delta, context)
+    );
     const edited = moveRoomStretch(
       room,
       { line: run.line, from: run.from, to: run.to, delta, ends, preferMoved: run.preferMoved },
@@ -226,10 +267,16 @@ export function resizeFace(primary, operation, { createId, specifications }) {
       const anchor =
         (entry.jog && !entry.replaces && ends[entry.end]?.jogAnchor) ||
         (entry.extension && ends[entry.extension === 'end' ? 1 : 0].joinAnchor);
-      if (anchor) additions.push({ room, edgeId, anchor, jog: entry.jog });
+      if (anchor || entry.jog) additions.push({ room, edgeId, anchor, jog: entry.jog });
     }
   }
   anchorNewEdges(primary, additions, specifications, createId);
+  primary.contactWidths = explicitContactWidths(
+    primary,
+    derived,
+    runs.map((run) => run.roomId),
+    context
+  );
   const edited = new Set(runs.map((run) => run.roomId));
   return { result: {}, preferredRoomIds: all.filter((id) => !edited.has(id)) };
 }

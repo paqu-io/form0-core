@@ -128,37 +128,54 @@ export function moveRoomStretch(room, plan, createId) {
       });
       return;
     }
-    // shift: the line's end vertex is the top of a jog leading to the continuation.
-    const far = list[(position + 2 * step + list.length) % list.length];
-    const jogDirection = minus(neighbour.back, corner.back);
-    const continuation = minus(far.back, neighbour.back);
+    // shift: the line's end vertex is the top of a jog (one or more collinear edges) leading to
+    // the continuation; the jog's inner stations go, the derivation places them again.
+    const at = (k) => list[(position + k * step + 2 * list.length) % list.length];
+    const jogFrame = lineFrame(corner.back, neighbour.back);
+    let reach = 1;
+    while (
+      jogFrame &&
+      reach < list.length - 2 &&
+      Math.abs(offset(jogFrame, at(reach + 1).back)) <= SAME
+    )
+      reach++;
+    const foot = at(reach);
+    const far = at(reach + 1);
+    const jogEdges = [];
+    for (let k = 0; k < reach; k++) {
+      const [p, q] = atEnd ? [at(k), at(k + 1)] : [at(k + 1), at(k)];
+      const edge = room.edges.find(
+        (entry) => entry.startId === p.vertex.id && entry.endId === q.vertex.id
+      );
+      if (edge) jogEdges.push(oldEdges.get(edge.id));
+      if (k > 0) removed.add(at(k).vertex.id);
+    }
+    const jogDirection = minus(foot.back, corner.back);
+    const continuation = minus(far.back, foot.back);
     if (end.station == null) {
       // The moved line now runs on the continuation: its last edge reaches the continuation's
       // first vertex, which is read back on the old line like a slid corner.
       removed.add(corner.vertex.id);
-      neighbour.out = neighbour.back;
-      neighbour.back = minus(neighbour.back, delta);
-      neighbour.run = true;
+      foot.out = foot.back;
+      foot.back = minus(foot.back, delta);
+      foot.run = true;
       return;
     }
     const top = plus(pointAt(frame, end.station), delta);
-    const foot = intersect(top, jogDirection, neighbour.back, continuation);
-    if (!foot) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
+    const point = intersect(top, jogDirection, foot.back, continuation);
+    if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
     corner.vertex = { ...corner.vertex, ...cleanPoint(top) };
     corner.back = pointAt(frame, end.station);
     corner.run = true;
-    neighbour.vertex = { ...neighbour.vertex, ...cleanPoint(foot) };
-    neighbour.back = foot;
-    neighbour.out = foot;
-    const old = room.edges.find((edge) =>
-      atEnd
-        ? edge.startId === corner.vertex.id && edge.endId === neighbour.vertex.id
-        : edge.startId === neighbour.vertex.id && edge.endId === corner.vertex.id
-    );
+    foot.vertex = { ...foot.vertex, ...cleanPoint(point) };
+    foot.back = point;
+    foot.out = point;
+    // The relocated jog keeps the identity of its longest old edge among those it owned (the
+    // planner's `keep`; a stretch that was another wall's contact is not the jog's own).
+    const own = end.keep ? jogEdges.filter((edge) => end.keep.includes(edge.id)) : jogEdges;
+    const old = [...own].sort((x, y) => (y.frame?.length ?? 0) - (x.frame?.length ?? 0))[0];
     jogs.push({
-      ids: atEnd
-        ? [corner.vertex.id, neighbour.vertex.id]
-        : [neighbour.vertex.id, corner.vertex.id],
+      ids: atEnd ? [corner.vertex.id, foot.vertex.id] : [foot.vertex.id, corner.vertex.id],
       replaces: old?.id ?? null,
       end: atEnd ? 1 : 0,
     });

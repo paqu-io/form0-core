@@ -1,35 +1,13 @@
 import { solveSeatingDelta } from '../attachment-seating.js';
-import { GAP_TOLERANCE, SAME, along, offset, overlap, pointAt } from './grid.js';
+import { SAME } from './grid.js';
 import { roomLines } from './room-lines.js';
-import { anchorAt, annotateLines } from './line-spans.js';
-import { resolutionFloor, resolveWallThickness } from './thickness.js';
-
-/** Today's exactness for an unsnapped contact (1 µm), so tolerance 0 behaves as before. */
-const EXACT = 1e-6;
+import { annotateLines } from './line-spans.js';
+import { resolutionFloor } from './thickness.js';
+import { contactWindow, facingGap, matchedWidth } from './contact-window.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
 };
-
-/** A line of the seated room facing a neighbour's line: overlap and gap (outward from `a`). */
-function facing(a, b) {
-  if (a.frame.tangent.x * b.frame.tangent.x + a.frame.tangent.y * b.frame.tangent.y >= 0)
-    return null;
-  const interval = overlap(
-    [0, a.frame.length],
-    [along(a.frame, b.frame.start), along(a.frame, b.frame.end)]
-  );
-  if (!interval) return null;
-  const gaps = interval.map(
-    (station) =>
-      a.outward * offset(a.frame, pointAt(b.frame, along(b.frame, pointAt(a.frame, station))))
-  );
-  if (Math.abs(gaps[0] - gaps[1]) > GAP_TOLERANCE) return null;
-  const onB = interval
-    .map((station) => along(b.frame, pointAt(a.frame, station)))
-    .sort((x, y) => x - y);
-  return { gap: (gaps[0] + gaps[1]) / 2, onB };
-}
 
 /**
  * Seat a created or moved room against the rooms already in place (R1: geometry the user is not
@@ -57,19 +35,15 @@ export function seatRoom(primary, roomId, { tolerance = 0, keep = false, specifi
   for (const a of roomLines(room)) {
     let best = null;
     for (const b of others) {
-      const found = facing(a, b);
+      const found = facingGap(a, b);
       if (!found || found.gap <= SAME) continue;
-      const subject = primary.subjects.get(anchorAt(b, ...found.onB)?.subjectId) || null;
-      const width = (rooms) => resolveWallThickness(floor, specifications, subject, rooms).value;
-      const inherited = width([roomId, b.roomId]);
-      const existing = width([b.roomId, null]);
-      const widths = [...new Set([existing, inherited])].filter((value) => value > 0);
-      if (!widths.length) continue;
-      const near = widths.sort((x, y) => Math.abs(found.gap - x) - Math.abs(found.gap - y))[0];
+      const window = contactWindow(primary, floor, specifications, roomId, b, found.onB, keep);
+      const near = matchedWidth(window, found.gap, tolerance);
+      if (near == null) continue;
       const mismatch = Math.abs(found.gap - near);
-      if (mismatch > tolerance + EXACT || (best && best.mismatch <= mismatch)) continue;
-      const seat = keep && existing > 0 ? existing : inherited > 0 ? inherited : near;
-      best = { a, b, gap: found.gap, seat, inherited, mismatch };
+      if (best && best.mismatch <= mismatch) continue;
+      const { inherited } = window;
+      best = { a, b, gap: found.gap, seat: window.seat ?? near, inherited, mismatch };
     }
     if (best) contacts.push(best);
   }
