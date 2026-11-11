@@ -94,6 +94,28 @@ export function junctionAllowance(derived, line, other, contactWidth) {
   return sin > 1e-9 && width > 0 ? (width + contactWidth * cos) / sin : 0;
 }
 
+/**
+ * The return a room makes against the other room's adjoining wall at a moved contact's end: the
+ * line parallel to that wall at its width outside it (where this room's clear space must stop),
+ * as a station on this line and a direction. Null when the other room has no adjoining wall there.
+ */
+export function junctionReturn(derived, line, other) {
+  if (!other || other.situation.kind === 'straight') return null;
+  const adjoining =
+    other.situation.kind === 'shift' ? other.situation.jog : other.situation.adjoining;
+  const width = pieceAtLineEnd(derived, adjoining, !other.atEnd)?.width ?? 0;
+  if (!(width > 0)) return null;
+  const { frame } = adjoining;
+  const base = pointAt(frame, 0, adjoining.outward * width);
+  const det = line.frame.tangent.x * frame.tangent.y - line.frame.tangent.y * frame.tangent.x;
+  if (Math.abs(det) <= 1e-9) return null;
+  const t =
+    ((base.x - line.frame.start.x) * frame.tangent.y -
+      (base.y - line.frame.start.y) * frame.tangent.x) /
+    det;
+  return { station: t, direction: frame.tangent };
+}
+
 /** The subject anchored on a room line just inside a station (towards `towards`). */
 export function subjectNear(line, station, towards) {
   const probe = station + Math.sign(towards - station) * SAME * 2;
@@ -246,12 +268,21 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
       jogAnchor: choose(staying),
     };
   }
-  const target = place(station + sign * allowance);
+  // Against the other room's adjoining wall the return runs parallel to it (square on a plan
+  // drawn square, along a slanted wall otherwise).
+  const square = relative > SAME ? junctionReturn(derived, line, partner) : null;
+  const against = square && sign * (square.station - station) > -SAME ? square : null;
+  const target = against ? against.station : place(station + sign * allowance);
   // A jog would pass the line's corner: the whole remainder of the line moves instead.
   if (atEnd ? target >= line.frame.length - SAME : target <= SAME) return { type: 'slide' };
   const staying = {
     anchor: subjectNear(line, target, target + sign),
     exposure: pieceAt(derived, line, target + sign * SAME * 2)?.exposure,
   };
-  return { type: 'jog', station: target, jogAnchor: choose(staying) };
+  return {
+    type: 'jog',
+    station: target,
+    jogAnchor: choose(staying),
+    ...(against ? { direction: against.direction } : {}),
+  };
 }

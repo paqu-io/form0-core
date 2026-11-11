@@ -145,7 +145,7 @@ export function moveRoomStretch(room, plan, createId) {
     if (end.type === 'jog') {
       // The stationary vertex at the station stays; a moved copy starts the jog.
       const stay = lineEntries.find((entry) => Math.abs(station(entry) - end.station) <= SAME);
-      const point = cleanPoint(onMovedLine(stay.back, frame.normal));
+      const point = cleanPoint(onMovedLine(stay.back, end.direction || frame.normal));
       const moved = { vertex: { id: createId(), ...point }, back: stay.back, run: true };
       const at = indexOf(stay.vertex.id);
       list.splice(atEnd ? at : at + 1, 0, moved);
