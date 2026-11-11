@@ -38,7 +38,7 @@ export function lineVertexIds(room, line) {
  *
  * The room is edited in place. Returns, per resulting edge, its provenance: the old edge it is
  * part of with the old stations it spans (beyond the old ends when lengthened) and whether it
- * moved, or a jog. Edges of an extension carry `extension: true`.
+ * moved, or a jog. Edges of an extension carry `extension: 'start'|'end'` (the side they extend).
  *
  * @returns {{edges: Map<string, Object>, lengths: Map<string, number>}} Provenance by new edge
  *   ID, and the old edges' lengths.
@@ -124,6 +124,7 @@ export function moveRoomStretch(room, plan, createId) {
       list.splice(atEnd ? at : at + 1, 0, moved);
       jogs.push({
         ids: atEnd ? [moved.vertex.id, stay.vertex.id] : [stay.vertex.id, moved.vertex.id],
+        end: atEnd ? 1 : 0,
       });
       return;
     }
@@ -132,7 +133,12 @@ export function moveRoomStretch(room, plan, createId) {
     const jogDirection = minus(neighbour.back, corner.back);
     const continuation = minus(far.back, neighbour.back);
     if (end.station == null) {
+      // The moved line now runs on the continuation: its last edge reaches the continuation's
+      // first vertex, which is read back on the old line like a slid corner.
       removed.add(corner.vertex.id);
+      neighbour.out = neighbour.back;
+      neighbour.back = minus(neighbour.back, delta);
+      neighbour.run = true;
       return;
     }
     const top = plus(pointAt(frame, end.station), delta);
@@ -154,6 +160,7 @@ export function moveRoomStretch(room, plan, createId) {
         ? [corner.vertex.id, neighbour.vertex.id]
         : [neighbour.vertex.id, corner.vertex.id],
       replaces: old?.id ?? null,
+      end: atEnd ? 1 : 0,
     });
   };
   reconnect(startEnd, false);
@@ -206,7 +213,13 @@ function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
     const pair = [a.vertex.id, b.vertex.id];
     const jog = jogs.find((entry) => entry.ids[0] === pair[0] && entry.ids[1] === pair[1]);
     if (jog) {
-      provenance.push({ startId: pair[0], endId: pair[1], jog: true, replaces: jog.replaces });
+      provenance.push({
+        startId: pair[0],
+        endId: pair[1],
+        jog: true,
+        replaces: jog.replaces ?? null,
+        end: jog.end,
+      });
       continue;
     }
     // A run edge is read back on the old line; any other edge where its ends lie (a slid corner
@@ -233,10 +246,13 @@ function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
       from: best.from,
       to: best.to,
       moved: run,
-      extension: Boolean(
-        stations &&
-          (Math.max(...stations) <= plan.from + SAME || Math.min(...stations) >= plan.to - SAME)
-      ),
+      extension: !stations
+        ? null
+        : Math.max(...stations) <= plan.from + SAME
+          ? 'start'
+          : Math.min(...stations) >= plan.to - SAME
+            ? 'end'
+            : null,
     });
   }
   // Each old edge's ID stays with one part: the preferred one, else the part covering most of it.

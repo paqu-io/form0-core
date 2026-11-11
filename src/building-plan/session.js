@@ -254,7 +254,11 @@ export function createBuildingPlanSession({
               specifications,
               editingPolicy,
             });
-          const applied = applyDerivedOperation(candidate, edit, { createId, specifications });
+          const applied = applyDerivedOperation(candidate, edit, {
+            createId,
+            specifications,
+            editingPolicy,
+          });
           divisions = applied.divisions;
           derivedIssues = applied.issues;
           return applied.result;
