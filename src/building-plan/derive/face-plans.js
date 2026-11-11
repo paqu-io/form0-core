@@ -6,6 +6,7 @@ const refuse = (code, message, subject) => {
   });
 };
 import { anchorAt } from './line-spans.js';
+import { retreatStation } from './jog-retreat.js';
 
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 
@@ -193,7 +194,7 @@ const minus = (p, q) => ({ x: p.x - q.x, y: p.y - q.y });
  * stays out of the partner room's wall material (the partner being the room across the moved
  * wall). F1: a new jog copies the adjacent part with its own exposure, else the moved part.
  */
-export function planEnd(derived, run, atEnd, delta) {
+export function planEnd(derived, run, atEnd, delta, primary = null) {
   const { line, situation } = run.ends[atEnd ? 1 : 0];
   const station = atEnd ? run.to : run.from;
   const sign = atEnd ? 1 : -1;
@@ -205,6 +206,11 @@ export function planEnd(derived, run, atEnd, delta) {
   const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;
   const partner = run.ends[atEnd ? 1 : 0].partner;
   const allowance = relative > SAME ? junctionAllowance(derived, line, partner, run.width ?? 0) : 0;
+  // A stretch growing with no room across it: its jog steps back from other rooms' material.
+  const place = (value) =>
+    relative < -SAME && !partner && primary
+      ? retreatStation(primary, derived, line, value, atEnd, -relative)
+      : value;
   const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
   const moving = {
     anchor: subjectNear(line, station, station - sign),
@@ -235,12 +241,12 @@ export function planEnd(derived, run, atEnd, delta) {
       .map((edge) => edge.id);
     return {
       type: 'shift',
-      station: station + sign * allowance,
+      station: place(station + sign * allowance),
       keep,
       jogAnchor: choose(staying),
     };
   }
-  const target = station + sign * allowance;
+  const target = place(station + sign * allowance);
   // A jog would pass the line's corner: the whole remainder of the line moves instead.
   if (atEnd ? target >= line.frame.length - SAME : target <= SAME) return { type: 'slide' };
   const staying = {

@@ -94,13 +94,19 @@ export function moveRoomStretch(room, plan, createId) {
     const value = station(entry);
     if (value > low + SAME && value < high - SAME) entry.run = true;
   }
-  // `shift` ends: vertices beyond the new jog station leave the line.
+  // `shift` ends: vertices at or beyond the new jog station leave the line; the jog's corner takes
+  // the place of one at the station (and its cut, if any).
+  const leave = (entry, top) => {
+    removed.add(entry.vertex.id);
+    if (entry.vertex.editingCutId && !top.vertex.editingCutId)
+      top.vertex = { ...top.vertex, editingCutId: entry.vertex.editingCutId };
+  };
   if (startEnd.type === 'shift' && startEnd.station != null)
-    for (const entry of lineEntries.slice(1))
-      if (station(entry) < startEnd.station - SAME) removed.add(entry.vertex.id);
+    for (const entry of lineEntries.slice(1, -1))
+      if (station(entry) < startEnd.station + SAME) leave(entry, lineEntries[0]);
   if (endEnd.type === 'shift' && endEnd.station != null)
-    for (const entry of lineEntries.slice(0, -1))
-      if (station(entry) > endEnd.station + SAME) removed.add(entry.vertex.id);
+    for (const entry of lineEntries.slice(1, -1))
+      if (station(entry) > endEnd.station - SAME) leave(entry, lineEntries.at(-1));
 
   for (const entry of lineEntries)
     if (entry.run) entry.vertex = { ...entry.vertex, ...cleanPoint(map(entry.back)) };
@@ -112,24 +118,25 @@ export function moveRoomStretch(room, plan, createId) {
     const step = atEnd ? 1 : -1;
     const neighbour = list[(position + step + list.length) % list.length];
     if (end.type === 'slide') {
-      const point = intersect(
-        corner.vertex,
-        minus(map(frame.end), map(frame.start)),
-        neighbour.back,
-        minus(corner.back, neighbour.back)
-      );
-      if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
-      // The corner slides along the whole adjoining line: stations it passes leave the line (the
-      // parts between them collapse); passing the line's far corner is left to the checks.
-      const adjoining = lineFrame(corner.back, neighbour.back);
-      const reach = adjoining ? along(adjoining, point) : 0;
-      for (let k = 1; adjoining && k < list.length - 2; k++) {
-        const passed = list[(position + k * step + 2 * list.length) % list.length];
-        const next = list[(position + (k + 1) * step + 2 * list.length) % list.length];
-        if (Math.abs(offset(adjoining, next.back)) > SAME) break;
-        if (along(adjoining, passed.back) >= reach - SAME) break;
-        removed.add(passed.vertex.id);
+      // The corner slides along the outline beyond it until the moved line meets it: the
+      // adjoining line (lengthened or shortened), or, when the moved line passes that line's far
+      // end, a later edge; the vertices it passes leave the outline (their edges collapse).
+      const movedDirection = minus(map(frame.end), map(frame.start));
+      const at = (k) => list[(position + k * step + 2 * list.length) % list.length];
+      let point = null;
+      for (let k = 1; k < Math.min(list.length - 1, 8) && !point; k++) {
+        const [from, to] = [k === 1 ? corner.back : at(k - 1).back, at(k).back];
+        const edge = lineFrame(from, to);
+        if (!edge) continue;
+        const hit = intersect(corner.vertex, movedDirection, from, minus(to, from));
+        const reach = hit && along(edge, hit);
+        // The first edge may lengthen (the corner moves away from it); later ones must contain it.
+        if (hit && reach <= edge.length + SAME && (k === 1 || reach >= -SAME)) {
+          point = hit;
+          for (let passed = 1; passed < k; passed++) removed.add(at(passed).vertex.id);
+        }
       }
+      if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
       corner.back = unmap(point);
       corner.out = point;

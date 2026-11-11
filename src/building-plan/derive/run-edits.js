@@ -55,7 +55,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
     const ends =
       run.fixedEnds ||
       [false, true].map((atEnd) => {
-        const plan = planEnd(derived, run, atEnd, delta);
+        const plan = planEnd(derived, run, atEnd, delta, primary);
         return seatJog ? seatJog(run, plan, atEnd) : plan;
       });
     const edited = moveRoomStretch(

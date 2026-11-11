@@ -58,13 +58,14 @@ export function junctionFollowers(derived, runs, delta) {
         })
         .map((edge) => edge.id);
       const shifted = { type: 'shift', station: (atEnd ? line.frame.length : 0) + shift, keep };
-      // A zero jog at the other end of the stretch: only the junction moves.
-      const still = { type: 'jog', station: near };
+      // The stretch is the whole line, moved by nothing: only the junction at its end moves (a
+      // zero jog at the other end merges away).
+      const still = { type: 'jog', station: atEnd ? 0 : line.frame.length };
       extra.push({
         roomId: line.roomId,
         line,
-        from: atEnd ? near : 0,
-        to: atEnd ? line.frame.length : near,
+        from: 0,
+        to: line.frame.length,
         fixedEnds: atEnd ? [still, shifted] : [shifted, still],
       });
     }
