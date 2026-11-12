@@ -9,6 +9,7 @@ import { moveCorner } from './corner-commands.js';
 import { resizePreserveGroup, resizeRoom } from './room-resizes.js';
 import { rejoinCut, splitFace } from './cut-commands.js';
 import { changeThickness } from './thickness-commands.js';
+import { PARTITION_COMMANDS } from './partition-commands.js';
 import {
   DATA_OPERATIONS,
   PROPERTY_OPERATIONS,
@@ -32,6 +33,7 @@ export const DERIVED_OPERATIONS = Object.freeze([
   'resize_preserve_group',
   'split_face',
   'rejoin_cut',
+  ...Object.keys(PARTITION_COMMANDS),
   ...DATA_OPERATIONS,
 ]);
 const FACE_COMMANDS = {
@@ -41,6 +43,7 @@ const FACE_COMMANDS = {
   resize_preserve_group: resizePreserveGroup,
   split_face: splitFace,
   rejoin_cut: rejoinCut,
+  ...PARTITION_COMMANDS,
 };
 /** Derived operations, and batches made only of data operations (J3). */
 export const usesDerivedPath = (operation) =>

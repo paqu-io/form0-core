@@ -6,6 +6,7 @@ import { inward } from './face-plans.js';
 import { editRuns, prepareEnds } from './run-edits.js';
 import { junctionFollowers } from './junction-follow.js';
 import { snapStations } from './corner-stations.js';
+import { shiftPartitions } from './partition-thickness.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -48,7 +49,7 @@ function stretch(derived, entry, width, next, amount = null) {
 /**
  * The stretches each changed piece moves (rules 7 and 8): a shared piece moves the non-anchor
  * room's stretch by the change and keeps the anchor's (`room_face`), or moves both by half
- * (`midline`); an exterior piece moves only under `midline`. Partitions keep their path (J5).
+ * (`midline`); an exterior piece moves only under `midline`. Partitions move separately (J5).
  */
 function plannedStretches(primary, derived, operation, specifications) {
   const floor = resolutionFloor(primary);
@@ -147,6 +148,8 @@ export function changeThickness(primary, before, operation, { createId, specific
   const all = primary.rooms.map((room) => room.id);
   const derived = deriveBuildingPlanPieces(before, specifications);
   const { moving, staying } = plannedStretches(primary, derived, operation, specifications);
+  // J5: under midline a partition's face moves by half the change; under room_face it holds.
+  if (operation.thicknessAnchor === 'midline') shiftPartitions(primary, before, specifications);
   if (!moving.length) return { result: { carvedRoomIds: [] }, preferredRoomIds: all };
   prepareEnds(derived, [...moving, ...staying]);
   // Ends paired at the current width; jogs keep clear of the wall at its new width.
