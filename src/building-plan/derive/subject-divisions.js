@@ -86,6 +86,31 @@ function keptPiece(context, subject, pieces) {
   return held || tied[0];
 }
 
+/** Lineage of a division of `source`, as today's normalization writes it. */
+export const divisionLineage = (source) => ({
+  splitFromWallId: source.lineage?.splitFromWallId || source.id,
+  dividedFromWallId: source.id,
+  automaticDivision: 'adjacency',
+});
+
+/**
+ * A new subject copying the source's answers, side answers (new side IDs) and custom rows (new
+ * row IDs), with the source's orientation basis. Its reference row is chosen by the write-back.
+ */
+export function subjectCopy(context, source) {
+  const target = { ...copy(source), id: context.createId() };
+  delete target.autoLabel;
+  target.segmentId = context.createId();
+  target.referenceFaceId = null;
+  target.sides = target.sides.map((side) => ({ ...side, id: context.createId() }));
+  renewBuildingPlanRowIdentities(target, context.createId);
+  for (const side of target.sides) renewBuildingPlanRowIdentities(side, context.createId);
+  context.subjects.set(target.id, target);
+  context.children.set(target.id, source.id);
+  if (context.basis.has(source.id)) context.basis.set(target.id, context.basis.get(source.id));
+  return target;
+}
+
 /**
  * Divide before joining: a subject anchored on several pieces keeps the piece that did not change
  * (see `keptPiece`); every other piece gets a new subject copying the answers, the side answers
@@ -106,11 +131,7 @@ export function divideSubjects(context) {
     const kept = keptPiece(context, subject, pieces);
     context.divided.add(id);
     const source = copy(subject);
-    const division = {
-      splitFromWallId: source.lineage?.splitFromWallId || source.id,
-      dividedFromWallId: source.id,
-      automaticDivision: 'adjacency',
-    };
+    const division = divisionLineage(source);
     const subjectIds = [];
     // New pieces are numbered in order along the source's axis, as today (W3.1, W3.2, ...).
     const tangent = subjectTangent(context, source) || { x: 0, y: 0 };
@@ -121,19 +142,7 @@ export function divideSubjects(context) {
     for (const piece of [...pieces].sort((a, b) => station(a) - station(b))) {
       const onPiece = (opening) => placed.get(opening.id) === piece;
       let target = subject;
-      if (piece !== kept) {
-        target = { ...copy(source), id: context.createId() };
-        delete target.autoLabel;
-        target.segmentId = context.createId();
-        target.referenceFaceId = null;
-        target.sides = target.sides.map((side) => ({ ...side, id: context.createId() }));
-        renewBuildingPlanRowIdentities(target, context.createId);
-        for (const side of target.sides) renewBuildingPlanRowIdentities(side, context.createId);
-        context.subjects.set(target.id, target);
-        context.children.set(target.id, source.id);
-        if (context.basis.has(source.id))
-          context.basis.set(target.id, context.basis.get(source.id));
-      }
+      if (piece !== kept) target = subjectCopy(context, source);
       target.lineage = { ...source.lineage, ...division };
       delete target.lineage.thicknessProfile;
       target.openings = (piece === kept ? subject : source).openings.filter(onPiece);

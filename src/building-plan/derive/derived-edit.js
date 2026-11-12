@@ -7,6 +7,7 @@ import { applyRoomCommand } from './room-commands.js';
 import { resizeFace } from './face-commands.js';
 import { moveCorner } from './corner-commands.js';
 import { resizePreserveGroup, resizeRoom } from './room-resizes.js';
+import { rejoinCut, splitFace } from './cut-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
@@ -18,12 +19,16 @@ export const DERIVED_OPERATIONS = Object.freeze([
   'move_corner',
   'resize_room',
   'resize_preserve_group',
+  'split_face',
+  'rejoin_cut',
 ]);
 const FACE_COMMANDS = {
   resize_face: resizeFace,
   move_corner: moveCorner,
   resize_room: resizeRoom,
   resize_preserve_group: resizePreserveGroup,
+  split_face: splitFace,
+  rejoin_cut: rejoinCut,
 };
 export const usesDerivedPath = (operation) => DERIVED_OPERATIONS.includes(operation?.type);
 

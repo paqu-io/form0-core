@@ -16,6 +16,7 @@ import {
   subjectTangent,
 } from './subject-joins.js';
 import { divideSubjects, retireSubjects } from './subject-divisions.js';
+import { dividePartitionSubjects } from './partition-divisions.js';
 import { placeRoomStations } from './room-stations.js';
 import { assembleRows, capOf } from './stored-rows.js';
 import { buildStoredWalls } from './stored-walls.js';
@@ -137,6 +138,7 @@ export function writeBackBuildingPlanFloor(primary, derived, options = {}) {
   const context = createContext(primary, derived, createId, preferredRoomIds);
   collectPieceSubjects(context);
   divideSubjects(context);
+  dividePartitionSubjects(context);
   joinPieceSubjects(context);
   // An explicit contact width (kept on attach) is an answer on that physical piece.
   for (const piece of context.pieces)
