@@ -6,6 +6,7 @@ import {
   copyBuildingPlanData as copy,
   createBuildingPlanSnapshot,
   equalValue,
+  findBuildingPlanFloor,
   own,
   planIssue,
   reconcileBuildingPlanProperties,
@@ -14,6 +15,7 @@ import {
 import { createUIRequestRegistry } from '../utilities/ui-requests.js';
 import { reconcileWallLabels } from './wall-labels.js';
 import { applyBuildingPlanOperation } from './operations.js';
+import { applyOpeningOperation } from './opening-operations.js';
 import {
   buildingPlanEditContext,
   reconcileBuildingPlanCandidate,
@@ -253,14 +255,16 @@ export function createBuildingPlanSession({
         current,
         copy(operation),
         (candidate, edit) => {
-          // Openings a confirmed edit removes first are plain data edits of the candidate.
-          const removal = edit.type === 'remove_opening' && operation.type !== 'remove_opening';
-          if (!derivedPath || removal)
+          if (!derivedPath)
             return applyBuildingPlanOperation(candidate, edit, {
               createId,
               specifications,
               editingPolicy,
             });
+          // Openings a confirmed edit removes first are plain data edits of the candidate; the
+          // edit's own write-back reads them.
+          if (edit.type === 'remove_opening' && operation.type !== 'remove_opening')
+            return applyOpeningOperation(findBuildingPlanFloor(candidate, edit.floorId), edit);
           const applied = applyDerivedOperation(candidate, edit, {
             createId,
             specifications,

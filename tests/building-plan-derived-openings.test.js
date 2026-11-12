@@ -173,3 +173,17 @@ test('a record-sync batch edits answers and an opening in one command, as today'
       }),
   ]);
 });
+
+test('an edit that cuts through a door asks first; confirmed, the door goes, as today', () => {
+  let doorId = null;
+  const move = (t, extra = {}) =>
+    t.apply({ type: 'move_room', roomId: t.floor().rooms[1].id, delta: { x: 1, y: 0 }, ...extra });
+  const { derived } = bothEngines([
+    (t) => {
+      doorId = t.floor().walls.flatMap((wall) => wall.doors)[0].id;
+      return move(t);
+    },
+    (t) => move(t, { removeOpeningIds: [doorId] }),
+  ]);
+  assert.equal(derived.floor().walls.flatMap((wall) => wall.doors).length, 0);
+});
