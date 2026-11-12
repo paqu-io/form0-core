@@ -46,7 +46,31 @@ function compatible(a, b, facing, adjacent = true) {
     );
 }
 
-/** Partition portions meeting at the cut become one; the second's subject joins the first's. */
+/**
+ * Decision I6: Rejoin gives back the wall the Split divided. When one subject was divided from the
+ * other (`dividedFromWallId` or `splitFromWallId`), that other survives; null leaves the choice
+ * to the write-back's join rule (W7).
+ */
+function divisionSurvivor(a, b) {
+  const from = (x, y) => [x.lineage?.dividedFromWallId, x.lineage?.splitFromWallId].includes(y.id);
+  if (from(b, a)) return [a, b];
+  if (from(a, b)) return [b, a];
+  return null;
+}
+
+/** `other` joins `survivor` (their answers were checked equal): rows, paths and openings move. */
+function absorbDivision(primary, survivor, other) {
+  for (const entry of [...primary.anchors, ...primary.partitions])
+    if (entry.subjectId === other.id) entry.subjectId = survivor.id;
+  survivor.openings = [...(survivor.openings || []), ...(other.openings || [])];
+  survivor.lineage = {
+    ...(survivor.lineage || {}),
+    mergedWallIds: [...(survivor.lineage?.mergedWallIds || []), other.id],
+  };
+  primary.subjects.delete(other.id);
+}
+
+/** Partition portions meeting at the cut become one subject (I6, else the first's). */
 function rejoinPartitions(primary, roomId, cutId, createId) {
   const portions = primary.partitions.filter((entry) => entry.roomId === roomId);
   const before = portions.find((entry) => entry.path.at(-1).editingCutId === cutId);
@@ -61,14 +85,7 @@ function rejoinPartitions(primary, roomId, cutId, createId) {
     for (const opening of subject.openings || [])
       if (opening.faceId === after.faceId)
         Object.assign(opening, { faceId: before.faceId, from: opening.from + length });
-  if (a !== b) {
-    a.openings = [...(a.openings || []), ...(b.openings || [])];
-    a.lineage = {
-      ...(a.lineage || {}),
-      mergedWallIds: [...(a.lineage?.mergedWallIds || []), b.id],
-    };
-    primary.subjects.delete(b.id);
-  }
+  if (a !== b) absorbDivision(primary, ...(divisionSurvivor(a, b) || [a, b]));
   Object.assign(before, {
     path: [before.path[0], after.path.at(-1)],
     freeEdges: [createId()],
@@ -83,7 +100,8 @@ function rejoinPartitions(primary, roomId, cutId, createId) {
 /**
  * `rejoin_cut` on the derived core (item 4, rule 5): an explicit cut, or an automatic boundary
  * by its ID, goes from every room and partition carrying it. The portions must continue each other
- * and have the same answers (today's codes); the pieces then join in the write-back.
+ * and have the same answers (today's codes). The wall the Split divided survives (I6); other
+ * pieces join in the write-back.
  *
  * @returns {{result: Object, preferredRoomIds: string[]}}
  */
@@ -125,6 +143,10 @@ export function rejoinCut(primary, { cutId }, { createId, specifications }) {
     const [a, b] = [p, q].map((piece) => piece && primary.subjects.get(piece.subjectId));
     compatible(a, b, facing, rooms(p) === rooms(q));
     joins.push({ room, vertex, subjects: [a, b] });
+  }
+  for (const { subjects } of joins) {
+    const pair = subjects[0] !== subjects[1] && divisionSurvivor(...subjects);
+    if (pair && primary.subjects.has(pair[1].id)) absorbDivision(primary, ...pair);
   }
   for (const { room, vertex, subjects } of joins) {
     joinEdges(primary, room, vertex.id);

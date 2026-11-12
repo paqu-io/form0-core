@@ -145,3 +145,28 @@ test('a partition: Split divides its wall and Rejoin joins it again', () => {
     (t) => t.apply({ type: 'rejoin_cut', cutId: cut }),
   ]);
 });
+
+test('Rejoin gives back the wall the Split divided, even when its piece became shorter (I6)', () => {
+  const t = example(true);
+  const w1 = () => t.floor().walls.find((wall) => wall.autoLabel === 'W1');
+  const original = w1().id;
+  const south = t.floor().rooms[0].faces[0].id;
+  const cut = cutOf(t.apply({ type: 'split_face', faceId: south, offset: 2 }));
+  // The Split point slides along the line to x = 4: W1 keeps 1 m, the new piece has 4 m, so the
+  // join rule alone (W7: the longer piece) would keep the new one.
+  const room = t.floor().rooms[0];
+  const vertex = room.vertices.find((v) => v.editingCutId === cut);
+  const moved = t.apply({
+    type: 'move_corner',
+    roomId: room.id,
+    vertexId: vertex.id,
+    point: { x: 4, y: 0 },
+  });
+  assert.equal(moved.status, 'applied', JSON.stringify(moved.issues));
+  assert.equal(w1().id, original);
+  assert.equal(round(Math.abs(w1().segments[0].end.x - w1().segments[0].start.x)), 1);
+  assert.equal(t.apply({ type: 'rejoin_cut', cutId: cut }).status, 'applied');
+  assert.equal(w1().id, original);
+  assert.equal(t.floor().walls.filter((wall) => /^W1(\.|$)/.test(wall.autoLabel)).length, 1);
+  assert.deepEqual(t.session.validate(), []);
+});
