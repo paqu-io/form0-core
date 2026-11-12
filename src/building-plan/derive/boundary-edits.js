@@ -29,7 +29,7 @@ export function lineVertexIds(room, line) {
  * with its inverse `unmap`: a corner drag turns the line), and reconnect each end:
  *
  * - `slide`: the stretch ends at a corner; the corner slides along the adjoining edge, whose
- *   direction stays fixed. With `plan.reverse` (corner drags) it may slide on past the far end
+ *   direction stays fixed, or goes to `point` when given (a wrapped corner's second stretch). With `plan.reverse` (corner drags) it may slide on past the far end
  *   of the adjoining line, which then reverses.
  * - `jog` at `station`: the line continues straight; vertices between the stretch end and the
  *   station move with it (an extension), and a right-angle jog joins the moved line to the
@@ -53,17 +53,30 @@ export function moveRoomStretch(room, plan, createId) {
   const frame = line.frame;
   const map = plan.map || ((point) => plus(point, delta));
   const unmap = plan.unmap || ((point) => minus(point, delta));
-  // Where the moved line crosses a line through `point` in `direction` (a jog's line): a jog
-  // stays square to the old line even when the edit turns the moved one.
-  const movedOrigin = map(frame.start);
-  const movedDirection = minus(map(frame.end), movedOrigin);
-  const onMovedLine = (point, direction) =>
-    intersect(movedOrigin, movedDirection, point, direction) || map(point);
+  // A stretch that becomes two lines at one vertex (a dragged Split point's counterpart): beyond
+  // `bendAt.station` the line moves by `bendAt.map`, and that vertex goes to `bendAt.point`. Each
+  // end then reconnects its own part.
+  const bend = plan.bendAt || null;
+  const mapAt = (atEnd) => (atEnd && bend ? bend.map : map);
+  const unmapAt = (atEnd) => (atEnd && bend ? bend.unmap : unmap);
+  const movedFrameAt = (atEnd) => lineFrame(mapAt(atEnd)(frame.start), mapAt(atEnd)(frame.end));
+  // Where an end's moved line crosses a line through `point` in `direction` (a jog's line): a
+  // jog stays square to the old line even when the edit turns the moved one.
+  const onMovedLine = (point, direction, atEnd) => {
+    const moved = movedFrameAt(atEnd);
+    return (
+      (moved && intersect(moved.start, moved.tangent, point, direction)) || mapAt(atEnd)(point)
+    );
+  };
   const [startEnd, endEnd] = plan.ends;
+  // `plan.readBack`: edge frames from before an earlier stretch of the same edit moved a vertex
+  // of this line (a wrapped corner placed by the first stretch).
   const oldEdges = new Map(
     room.edges.map((edge) => {
       const point = (id) => room.vertices.find((vertex) => vertex.id === id);
-      return [edge.id, { ...edge, frame: lineFrame(point(edge.startId), point(edge.endId)) }];
+      const frame =
+        plan.readBack?.get(edge.id) || lineFrame(point(edge.startId), point(edge.endId));
+      return [edge.id, { ...edge, frame }];
     })
   );
   // Working boundary: each entry keeps the vertex and where it came from in the old geometry.
@@ -111,13 +124,21 @@ export function moveRoomStretch(room, plan, createId) {
     for (const entry of lineEntries.slice(1, -1))
       if (station(entry) > endEnd.station - SAME) leave(entry, lineEntries.at(-1));
 
-  for (const entry of lineEntries)
-    if (entry.run) entry.vertex = { ...entry.vertex, ...cleanPoint(map(entry.back)) };
+  for (const entry of lineEntries) {
+    if (!entry.run) continue;
+    const value = station(entry);
+    const point =
+      bend && Math.abs(value - bend.station) <= SAME
+        ? bend.point
+        : mapAt(Boolean(bend) && value > bend.station)(entry.back);
+    entry.vertex = { ...entry.vertex, ...cleanPoint(point) };
+  }
 
   // Decision E: vertices of the moved line that an end placed on it (a slid corner, a bend) has
-  // reached or passed leave the outline; passing a cut refuses (moving cuts belongs to item 4).
-  const movedFrame = lineFrame(movedOrigin, map(frame.end));
+  // reached or passed leave the outline; a cut passed retires in this room (decision I3), and the
+  // row of the collapsed stretch follows the write-back's lifecycle.
   const leavePassed = (placed, atEnd) => {
+    const movedFrame = movedFrameAt(atEnd);
     if (!movedFrame) return;
     const inner = lineEntries.slice(1, -1);
     const order = atEnd ? inner.reverse() : inner;
@@ -125,8 +146,6 @@ export function moveRoomStretch(room, plan, createId) {
     // Inner vertices from the placed end inwards (after it when it is itself an inner vertex).
     for (const entry of order.slice(order.indexOf(placed) + 1)) {
       if (!entry.run || outward(entry) < outward(placed) - SAME) break;
-      if (entry.vertex.editingCutId)
-        refuse('invalid_room_geometry', 'This edit would pass a cut of its wall.');
       removed.add(entry.vertex.id);
     }
   };
@@ -141,9 +160,10 @@ export function moveRoomStretch(room, plan, createId) {
       // The corner slides along the outline beyond it until the moved line meets it: the
       // adjoining line (lengthened or shortened), or, when the moved line passes that line's far
       // end, a later edge; the vertices it passes leave the outline (their edges collapse).
-      const movedDirection = minus(map(frame.end), map(frame.start));
+      const movedDirection = minus(mapAt(atEnd)(frame.end), mapAt(atEnd)(frame.start));
       const at = (k) => list[(position + k * step + 2 * list.length) % list.length];
-      let point = null;
+      // A wrapped corner's second stretch already knows where the corner goes (`end.point`).
+      let point = end.point || null;
       let reversed = null;
       for (let k = 1; k < Math.min(list.length - 1, 8) && !point; k++) {
         const [from, to] = [k === 1 ? corner.back : at(k - 1).back, at(k).back];
@@ -176,8 +196,8 @@ export function moveRoomStretch(room, plan, createId) {
       if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
       if (reversed) jogs.push(reversed);
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
-      corner.back = unmap(point);
-      corner.out = point;
+      corner.back = unmapAt(atEnd)(point);
+      corner.out = end.out || point;
       leavePassed(corner, atEnd);
       return;
     }
@@ -189,7 +209,7 @@ export function moveRoomStretch(room, plan, createId) {
         : corner;
       if (end.point) {
         entry.vertex = { ...entry.vertex, ...cleanPoint(end.point) };
-        entry.back = unmap(end.point);
+        entry.back = unmapAt(atEnd)(end.point);
       }
       entry.out = { x: entry.vertex.x, y: entry.vertex.y };
       entry.run = true;
@@ -199,8 +219,10 @@ export function moveRoomStretch(room, plan, createId) {
     if (end.type === 'jog') {
       // The stationary vertex at the station stays; a moved copy starts the jog.
       const stay = lineEntries.find((entry) => Math.abs(station(entry) - end.station) <= SAME);
-      const point = cleanPoint(onMovedLine(stay.back, end.direction || frame.normal));
-      const moved = { vertex: { id: createId(), ...point }, back: stay.back, run: true };
+      const point = cleanPoint(onMovedLine(stay.back, end.direction || frame.normal, atEnd));
+      // A jog formed at a cut carries the cut at both ends, as today (the Split spans the jog).
+      const cut = stay.vertex.editingCutId ? { editingCutId: stay.vertex.editingCutId } : {};
+      const moved = { vertex: { id: createId(), ...point, ...cut }, back: stay.back, run: true };
       const at = indexOf(stay.vertex.id);
       list.splice(atEnd ? at : at + 1, 0, moved);
       jogs.push({
@@ -238,11 +260,11 @@ export function moveRoomStretch(room, plan, createId) {
       // first vertex, which is read back on the old line like a slid corner.
       removed.add(corner.vertex.id);
       foot.out = foot.back;
-      foot.back = unmap(foot.back);
+      foot.back = unmapAt(atEnd)(foot.back);
       foot.run = true;
       return;
     }
-    const top = onMovedLine(pointAt(frame, end.station), jogDirection);
+    const top = onMovedLine(pointAt(frame, end.station), jogDirection, atEnd);
     const point = intersect(top, jogDirection, foot.back, continuation);
     if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
     corner.vertex = { ...corner.vertex, ...cleanPoint(top) };

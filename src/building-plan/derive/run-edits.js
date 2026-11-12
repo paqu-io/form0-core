@@ -28,9 +28,12 @@ export function prepareEnds(derived, runs) {
       ),
     }));
   for (const run of runs)
-    for (const end of run.ends)
+    for (const end of run.ends) {
+      // A stretch made of two sides' stretches takes each end's partner from its own side.
+      const partnerRun = run.partnerRuns?.[end.atEnd ? 1 : 0] || run.partnerRun;
       end.partner =
-        run.partnerRun?.ends?.find((other) => samePlace(other.point, end.point, run.width)) || null;
+        partnerRun?.ends?.find((other) => samePlace(other.point, end.point, run.width)) || null;
+    }
 }
 
 /**
@@ -44,7 +47,8 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
   for (let run of runs) {
     const room = primary.rooms.find((entry) => entry.id === run.roomId);
     // A second stretch of a room already edited: find its line again in the current geometry.
-    if (done.has(room.id)) {
+    // (A wrapped corner's second stretch keeps its line: the first placed the corner already.)
+    if (done.has(room.id) && !run.readBack) {
       run = refreshRun(primary, run, specifications);
       if (!run) continue;
     }
@@ -71,6 +75,8 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
         unmap: run.unmap,
         ends,
         preferMoved: run.preferMoved,
+        bendAt: run.bendAt,
+        readBack: run.readBack,
         // Decision F: only a corner drag (a turned stretch) may reverse a return.
         reverse: Boolean(run.map),
       },
@@ -198,10 +204,11 @@ function refreshRun(primary, run, specifications) {
   );
   if (!line) return null;
   // An end planned at the line's end (a wrapped corner) still reaches it.
-  const from = run.ownEnds?.[0] ? 0 : Math.max(0, along(line.frame, p));
-  const to = run.ownEnds?.[1]
-    ? line.frame.length
-    : Math.min(line.frame.length, along(line.frame, q));
+  let from = run.ownEnds?.[0] ? 0 : Math.max(0, along(line.frame, p));
+  let to = run.ownEnds?.[1] ? line.frame.length : Math.min(line.frame.length, along(line.frame, q));
+  // The first stretch's corner passed this stretch's far end: the whole remaining line follows.
+  if (run.ownEnds?.[0] && to <= from + SAME) to = line.frame.length;
+  if (run.ownEnds?.[1] && to <= from + SAME) from = 0;
   if (to - from <= SAME) return null;
   const next = { ...run, line, from, to };
   const partner = run.ends.map((end) => end.partner);

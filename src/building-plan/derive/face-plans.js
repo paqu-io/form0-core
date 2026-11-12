@@ -225,7 +225,8 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
   const sign = atEnd ? 1 : -1;
   // How far the line moves into the room at this end (a turned line moves by different amounts).
   const point = pointAt(line.frame, station);
-  const shift = run.map ? minus(run.map(point), point) : delta;
+  const map = run.maps?.[atEnd ? 1 : 0] || run.map;
+  const shift = map ? minus(map(point), point) : delta;
   const moved = dot(shift, inward(line));
   if (situation.kind === 'slide') return { type: 'slide' };
   const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;

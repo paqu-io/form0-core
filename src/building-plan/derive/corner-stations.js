@@ -48,7 +48,8 @@ export function removeStation(primary, room, vertexId, dropEdgeId) {
 
 /**
  * Stations of a run whose line keeps its place (the corner moves along it) stay where they are;
- * the ones the corner reached or passed leave the outline with the edge towards the corner.
+ * the ones the corner reached or passed leave the outline with the edge towards the corner. A cut
+ * passed retires in this room (decision I3).
  */
 export function dropPassedStations(primary, room, side, point) {
   const after = lineFrame(side.fixed, point);
@@ -60,8 +61,7 @@ export function dropPassedStations(primary, room, side, point) {
         (edge.startId === id && edge.endId === side.corner.id) ||
         (edge.endId === id && edge.startId === side.corner.id)
     );
-    if (!vertex.physicalBoundaryId || vertex.editingCutId || !towards)
-      refuse('invalid_room_geometry', 'This corner would pass a cut of its wall.');
+    if (!towards) refuse('invalid_room_geometry', 'This corner would pass a vertex of its wall.');
     removeStation(primary, room, id, towards.id);
   }
 }

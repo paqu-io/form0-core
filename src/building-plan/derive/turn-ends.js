@@ -21,8 +21,9 @@ function intersect(p, u, q, v) {
  */
 export function planTurnedEnd(run, atEnd) {
   const { line, situation } = run.ends[atEnd ? 1 : 0];
-  if (!run.map) return null;
-  const moved = lineFrame(run.map(line.frame.start), run.map(line.frame.end));
+  const map = run.maps?.[atEnd ? 1 : 0] || run.map;
+  if (!map) return null;
+  const moved = lineFrame(map(line.frame.start), map(line.frame.end));
   if (!moved) return null;
   if (situation.kind === 'slide') {
     const { start, end } = situation.adjoining.frame;

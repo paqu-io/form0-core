@@ -1,4 +1,29 @@
-import { SAME, along, offset, pointAt } from './grid.js';
+import { SAME, along, lineFrame, offset, pointAt } from './grid.js';
+
+/** Intersection of the lines through a and b and through c and d, or null if parallel. */
+function crossing(a, b, c, d) {
+  const [u, v] = [
+    { x: b.x - a.x, y: b.y - a.y },
+    { x: d.x - c.x, y: d.y - c.y },
+  ];
+  const det = u.x * v.y - u.y * v.x;
+  if (Math.abs(det) <= 1e-12) return null;
+  const t = ((c.x - a.x) * v.y - (c.y - a.y) * v.x) / det;
+  return { x: a.x + u.x * t, y: a.y + u.y * t };
+}
+
+/**
+ * A dragged Split point's counterpart (rule 6 of item 4): both stretches lie on one line of the
+ * neighbour and meet at its cut with the same ID. Returns that station, or null.
+ */
+function counterpartCut(first, second) {
+  const cutId = first.side.corner.editingCutId;
+  if (!cutId || first.line !== second.line || Math.abs(first.to - second.from) > SAME) return null;
+  const meet = first.to;
+  return first.line.cuts.some((cut) => cut.cutId === cutId && Math.abs(cut.station - meet) <= SAME)
+    ? meet
+    : null;
+}
 
 /** The corner room's line holding a side's run (its first edge lies on it). */
 function sideLine(derived, room, side) {
@@ -75,13 +100,28 @@ function clearBetween(derived, line, from, to) {
 /**
  * A neighbour wraps the corner when it faces both runs on two consecutive lines of its own: the
  * corner between them is the dragged corner's counterpart. Both stretches reach it (caps and
- * remainders between follow the line) and it slides to where the moved lines meet.
+ * remainders between follow the line) and it slides to where the moved lines meet. For a dragged
+ * Split point the counterpart is the neighbour's cut with the same ID on one straight line.
  */
 function wrapCorners(derived, runs) {
   const following = runs.filter((run) => !run.stationary);
+  const merges = [];
   for (const first of following)
     for (const second of following) {
       if (first.roomId !== second.roomId || first.side === second.side) continue;
+      const meet = counterpartCut(first, second);
+      if (meet != null) {
+        // One stretch that becomes two lines at the cut: the cut goes where they meet.
+        const { start, end } = first.line.frame;
+        const point = crossing(
+          first.map(start),
+          first.map(end),
+          second.map(start),
+          second.map(end)
+        );
+        if (point) merges.push({ first, second, meet, point });
+        continue;
+      }
       const own = derived.lines
         .filter((line) => line.roomId === first.roomId)
         .sort((a, b) => a.index - b.index);
@@ -92,11 +132,45 @@ function wrapCorners(derived, runs) {
         !clearBetween(derived, second.line, 0, second.from)
       )
         continue;
+      // The counterpart corner: where both moved lines meet.
+      const corner = first.line.frame.end;
+      const movedFirst = lineFrame(first.map(first.line.frame.start), first.map(corner));
+      const [p, q] = [second.map(corner), second.map(second.line.frame.end)];
+      const aligned = [p, q].every((point) => Math.abs(offset(movedFirst, point)) <= SAME);
+      // On one straight line again, the counterpart lies across from the dragged vertex.
+      const dragged = first.map(first.side.corner);
+      const across = pointAt(movedFirst, along(movedFirst, dragged));
+      const point = (!aligned && crossing(movedFirst.start, movedFirst.end, p, q)) || across;
       first.to = end;
       second.from = 0;
-      first.ownEnds = [first.ownEnds?.[0] ?? null, { type: 'slide' }];
-      second.ownEnds = [{ type: 'slide' }, second.ownEnds?.[1] ?? null];
+      // The first stretch puts the corner in place; the second line has not moved yet, so its
+      // edge there reads back from the old corner. The second keeps its line and reads back
+      // against its frames from before the first.
+      // When the second line keeps its place the corner simply slides along it (passing its
+      // stations, or reversing a return); otherwise it goes straight to where it belongs.
+      const placed = second.side.keepsLine
+        ? { type: 'slide' }
+        : { type: 'slide', point, out: corner };
+      first.ownEnds = [first.ownEnds?.[0] ?? null, placed];
+      second.ownEnds = [{ type: 'slide', point }, second.ownEnds?.[1] ?? null];
+      const frame = second.line.frame;
+      second.readBack = new Map(
+        second.line.edges.map((e) => [
+          e.id,
+          lineFrame(pointAt(frame, e.from), pointAt(frame, e.to)),
+        ])
+      );
     }
+  for (const { first, second, meet, point } of merges) {
+    runs.splice(runs.indexOf(second), 1);
+    Object.assign(first, {
+      to: second.to,
+      maps: [first.map, second.map],
+      bendAt: { station: meet, point, map: second.map, unmap: second.unmap },
+      partnerRuns: [first.partnerRun, second.partnerRun],
+      ownEnds: [first.ownEnds?.[0] ?? null, second.ownEnds?.[1] ?? null],
+    });
+  }
 }
 
 /**
