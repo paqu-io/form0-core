@@ -5,19 +5,28 @@ import { pieceMaterial } from './material.js';
 import { convexPolygonOps as ops } from './polygon-ops.js';
 
 const ANSWER_KEYS = ['values', 'overrides', 'providerOverrides'];
+// F4′: a cap lies inside its source's material and has no thickness or height of its own.
+const PHYSICAL = ['wall_thickness_m', 'wall_height_m'];
+const answers = (owner, key) =>
+  key === 'overrides'
+    ? Object.fromEntries(
+        Object.entries(owner?.overrides || {}).filter(([name]) => !PHYSICAL.includes(name))
+      )
+    : owner?.[key] || {};
 const hasRows = (owner) => Object.values(owner?.repeatable || {}).some((rows) => rows?.length);
-const hasAnswers = (owner) => ANSWER_KEYS.some((key) => Object.keys(owner?.[key] || {}).length);
+const hasAnswers = (owner) => ANSWER_KEYS.some((key) => Object.keys(answers(owner, key)).length);
 
 /**
  * A stretch's subject loses nothing when it becomes a cap of `source`: it has no answers or
  * records, or the same answers as the source (sides matched by their answers, not their signs).
+ * Thickness and height answers do not count (F4′): a cap has neither of its own.
  */
 export function sameCapAnswers(subject, source) {
   if (!subject) return true;
   const owners = [subject, ...(subject.sides || [])];
   if (owners.some(hasRows)) return false;
   if (!owners.some(hasAnswers)) return true;
-  const same = (a, b) => ANSWER_KEYS.every((key) => equalValue(a?.[key] || {}, b?.[key] || {}));
+  const same = (a, b) => ANSWER_KEYS.every((key) => equalValue(answers(a, key), answers(b, key)));
   if (!same(subject, source)) return false;
   return (subject.sides || [])
     .filter(hasAnswers)
