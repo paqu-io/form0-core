@@ -181,12 +181,13 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
   const moved = dot(shift, inward(line));
   if (situation.kind === 'slide') return { type: 'slide' };
   const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;
-  // A held jog (another room's contact) stays while the step remains (the moved line stops short
-  // of the continuation): the corner slides along it.
-  if (situation.held && Math.abs(relative) > SAME) {
-    const before = -depth(line, situation.continuation);
-    if (Math.sign(relative) === Math.sign(before)) return { type: 'slide' };
-  }
+  // The step remains: the moved line stops short of the continuation, as the old line did.
+  const remains =
+    situation.kind === 'shift' &&
+    Math.abs(relative) > SAME &&
+    Math.sign(relative) === Math.sign(-depth(line, situation.continuation));
+  // A held jog (another room's contact) stays while the step remains: the corner slides along it.
+  if (situation.held && remains) return { type: 'slide' };
   const partner = run.ends[atEnd ? 1 : 0].partner;
   const allowance = relative > SAME ? junctionAllowance(derived, line, partner, run.width ?? 0) : 0;
   // A stretch growing with no room across it: its jog steps back from other rooms' material.
@@ -224,9 +225,11 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
         return piece?.subjectId && piece.exposure === 'exterior';
       })
       .map((edge) => edge.id);
+    // `remains`: placed where it stands, the step stays (see `editRuns`).
     return {
       type: 'shift',
       station: place(station + sign * allowance),
+      remains,
       keep,
       jogAnchor: choose(staying),
     };

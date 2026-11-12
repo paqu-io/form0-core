@@ -59,6 +59,16 @@ function holdContactJog(derived, moving, situation) {
 }
 
 /**
+ * A remaining step whose jog would be placed again where it stands (after R1 seating) is not
+ * placed again: it keeps its edges and what is on them, and the corner slides along it.
+ */
+function standing(run, plan, atEnd) {
+  if (plan.type !== 'shift' || !plan.remains || plan.station == null) return plan;
+  const end = atEnd ? run.line.frame.length : 0;
+  return Math.abs(plan.station - end) <= SAME ? { type: 'slide' } : plan;
+}
+
+/**
  * Move each run (by its own `delta` or `map`, else by `delta`), reconnect its ends (as planned,
  * or as its `ownEnds` say), carry anchors and openings, and anchor the edges the edit created.
  * `seatJog` may place a jog again (R1).
@@ -84,7 +94,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
       [false, true].map((atEnd) => {
         if (run.ownEnds?.[atEnd ? 1 : 0]) return run.ownEnds[atEnd ? 1 : 0];
         const plan = planEnd(derived, run, atEnd, run.delta || delta, primary);
-        return seatJog ? seatJog(run, plan, atEnd) : plan;
+        return standing(run, seatJog ? seatJog(run, plan, atEnd) : plan, atEnd);
       });
     const edited = moveRoomStretch(
       room,

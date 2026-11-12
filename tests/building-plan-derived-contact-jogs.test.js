@@ -98,12 +98,16 @@ test('dragging the other end of that step leaves its door alone', () => {
   }
 });
 
-test("a free step stays put when the dragged stretch moves in (no retreat on the step's depth)", () => {
-  // Room 1 as an L (its bottom split at x = 3, the left part 3 m down), Room 2 removed, and a
-  // room to the east whose north wall stands at the step's level beyond Room 1's east wall.
+/**
+ * Room 1 as an L (its bottom split at x = 3, the left part 3 m down), Room 2 removed, and a room
+ * to the east whose north wall stands at the step's level beyond Room 1's east wall. The step
+ * (x 3–5 at y = 3) is free: no other room touches it. It holds the example's door unless removed.
+ */
+function lShaped({ keepDoor = false } = {}) {
   const t = example();
   const door = doorWall(t.floor());
-  t.applied({ type: 'remove_opening', wallId: door.id, openingId: door.doors[0].id });
+  if (!keepDoor)
+    t.applied({ type: 'remove_opening', wallId: door.id, openingId: door.doors[0].id });
   t.applied({ type: 'remove_room', roomId: t.floor().rooms[1].id });
   const room = () => t.floor().rooms[0];
   const bottom = rowWhere(room(), (a, b) => near(a.y, 3) && near(b.y, 3));
@@ -115,17 +119,59 @@ test("a free step stays put when the dragged stretch moves in (no retreat on the
     attach: false,
     rectangle: { x: 5.6, y: 2.9, width: 2.4, height: 3 },
   });
-  const east = rowWhere(room(), (a, b) => near(a.x, 5) && near(b.x, 5));
-  t.applied({ type: 'resize_face', faceId: east.id, distance: -0.1 });
-  assert.deepEqual(
-    room().vertices.map((v) => [Math.round(v.x * 1000) / 1000, Math.round(v.y * 1000) / 1000]),
-    [
-      [0, 0],
-      [4.9, 0],
-      [4.9, 3],
+  const east = () => rowWhere(room(), (a, b) => near(a.x, 5) && near(b.x, 5));
+  return { ...t, room, east };
+}
+const rounded = (room) =>
+  room.vertices.map((v) => [Math.round(v.x * 1000) / 1000, Math.round(v.y * 1000) / 1000]);
+/** A door's centre on the plan (its offset runs along its wall's segment). */
+function doorCentre(floor) {
+  const wall = doorWall(floor);
+  const door = wall.doors[0];
+  const { start, end } = wall.segments.find((segment) => segment.id === door.segmentId);
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  const along = door.offset + door.width / 2;
+  return {
+    id: door.id,
+    x: start.x + ((end.x - start.x) * along) / length,
+    y: start.y + ((end.y - start.y) * along) / length,
+  };
+}
+
+test("a free step stays put when the dragged stretch moves in (no retreat on the step's depth)", () => {
+  const t = lShaped();
+  t.applied({ type: 'resize_face', faceId: t.east().id, distance: -0.1 });
+  assert.deepEqual(rounded(t.room()), [
+    [0, 0],
+    [4.9, 0],
+    [4.9, 3],
+    [3, 3],
+    [3, 6],
+    [0, 6],
+  ]);
+});
+
+test('a free step that stays where it stands keeps its door: the corner slides along it', () => {
+  for (const distance of [-0.1, 0.1, 0.25]) {
+    const t = lShaped({ keepDoor: true });
+    const before = doorCentre(t.floor());
+    // No door question: the step is not placed again.
+    t.applied({ type: 'resize_face', faceId: t.east().id, distance });
+    assert.deepEqual(rounded(t.room()).slice(1, 4), [
+      [5 + distance, 0],
+      [5 + distance, 3],
       [3, 3],
-      [3, 6],
-      [0, 6],
-    ]
-  );
+    ]);
+    const after = doorCentre(t.floor());
+    assert.equal(after.id, before.id, String(distance));
+    const moved = Math.hypot(after.x - before.x, after.y - before.y);
+    assert.ok(moved < 1e-6, JSON.stringify({ before, after }));
+  }
+  // The step shortened past the door, or gone: the door is part of the edit (question).
+  for (const distance of [-1.9, -2, -2.5]) {
+    const t = lShaped({ keepDoor: true });
+    const result = t.apply({ type: 'resize_face', faceId: t.east().id, distance });
+    assert.equal(result.status, 'conflict', String(distance));
+    assert.equal(result.issues[0].code, 'opening_cut_requires_confirmation');
+  }
 });
