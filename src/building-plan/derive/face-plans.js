@@ -198,9 +198,10 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
   const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
   const moving = {
     anchor: subjectNear(line, station, station - sign),
-    exposure: run.partnerRun
-      ? 'interior'
-      : pieceAt(derived, line, station - sign * SAME * 2)?.exposure,
+    exposure:
+      run.partnerRun && !run.partnerRun.detached
+        ? 'interior'
+        : pieceAt(derived, line, station - sign * SAME * 2)?.exposure,
   };
   // F1: a new jog copies the adjacent part with its exposure, else the moved part.
   const choose = (staying) =>

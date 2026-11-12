@@ -172,3 +172,38 @@ test('a neighbour wrapping round the dragged corner stays put when the wall wide
     assert.deepEqual(session.validate(), []);
   }
 });
+
+test("a detached room's step returns against the neighbour's wall, as while widening", () => {
+  // Room 2's side of W3 dragged away from Room 1: within the limit the wall widens, past it Room 2
+  // detaches. Either way the step left at Room 1's corner stands outside Room 1's east wall
+  // (x = 5.2), not level with its corner (manual round, session 4007c4b7).
+  for (const distance of [-0.2, -1]) {
+    const t = example();
+    const door = t.floor().walls.find((wall) => wall.doors.length);
+    t.apply({ type: 'remove_opening', wallId: door.id, openingId: door.doors[0].id });
+    const room2 = () => t.floor().rooms[1];
+    const shared = room2().faces.find(
+      (face) => t.floor().walls.find((wall) => wall.id === face.wallId).exposure === 'interior'
+    );
+    t.apply({ type: 'resize_face', faceId: shared.id, distance });
+    const corners = room2()
+      .vertices.filter((b, i, v) => {
+        const [a, c] = [v[(i + v.length - 1) % v.length], v[(i + 1) % v.length]];
+        return Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) > 1e-9;
+      })
+      .map((v) => [Math.round(v.x * 1000) / 1000, Math.round(v.y * 1000) / 1000]);
+    const y = Math.round((3.2 - distance) * 1000) / 1000;
+    assert.deepEqual(
+      corners,
+      [
+        [3, y],
+        [5.2, y],
+        [5.2, 3.2],
+        [8, 3.2],
+        [8, 6.2],
+        [3, 6.2],
+      ],
+      String(distance)
+    );
+  }
+});

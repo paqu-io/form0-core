@@ -46,8 +46,15 @@ export function resizeFace(primary, operation, { createId, specifications, editi
   if (Math.abs(plan.distance) <= SAME) return { result: {}, preferredRoomIds: all };
   if (plan.kind === 'detach')
     keepWallWithStationaryRoom(primary, sharing[0].subjectId, stretch.roomId, sharing[0].roomId);
-  for (const follower of plan.kind === 'detach' ? [] : sharing) {
-    const run = { ...follower, partnerRun: runs[0], stationary: plan.kind !== 'move' };
+  // A detached neighbour stays as the stationary partner: the moved stretch's jogs still return
+  // against its walls as while widening or holding.
+  for (const follower of sharing) {
+    const run = {
+      ...follower,
+      partnerRun: runs[0],
+      stationary: plan.kind !== 'move',
+      detached: plan.kind === 'detach',
+    };
     runs.push(run);
     runs[0].partnerRun = run;
     runs[0].width = plan.width ?? follower.width;
