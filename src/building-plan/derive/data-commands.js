@@ -1,21 +1,28 @@
 import { findBuildingPlanFloor, findFace, reconcileBuildingPlanProperties } from '../model.js';
 import { applyProperty } from '../property-edits.js';
+import { OPENING_OPERATIONS, applyOpeningOperation } from '../opening-operations.js';
 import { extractBuildingPlanPrimary } from './extract.js';
 
 export const PROPERTY_OPERATIONS = Object.freeze(['set_property', 'set_defaults', 'set_provider']);
+/** Operations that edit stored data only; a thickness they change moves rooms afterwards. */
+export const DATA_OPERATIONS = Object.freeze([...PROPERTY_OPERATIONS, ...OPENING_OPERATIONS]);
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
 };
 
-/** A batch the derived core runs whole: a flat list of property operations only (J3). */
-export const isPropertyBatch = (operation) =>
+/** A batch the derived core runs whole: a flat list of data operations only (J3). */
+export const isDataBatch = (operation) =>
   operation?.type === 'batch' &&
   Array.isArray(operation.operations) &&
   operation.operations.length > 0 &&
-  operation.operations.every((entry) => PROPERTY_OPERATIONS.includes(entry?.type));
+  operation.operations.every((entry) => DATA_OPERATIONS.includes(entry?.type));
 
-/** The entries of a property operation or batch, each with its floor. */
+/** A data operation or a batch of them. */
+export const isDataOperation = (operation) =>
+  DATA_OPERATIONS.includes(operation?.type) || isDataBatch(operation);
+
+/** The entries of a data operation or batch, each with its floor. */
 const entriesOf = (operation) =>
   (operation.type === 'batch' ? operation.operations : [operation]).map((entry) => ({
     ...entry,
@@ -24,13 +31,9 @@ const entriesOf = (operation) =>
 
 /** The floors a derived operation edits. */
 export const operationFloorIds = (operation) =>
-  PROPERTY_OPERATIONS.includes(operation?.type) || operation?.type === 'batch'
+  isDataOperation(operation)
     ? [...new Set(entriesOf(operation).map((entry) => entry.floorId))]
     : [operation.floorId];
-
-/** A property operation or a batch of them. */
-export const isPropertyOperation = (operation) =>
-  PROPERTY_OPERATIONS.includes(operation?.type) || isPropertyBatch(operation);
 
 /**
  * Rule 7's anchor context, read from the plan before the operation: the anchor policy, the room
@@ -43,7 +46,7 @@ export function thicknessContext(snapshot, operation, editingPolicy = {}) {
   const activeRoomsByWall = {};
   for (const entry of entriesOf(operation)) {
     activeRoomsByWall[entry.floorId] ||= {};
-    if (!entry.faceId) continue;
+    if (!entry.faceId || !PROPERTY_OPERATIONS.includes(entry.type)) continue;
     const selected = findFace(findBuildingPlanFloor(snapshot, entry.floorId), entry.faceId);
     activeRoomsByWall[entry.floorId][selected.wall.id] = entry.activeRoomId || selected.room.id;
   }
@@ -60,25 +63,36 @@ export const floorContext = (context, floorId) => ({
 });
 
 /**
- * Apply the answers of a property operation or batch to the stored floors with today's code
- * (J4), and read each edited floor into primary data before and after: only answers differ.
+ * Apply the data edits of an operation or batch to the stored floors with today's code (J4, rule
+ * 12): openings first, on the walls the host saw, then answers. Each edited floor is read into
+ * primary data with the answers before (`before`) and after (`primary`); geometry is the same.
  *
- * @returns {{context: Object, floors: Array<{floor: Object, before: Object, primary: Object}>}}
+ * @returns {{context: Object, created: Array<Object>, floors: Array<{floor: Object,
+ *   before: Object, primary: Object}>}}
  */
-export function applyPropertyAnswers(snapshot, operation, { specifications, editingPolicy = {} }) {
+export function applyDataEdits(snapshot, operation, { createId, specifications, editingPolicy }) {
   const context = thicknessContext(snapshot, operation, editingPolicy);
+  const entries = entriesOf(operation);
+  const created = [];
+  for (const entry of entries.filter((e) => OPENING_OPERATIONS.includes(e.type))) {
+    const floor = findBuildingPlanFloor(snapshot, entry.floorId);
+    const result = applyOpeningOperation(floor, entry, createId);
+    if (result.created) created.push(result.created);
+  }
   const before = new Map();
-  for (const entry of entriesOf(operation)) {
+  for (const entry of entries) {
     const floor = findBuildingPlanFloor(snapshot, entry.floorId);
     if (!before.has(floor.id)) before.set(floor.id, extractBuildingPlanPrimary(floor));
-    applyProperty(floor, entry, specifications);
   }
+  for (const entry of entries.filter((e) => PROPERTY_OPERATIONS.includes(e.type)))
+    applyProperty(findBuildingPlanFloor(snapshot, entry.floorId), entry, specifications);
   const issues = reconcileBuildingPlanProperties(snapshot, specifications).filter(
     (issue) => issue.code !== 'conflicting_room_defaults'
   );
   if (issues.length) throw Object.assign(new Error(issues[0].message), { issues });
   return {
     context,
+    created,
     floors: [...before].map(([floorId, primary]) => {
       const floor = findBuildingPlanFloor(snapshot, floorId);
       return { floor, before: primary, primary: extractBuildingPlanPrimary(floor) };

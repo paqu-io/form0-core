@@ -253,7 +253,9 @@ export function createBuildingPlanSession({
         current,
         copy(operation),
         (candidate, edit) => {
-          if (!derivedPath || edit.type === 'remove_opening')
+          // Openings a confirmed edit removes first are plain data edits of the candidate.
+          const removal = edit.type === 'remove_opening' && operation.type !== 'remove_opening';
+          if (!derivedPath || removal)
             return applyBuildingPlanOperation(candidate, edit, {
               createId,
               specifications,

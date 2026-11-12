@@ -10,14 +10,15 @@ import { resizePreserveGroup, resizeRoom } from './room-resizes.js';
 import { rejoinCut, splitFace } from './cut-commands.js';
 import { changeThickness } from './thickness-commands.js';
 import {
+  DATA_OPERATIONS,
   PROPERTY_OPERATIONS,
-  applyPropertyAnswers,
+  applyDataEdits,
   floorContext,
-  isPropertyBatch,
-  isPropertyOperation,
+  isDataBatch,
+  isDataOperation,
   operationFloorIds,
   thicknessContext,
-} from './property-commands.js';
+} from './data-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
@@ -31,7 +32,7 @@ export const DERIVED_OPERATIONS = Object.freeze([
   'resize_preserve_group',
   'split_face',
   'rejoin_cut',
-  ...PROPERTY_OPERATIONS,
+  ...DATA_OPERATIONS,
 ]);
 const FACE_COMMANDS = {
   resize_face: resizeFace,
@@ -41,9 +42,9 @@ const FACE_COMMANDS = {
   split_face: splitFace,
   rejoin_cut: rejoinCut,
 };
-/** Derived operations, and batches made only of property operations (J3). */
+/** Derived operations, and batches made only of data operations (J3). */
 export const usesDerivedPath = (operation) =>
-  DERIVED_OPERATIONS.includes(operation?.type) || isPropertyBatch(operation);
+  DERIVED_OPERATIONS.includes(operation?.type) || isDataBatch(operation);
 export { operationFloorIds };
 
 function writeFloor(snapshot, floor, primary, options) {
@@ -71,8 +72,8 @@ export function applyDerivedOperation(
   operation,
   { createId, specifications, editingPolicy = {} }
 ) {
-  if (isPropertyOperation(operation))
-    return applyPropertyOperation(snapshot, operation, { createId, specifications, editingPolicy });
+  if (isDataOperation(operation))
+    return applyDataOperation(snapshot, operation, { createId, specifications, editingPolicy });
   const floor = findBuildingPlanFloor(snapshot, operation.floorId);
   const primary = extractBuildingPlanPrimary(floor);
   const command = FACE_COMMANDS[operation.type];
@@ -88,11 +89,12 @@ export function applyDerivedOperation(
 }
 
 /**
- * A property operation or a batch of them (item 4b): the answers change on the stored floors, and
- * each floor's thickness changes move its rooms (`changeThickness`) before it is written back.
+ * A data operation or a batch of them (items 4b, 4c): openings and answers change on the stored
+ * floors, and each floor's thickness changes move its rooms (`changeThickness`) before it is
+ * written back.
  */
-function applyPropertyOperation(snapshot, operation, options) {
-  const { context, floors } = applyPropertyAnswers(snapshot, operation, options);
+function applyDataOperation(snapshot, operation, options) {
+  const { context, created, floors } = applyDataEdits(snapshot, operation, options);
   const carved = [];
   const divisions = [];
   const issues = [];
@@ -108,7 +110,16 @@ function applyPropertyOperation(snapshot, operation, options) {
     divisions.push(...written.divisions);
     issues.push(...written.issues);
   }
-  return { result: { carvedRoomIds: carved }, divisions, issues };
+  const result =
+    operation.type === 'batch'
+      ? { createdSubjects: created }
+      : created.length
+        ? { created: created[0] }
+        : {};
+  // A thickness change lists the rooms it carved (I5).
+  if (operation.type === 'batch' || PROPERTY_OPERATIONS.includes(operation.type))
+    result.carvedRoomIds = carved;
+  return { result, divisions, issues };
 }
 
 /**
@@ -123,7 +134,7 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
   const floor = findBuildingPlanFloor(snapshot, floorId);
   const primary = extractBuildingPlanPrimary(floor);
   let moved = { result: { carvedRoomIds: [] }, preferredRoomIds: undefined };
-  if (change && isPropertyOperation(change.operation)) {
+  if (change && isDataOperation(change.operation)) {
     const before = extractBuildingPlanPrimary(findBuildingPlanFloor(change.previous, floorId));
     const context = thicknessContext(change.current, change.operation, editingPolicy);
     moved = changeThickness(primary, before, floorContext(context, floorId), options);
