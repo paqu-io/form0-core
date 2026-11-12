@@ -92,3 +92,23 @@ export function applyProperty(floor, operation, specifications) {
   if (operation.reset) delete target[operation.property];
   else target[operation.property] = copy(operation.value);
 }
+
+/** The value operations, shared by today's engine and the derived core. */
+export const VALUE_OPERATIONS = Object.freeze(['set_values', 'set_custom_rows']);
+
+/**
+ * Apply `set_values` (plain answers) or `set_custom_rows` (a subject's custom collections) to the
+ * stored floor's subject.
+ */
+export function applyValueOperation(floor, operation) {
+  const subject = operationSubject(floor, operation);
+  if (operation.type === 'set_custom_rows') {
+    subject.repeatable = copy(operation.repeatable || {});
+    return;
+  }
+  for (const [key, value] of Object.entries(operation.values || {})) {
+    propertyKey(key);
+    subject.values ||= {};
+    subject.values[key] = copy(value);
+  }
+}

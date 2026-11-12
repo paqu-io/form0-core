@@ -56,7 +56,8 @@ import { movePartitionPortion } from './partition-edits.js';
 import { reshapeBuildingPlanAxes, reshapeBuildingPlanAxisThickness } from './axis-edits.js';
 import { completeThicknessCorners } from './corner-profiles.js';
 import { reshapeBuildingPlanBoundary } from './junction-edits.js';
-import { applyProperty, operationSubject, propertyKey } from './property-edits.js';
+import { applyProperty, applyValueOperation } from './property-edits.js';
+import { applyElementOperation } from './element-operations.js';
 import { applyOpeningOperation } from './opening-operations.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
@@ -1313,18 +1314,9 @@ export function applyBuildingPlanOperation(
       break;
     }
     case 'set_values':
-    case 'set_custom_rows': {
-      const subject = operationSubject(floor, operation);
-      if (operation.type === 'set_custom_rows')
-        subject.repeatable = copy(operation.repeatable || {});
-      else
-        for (const [key, value] of Object.entries(operation.values || {})) {
-          propertyKey(key);
-          subject.values ||= {};
-          subject.values[key] = copy(value);
-        }
+    case 'set_custom_rows':
+      applyValueOperation(floor, operation);
       break;
-    }
     case 'create_opening':
     case 'update_opening':
     case 'remove_opening': {
@@ -1382,24 +1374,8 @@ export function applyBuildingPlanOperation(
     case 'create_element':
     case 'update_element':
     case 'remove_element': {
-      const room = findRoom(floor, operation.roomId);
-      if (!['columns', 'beams', 'objects'].includes(operation.collection))
-        failOperation('unknown_collection', 'Choose a supported room element collection.');
-      const list = room[operation.collection];
-      if (operation.type === 'create_element') {
-        const item = {
-          id: operation.id || createId(),
-          ...copy(operation.element || {}),
-          values: copy(operation.values || {}),
-        };
-        list.push(item);
-        return { created: { type: operation.collection, id: item.id } };
-      }
-      const item = list.find((entry) => entry.id === operation.elementId);
-      if (!item) failOperation('missing_element', 'The room element no longer exists.');
-      if (operation.type === 'remove_element') {
-        room[operation.collection] = list.filter((entry) => entry !== item);
-      } else Object.assign(item, copy(operation.element || {}), { id: item.id });
+      const result = applyElementOperation(floor, operation, createId);
+      if (result.created) return result;
       break;
     }
     default:
