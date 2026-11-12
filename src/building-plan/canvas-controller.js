@@ -640,9 +640,11 @@ export class BuildingPlanCanvasController {
   roomOperation(id, rect) {
     const room = this.rooms.get(id);
     if (!room) return null;
+    // A drag that keeps the size within 1 mm is a move (hosts round the dragged rectangle).
+    const tolerance = this.gridSize * 1e-3;
     const sameSize =
-      Math.abs(rect.width - room.rect.width) < 1e-6 &&
-      Math.abs(rect.height - room.rect.height) < 1e-6;
+      Math.abs(rect.width - room.rect.width) < tolerance &&
+      Math.abs(rect.height - room.rect.height) < tolerance;
     return sameSize
       ? {
           type: 'move_room',
