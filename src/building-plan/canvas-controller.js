@@ -272,6 +272,8 @@ export function buildingPlanCanvasSnapshot({
 /**
  * Shared canvas rules. Hosts supply record transactions, navigation, and issue presentation.
  * No DOM, framework, lifecycle event, or record persistence belongs in this controller.
+ * `derivedCommands` runs the geometry commands on the derived core (see the record session); a
+ * host passes the same value to every session of one plan.
  */
 export class BuildingPlanCanvasController {
   constructor({
@@ -287,6 +289,7 @@ export class BuildingPlanCanvasController {
     confirmOpeningRemoval = () => false,
     managedTransactions = false,
     presentQuestion,
+    derivedCommands = false,
   }) {
     Object.assign(this, {
       meta,
@@ -300,6 +303,7 @@ export class BuildingPlanCanvasController {
       confirmOpeningRemoval,
       managedTransactions,
       presentQuestion,
+      derivedCommands,
     });
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
     this.interaction = createBuildingPlanInteraction({
@@ -329,6 +333,7 @@ export class BuildingPlanCanvasController {
           properties: this.meta.properties,
           createId: this.createId,
           editingPolicy: this.editingPolicy,
+          derivedCommands: this.derivedCommands,
         });
       else {
         const result = this.session.synchronize(plan);

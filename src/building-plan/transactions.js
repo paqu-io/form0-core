@@ -313,7 +313,11 @@ export function buildingPlanOperationsForRow({
   };
 }
 
-/** One adapter for canonical record ownership, editor scopes, and semantic operations. */
+/**
+ * One adapter for canonical record ownership, editor scopes, and semantic operations.
+ * `derivedCommands` runs the geometry commands on the derived core (redesign step 3; until the
+ * switch, hosts turn it on for testing).
+ */
 export function createBuildingPlanRecordSession({
   record,
   meta: suppliedMeta,
@@ -323,6 +327,7 @@ export function createBuildingPlanRecordSession({
   createRowId = generateUuidV7,
   readOnly = false,
   editingPolicy = {},
+  derivedCommands = false,
 }) {
   const meta = getBuildingPlanRecordMetadata({ meta: suppliedMeta, schema, sectionKey });
   let source = copy(record || { values: {}, repeatable: {} });
@@ -333,6 +338,7 @@ export function createBuildingPlanRecordSession({
     createId,
     readOnly,
     editingPolicy,
+    derivedCommands,
   });
   source = writeBuildingPlanRecord({
     meta,
