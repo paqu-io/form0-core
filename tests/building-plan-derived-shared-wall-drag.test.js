@@ -134,3 +134,41 @@ test('sharedWallDrag accepts widen and move_wall; ask comes with questions (item
   );
   assert.throws(() => normalizeBuildingPlanEditingPolicy({ sharedWallDrag: 'ask' }), TypeError);
 });
+
+test('a neighbour wrapping round the dragged corner stays put when the wall widens or detaches', () => {
+  // Room 1's north-west wall goes up 2 m: its step faces Room 2's west wall (W8.1) and its north
+  // face continues under Room 2 (W3). Dragging Room 2's side of W8.1 away from Room 1 slides
+  // Room 2's corner along W3; Room 1 is the partner across W8.1, not a junction to carry along.
+  for (const distance of [-0.2, -0.3, -0.6]) {
+    const f = createBuildingPlanExample();
+    let serial = 0;
+    const session = createBuildingPlanSession({
+      snapshot: f.snapshot,
+      properties: f.meta.properties,
+      createId: () => `wrap-${++serial}`,
+      derivedCommands: true,
+      editingPolicy: { sharedWallDrag: 'widen' },
+    });
+    const floor = () => session.getSnapshot().floors[0];
+    const apply = (operation) => session.apply({ floorId: f.floorId, ...operation });
+    const door = floor().walls.find((wall) => wall.doors.length);
+    apply({ type: 'remove_opening', wallId: door.id, openingId: door.doors[0].id });
+    const northWest = floor().walls.find((wall) => wall.autoLabel === 'W3.2');
+    const row = (room, wall) => room.faces.find((face) => face.wallId === wall.id).id;
+    apply({ type: 'resize_face', faceId: row(floor().rooms[0], northWest), distance: 2 });
+    // Corners only: a new automatic boundary on a straight line is no change of shape.
+    const corners = (room) =>
+      room.vertices
+        .filter((b, i, v) => {
+          const [a, c] = [v[(i + v.length - 1) % v.length], v[(i + 1) % v.length]];
+          return Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) > 1e-9;
+        })
+        .map((v) => [v.x, v.y]);
+    const room1 = corners(floor().rooms[0]);
+    const shared = floor().walls.find((wall) => wall.autoLabel === 'W8.1');
+    const result = apply({ type: 'resize_face', faceId: row(floor().rooms[1], shared), distance });
+    assert.equal(result.status, 'applied', JSON.stringify(result.issues));
+    assert.deepEqual(corners(floor().rooms[0]), room1, String(distance));
+    assert.deepEqual(session.validate(), []);
+  }
+});

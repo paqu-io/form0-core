@@ -154,7 +154,8 @@ export function changeThickness(primary, before, operation, { createId, specific
   prepareEnds(derived, [...moving, ...staying]);
   // Ends paired at the current width; jogs keep clear of the wall at its new width.
   for (const run of moving) run.width = run.next;
-  const runs = [...moving, ...junctionFollowers(derived, moving, { x: 0, y: 0 })];
+  const across = [...moving, ...staying].map((run) => run.partnerRun?.roomId).filter(Boolean);
+  const runs = [...moving, ...junctionFollowers(derived, moving, { x: 0, y: 0 }, across)];
   const context = {
     floor: resolutionFloor(primary),
     specifications,

@@ -19,12 +19,15 @@ function intersect(p, u, q, v) {
  * of the neighbour moves.
  *
  * A run may carry its own `delta` (a thickness change moves each stretch by its own amount).
+ * `across`: the rooms across the dragged wall, which never follow.
  *
  * @returns {Array<Object>} Runs for `editRuns` with their ends given (`fixedEnds`).
  */
-export function junctionFollowers(derived, runs, delta) {
+export function junctionFollowers(derived, runs, delta, across = []) {
   const moving = runs.filter((run) => !run.stationary);
-  const rooms = new Set(moving.map((run) => run.roomId));
+  // A room across the dragged wall is its partner, never a junction follower: it moves with the
+  // wall or stays (widen, detach), even where it also wraps round the corner.
+  const rooms = new Set([...moving.map((run) => run.roomId), ...across]);
   const extra = [];
   for (const run of moving)
     for (const end of run.ends) {

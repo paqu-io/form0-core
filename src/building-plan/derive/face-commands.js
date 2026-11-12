@@ -73,7 +73,12 @@ export function resizeFace(primary, operation, { createId, specifications, editi
   // Neighbours whose junction sits at a corner the drag slides along a shared wall follow it.
   const moving = [
     ...runs.filter((run) => !run.stationary),
-    ...junctionFollowers(derived, runs, delta),
+    ...junctionFollowers(
+      derived,
+      runs,
+      delta,
+      sharing.map((entry) => entry.roomId)
+    ),
   ];
   editRuns(primary, derived, moving, delta, {
     createId,
