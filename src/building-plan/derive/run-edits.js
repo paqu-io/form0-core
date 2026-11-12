@@ -14,18 +14,18 @@ const samePlace = (p, q, width) => Math.hypot(p.x - q.x, p.y - q.y) <= width + S
  * run across the moved wall at the same place.
  */
 export function prepareEnds(derived, runs) {
+  const key = (line) => `${line.roomId}:${line.index}`;
+  const moving = new Set(runs.filter((run) => !run.stationary).map((run) => key(run.line)));
   for (const run of runs)
     run.ends = [false, true].map((atEnd) => ({
       atEnd,
       stationary: Boolean(run.stationary),
       line: run.line,
       point: endPoint(run, atEnd),
-      situation: endSituation(
-        derived.lines,
-        derived.caps,
-        run.line,
-        atEnd ? run.to : run.from,
-        atEnd
+      situation: holdContactJog(
+        derived,
+        moving,
+        endSituation(derived.lines, derived.caps, run.line, atEnd ? run.to : run.from, atEnd)
       ),
     }));
   for (const run of runs)
@@ -35,6 +35,27 @@ export function prepareEnds(derived, runs) {
       end.partner =
         partnerRun?.ends?.find((other) => samePlace(other.point, end.point, run.width)) || null;
     }
+}
+
+/**
+ * A step's jog that is (partly) a contact with another room's line this edit does not move is
+ * that room's wall too (`held`): while the step remains, it holds and the moved stretch's corner
+ * slides along it instead of placing the jog again (R1; see `planEnd`).
+ */
+function holdContactJog(derived, moving, situation) {
+  if (situation.kind !== 'shift') return situation;
+  const { jog } = situation;
+  const contact = derived.pieces.some(
+    (piece) =>
+      piece.lines.some((entry) => entry.roomId === jog.roomId && entry.index === jog.index) &&
+      piece.lines.some(
+        (entry) =>
+          entry.roomId &&
+          entry.roomId !== jog.roomId &&
+          !moving.has(`${entry.roomId}:${entry.index}`)
+      )
+  );
+  return contact ? { ...situation, held: true } : situation;
 }
 
 /**

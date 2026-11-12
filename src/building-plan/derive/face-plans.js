@@ -181,12 +181,19 @@ export function planEnd(derived, run, atEnd, delta, primary = null) {
   const moved = dot(shift, inward(line));
   if (situation.kind === 'slide') return { type: 'slide' };
   const relative = situation.kind === 'shift' ? moved - depth(line, situation.continuation) : moved;
+  // A held jog (another room's contact) stays while the step remains (the moved line stops short
+  // of the continuation): the corner slides along it.
+  if (situation.held && Math.abs(relative) > SAME) {
+    const before = -depth(line, situation.continuation);
+    if (Math.sign(relative) === Math.sign(before)) return { type: 'slide' };
+  }
   const partner = run.ends[atEnd ? 1 : 0].partner;
   const allowance = relative > SAME ? junctionAllowance(derived, line, partner, run.width ?? 0) : 0;
   // A stretch growing with no room across it: its jog steps back from other rooms' material.
+  // The strip the room gains lies between the old and the moved line (not the continuation).
   const place = (value) =>
-    relative < -SAME && !partner && primary
-      ? retreatStation(primary, derived, line, value, atEnd, -relative)
+    moved < -SAME && !partner && primary
+      ? retreatStation(primary, derived, line, value, atEnd, -moved)
       : value;
   const jogExposure = partner?.situation.kind === 'straight' ? 'interior' : 'exterior';
   const moving = {
