@@ -6,6 +6,7 @@ import { keepWallWithStationaryRoom, sharedWallMode, widenPlan } from './shared-
 import { followers, inward, locateFace } from './face-plans.js';
 import { editRuns, prepareEnds } from './run-edits.js';
 import { junctionFollowers } from './junction-follow.js';
+import { seatLengthenedStretches } from './lengthened-seats.js';
 
 const refuse = (code, message, subject) => {
   throw Object.assign(new Error(message), {
@@ -92,6 +93,9 @@ export function resizeFace(primary, operation, { createId, specifications, editi
     specifications,
     seatJog: (run, plan, atEnd) => seatJogStation(primary, run, plan, atEnd, delta, context),
   });
+  // M6: a stretch the edit lengthened into another room's wall lands at the contact's width.
+  const editedIds = [...new Set(moving.map((run) => run.roomId))];
+  seatLengthenedStretches(primary, derived, editedIds, context, createId);
   primary.contactWidths = explicitContactWidths(
     primary,
     derived,

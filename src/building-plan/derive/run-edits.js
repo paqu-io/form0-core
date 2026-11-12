@@ -107,6 +107,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
         unmap: run.unmap,
         ends,
         preferMoved: run.preferMoved,
+        preferStaying: run.preferStaying,
         bendAt: run.bendAt,
         readBack: run.readBack,
         // Decision F: only a corner drag (a turned stretch) may reverse a return.

@@ -87,13 +87,16 @@ export function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
             : null,
     });
   }
-  // Each old edge's ID stays with one part: the preferred one, else the part covering most of it.
+  // Each old edge's ID stays with one part: the preferred one (the moved part of `preferMoved`
+  // edges, the staying part with `preferStaying`), else the part covering most of it.
   const keeper = new Map();
   for (const entry of provenance) {
     if (entry.jog) continue;
     const length =
       Math.min(entry.to, oldEdges.get(entry.edgeId).frame.length) - Math.max(entry.from, 0);
-    const preferred = plan.preferMoved?.includes(entry.edgeId) && entry.moved;
+    const preferred =
+      (plan.preferMoved?.includes(entry.edgeId) && entry.moved) ||
+      (plan.preferStaying && !entry.moved);
     const rank = (preferred ? 1e9 : 0) + length;
     if (!keeper.has(entry.edgeId) || keeper.get(entry.edgeId).rank < rank)
       keeper.set(entry.edgeId, { entry, rank });
