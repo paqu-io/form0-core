@@ -57,6 +57,7 @@ import { reshapeBuildingPlanAxes, reshapeBuildingPlanAxisThickness } from './axi
 import { completeThicknessCorners } from './corner-profiles.js';
 import { reshapeBuildingPlanBoundary } from './junction-edits.js';
 import { applyProperty, operationSubject, propertyKey } from './property-edits.js';
+import { applyOpeningOperation } from './opening-operations.js';
 
 export function failOperation(code, message, subject = null, details = {}) {
   const error = new Error(message);
@@ -1324,37 +1325,11 @@ export function applyBuildingPlanOperation(
         }
       break;
     }
-    case 'create_opening': {
-      const wall = findWall(floor, operation.wallId);
-      if (!['door', 'window'].includes(operation.kind))
-        failOperation('invalid_opening_type', 'Choose a door or a window.');
-      const opening = {
-        id: operation.id || createId(),
-        type: operation.kind,
-        segmentId: operation.segmentId || wall.segments[0]?.id,
-        offset: operation.offset,
-        width: operation.width,
-        height: operation.height ?? null,
-        sillHeight: operation.sillHeight ?? null,
-        values: copy(operation.values || {}),
-      };
-      wall[operation.kind === 'door' ? 'doors' : 'windows'].push(opening);
-      return { created: { type: opening.type, id: opening.id } };
-    }
+    case 'create_opening':
     case 'update_opening':
     case 'remove_opening': {
-      const wall = findWall(floor, operation.wallId);
-      const opening = [...wall.doors, ...wall.windows].find(
-        (entry) => entry.id === operation.openingId
-      );
-      if (!opening) failOperation('missing_opening', 'The opening no longer exists.');
-      if (operation.type === 'remove_opening') {
-        wall[opening.type === 'door' ? 'doors' : 'windows'] = wall[
-          opening.type === 'door' ? 'doors' : 'windows'
-        ].filter((entry) => entry.id !== opening.id);
-      } else
-        for (const key of ['offset', 'width', 'height', 'sillHeight', 'segmentId', 'values'])
-          if (own(operation, key)) opening[key] = copy(operation[key]);
+      const result = applyOpeningOperation(floor, operation, createId);
+      if (result.created) return result;
       break;
     }
     case 'remove_face': {
