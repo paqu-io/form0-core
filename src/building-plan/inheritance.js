@@ -2,9 +2,10 @@ import { evaluateConditions } from '../engine/conditions.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { isFieldValueEmpty } from '../utilities/field-value-empty.js';
 import { copyEventData as copy } from '../utilities/event-data.js';
+import { areJsonValuesEqual } from '../utilities/value-equality.js';
 
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const equal = areJsonValuesEqual;
 
 export function propertySpecification(specifications, property, nodeKey = 'walls', scope = null) {
   return (

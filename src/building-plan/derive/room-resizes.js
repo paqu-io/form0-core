@@ -1,5 +1,5 @@
 import { cleanPoint, polygonIssue } from '../geometry.js';
-import { copyBuildingPlanData as copy } from '../model.js';
+import { copyBuildingPlanData as copy, equalValue } from '../model.js';
 import { SAME, along } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { roomLines } from './room-lines.js';
@@ -267,7 +267,7 @@ export function resizePreserveGroup(primary, operation, options) {
   const outside = primary.rooms.filter((room) => {
     if (allowed.has(room.id)) return false;
     const old = before.find((entry) => entry.id === room.id);
-    return JSON.stringify(old?.vertices) !== JSON.stringify(room.vertices);
+    return !equalValue(old?.vertices, room.vertices);
   });
   if (outside.length)
     refuse(

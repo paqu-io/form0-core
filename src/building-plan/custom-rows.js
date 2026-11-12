@@ -1,3 +1,4 @@
+import { areJsonValuesEqual } from '../utilities/value-equality.js';
 /** Copying a wall owner creates new independent custom row identities. */
 export function renewBuildingPlanRowIdentities(subject, createId) {
   for (const rows of Object.values(subject.repeatable || {}))
@@ -24,5 +25,5 @@ export function sameBuildingPlanCustomRows(a, b) {
         }),
       ])
     );
-  return JSON.stringify(content(a.repeatable)) === JSON.stringify(content(b.repeatable));
+  return areJsonValuesEqual(content(a.repeatable), content(b.repeatable));
 }

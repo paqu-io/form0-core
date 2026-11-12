@@ -4,6 +4,7 @@ import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import {
   copyBuildingPlanData as copy,
+  equalValue,
   findBuildingPlanFloor,
   findRoom,
   findWall,
@@ -394,19 +395,16 @@ export function createBuildingPlanEditor(options) {
             ].includes(field.type) &&
             !['storage', 'geometry', 'derived', 'reference'].includes(field.binding?.role) &&
             !['storage', 'geometry', 'derived', 'reference'].includes(field.binding?.storageRole) &&
-            JSON.stringify(normalizeFieldValue(field.field, row.values?.[field.dataName])) !==
-              JSON.stringify(
-                normalizeFieldValue(field.field, editor.initialRow.values?.[field.dataName])
-              )
+            !equalValue(
+              normalizeFieldValue(field.field, row.values?.[field.dataName]),
+              normalizeFieldValue(field.field, editor.initialRow.values?.[field.dataName])
+            )
         );
       } catch (error) {
         if (!(error instanceof TypeError)) throw error;
         return { status: 'invalid', issues: [], record: session.getRecord() };
       }
-      if (
-        !changed.length &&
-        JSON.stringify(row.repeatable) === JSON.stringify(editor.initialRow.repeatable)
-      )
+      if (!changed.length && equalValue(row.repeatable, editor.initialRow.repeatable))
         return { status: 'unchanged', issues: [], record: session.getRecord() };
       if (
         !finishAll &&

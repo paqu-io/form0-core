@@ -1,4 +1,5 @@
 import { copyEventData as copy } from '../utilities/event-data.js';
+import { areJsonValuesEqual } from '../utilities/value-equality.js';
 
 export function createWallSides(createId) {
   return [-1, 1].map((sign) => ({
@@ -37,7 +38,7 @@ export function mergeWallSides(reference, other, direction) {
     for (const [property, value] of Object.entries(source.overrides || {})) {
       if (
         Object.hasOwn(target.overrides, property) &&
-        JSON.stringify(target.overrides[property]) !== JSON.stringify(value)
+        !areJsonValuesEqual(target.overrides[property], value)
       ) {
         const error = new Error(
           'Resolve the differing accepted answers on this physical wall surface.'
@@ -52,7 +53,7 @@ export function mergeWallSides(reference, other, direction) {
         target[key] ||= {};
         if (
           Object.hasOwn(target[key], property) &&
-          JSON.stringify(target[key][property]) !== JSON.stringify(value)
+          !areJsonValuesEqual(target[key][property], value)
         ) {
           const error = new Error('Resolve the differing answers on this physical wall surface.');
           error.issues = [
@@ -67,7 +68,7 @@ export function mergeWallSides(reference, other, direction) {
       if (
         target.repeatable[key]?.length &&
         rows.length &&
-        JSON.stringify(target.repeatable[key]) !== JSON.stringify(rows)
+        !areJsonValuesEqual(target.repeatable[key], rows)
       ) {
         const error = new Error('Resolve custom records on this surface before joining it.');
         error.issues = [{ code: 'conflicting_surface_records', message: error.message }];

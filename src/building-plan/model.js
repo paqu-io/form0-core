@@ -1,3 +1,4 @@
+import { areJsonValuesEqual } from '../utilities/value-equality.js';
 import { createWallSides, wallSide } from './wall-sides.js';
 import { resolveInheritedProperty, nodeSubjects } from './inheritance.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
@@ -35,7 +36,8 @@ export const copyBuildingPlanData = (value) =>
       ? structuredClone(value)
       : JSON.parse(JSON.stringify(value));
 export const own = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
-export const equalValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/** Plan data compare by content: key order does not matter (see `areJsonValuesEqual`). */
+export const equalValue = areJsonValuesEqual;
 export const planIssue = (code, message, subject = null, details = {}) => ({
   code,
   message,

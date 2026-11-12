@@ -302,8 +302,7 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
       for (let i = 0; i < stations.length - 1; i++) {
         const signature = coverage(floor, wall, segment, (stations[i] + stations[i + 1]) / 2);
         const explicit = explicitStations.some((station) => Math.abs(station - stations[i]) <= EPS);
-        if (i && (JSON.stringify(signature) !== JSON.stringify(previous) || explicit))
-          cuts.push(stations[i]);
+        if (i && (!equalValue(signature, previous) || explicit)) cuts.push(stations[i]);
         previous = signature;
       }
       cuts.push(frame.length);
@@ -390,10 +389,7 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
       face.sideId = side.id;
       side.roomId = room.id;
       for (const [key, value] of Object.entries(face.overrides || {})) {
-        if (
-          Object.hasOwn(side.overrides, key) &&
-          JSON.stringify(side.overrides[key]) !== JSON.stringify(value)
-        )
+        if (Object.hasOwn(side.overrides, key) && !equalValue(side.overrides[key], value))
           fail(
             'conflicting_surface_answers',
             'Resolve the differing answers for this physical wall surface before attaching rooms.'
