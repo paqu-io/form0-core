@@ -47,6 +47,7 @@ export function rebuildEdges(room, list, oldEdges, jogs, plan, createId) {
         endId: pair[1],
         jog: true,
         replaces: jog.replaces ?? null,
+        reversed: jog.reversed ?? null,
         end: jog.end,
       });
       continue;

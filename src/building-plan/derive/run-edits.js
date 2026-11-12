@@ -71,17 +71,20 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
         unmap: run.unmap,
         ends,
         preferMoved: run.preferMoved,
+        // Decision F: only a corner drag (a turned stretch) may reverse a return.
+        reverse: Boolean(run.map),
       },
       createId
     );
     remapRoomSpans(primary, room, edited.edges, edited.lengths, createId);
     for (const [edgeId, entry] of edited.edges) {
       const anchor =
-        (entry.jog && !entry.replaces && ends[entry.end]?.jogAnchor) ||
+        (entry.jog && !entry.replaces && !entry.reversed && ends[entry.end]?.jogAnchor) ||
         (entry.extension && ends[entry.extension === 'end' ? 1 : 0].joinAnchor);
       // What a created stretch is when it ends up neither a cap nor part of a contact.
+      // A reversed return keeps the row of the old edge it came from (built rule 7).
       const fallback = entry.jog
-        ? ends[entry.end]?.jogAnchor || null
+        ? (entry.reversed ? previous.get(entry.reversed) : ends[entry.end]?.jogAnchor) || null
         : entry.extension
           ? previous.get(entry.edgeId) || null
           : null;

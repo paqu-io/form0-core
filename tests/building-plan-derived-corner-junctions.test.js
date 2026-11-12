@@ -182,3 +182,14 @@ for (const point of [
     t.moveB(3, 2.2);
     assert.deepEqual(t.floor().rooms.map(corners), before);
   });
+
+for (const angle of [0, 0.37])
+  test(`a return reverses when a wrapped corner passes its end (F), angle=${angle}`, () => {
+    // Up to (3,3.6): A's corner runs up its west line past (2.8,3), so A's return flips to run
+    // down to it. Down to (3,1.8): back past (2.8,3), the return flips again and meets B's west
+    // wall. Then back home. Same outlines as today at every step.
+    bothEngines(
+      [stepDown, (t) => t.moveB(3, 3.6), (t) => t.moveB(3, 1.8), (t) => t.moveB(3, 2.2)],
+      angle
+    );
+  });

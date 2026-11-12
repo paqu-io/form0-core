@@ -29,7 +29,8 @@ export function lineVertexIds(room, line) {
  * with its inverse `unmap`: a corner drag turns the line), and reconnect each end:
  *
  * - `slide`: the stretch ends at a corner; the corner slides along the adjoining edge, whose
- *   direction stays fixed.
+ *   direction stays fixed. With `plan.reverse` (corner drags) it may slide on past the far end
+ *   of the adjoining line, which then reverses.
  * - `jog` at `station`: the line continues straight; vertices between the stretch end and the
  *   station move with it (an extension), and a right-angle jog joins the moved line to the
  *   stationary vertex at the station.
@@ -143,6 +144,7 @@ export function moveRoomStretch(room, plan, createId) {
       const movedDirection = minus(map(frame.end), map(frame.start));
       const at = (k) => list[(position + k * step + 2 * list.length) % list.length];
       let point = null;
+      let reversed = null;
       for (let k = 1; k < Math.min(list.length - 1, 8) && !point; k++) {
         const [from, to] = [k === 1 ? corner.back : at(k - 1).back, at(k).back];
         const edge = lineFrame(from, to);
@@ -153,9 +155,26 @@ export function moveRoomStretch(room, plan, createId) {
         if (hit && reach <= edge.length + SAME && (k === 1 || reach >= -SAME)) {
           point = hit;
           for (let passed = 1; passed < k; passed++) removed.add(at(passed).vertex.id);
+        } else if (
+          plan.reverse &&
+          hit &&
+          reach > edge.length + SAME &&
+          Math.abs(offset(edge, at(k + 1).back)) > SAME
+        ) {
+          // Decision F: a corner drag carries the corner on along this line past its far end,
+          // where the outline turns away; the edge to that vertex reverses (a return flips).
+          point = hit;
+          for (let passed = 1; passed < k; passed++) removed.add(at(passed).vertex.id);
+          const [p, q] = atEnd ? [at(k - 1), at(k)] : [at(k), at(k - 1)];
+          const old = room.edges.find(
+            (entry) => entry.startId === p.vertex.id && entry.endId === q.vertex.id
+          );
+          const ids = [corner.vertex.id, at(k).vertex.id];
+          reversed = { ids: atEnd ? ids : ids.reverse(), end: atEnd ? 1 : 0, reversed: old?.id };
         }
       }
       if (!point) refuse('invalid_room_geometry', 'This edit would collapse a wall.');
+      if (reversed) jogs.push(reversed);
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
       corner.back = unmap(point);
       corner.out = point;
