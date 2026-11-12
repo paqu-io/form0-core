@@ -113,6 +113,23 @@ export function moveRoomStretch(room, plan, createId) {
   for (const entry of lineEntries)
     if (entry.run) entry.vertex = { ...entry.vertex, ...cleanPoint(map(entry.back)) };
 
+  // Decision E: vertices of the moved line that an end placed on it (a slid corner, a bend) has
+  // reached or passed leave the outline; passing a cut refuses (moving cuts belongs to item 4).
+  const movedFrame = lineFrame(movedOrigin, map(frame.end));
+  const leavePassed = (placed, atEnd) => {
+    if (!movedFrame) return;
+    const inner = lineEntries.slice(1, -1);
+    const order = atEnd ? inner.reverse() : inner;
+    const outward = (entry) => (atEnd ? 1 : -1) * along(movedFrame, entry.vertex);
+    // Inner vertices from the placed end inwards (after it when it is itself an inner vertex).
+    for (const entry of order.slice(order.indexOf(placed) + 1)) {
+      if (!entry.run || outward(entry) < outward(placed) - SAME) break;
+      if (entry.vertex.editingCutId)
+        refuse('invalid_room_geometry', 'This edit would pass a cut of its wall.');
+      removed.add(entry.vertex.id);
+    }
+  };
+
   const jogs = [];
   const reconnect = (end, atEnd) => {
     const corner = atEnd ? lineEntries.at(-1) : lineEntries[0];
@@ -142,6 +159,7 @@ export function moveRoomStretch(room, plan, createId) {
       corner.vertex = { ...corner.vertex, ...cleanPoint(point) };
       corner.back = unmap(point);
       corner.out = point;
+      leavePassed(corner, atEnd);
       return;
     }
     if (end.type === 'bend') {
@@ -156,6 +174,7 @@ export function moveRoomStretch(room, plan, createId) {
       }
       entry.out = { x: entry.vertex.x, y: entry.vertex.y };
       entry.run = true;
+      leavePassed(entry, atEnd);
       return;
     }
     if (end.type === 'jog') {

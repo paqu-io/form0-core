@@ -135,3 +135,50 @@ for (const angle of [0, 0.37])
     });
     assert.ok(Math.min(...sides) > 0.1, 'no sliver jog at the pivot');
   });
+
+/** Distance from a point to the line through p and q. */
+const toLine = (point, p, q) =>
+  Math.abs((q.x - p.x) * (point.y - p.y) - (q.y - p.y) * (point.x - p.x)) /
+  Math.hypot(q.x - p.x, q.y - p.y);
+
+test('a slid corner drops the station it passes on its own moved line (E)', () => {
+  // After B's east corner went to (8,2.6), B's south line is slanted with a 12 mm cap at its
+  // west corner. Dragging that line 0.3 m slides the corner down B's west wall, 36 mm along the
+  // moved line: past the cap's station, which must leave the outline.
+  const t = example();
+  t.moveB(8, 2.6, 'east');
+  t.applied({ type: 'resize_face', faceId: t.f.faceB, distance: 0.3 });
+  const b = t.floor().rooms[1];
+  const corner = b.vertices.find((v) => round(v.x) === 3 && round(v.y) === 2.898);
+  assert.ok(corner, 'the corner slid along B west wall');
+  assert.ok(
+    b.vertices.every((v) => v.x >= 3 - 1e-9),
+    'no station left west of the slid corner'
+  );
+});
+
+for (const point of [
+  [3.2, 2.5],
+  [2.7, 1.9],
+])
+  test(`a wrapped corner dragged diagonally: both neighbour lines turn (${point})`, () => {
+    // Today refuses these drags (corner_constraint_conflict); the derived core places A's corner
+    // where its two lines, 0.2 m from B's moved lines, meet.
+    const t = example();
+    stepDown(t);
+    const before = t.floor().rooms.map(corners);
+    t.moveB(...point);
+    const [a, b] = t.floor().rooms;
+    const at = (x, y) => b.vertices.find((v) => round(v.x) === x && round(v.y) === y);
+    const [corner, east, north] = [at(...point), at(5, 2.2), at(3, 6.2)];
+    assert.ok(
+      a.vertices.some(
+        (v) =>
+          Math.abs(toLine(v, corner, east) - 0.2) < 1e-3 &&
+          Math.abs(toLine(v, corner, north) - 0.2) < 1e-3
+      ),
+      "A's corner is the counterpart of B's"
+    );
+    t.moveB(3, 2.2);
+    assert.deepEqual(t.floor().rooms.map(corners), before);
+  });
