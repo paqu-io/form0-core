@@ -1,11 +1,17 @@
 import { findBuildingPlanFloor, findFace, reconcileBuildingPlanProperties } from '../model.js';
-import { applyProperty } from '../property-edits.js';
+import { VALUE_OPERATIONS, applyProperty, applyValueOperation } from '../property-edits.js';
+import { ELEMENT_OPERATIONS, applyElementOperation } from '../element-operations.js';
 import { OPENING_OPERATIONS, applyOpeningOperation } from '../opening-operations.js';
 import { extractBuildingPlanPrimary } from './extract.js';
 
 export const PROPERTY_OPERATIONS = Object.freeze(['set_property', 'set_defaults', 'set_provider']);
 /** Operations that edit stored data only; a thickness they change moves rooms afterwards. */
-export const DATA_OPERATIONS = Object.freeze([...PROPERTY_OPERATIONS, ...OPENING_OPERATIONS]);
+export const DATA_OPERATIONS = Object.freeze([
+  ...PROPERTY_OPERATIONS,
+  ...OPENING_OPERATIONS,
+  ...VALUE_OPERATIONS,
+  ...ELEMENT_OPERATIONS,
+]);
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -64,8 +70,9 @@ export const floorContext = (context, floorId) => ({
 
 /**
  * Apply the data edits of an operation or batch to the stored floors with today's code (J4, rule
- * 12): openings first, on the walls the host saw, then answers. Each edited floor is read into
- * primary data with the answers before (`before`) and after (`primary`); geometry is the same.
+ * 12): openings first, on the walls the host saw, then values, custom rows and room elements in
+ * their order, then property answers. Each edited floor is read into primary data with the
+ * property answers before (`before`) and after (`primary`); geometry is the same.
  *
  * @returns {{context: Object, created: Array<Object>, floors: Array<{floor: Object,
  *   before: Object, primary: Object}>}}
@@ -74,11 +81,19 @@ export function applyDataEdits(snapshot, operation, { createId, specifications, 
   const context = thicknessContext(snapshot, operation, editingPolicy);
   const entries = entriesOf(operation);
   const created = [];
-  for (const entry of entries.filter((e) => OPENING_OPERATIONS.includes(e.type))) {
+  const edit = (entry) => {
     const floor = findBuildingPlanFloor(snapshot, entry.floorId);
-    const result = applyOpeningOperation(floor, entry, createId);
+    if (VALUE_OPERATIONS.includes(entry.type)) return applyValueOperation(floor, entry);
+    const result = OPENING_OPERATIONS.includes(entry.type)
+      ? applyOpeningOperation(floor, entry, createId)
+      : applyElementOperation(floor, entry, createId);
     if (result.created) created.push(result.created);
-  }
+  };
+  for (const entry of entries.filter((e) => OPENING_OPERATIONS.includes(e.type))) edit(entry);
+  for (const entry of entries.filter(
+    (e) => VALUE_OPERATIONS.includes(e.type) || ELEMENT_OPERATIONS.includes(e.type)
+  ))
+    edit(entry);
   const before = new Map();
   for (const entry of entries) {
     const floor = findBuildingPlanFloor(snapshot, entry.floorId);

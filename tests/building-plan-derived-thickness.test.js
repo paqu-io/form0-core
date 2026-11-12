@@ -67,7 +67,7 @@ test('property operations, and batches made only of them, run on the derived cor
     assert.ok(usesDerivedPath({ type }), type);
   const property = { type: 'set_property', property: 'material', value: 'Wood' };
   assert.ok(usesDerivedPath({ type: 'batch', operations: [property, property] }));
-  assert.ok(!usesDerivedPath({ type: 'batch', operations: [property, { type: 'set_values' }] }));
+  assert.ok(!usesDerivedPath({ type: 'batch', operations: [property, { type: 'create_floor' }] }));
   assert.ok(!usesDerivedPath({ type: 'batch', operations: [] }));
 });
 

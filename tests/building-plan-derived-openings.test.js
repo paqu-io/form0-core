@@ -82,7 +82,8 @@ test('opening operations, and batches of data operations, run on the derived cor
   const opening = { type: 'update_opening', openingId: 'door', offset: 1 };
   const property = { type: 'set_property', property: 'material', value: 'Wood' };
   assert.ok(usesDerivedPath({ type: 'batch', operations: [property, opening] }));
-  assert.ok(!usesDerivedPath({ type: 'batch', operations: [opening, { type: 'set_values' }] }));
+  assert.ok(usesDerivedPath({ type: 'batch', operations: [opening, { type: 'set_values' }] }));
+  assert.ok(!usesDerivedPath({ type: 'batch', operations: [opening, { type: 'create_floor' }] }));
 });
 
 test('a window is created, moved, resized, answered and removed as today', () => {
