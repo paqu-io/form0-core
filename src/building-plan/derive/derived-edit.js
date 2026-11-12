@@ -8,6 +8,16 @@ import { resizeFace } from './face-commands.js';
 import { moveCorner } from './corner-commands.js';
 import { resizePreserveGroup, resizeRoom } from './room-resizes.js';
 import { rejoinCut, splitFace } from './cut-commands.js';
+import { changeThickness } from './thickness-commands.js';
+import {
+  PROPERTY_OPERATIONS,
+  applyPropertyAnswers,
+  floorContext,
+  isPropertyBatch,
+  isPropertyOperation,
+  operationFloorIds,
+  thicknessContext,
+} from './property-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
@@ -21,6 +31,7 @@ export const DERIVED_OPERATIONS = Object.freeze([
   'resize_preserve_group',
   'split_face',
   'rejoin_cut',
+  ...PROPERTY_OPERATIONS,
 ]);
 const FACE_COMMANDS = {
   resize_face: resizeFace,
@@ -30,7 +41,10 @@ const FACE_COMMANDS = {
   split_face: splitFace,
   rejoin_cut: rejoinCut,
 };
-export const usesDerivedPath = (operation) => DERIVED_OPERATIONS.includes(operation?.type);
+/** Derived operations, and batches made only of property operations (J3). */
+export const usesDerivedPath = (operation) =>
+  DERIVED_OPERATIONS.includes(operation?.type) || isPropertyBatch(operation);
+export { operationFloorIds };
 
 function writeFloor(snapshot, floor, primary, options) {
   const { specifications } = options;
@@ -57,6 +71,8 @@ export function applyDerivedOperation(
   operation,
   { createId, specifications, editingPolicy = {} }
 ) {
+  if (isPropertyOperation(operation))
+    return applyPropertyOperation(snapshot, operation, { createId, specifications, editingPolicy });
   const floor = findBuildingPlanFloor(snapshot, operation.floorId);
   const primary = extractBuildingPlanPrimary(floor);
   const command = FACE_COMMANDS[operation.type];
@@ -71,13 +87,53 @@ export function applyDerivedOperation(
   return { result, ...written };
 }
 
-/** Write a floor of a derived candidate again after a decision changed its answers. */
-export function rederiveFloor(snapshot, floorId, { createId, specifications }) {
+/**
+ * A property operation or a batch of them (item 4b): the answers change on the stored floors, and
+ * each floor's thickness changes move its rooms (`changeThickness`) before it is written back.
+ */
+function applyPropertyOperation(snapshot, operation, options) {
+  const { context, floors } = applyPropertyAnswers(snapshot, operation, options);
+  const carved = [];
+  const divisions = [];
+  const issues = [];
+  for (const { floor, before, primary } of floors) {
+    const { result, preferredRoomIds } = changeThickness(
+      primary,
+      before,
+      floorContext(context, floor.id),
+      options
+    );
+    carved.push(...result.carvedRoomIds);
+    const written = writeFloor(snapshot, floor, primary, { ...options, preferredRoomIds });
+    divisions.push(...written.divisions);
+    issues.push(...written.issues);
+  }
+  return { result: { carvedRoomIds: carved }, divisions, issues };
+}
+
+/**
+ * Write a floor of a derived candidate again after a decision changed its answers. After a
+ * property operation (`change`: the operation, the candidate before the decision and the plan
+ * before the operation), a thickness the decision changed moves the rooms as the operation would.
+ *
+ * @returns {{divisions: Array<Object>, issues: Array<Object>, carvedRoomIds: string[]}}
+ */
+export function rederiveFloor(snapshot, floorId, options, change = null) {
+  const { createId, specifications, editingPolicy = {} } = options;
   const floor = findBuildingPlanFloor(snapshot, floorId);
-  return writeFloor(snapshot, floor, extractBuildingPlanPrimary(floor), {
+  const primary = extractBuildingPlanPrimary(floor);
+  let moved = { result: { carvedRoomIds: [] }, preferredRoomIds: undefined };
+  if (change && isPropertyOperation(change.operation)) {
+    const before = extractBuildingPlanPrimary(findBuildingPlanFloor(change.previous, floorId));
+    const context = thicknessContext(change.current, change.operation, editingPolicy);
+    moved = changeThickness(primary, before, floorContext(context, floorId), options);
+  }
+  const written = writeFloor(snapshot, floor, primary, {
     createId,
     specifications,
+    preferredRoomIds: moved.preferredRoomIds,
   });
+  return { ...written, carvedRoomIds: moved.result.carvedRoomIds };
 }
 
 /**
@@ -90,12 +146,14 @@ export function derivedCandidateIssues(before, candidate, operation, writeIssues
   );
   const issues = writeIssues.filter((issue) => issue.code !== 'conflicting_room_defaults');
   if (issues.length) return { defaultConflicts, issues };
-  const floor = candidate.floors.find((entry) => entry.id === operation.floorId);
+  const floors = operationFloorIds(operation)
+    .map((id) => candidate.floors.find((entry) => entry.id === id))
+    .filter(Boolean);
   return {
     defaultConflicts,
     issues: [
       ...buildingPlanPinIssues(before, candidate, operation.pinnedFaceIds),
-      ...(floor ? buildingPlanBoundaryClearanceIssues(floor) : []),
+      ...floors.flatMap((floor) => buildingPlanBoundaryClearanceIssues(floor)),
     ],
   };
 }

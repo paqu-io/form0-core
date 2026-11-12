@@ -18,6 +18,8 @@ function intersect(p, u, q, v) {
  * amount, when its continuation would otherwise lie on or past the moved room's face; nothing else
  * of the neighbour moves.
  *
+ * A run may carry its own `delta` (a thickness change moves each stretch by its own amount).
+ *
  * @returns {Array<Object>} Runs for `editRuns` with their ends given (`fixedEnds`).
  */
 export function junctionFollowers(derived, runs, delta) {
@@ -46,7 +48,8 @@ export function junctionFollowers(derived, runs, delta) {
       // continuation short of it holds and meets the lengthened wall as a contact (R1, F3).
       if (-depth(line, situation.continuation) < piece.width - SAME) continue;
       const start = pointAt(run.line.frame, end.atEnd ? run.to : run.from);
-      const moved = { x: start.x + delta.x, y: start.y + delta.y };
+      const step = run.delta || delta;
+      const moved = { x: start.x + step.x, y: start.y + step.y };
       const next = intersect(moved, run.line.frame.tangent, corner, adjoining.frame.tangent);
       if (!next) continue;
       const shift = along(line.frame, next) - along(line.frame, corner);

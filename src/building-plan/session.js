@@ -26,6 +26,7 @@ import {
 import {
   applyDerivedOperation,
   derivedCandidateIssues,
+  operationFloorIds,
   rederiveFloor,
   usesDerivedPath,
 } from './derive/derived-edit.js';
@@ -397,19 +398,31 @@ export function createBuildingPlanSession({
     return changes;
   }
 
-  function reconcilePrepared(prepared) {
+  /** `previous`: the candidate before a decision changed its answers (property operations). */
+  function reconcilePrepared(prepared, previous = null) {
     try {
       if (derived(prepared.operation)) {
-        const written = rederiveFloor(prepared.candidate, prepared.operation.floorId, {
-          createId,
-          specifications,
-        });
-        prepared.divisions.push(...written.divisions);
+        const writeIssues = [];
+        const change = previous && { operation: prepared.operation, previous, current };
+        for (const floorId of operationFloorIds(prepared.operation)) {
+          const written = rederiveFloor(
+            prepared.candidate,
+            floorId,
+            { createId, specifications, editingPolicy },
+            change
+          );
+          prepared.divisions.push(...written.divisions);
+          writeIssues.push(...written.issues);
+          if (prepared.result?.carvedRoomIds)
+            prepared.result.carvedRoomIds = [
+              ...new Set([...prepared.result.carvedRoomIds, ...written.carvedRoomIds]),
+            ].sort();
+        }
         const checked = derivedCandidateIssues(
           current,
           prepared.candidate,
           prepared.operation,
-          written.issues
+          writeIssues
         );
         prepared.defaultConflicts = checked.defaultConflicts;
         prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
@@ -449,9 +462,10 @@ export function createBuildingPlanSession({
           ])
           .find((subject) => subject.id === conflict.subject.id);
         if (!owner || Number(decision.slice(10)) >= conflict.candidates.length) return stale();
+        const previous = copy(prepared.candidate);
         owner.overrides ||= {};
         owner.overrides[conflict.property] = copy(value);
-        const issues = reconcilePrepared(prepared);
+        const issues = reconcilePrepared(prepared, previous);
         if (issues.length) return response('conflict', issues);
         decision = null;
       } else {

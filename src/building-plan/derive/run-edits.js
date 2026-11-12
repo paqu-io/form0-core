@@ -17,6 +17,7 @@ export function prepareEnds(derived, runs) {
   for (const run of runs)
     run.ends = [false, true].map((atEnd) => ({
       atEnd,
+      stationary: Boolean(run.stationary),
       line: run.line,
       point: endPoint(run, atEnd),
       situation: endSituation(
@@ -37,9 +38,9 @@ export function prepareEnds(derived, runs) {
 }
 
 /**
- * Move each run (by `delta`, or by its own `map`), reconnect its ends (as planned, or as its
- * `ownEnds` say), carry anchors and openings, and anchor the edges the edit created. `seatJog`
- * may place a jog again (R1).
+ * Move each run (by its own `delta` or `map`, else by `delta`), reconnect its ends (as planned,
+ * or as its `ownEnds` say), carry anchors and openings, and anchor the edges the edit created.
+ * `seatJog` may place a jog again (R1).
  */
 export function editRuns(primary, derived, runs, delta, { createId, specifications, seatJog }) {
   const additions = [];
@@ -61,7 +62,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
       run.fixedEnds ||
       [false, true].map((atEnd) => {
         if (run.ownEnds?.[atEnd ? 1 : 0]) return run.ownEnds[atEnd ? 1 : 0];
-        const plan = planEnd(derived, run, atEnd, delta, primary);
+        const plan = planEnd(derived, run, atEnd, run.delta || delta, primary);
         return seatJog ? seatJog(run, plan, atEnd) : plan;
       });
     const edited = moveRoomStretch(
@@ -70,7 +71,7 @@ export function editRuns(primary, derived, runs, delta, { createId, specificatio
         line: run.line,
         from: run.from,
         to: run.to,
-        delta: run.fixedEnds ? { x: 0, y: 0 } : delta,
+        delta: run.fixedEnds ? { x: 0, y: 0 } : run.delta || delta,
         map: run.map,
         unmap: run.unmap,
         ends,

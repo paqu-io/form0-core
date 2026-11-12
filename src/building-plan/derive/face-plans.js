@@ -8,6 +8,9 @@ const refuse = (code, message, subject) => {
 import { anchorAt } from './line-spans.js';
 import { retreatStation } from './jog-retreat.js';
 import { planTurnedEnd } from './turn-ends.js';
+import { junctionAllowance, junctionReturn } from './junction-allowance.js';
+
+export { pieceAtLineEnd } from './junction-allowance.js';
 
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 
@@ -64,58 +67,6 @@ export function endSituation(lines, caps, line, station, atEnd) {
 
 /** Offset into the room of a parallel line, measured from `line`. */
 export const depth = (line, other) => -line.outward * offset(line.frame, other.frame.start);
-
-/** The current piece (or cap source) of a room line at one of its ends. */
-export function pieceAtLineEnd(derived, line, atEnd) {
-  const station = atEnd ? line.frame.length : 0;
-  const touches = (entry) =>
-    entry.roomId === line.roomId &&
-    entry.index === line.index &&
-    Math.abs((atEnd ? entry.to : entry.from) - station) <= SAME;
-  return (
-    derived.pieces.find((piece) => piece.lines.some(touches)) ||
-    derived.caps.find(touches)?.source ||
-    null
-  );
-}
-
-/**
- * How far a room's line must reach past a moved contact's end so its clear space stays out of the
- * other room's wall material there: the other room's adjoining wall, measured along this line
- * (today's junction allowance), or the contact's own width when the other room jogs there too.
- */
-export function junctionAllowance(derived, line, other, contactWidth) {
-  if (!other) return 0;
-  if (other.situation.kind === 'straight') return contactWidth;
-  const adjoining =
-    other.situation.kind === 'shift' ? other.situation.jog : other.situation.adjoining;
-  const width = pieceAtLineEnd(derived, adjoining, !other.atEnd)?.width ?? 0;
-  const cos = Math.abs(dot(line.frame.tangent, adjoining.frame.tangent));
-  const sin = Math.sqrt(Math.max(0, 1 - cos * cos));
-  return sin > 1e-9 && width > 0 ? (width + contactWidth * cos) / sin : 0;
-}
-
-/**
- * The return a room makes against the other room's adjoining wall at a moved contact's end: the
- * line parallel to that wall at its width outside it (where this room's clear space must stop),
- * as a station on this line and a direction. Null when the other room has no adjoining wall there.
- */
-export function junctionReturn(derived, line, other) {
-  if (!other || other.situation.kind === 'straight') return null;
-  const adjoining =
-    other.situation.kind === 'shift' ? other.situation.jog : other.situation.adjoining;
-  const width = pieceAtLineEnd(derived, adjoining, !other.atEnd)?.width ?? 0;
-  if (!(width > 0)) return null;
-  const { frame } = adjoining;
-  const base = pointAt(frame, 0, adjoining.outward * width);
-  const det = line.frame.tangent.x * frame.tangent.y - line.frame.tangent.y * frame.tangent.x;
-  if (Math.abs(det) <= 1e-9) return null;
-  const t =
-    ((base.x - line.frame.start.x) * frame.tangent.y -
-      (base.y - line.frame.start.y) * frame.tangent.x) /
-    det;
-  return { station: t, direction: frame.tangent };
-}
 
 /** The subject anchored on a room line just inside a station (towards `towards`). */
 export function subjectNear(line, station, towards) {
