@@ -174,6 +174,24 @@ export function createBuildingPlanEditor(options) {
     const existing = resolveBuildingPlanRow(session.getRecord(), path);
     const opened = session.beginScope({ id: scopeId, parentScopeId, subject: { path } });
     if (opened.status !== 'opened') return opened;
+    try {
+      return fillOpenedRow({ path, scopeId, row, existing, opened });
+    } catch (error) {
+      // Anything that throws once the scope is open (a listener while the opening publishes, a
+      // row that does not materialize) would leave it open, and its parent could then neither
+      // save nor cancel. Close it and report the first error.
+      if (session.getState().scopes.some((entry) => entry.id === scopeId)) {
+        try {
+          close(scopeId, false);
+        } catch {
+          // A listener throwing again while the cancellation publishes: the first error stands.
+        }
+      }
+      throw error;
+    }
+  }
+
+  function fillOpenedRow({ path, scopeId, row, existing, opened }) {
     if (!existing) {
       const operation = createOperation(path);
       const created = session.apply(operation, { scopeId });
