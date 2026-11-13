@@ -10,6 +10,7 @@ import { resizePreserveGroup, resizeRoom } from './room-resizes.js';
 import { rejoinCut, splitFace } from './cut-commands.js';
 import { changeThickness } from './thickness-commands.js';
 import { PARTITION_COMMANDS } from './partition-commands.js';
+import { SELF_FACING_OPERATIONS, selfFacingWallIssues } from './self-facing-walls.js';
 import {
   DATA_OPERATIONS,
   PROPERTY_OPERATIONS,
@@ -152,7 +153,8 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
 
 /**
  * Split the write-back's issues as today's reconciliation does: conflicting room defaults become
- * a question; any other issue refuses the edit. Pins and wall clearance are checked as today.
+ * a question; any other issue refuses the edit. Pins and wall clearance are checked as today; a
+ * face or corner drag must not leave a slit against the room's own wall (Q5).
  */
 export function derivedCandidateIssues(before, candidate, operation, writeIssues) {
   const defaultConflicts = writeIssues.filter(
@@ -163,11 +165,18 @@ export function derivedCandidateIssues(before, candidate, operation, writeIssues
   const floors = operationFloorIds(operation)
     .map((id) => candidate.floors.find((entry) => entry.id === id))
     .filter(Boolean);
+  const selfFacing = SELF_FACING_OPERATIONS.includes(operation.type)
+    ? floors.flatMap((floor) => {
+        const previous = before.floors.find((entry) => entry.id === floor.id);
+        return previous ? selfFacingWallIssues(previous, floor) : [];
+      })
+    : [];
   return {
     defaultConflicts,
     issues: [
       ...buildingPlanPinIssues(before, candidate, operation.pinnedFaceIds),
       ...floors.flatMap((floor) => buildingPlanBoundaryClearanceIssues(floor)),
+      ...selfFacing,
     ],
   };
 }
