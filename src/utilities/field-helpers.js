@@ -4,17 +4,24 @@
 // Field Flattening Utilities
 // =============================================================================
 
+const CONTAINER_TYPES = new Set(['Section', 'RepeatableSection', 'BuildingPlanSection']);
+
+/**
+ * Sections, RepeatableSections and BuildingPlanSections hold elements, never a value of their own.
+ * @param {{ type?: string } | null | undefined} field
+ * @returns {boolean}
+ */
+export function isContainerField(field) {
+  return CONTAINER_TYPES.has(field?.type);
+}
+
 export function flattenFields(elements) {
   if (!Array.isArray(elements)) {
     return [];
   }
 
   return elements.flatMap((el) => {
-    if (
-      el.type === 'Section' ||
-      el.type === 'RepeatableSection' ||
-      el.type === 'BuildingPlanSection'
-    ) {
+    if (isContainerField(el)) {
       return [el, ...flattenFields(el.elements)];
     }
 

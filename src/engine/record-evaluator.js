@@ -21,6 +21,7 @@ import { areStructuredValuesEqual } from '../utilities/value-equality.js';
 import { projectCollectionValue } from '../utilities/repeatable-collections.js';
 import { getFormSchemaRevision } from '../utilities/schema-revision.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
+import { isContainerField } from '../utilities/field-helpers.js';
 import { createRecordFreshness } from './record-freshness.js';
 import {
   refreshBuildingPlanProjections,
@@ -381,8 +382,10 @@ export function createRecordEvaluator({
         record.visible = {};
         record.required = {};
         record.read_only = {};
+        // Every value field gets its default (null when empty); containers have no value, and a
+        // null under a container's name would reach drafts and BuildingPlan rows.
         for (const field of template.fields)
-          if (!Object.hasOwn(record.values, field.data_name))
+          if (!isContainerField(field) && !Object.hasOwn(record.values, field.data_name))
             record.values[field.data_name] = copyRecordData(
               getDefaultValue(viewing ? { ...field, default_value: null } : field)
             );
