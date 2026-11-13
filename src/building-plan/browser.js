@@ -10,6 +10,7 @@ export {
   buildingPlanFaceSegments,
 } from './model.js';
 export { buildingPlanPointFromViewport } from './geometry.js';
+export { buildingPlanLabelPlacement } from './label-placement.js';
 export { isBuildingPlanInternalCollection } from './metadata.js';
 export {
   normalizeBuildingPlanEditingPolicy,

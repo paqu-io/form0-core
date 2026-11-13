@@ -68,6 +68,7 @@ export {
   buildingPlanFaceSegments,
 } from './building-plan/model.js';
 export { buildingPlanPointFromViewport } from './building-plan/geometry.js';
+export { buildingPlanLabelPlacement } from './building-plan/label-placement.js';
 export {
   normalizeBuildingPlanEditingPolicy,
   BUILDING_PLAN_EDITING_DEFAULTS,
