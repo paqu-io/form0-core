@@ -1,23 +1,37 @@
-# form0-core
+<p align="center">
+  <img
+    src=".github/assets/form0-icon.svg"
+    alt="form0 icon"
+    width="88"
+  />
+</p>
 
-[![NPM Version](https://img.shields.io/npm/v/form0-core)](https://www.npmjs.com/package/form0-core)
-[![NPM Downloads](https://img.shields.io/npm/dm/form0-core)](https://www.npmjs.com/package/form0-core)
-[![CI](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml/badge.svg)](https://github.com/paqu-io/form0-core/actions/workflows/ci.yml)
-![NPM License](https://img.shields.io/npm/l/form0-core)
-[![Docs](https://img.shields.io/badge/docs-docs.form0.dev-2563eb)](https://docs.form0.dev)
-[![Website](https://img.shields.io/badge/site-form0.dev-0f172a)](https://form0.dev)
-![NPM Last Update](https://img.shields.io/npm/last-update/form0-core)
-[![Socket](https://socket.dev/api/badge/npm/package/form0-core)](https://socket.dev/npm/package/form0-core)
+<h1 align="center">form0-core</h1>
+
+<p align="center">
+  A framework-agnostic, schema-driven form engine for web and mobile.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/form0-core"><img alt="npm version" src="https://img.shields.io/npm/v/form0-core"></a>
+  <a href="https://www.npmjs.com/package/form0-core"><img alt="npm downloads" src="https://img.shields.io/npm/dm/form0-core"></a>
+  <a href="https://github.com/paqu-io/form0-core/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/paqu-io/form0-core/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/npm/l/form0-core"></a>
+  <a href="https://docs.form0.dev"><img alt="Documentation" src="https://img.shields.io/badge/docs-docs.form0.dev-2563eb"></a>
+  <a href="https://form0.dev"><img alt="Website" src="https://img.shields.io/badge/site-form0.dev-0f172a"></a>
+  <img alt="npm last update" src="https://img.shields.io/npm/last-update/form0-core">
+  <a href="https://socket.dev/npm/package/form0-core"><img alt="Socket" src="https://socket.dev/api/badge/npm/package/form0-core"></a>
+</p>
 
 > [!NOTE]
 > form0 is in active development and is available to use today. Its schema format and core
 > concepts are stable in practice, but releases before 1.0 may include breaking changes. Pin your
 > versions and review the release notes when upgrading. A formally stable release is coming.
 
-`form0-core` is the framework-agnostic, schema-driven engine behind the
-[form0 open-source ecosystem](https://form0.dev). It evaluates calculations, conditional
-visibility, requirements, read-only rules, validation, and form events in Node.js, browsers, and
-React Native.
+`form0-core` is the headless engine behind the [form0 open-source ecosystem](https://form0.dev).
+It evaluates calculations, conditional visibility, field requirements, read-only rules,
+validation, and form events across Node.js, browsers, and React Native.
+Your application retains control over rendering, backend integration, and data storage.
 
 ## 🚀 Start with the CLI
 
@@ -276,6 +290,10 @@ authoring workflow.
 
 See [SUPPORT.md](https://github.com/paqu-io/form0-core/blob/main/SUPPORT.md) for help and
 [CONTRIBUTING.md](https://github.com/paqu-io/form0-core/blob/main/CONTRIBUTING.md) to contribute.
+
+If you find form0 ecosystem useful, a ⭐ on GitHub or a mention
+in your project would be greatly appreciated.
+It helps others discover the project!
 
 ## 📄 License
 
