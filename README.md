@@ -2,7 +2,7 @@
   <img
     src=".github/assets/form0-icon.svg"
     alt="form0 icon"
-    width="88"
+    width="100"
   />
 </p>
 
