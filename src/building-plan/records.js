@@ -421,10 +421,11 @@ export function writeBuildingPlanRecord(options) {
 }
 
 /**
- * The throwaway record a canvas preview draws from. A previewed edit may hold questions its commit
- * asks (rooms that disagree on a shared wall's value); the conflicted value stays as it was in this
- * record, which is never stored. Every other problem still refuses. Internal: not exported from
- * the package.
+ * A record of a proposal that may hold questions its commit asks (rooms that disagree on a shared
+ * wall's value): what a canvas preview draws from, and what the canvas hands a managed host, which
+ * commits the operation itself and returns its own record. The conflicted value stays as it was;
+ * the record cannot be read back while the question is open, so it is never stored. Every other
+ * problem still refuses. Internal: not exported from the package.
  */
 export function writeBuildingPlanPreviewRecord(options) {
   return writeRecord(options, (issue) => issue.code !== 'conflicting_room_defaults');

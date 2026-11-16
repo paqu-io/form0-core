@@ -517,7 +517,11 @@ export class BuildingPlanCanvasController {
           return null;
         }
       }
-      const next = writeBuildingPlanRecord({
+      // Managed hosts commit the operation themselves and ask its questions there, so the proposal
+      // may still hold them; the host's result (its record, or 'pending') replaces this one.
+      const next = (
+        this.managedTransactions ? writeBuildingPlanPreviewRecord : writeBuildingPlanRecord
+      )({
         meta: this.meta,
         record: this.record,
         plan: committed?.snapshot || proposal.snapshot,
@@ -571,6 +575,13 @@ export class BuildingPlanCanvasController {
           ].find((entry) => entry.id === created.id || entry.subjectId === created.id) || created
         );
       return result;
+    } catch (error) {
+      // Hosts apply from pointer handlers: a throw here left the drag attached to the pointer
+      // (web retest 2026-11-16). Report it and follow the host's record again.
+      this.busy = false;
+      this.syncFromState();
+      this.reportIssues(error.issues || [{ code: 'invalid_operation', message: error.message }]);
+      return null;
     } finally {
       this.busy = false;
       this.pending = null;
