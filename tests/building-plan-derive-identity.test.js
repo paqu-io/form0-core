@@ -69,17 +69,23 @@ test('a partial contact keeps both walls on their remainders; the shared stretch
   }
 });
 
-test('a join keeps every answer or is refused; the stationary room keeps its wall', () => {
+test('a join keeps every answer or asks; the stationary room keeps its wall', () => {
   const stored = unboundFloor();
   const [w3, w5] = ['W3', 'W5'].map((label) => byLabel(stored, label));
   const heights = (a, b) => (primary) => {
     if (a != null) primary.subjects.get(w3.id).overrides.wall_height = a;
     if (b != null) primary.subjects.get(w5.id).overrides.wall_height = b;
   };
-  assert.equal(
-    refusal(() => writeBack(stored, specifications, { edit: heights(2.5, 2.7) })),
-    'conflicting_wall_properties'
-  );
+  // Two different own heights are a choice the session asks (2026-11-16, option a), not a
+  // refusal: the survivor holds its own value until the person answers.
+  const both = writeBack(stored, specifications, { edit: heights(2.5, 2.7) });
+  const choice = both.issues.find((issue) => issue.options);
+  assert.equal(choice.code, 'conflicting_room_defaults');
+  assert.equal(choice.origin, 'join');
+  assert.deepEqual(choice.entries, [{ kind: 'property', key: 'wall_height' }]);
+  assert.deepEqual(choice.options.map((option) => option.values[0]).sort(), [2.5, 2.7]);
+  assert.equal(interior(both.floor)[0].overrides.wall_height, choice.options[0].values[0]);
+  // One own height against no value at all (nothing inherited) is kept without a question.
   const merged = writeBack(stored, specifications, { edit: heights(null, 2.7) }).floor;
   assert.equal(interior(merged)[0].overrides.wall_height, 2.7);
   assert.equal(byLabel(merged, 'W3').overrides.wall_height, undefined);

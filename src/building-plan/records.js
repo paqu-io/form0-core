@@ -207,6 +207,8 @@ export function readBuildingPlanRecord(options) {
       if (state.autoLabel != null && wall.values.wall_label === state.autoLabel)
         delete wall.values.wall_label;
       if (state.lineage) wall.lineage = copy(state.lineage);
+      // Properties whose own value the shared-value question chose (released on detach).
+      if (state.sharedChoices?.length) wall.sharedChoices = copy(state.sharedChoices);
       wall.repeatable = readCustom(meta, 'physical_walls', wallRow);
       wall.sides = rows(meta, 'wall_sides', wallRow).map((sideRow) => {
         const side = modelOf(meta, 'wall_sides', sideRow);
@@ -479,6 +481,7 @@ export function writeBuildingPlanRecord(options) {
         id: wall.id,
         referenceFaceId: wall.referenceFaceId,
         overrideProperties: Object.keys(wall.overrides),
+        ...(wall.sharedChoices?.length ? { sharedChoices: wall.sharedChoices } : {}),
         ...(wall.lineage ? { lineage: wall.lineage } : {}),
       });
       for (const collection of ['doors', 'windows']) {

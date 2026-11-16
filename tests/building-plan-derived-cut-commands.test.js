@@ -99,29 +99,67 @@ test('Split at an automatic boundary makes that station the cut', () => {
   );
 });
 
-test('Rejoin refuses differing room-side answers, as today', () => {
-  let cut = null;
-  bothEngines([
-    (t) => {
-      const result = t.apply({ type: 'split_face', faceId: t.f.faceA, offset: 1.5 });
-      cut = cutOf(result);
-      return result;
-    },
-    (t) => {
-      const other = t
-        .floor()
-        .rooms[0].faces.find(
-          (face) => face.lineage?.editingOriginFaceId === t.f.faceA && face.id !== t.f.faceA
-        );
-      return t.apply({
-        type: 'set_values',
-        faceId: other.id,
-        scope: 'wall_face',
-        values: { finish: 'painted' },
-      });
-    },
-    (t) => t.apply({ type: 'rejoin_cut', cutId: cut }),
-  ]);
+/** A Split shared wall on the derived core, with the new portion's row (2026-11-16 tests). */
+function splitPortion() {
+  const t = example(true);
+  const cut = cutOf(t.apply({ type: 'split_face', faceId: t.f.faceA, offset: 1.5 }));
+  const other = t
+    .floor()
+    .rooms[0].faces.find(
+      (face) => face.lineage?.editingOriginFaceId === t.f.faceA && face.id !== t.f.faceA
+    );
+  const wallOf = (faceId) =>
+    t
+      .floor()
+      .walls.find(
+        (wall) => wall.id === t.floor().rooms[0].faces.find((face) => face.id === faceId).wallId
+      );
+  return { t, cut, other, wallOf };
+}
+
+test('Rejoin asks once which values the rejoined wall keeps (2026-11-16)', () => {
+  const { t, cut, other, wallOf } = splitPortion();
+  t.apply({ type: 'set_property', faceId: other.id, property: 'wall_height', value: 2.4 });
+  // One side's answer against no answer is kept without a question, as at a join.
+  t.apply({
+    type: 'set_values',
+    faceId: other.id,
+    scope: 'wall_face',
+    values: { finish: 'painted' },
+  });
+  const asked = t.apply({ type: 'rejoin_cut', cutId: cut });
+  assert.equal(asked.status, 'pending');
+  const { params } = asked.uiOperations[0];
+  assert.equal(
+    params.message,
+    'W3 and W3.3 have different values for Height. Choose the one the rejoined wall keeps; you can still change it on the wall later.'
+  );
+  assert.deepEqual(
+    params.buttons.map((button) => button.label),
+    ['W3: 3 m', 'W3.3: 2.4 m', 'Cancel rejoin']
+  );
+  assert.equal(
+    t.session.resolveUIRequest(params.requestId, { value: 'candidate:1' }).status,
+    'applied'
+  );
+  const wall = wallOf(t.f.faceA);
+  assert.equal(wall.overrides.wall_height, 2.4);
+  // 2.4 m was typed on W3.3: it stays a typed value, never released by a later detach.
+  assert.equal(wall.sharedChoices, undefined);
+  assert.ok(wall.sides.some((side) => side.values?.finish === 'painted'));
+  assert.ok(t.floor().rooms[0].vertices.every((vertex) => !vertex.editingCutId));
+});
+
+test('Rejoin keeps refusing a different thickness, in plain words (2026-11-16)', () => {
+  const { t, cut, other } = splitPortion();
+  t.apply({ type: 'set_property', faceId: other.id, property: 'wall_thickness', value: 0.3 });
+  const refused = t.apply({ type: 'rejoin_cut', cutId: cut });
+  assert.equal(refused.status, 'conflict');
+  assert.equal(refused.issues[0].code, 'cut_construction_conflict');
+  assert.match(
+    refused.issues[0].message,
+    /have different thicknesses \(200 mm and 300 mm\)|\(300 mm and 200 mm\)/
+  );
 });
 
 test('a partition: Split divides its wall and Rejoin joins it again', () => {

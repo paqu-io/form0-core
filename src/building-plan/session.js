@@ -16,6 +16,11 @@ import { createUIRequestRegistry } from '../utilities/ui-requests.js';
 import { reconcileWallLabels } from './wall-labels.js';
 import { assignBuildingPlanDefaultNames } from './default-names.js';
 import { sharedValueQuestion } from './shared-value-question.js';
+import {
+  applySharedValueChoice,
+  carriedJoinChoices,
+  groupSharedValueChoices,
+} from './shared-value-choices.js';
 import { applyBuildingPlanOperation } from './operations.js';
 import { applyOpeningOperation } from './opening-operations.js';
 import {
@@ -459,29 +464,24 @@ export function createBuildingPlanSession({
     if (!prepared || prepared.revision !== revision || !scopeExists(prepared.scopeId))
       return stale();
     if (prepared.generation !== pendingGeneration) return stale();
-    const conflict = prepared.defaultConflicts?.[0];
-    if (conflict) {
+    // Values walls give differently: one question per wall summarising them (2026-11-16).
+    const [choice] = groupSharedValueChoices(prepared.defaultConflicts || [], prepared.candidate);
+    if (choice) {
       if (decision?.startsWith('candidate:')) {
-        const value = conflict.candidates[Number(decision.slice(10))]?.value;
-        const owner = prepared.candidate.floors
-          .flatMap((floor) => [
-            floor,
-            ...floor.rooms,
-            ...floor.rooms.flatMap((room) => [...room.columns, ...room.beams, ...room.objects]),
-            ...floor.walls.flatMap((wall) => [wall, ...wall.sides, ...wall.doors, ...wall.windows]),
-          ])
-          .find((subject) => subject.id === conflict.subject.id);
-        if (!owner || Number(decision.slice(10)) >= conflict.candidates.length) return stale();
+        const before = prepared.defaultConflicts;
         const previous = copy(prepared.candidate);
-        owner.overrides ||= {};
-        owner.overrides[conflict.property] = copy(value);
+        if (!applySharedValueChoice(prepared.candidate, choice, Number(decision.slice(10))))
+          return stale();
         const issues = reconcilePrepared(prepared, previous);
         if (issues.length) return response('conflict', issues);
+        prepared.defaultConflicts.push(
+          ...carriedJoinChoices(before, choice, prepared.defaultConflicts, prepared.candidate)
+        );
         decision = null;
       } else {
         const question = questions.create(
           {
-            ...sharedValueQuestion(conflict, prepared.candidate, specifications),
+            ...sharedValueQuestion(choice, prepared.candidate, specifications),
             context: { revision, scopeId: prepared.scopeId },
           },
           (reply) => ({ proposal, reply }),

@@ -3,6 +3,8 @@ import { mergeWallAnswers } from '../wall-merge.js';
 import { createWallSides } from '../wall-sides.js';
 import { SAME } from './grid.js';
 import { rowTangent } from './frames.js';
+import { carrySharedChoices, roomsChanged } from './shared-choices.js';
+import { assertJoinThickness, prepareJoinChoice } from './value-choices.js';
 
 const LABEL = /^W\d+(?:\.\d+)*$/;
 const labelParts = (label) =>
@@ -57,7 +59,9 @@ export function relativeDirection(context, a, b) {
  */
 export function absorbSubject(context, survivor, other) {
   const direction = relativeDirection(context, survivor, other);
+  const carry = carrySharedChoices(survivor, other);
   mergeWallAnswers(survivor, other, direction);
+  carry();
   survivor.lineage = {
     ...(survivor.lineage || {}),
     mergedWallIds: [...(survivor.lineage?.mergedWallIds || []), other.id],
@@ -130,6 +134,7 @@ export function joinPieceSubjects(context) {
       continue;
     }
     const [survivor, ...others] = members.sort(order);
+    if (others.length) askJoinChoice(context, piece, survivor.subject, members);
     for (const { subject } of others) absorbSubject(context, survivor.subject, subject);
     piece.subjectId = survivor.subject.id;
   }
@@ -146,6 +151,31 @@ export function joinPieceSubjects(context) {
     return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
   };
   for (const piece of bare.sort(before)) piece.subjectId = newSubject(context).id;
+}
+
+const nameText = (value) =>
+  typeof value === 'string'
+    ? value
+    : (value?.other?.[0]?.label ?? value?.choice?.[0]?.label ?? value?.choice?.[0]?.value ?? null);
+
+/**
+ * Walls joining into one piece (2026-11-16): an own thickness that disagrees with the contact's
+ * width refuses (c3); other differing values become one choice for the session to ask (option a),
+ * a join when the piece faces other rooms than its walls did, a rejoin when it faces the same.
+ */
+function askJoinChoice(context, piece, survivor, members) {
+  const described = members.map((member) => ({
+    ...member,
+    label: labelOf(context, member.subject) ?? null,
+    roomName: nameText(context.rooms.get(member.roomId)?.values?.room_name),
+  }));
+  assertJoinThickness(piece, described);
+  const origin = members.some((member) => roomsChanged(context, member.subject.id, piece))
+    ? 'join'
+    : 'rejoin';
+  const direction = (subject) => relativeDirection(context, survivor, subject);
+  const choice = prepareJoinChoice(survivor, described, direction, origin);
+  if (choice) context.issues.push(choice);
 }
 
 /** A wall the user deliberately separated (Separate wall) never joins its neighbour again. */

@@ -188,6 +188,7 @@ test('wall and column heights are required on enclosed levels only', async () =>
 
 test('rooms with the same name are told apart in the question', async () => {
   const { sharedValueQuestion } = await import('../src/building-plan/shared-value-question.js');
+  const { groupSharedValueChoices } = await import('../src/building-plan/shared-value-choices.js');
   const bedroom = { choice: [{ value: 'bedroom', label: 'Bedroom' }], other: [] };
   const snapshot = {
     floors: [
@@ -202,18 +203,16 @@ test('rooms with the same name are told apart in the question', async () => {
       },
     ],
   };
-  const question = sharedValueQuestion(
-    {
-      subject: { type: 'walls', id: 'wall' },
-      property: 'wall_thickness',
-      candidates: [
-        { id: 'a', value: 0.2 },
-        { id: 'b', value: 0.3 },
-      ],
-    },
-    snapshot,
-    meta.properties
-  );
+  const conflict = {
+    subject: { type: 'walls', id: 'wall' },
+    property: 'wall_thickness',
+    candidates: [
+      { id: 'a', value: 0.2 },
+      { id: 'b', value: 0.3 },
+    ],
+  };
+  const [choice] = groupSharedValueChoices([conflict], snapshot);
+  const question = sharedValueQuestion(choice, snapshot, meta.properties);
   assert.match(
     question.message,
     /^Wall W3 is shared by Bedroom \(room 1\) and Bedroom \(room 2\),/

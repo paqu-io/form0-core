@@ -1,8 +1,11 @@
-import { equalValue } from '../model.js';
+import { equalValue, own } from '../model.js';
+import { mergeWallAnswers } from '../wall-merge.js';
 import { SAME, along, lineFrame, offset } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { pieceAt } from './face-plans.js';
 import { joinEdges } from './cut-edges.js';
+import { prepareJoinChoice } from './value-choices.js';
+import { carrySharedChoices } from './shared-choices.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -10,8 +13,16 @@ const refuse = (code, message) => {
 const notAligned = () =>
   refuse('cut_not_aligned', 'Align the split portions on the same straight line before rejoining.');
 const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const ANSWERS = ['overrides', 'providerOverrides', 'values', 'repeatable'];
-const sameAnswers = (a, b) => ANSWERS.every((key) => equalValue(a?.[key] || {}, b?.[key] || {}));
+const millimetres = (metres) => (metres > 0 ? `${Math.round(metres * 1000)} mm` : 'unknown');
+const thicknessOf = (subject) =>
+  own(subject.overrides, 'wall_thickness')
+    ? subject.overrides.wall_thickness
+    : (subject.properties?.wall_thickness ?? null);
+/** Both hold custom records and they differ (one holding none keeps the other's, as a join). */
+const recordsDiffer = (a, b) =>
+  [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])].some(
+    (key) => a?.[key]?.length && b?.[key]?.length && !equalValue(a[key], b[key])
+  );
 
 /** Two runs continue each other: same direction, the second on the first's line. */
 function collinear(first, second) {
@@ -22,27 +33,43 @@ function collinear(first, second) {
 }
 
 /**
- * Today's Rejoin checks (rule 5): the physical answers match, and each side's answers match the
- * side facing the same room (`facing`: the sign of a subject's side towards the cut's room).
- * Different rooms on either side (`adjacent` false) are a different adjacency.
+ * Rejoin checks (rule 5, revised 2026-11-16): the portions must face the same rooms (`adjacent`).
+ * Differing values are asked by one choice (`rejoinSubjects`) except what no choice can settle:
+ * a different thickness (geometry; item 5) and different custom records, which refuse in plain
+ * words, and different explicit providers, which refuse as before. `facing`: the sign of a
+ * subject's side towards the cut's room.
  */
 function compatible(a, b, facing, adjacent = true) {
   if (!a || !b) refuse('cut_physical_conflict', 'These pieces no longer share a boundary.');
   if (a === b) return;
-  if (!sameAnswers(a, b))
+  if (!adjacent)
+    refuse(
+      'cut_answer_conflict',
+      'Rejoin requires the same rooms on both sides of the two portions.'
+    );
+  const names = `${a.autoLabel || 'This portion'} and ${b.autoLabel || 'the next portion'}`;
+  const [x, y] = [a, b].map(thicknessOf);
+  if (!equalValue(x, y))
+    refuse(
+      'cut_construction_conflict',
+      `${names} have different thicknesses (${millimetres(x)} and ${millimetres(y)}). Set the same thickness on both, then rejoin.`
+    );
+  const direction = facing(a) * facing(b);
+  const sideRecords = (a.sides || []).some((side) =>
+    recordsDiffer(
+      side.repeatable,
+      (b.sides || []).find((entry) => entry.sign === side.sign * direction)?.repeatable
+    )
+  );
+  if (recordsDiffer(a.repeatable, b.repeatable) || sideRecords)
+    refuse(
+      'cut_construction_conflict',
+      `${names} have different custom records. Make them the same on both, then rejoin.`
+    );
+  if (!equalValue(a.providerOverrides || {}, b.providerOverrides || {}))
     refuse(
       'cut_construction_conflict',
       'Resolve the physical answers and override intent before rejoining.'
-    );
-  const direction = facing(a) * facing(b);
-  const sides = (a.sides || []).every((side) => {
-    const other = (b.sides || []).find((entry) => entry.sign === side.sign * direction);
-    return other && sameAnswers(side, other);
-  });
-  if (!adjacent || !sides)
-    refuse(
-      'cut_answer_conflict',
-      'Rejoin requires matching room adjacency and compatible answers on both surfaces.'
     );
 }
 
@@ -58,8 +85,22 @@ function divisionSurvivor(a, b) {
   return null;
 }
 
-/** `other` joins `survivor` (their answers were checked equal): rows, paths and openings move. */
-function absorbDivision(primary, survivor, other) {
+/**
+ * `other` joins `survivor`: values that differ become one choice for the session (option a, as a
+ * rejoin), every other answer merges; rows, paths and openings move.
+ */
+function absorbDivision(primary, survivor, other, facing) {
+  const direction = (subject) => (subject === survivor ? 1 : facing(survivor) * facing(subject));
+  const members = [survivor, other].map((subject) => ({
+    subject,
+    roomId: null,
+    label: subject.autoLabel ?? null,
+  }));
+  const choice = prepareJoinChoice(survivor, members, direction, 'rejoin');
+  if (choice) (primary.valueChoices ||= []).push(choice);
+  const carry = carrySharedChoices(survivor, other);
+  mergeWallAnswers(survivor, other, direction(other));
+  carry();
   for (const entry of [...primary.anchors, ...primary.partitions])
     if (entry.subjectId === other.id) entry.subjectId = survivor.id;
   survivor.openings = [...(survivor.openings || []), ...(other.openings || [])];
@@ -85,7 +126,7 @@ function rejoinPartitions(primary, roomId, cutId, createId) {
     for (const opening of subject.openings || [])
       if (opening.faceId === after.faceId)
         Object.assign(opening, { faceId: before.faceId, from: opening.from + length });
-  if (a !== b) absorbDivision(primary, ...(divisionSurvivor(a, b) || [a, b]));
+  if (a !== b) absorbDivision(primary, ...(divisionSurvivor(a, b) || [a, b]), () => 1);
   Object.assign(before, {
     path: [before.path[0], after.path.at(-1)],
     freeEdges: [createId()],
@@ -100,8 +141,8 @@ function rejoinPartitions(primary, roomId, cutId, createId) {
 /**
  * `rejoin_cut` on the derived core (item 4, rule 5): an explicit cut, or an automatic boundary
  * by its ID, goes from every room and partition carrying it. The portions must continue each other
- * and have the same answers (today's codes). The wall the Split divided survives (I6); other
- * pieces join in the write-back.
+ * and face the same rooms; their differing values are asked once (2026-11-16). The wall the Split
+ * divided survives (I6); other pieces join in the write-back, which asks the same way.
  *
  * @returns {{result: Object, preferredRoomIds: string[]}}
  */
@@ -142,11 +183,11 @@ export function rejoinCut(primary, { cutId }, { createId, specifications }) {
         : -1;
     const [a, b] = [p, q].map((piece) => piece && primary.subjects.get(piece.subjectId));
     compatible(a, b, facing, rooms(p) === rooms(q));
-    joins.push({ room, vertex, subjects: [a, b] });
+    joins.push({ room, vertex, subjects: [a, b], facing });
   }
-  for (const { subjects } of joins) {
+  for (const { subjects, facing } of joins) {
     const pair = subjects[0] !== subjects[1] && divisionSurvivor(...subjects);
-    if (pair && primary.subjects.has(pair[1].id)) absorbDivision(primary, ...pair);
+    if (pair && primary.subjects.has(pair[1].id)) absorbDivision(primary, ...pair, facing);
   }
   for (const { room, vertex, subjects } of joins) {
     joinEdges(primary, room, vertex.id);

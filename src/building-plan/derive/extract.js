@@ -74,5 +74,13 @@ export function extractBuildingPlanPrimary(floor) {
     anchors,
     partitions,
     subjects: extractBuildingPlanSubjects(floor),
+    // The rooms each stored wall faced before the edit: a shared-value answer holds only while
+    // its wall faces the same rooms (`shared-choices.js`), and a join is told from a rejoin.
+    previousRooms: new Map(
+      (floor.walls || []).map((wall) => [
+        wall.id,
+        [...new Set((wall.sides || []).map((side) => side.roomId).filter(Boolean))].sort(),
+      ])
+    ),
   };
 }

@@ -51,43 +51,116 @@ function roomNumber(snapshot, id) {
   return null;
 }
 
-function wallName(snapshot, id) {
+/** A wall's name; its automatic label when the typed one is still being chosen. */
+function wallName(snapshot, id, typed = true) {
   for (const floor of snapshot.floors)
     for (const wall of floor.walls)
       if (wall.id === id || (wall.sides || []).some((side) => side.id === id))
-        return wall.values?.wall_label || wall.autoLabel || null;
+        return (typed && wall.values?.wall_label) || wall.autoLabel || null;
   return null;
 }
 
+const listed = (names) =>
+  names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+
+function specificationFor(specifications, key) {
+  const entries = Object.values(specifications).filter((entry) => entry.property === key);
+  return entries.find((entry) => entry.nodeKey === 'walls') || entries[0];
+}
+
+/** What a difference is about, as a person reads it: the field, and the side for a surface. */
+function entryLabel(entry, choice, snapshot, specifications) {
+  const field =
+    plainLabel(specificationFor(specifications, entry.key)?.field) ||
+    (entry.key === 'wall_label' ? 'Wall label' : entry.key);
+  if (entry.kind !== 'side') return field;
+  let roomId = null;
+  for (const floor of snapshot.floors)
+    for (const wall of floor.walls)
+      if (wall.id === choice.subjectId)
+        roomId = wall.sides.find((side) => side.id === entry.sideId)?.roomId ?? null;
+  return roomId ? `${field} on ${sourceName(snapshot, roomId)}'s side` : `${field} on the outside`;
+}
+
 /**
- * The question for a value that rooms sharing a wall give differently (conflicting_room_defaults),
- * in words a person reads: which wall, which rooms, the field's label and the values with units.
- * English for now, as every BuildingPlan question (translating them is a recorded follow-up).
+ * Who each option stands for: a room (with its position when two rooms share a name), or a wall
+ * for a rejoin. `rooms` are the room names alone; `names` add the wall when one room gives two
+ * sets of values (two of its walls join one).
  */
-export function sharedValueQuestion(conflict, snapshot, specifications) {
-  const specification = Object.values(specifications).find(
-    (entry) => entry.property === conflict.property
-  );
-  const field = plainLabel(specification?.field) || conflict.property;
-  const wall = wallName(snapshot, conflict.subject.id);
-  const names = conflict.candidates.map((candidate) => sourceName(snapshot, candidate.id));
-  // Two rooms may share a name (two "Bedroom"s): add their position on the floor.
-  const sources = names.map((name, index) => {
-    const id = conflict.candidates[index].id;
-    const clash = conflict.candidates.some((other, at) => names[at] === name && other.id !== id);
+function optionNames(choice, snapshot) {
+  if (choice.origin === 'rejoin') {
+    const names = choice.options.map((option, index) => option.label || `portion ${index + 1}`);
+    return { names, rooms: names };
+  }
+  const base = choice.options.map((option) => sourceName(snapshot, option.id));
+  const rooms = base.map((name, index) => {
+    const { id } = choice.options[index];
+    const clash = choice.options.some(
+      (other, at) => at !== index && base[at] === name && other.id !== id
+    );
     const number = clash ? roomNumber(snapshot, id) : null;
     return number ? `${name} (room ${number})` : name;
   });
-  const shared = [...new Set(sources)].join(' and ');
+  const names = rooms.map((name, index) => {
+    const { id, label } = choice.options[index];
+    const twin = choice.options.some((other, at) => at !== index && other.id === id);
+    return label && twin ? `${name} (${label})` : name;
+  });
+  return { names, rooms };
+}
+
+/**
+ * The question for values that walls give differently before an edit is accepted (see
+ * `shared-value-choices.js`), in words a person reads: which wall, which rooms or portions, the
+ * fields' labels and the values with units. One difference keeps the wording decided on
+ * 2026-11-16; several are summarised in one question with one choice of whose values apply, and
+ * a mixed result is edited on the wall afterwards. English for now, as every BuildingPlan question
+ * (translating them is a recorded follow-up).
+ */
+export function sharedValueQuestion(choice, snapshot, specifications) {
+  const { names, rooms } = optionNames(choice, snapshot);
+  const fields = choice.entries.map((entry) => entryLabel(entry, choice, snapshot, specifications));
+  const format = (index, at) =>
+    formatValue(choice.options[index].values[at], choice.entries[at].key);
+  const rejoin = choice.origin === 'rejoin';
+  const labelChosen = choice.entries.some(
+    (entry) => entry.kind === 'answer' && entry.key === 'wall_label'
+  );
+  const wall = wallName(snapshot, choice.subjectId, !labelChosen);
+  const subject = rejoin
+    ? listed(names)
+    : `${wall ? `Wall ${wall}` : 'This wall'} is shared by ${listed([...new Set(rooms)])}, which`;
+  const cancel = { id: 'cancel', label: rejoin ? 'Cancel rejoin' : 'Cancel edit' };
+  if (choice.entries.length === 1)
+    return {
+      title: rejoin ? 'Rejoin: choose one value' : 'Shared wall: choose one value',
+      message: rejoin
+        ? `${subject} have different values for ${fields[0]}. Choose the one the rejoined wall keeps; you can still change it on the wall later.`
+        : `${subject} give different values for ${fields[0]}. Choose the one that applies to this wall; you can still change it on the wall later.`,
+      buttons: [
+        ...names.map((name, index) => ({
+          id: `candidate:${index}`,
+          label: `${name}: ${format(index, 0)}`,
+        })),
+        cancel,
+      ],
+    };
+  const differences = fields
+    .map(
+      (field, at) =>
+        `${field} (${names.map((name, index) => `${name} ${format(index, at)}`).join(', ')})`
+    )
+    .join('; ');
   return {
-    title: 'Shared wall: choose one value',
-    message: `${wall ? `Wall ${wall}` : 'This wall'} is shared by ${shared}, which give different values for ${field}. Choose the one that applies to this wall; you can still change it on the wall later.`,
+    title: rejoin
+      ? 'Rejoin: choose which values to keep'
+      : 'Shared wall: choose whose values apply',
+    message: rejoin
+      ? `${subject} have different values: ${differences}. Choose which values the rejoined wall keeps; you can still change each one on the wall later.`
+      : `${subject} give different values: ${differences}. Choose whose values apply to this wall; you can still change each one on the wall later.`,
     buttons: [
-      ...conflict.candidates.map((candidate, index) => ({
-        id: `candidate:${index}`,
-        label: `${sources[index]}: ${formatValue(candidate.value, conflict.property)}`,
-      })),
-      { id: 'cancel', label: 'Cancel edit' },
+      ...names.map((name, index) => ({ id: `candidate:${index}`, label: `${name}'s values` })),
+      cancel,
     ],
   };
 }

@@ -91,6 +91,11 @@ export function applyProperty(floor, operation, specifications) {
     failOperation('property_not_inheritable', 'This property does not accept inherited defaults.');
   if (operation.reset) delete target[operation.property];
   else target[operation.property] = copy(operation.value);
+  // A typed or reset value is no longer the shared-value question's choice (2026-11-16).
+  if (operation.type === 'set_property' && subject.sharedChoices) {
+    subject.sharedChoices = subject.sharedChoices.filter((key) => key !== operation.property);
+    if (!subject.sharedChoices.length) delete subject.sharedChoices;
+  }
 }
 
 /** The value operations, shared by today's engine and the derived core. */
