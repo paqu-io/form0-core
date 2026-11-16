@@ -82,12 +82,12 @@ test('widen: towards the neighbour the whole wall moves, as move_wall does', () 
 });
 
 test('widen: past the limit the face holds; further on the room detaches, B keeps the wall', () => {
-  // Exterior 0.5: both rooms' own walls need 1 m, so between 0.5 and 1 m the face holds.
+  // Exterior 0.5: both rooms' own walls need 1 m, so between 0.7 and 1 m the face holds.
   const held = example(0.5);
-  held.apply({ type: 'resize_face', faceId: held.f.faceA, distance: -0.5 });
+  held.apply({ type: 'resize_face', faceId: held.f.faceA, distance: -0.7 });
   const a = held.floor().rooms[0];
-  assert.ok(near(top(a), 2.7), 'held at the 0.5 m limit');
-  assert.equal(wallOf(held.floor(), a, 2.7).properties.wall_thickness_m, 0.5);
+  assert.ok(near(top(a), 2.5), 'held at the 0.7 m limit');
+  assert.equal(wallOf(held.floor(), a, 2.5).properties.wall_thickness_m, 0.7);
 
   const apart = example(0.5);
   apart.apply({ type: 'resize_face', faceId: apart.f.faceA, distance: -1 });

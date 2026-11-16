@@ -3,7 +3,7 @@ import { resolveWallThickness } from './thickness.js';
 import { keepOpeningsWithStationaryRooms } from './room-commands.js';
 
 /** Widening limit when the form's thickness field sets no maximum (decision F7). */
-export const SHARED_WALL_WIDEN_LIMIT = 0.5;
+export const SHARED_WALL_WIDEN_LIMIT = 0.7;
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -19,7 +19,7 @@ export function sharedWallMode(operation, editingPolicy = {}) {
 
 /**
  * `widen` for a drag away from the neighbour (decision R1, F7). The neighbour keeps its face and
- * the wall widens by the drag, up to the limit (the thickness field's `max`, else 0.5 m). Past the
+ * the wall widens by the drag, up to the limit (the thickness field's `max`, else 0.7 m). Past the
  * limit the face holds there, until the gap reaches the larger of the limit and both rooms' own
  * exterior walls side by side; then the room detaches. A wall already at or above the limit does
  * not widen: it holds, then detaches the same way.
