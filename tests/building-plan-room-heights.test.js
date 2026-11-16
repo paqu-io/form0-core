@@ -159,7 +159,7 @@ test('changing a room shared with two rooms of another height asks once per shar
   );
   assert.deepEqual(
     questions[0].buttons.map((button) => button.label),
-    ['3 m (Room 1)', '2.5 m (Room 2)', 'Cancel edit']
+    ['Room 1: 3 m', 'Room 2: 2.5 m', 'Cancel edit']
   );
   const { questions: again } = await setRoomHeight(context, 1, 2.4);
   assert.equal(again.length, 0, 'answered walls keep their own height and no longer ask');
@@ -184,4 +184,42 @@ test('wall and column heights are required on enclosed levels only', async () =>
   assert.ok((await heightIssues('ground_floor')) > 0);
   assert.equal(await heightIssues('roof'), 0);
   assert.equal(await heightIssues('land_survey'), 0);
+});
+
+test('rooms with the same name are told apart in the question', async () => {
+  const { sharedValueQuestion } = await import('../src/building-plan/shared-value-question.js');
+  const bedroom = { choice: [{ value: 'bedroom', label: 'Bedroom' }], other: [] };
+  const snapshot = {
+    floors: [
+      {
+        id: 'floor',
+        values: {},
+        rooms: [
+          { id: 'a', values: { room_name: bedroom } },
+          { id: 'b', values: { room_name: bedroom } },
+        ],
+        walls: [{ id: 'wall', values: {}, autoLabel: 'W3', sides: [] }],
+      },
+    ],
+  };
+  const question = sharedValueQuestion(
+    {
+      subject: { type: 'walls', id: 'wall' },
+      property: 'wall_thickness',
+      candidates: [
+        { id: 'a', value: 0.2 },
+        { id: 'b', value: 0.3 },
+      ],
+    },
+    snapshot,
+    meta.properties
+  );
+  assert.match(
+    question.message,
+    /^Wall W3 is shared by Bedroom \(room 1\) and Bedroom \(room 2\),/
+  );
+  assert.deepEqual(
+    question.buttons.map((button) => button.label),
+    ['Bedroom (room 1): 200 mm', 'Bedroom (room 2): 300 mm', 'Cancel edit']
+  );
 });

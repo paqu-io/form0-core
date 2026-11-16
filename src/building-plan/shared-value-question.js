@@ -42,6 +42,15 @@ function sourceName(snapshot, id) {
   return 'another source';
 }
 
+/** A room's position on its floor (1-based), for telling rooms with the same name apart. */
+function roomNumber(snapshot, id) {
+  for (const floor of snapshot.floors) {
+    const index = floor.rooms.findIndex((room) => room.id === id);
+    if (index >= 0) return index + 1;
+  }
+  return null;
+}
+
 function wallName(snapshot, id) {
   for (const floor of snapshot.floors)
     for (const wall of floor.walls)
@@ -61,7 +70,14 @@ export function sharedValueQuestion(conflict, snapshot, specifications) {
   );
   const field = plainLabel(specification?.field) || conflict.property;
   const wall = wallName(snapshot, conflict.subject.id);
-  const sources = conflict.candidates.map((candidate) => sourceName(snapshot, candidate.id));
+  const names = conflict.candidates.map((candidate) => sourceName(snapshot, candidate.id));
+  // Two rooms may share a name (two "Bedroom"s): add their position on the floor.
+  const sources = names.map((name, index) => {
+    const id = conflict.candidates[index].id;
+    const clash = conflict.candidates.some((other, at) => names[at] === name && other.id !== id);
+    const number = clash ? roomNumber(snapshot, id) : null;
+    return number ? `${name} (room ${number})` : name;
+  });
   const shared = [...new Set(sources)].join(' and ');
   return {
     title: 'Shared wall: choose one value',
@@ -69,7 +85,7 @@ export function sharedValueQuestion(conflict, snapshot, specifications) {
     buttons: [
       ...conflict.candidates.map((candidate, index) => ({
         id: `candidate:${index}`,
-        label: `${formatValue(candidate.value, conflict.property)} (${sources[index]})`,
+        label: `${sources[index]}: ${formatValue(candidate.value, conflict.property)}`,
       })),
       { id: 'cancel', label: 'Cancel edit' },
     ],
