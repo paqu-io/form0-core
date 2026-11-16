@@ -22,7 +22,7 @@ test('a dragged face adapts to a new 200 mm contact instead of pushing the neigh
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   const neighbourId = apply({
@@ -46,7 +46,7 @@ test('a dragged face adapts to a new 200 mm contact instead of pushing the neigh
       wall.sides.some((side) => side.roomId === neighbourId)
   );
   assert.deepEqual(
-    shared.map((wall) => wall.properties.wall_thickness_m),
+    shared.map((wall) => wall.properties.wall_thickness),
     [0.2]
   );
   assert.deepEqual(session.validate(), []);

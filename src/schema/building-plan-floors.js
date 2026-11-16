@@ -127,7 +127,7 @@ export const FLOOR_SYSTEM_ROUTES = {
       [
         `floor_${surface}_wall_thickness`,
         {
-          property: 'wall_thickness_m',
+          property: 'wall_thickness',
           inherit_to: 'walls',
           scope: 'physical_wall',
           applies_to: { exposure: surface },

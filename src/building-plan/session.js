@@ -337,7 +337,7 @@ export function createBuildingPlanSession({
           );
           return (
             spec &&
-            !['wall_thickness_m', 'wall_height_m'].includes(property) &&
+            !['wall_thickness', 'wall_height'].includes(property) &&
             spec.on_split !== 'copy'
           );
         });
@@ -565,7 +565,7 @@ export function createBuildingPlanSession({
         // gives (prepared again at the current widths); only answers are restored.
         if (
           derived(prepared.operation) &&
-          change.property === 'wall_thickness_m' &&
+          change.property === 'wall_thickness' &&
           change.exposureChanged
         )
           continue;

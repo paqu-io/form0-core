@@ -258,7 +258,7 @@ test('scoped physical calculations execute once per physical wall and feed face 
     walls: {
       extra_elements: [
         field('CalculatedField', 'wall_cost', {
-          calculate: 'SETRESULT(count($wall_thickness_m) * 1000);',
+          calculate: 'SETRESULT(count($wall_thickness) * 1000);',
           building_plan: { scope: 'physical_wall' },
         }),
         field('CalculatedField', 'face_cost', { calculate: 'SETRESULT($wall_cost + 1);' }),
@@ -297,17 +297,17 @@ for (const security of ['trusted', 'safe'])
       walls: {
         extra_elements: [
           field('CalculatedField', 'span_cost', {
-            calculate: 'SETRESULT($wall_thickness_m * 1000);',
+            calculate: 'SETRESULT($wall_thickness * 1000);',
           }),
           field('TextField', 'thick_note', {
             visible: false,
             visible_conditions: {
-              field_id: 'bp_wall_thickness_m',
+              field_id: 'bp_wall_thickness',
               operator: 'greater_than',
               value: 0.3,
             },
             required_conditions: {
-              field_id: 'bp_wall_thickness_m',
+              field_id: 'bp_wall_thickness',
               operator: 'greater_than',
               value: 0.3,
             },
@@ -328,17 +328,17 @@ for (const security of ['trusted', 'safe'])
       type: 'set_property',
       floorId: f.floorId,
       faceId: face.id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.4,
     });
     f.apply({
       type: 'set_defaults',
       floorId: f.floorId,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.25,
     });
     const nodes = f.meta.repeatablesByNodeKey;
-    const thickness = nodes.walls.fieldsByOriginalDataName.wall_thickness_m.dataName;
+    const thickness = nodes.walls.fieldsByOriginalDataName.wall_thickness.dataName;
     const cost = nodes.walls.fieldsByOriginalDataName.span_cost.dataName;
     const note = nodes.walls.fieldsByOriginalDataName.thick_note.dataName;
     const storage = nodes.walls.fields.find((field) => field.binding?.role === 'storage').dataName;
@@ -384,7 +384,7 @@ for (const security of ['trusted', 'safe'])
       type: 'set_property',
       floorId: f.floorId,
       faceId: face.id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: null,
     });
     const incomplete = await evaluator.prepareSubmission(
@@ -399,7 +399,7 @@ for (const security of ['trusted', 'safe'])
         (issue) =>
           issue.fieldName === thickness &&
           issue.canonical?.fieldName ===
-            nodes.physical_walls.fieldsByOriginalDataName.wall_thickness_m.dataName
+            nodes.physical_walls.fieldsByOriginalDataName.wall_thickness.dataName
       ),
       JSON.stringify(incomplete.validationSummary.orderedIssues)
     );
@@ -407,13 +407,13 @@ for (const security of ['trusted', 'safe'])
       type: 'set_property',
       floorId: f.floorId,
       faceId: face.id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       reset: true,
     });
     f.apply({
       type: 'set_defaults',
       floorId: f.floorId,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: null,
     });
     const inheritedUnknown = await evaluator.prepareSubmission(
@@ -427,12 +427,11 @@ for (const security of ['trusted', 'safe'])
       inheritedUnknown.validationSummary.orderedIssues.filter(
         (issue) =>
           issue.fieldName === thickness ||
-          issue.fieldName ===
-            nodes.physical_walls.fieldsByOriginalDataName.wall_thickness_m.dataName
+          issue.fieldName === nodes.physical_walls.fieldsByOriginalDataName.wall_thickness.dataName
       ).length,
       f.session
         .getSnapshot()
-        .floors[0].walls.filter((wall) => wall.properties.wall_thickness_m === null).length
+        .floors[0].walls.filter((wall) => wall.properties.wall_thickness === null).length
     );
   });
 
@@ -511,13 +510,13 @@ test('normal row edits write one canonical shared property and cancel sibling ge
   );
   const child = session.beginScope({ id: 'wall-editor', parentScopeId: floorScope }).scopeId;
   const edited = structuredClone(face);
-  edited.values[nodes.walls.fieldsByOriginalDataName.wall_thickness_m.dataName] = 0.4;
+  edited.values[nodes.walls.fieldsByOriginalDataName.wall_thickness.dataName] = 0.4;
   const result = session.applyRow({ path, editedRow: edited, initialRow: face, scopeId: child });
   assert.equal(result.status, 'applied', JSON.stringify(result.issues));
   const after = session.getSnapshot().floors[0];
   const shared = after.walls.find((wall) => wall.id === originalFaces(after.rooms[0])[2].wallId);
-  assert.equal(shared.properties.wall_thickness_m, 0.4);
-  assert.equal(shared.provenance.wall_thickness_m.scope, 'physical_wall');
+  assert.equal(shared.properties.wall_thickness, 0.4);
+  assert.equal(shared.provenance.wall_thickness.scope, 'physical_wall');
   assert.equal(session.cancelScope(child).status, 'cancelled');
   assert.equal(session.getSnapshot().floors[0].values.floor_name, 'Independent answer');
   assert.deepEqual(session.getSnapshot().floors[0].rooms, initialRooms);
@@ -673,9 +672,7 @@ test('uncaptured structural coordinates stay uncaptured through record round tri
   const floorRow = record.repeatable[nodes.floors.preferredKey][0];
   const roomRow = floorRow.repeatable[nodes.rooms.preferredKey][0];
   const editedColumn = structuredClone(column);
-  editedColumn.values[
-    nodes.columns.fieldsByOriginalDataName.column_cross_section_width_m.dataName
-  ] = 0.4;
+  editedColumn.values[nodes.columns.fieldsByOriginalDataName.column_width.dataName] = 0.4;
   const result = session.applyRow({
     path: [
       { key: nodes.floors.preferredKey, id: floorRow.id },
@@ -763,8 +760,8 @@ test('physical requiredness produces one finding per wall that navigates to an o
     diagnostics: { console: false },
   }).prepareSubmission(record);
   const nodes = f.meta.repeatablesByNodeKey;
-  const physicalHeight = nodes.physical_walls.fieldsByOriginalDataName.wall_height_m.dataName;
-  const faceHeight = nodes.walls.fieldsByOriginalDataName.wall_height_m.dataName;
+  const physicalHeight = nodes.physical_walls.fieldsByOriginalDataName.wall_height.dataName;
+  const faceHeight = nodes.walls.fieldsByOriginalDataName.wall_height.dataName;
   const heightIssues = result.validationSummary.orderedIssues.filter(
     (issue) => issue.canonical?.fieldName === physicalHeight
   );

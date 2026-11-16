@@ -18,7 +18,7 @@ function exteriorFaces(floor) {
   const faces = [];
   for (const wall of floor.walls) {
     const rooms = wall.sides.filter((side) => side.roomId);
-    const width = wall.properties?.wall_thickness_m;
+    const width = wall.properties?.wall_thickness;
     if (wall.exposure !== 'exterior' || rooms.length !== 1 || !(width > 0)) continue;
     const { roomId, sign } = rooms[0];
     for (const segment of wall.segments) {

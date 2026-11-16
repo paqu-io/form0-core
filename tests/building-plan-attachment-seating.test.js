@@ -35,7 +35,7 @@ function fixture(policy) {
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   assert.equal(exterior.status, 'applied', JSON.stringify(exterior.issues));
@@ -68,7 +68,7 @@ const sharedWidths = (plan, roomId) =>
   plan.floors[0].walls
     .filter((wall) => wall.sides.filter((side) => side.roomId).length === 2)
     .filter((wall) => wall.sides.some((side) => side.roomId === roomId))
-    .map((wall) => wall.properties.wall_thickness_m);
+    .map((wall) => wall.properties.wall_thickness);
 
 test('attaching a room keeps rooms in place and seats it at the shared interior thickness', () => {
   const f = fixture('ask');
@@ -99,8 +99,8 @@ test('Keep previous values seats the attached room at the kept width without mov
   );
   assert.ok(shared.length >= 2);
   for (const wall of shared) {
-    assert.equal(wall.properties.wall_thickness_m, 0.5);
-    assert.equal(wall.overrides.wall_thickness_m, 0.5, 'The kept width is an explicit override.');
+    assert.equal(wall.properties.wall_thickness, 0.5);
+    assert.equal(wall.overrides.wall_thickness, 0.5, 'The kept width is an explicit override.');
   }
   assert.deepEqual(f.session.validate(), []);
 });

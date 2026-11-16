@@ -186,7 +186,7 @@ test('the portable canvas exposes real corners and owners after normalization', 
       floorId: before.id,
       nodeKey: 'floors',
       fieldName: 'floor_exterior_wall_thickness',
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.2,
     }).status,
     'applied'

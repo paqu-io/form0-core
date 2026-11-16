@@ -165,7 +165,7 @@ test('nested cancellation restores cap geometry and preserves earlier parent ans
         floorId: f.floorId,
         wallId: shared.id,
         activeRoomId: before.floors[0].rooms[1].id,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.8,
       },
       { scopeId: 'room' }
@@ -246,7 +246,7 @@ for (const angle of [0, 0.37])
         type: 'set_property',
         wallId: shared.id,
         activeRoomId: before.floors[0].rooms[1].id,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.8,
       });
       const after = f.session.getSnapshot(),
@@ -277,7 +277,7 @@ for (const angle of [0, 0.37])
           type: 'set_property',
           wallId: shared.id,
           activeRoomId: before.floors[0].rooms[1].id,
-          property: 'wall_thickness_m',
+          property: 'wall_thickness',
           value,
         });
         const current = f.session.getSnapshot().floors[0];

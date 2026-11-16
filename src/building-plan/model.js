@@ -26,8 +26,8 @@ import {
 
 export const BUILDING_PLAN_VERSION = 2;
 export const BUILDING_PLAN_PROPERTIES = Object.freeze({
-  wall_thickness_m: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: 0.2 }),
-  wall_height_m: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: null }),
+  wall_thickness: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: 0.2 }),
+  wall_height: Object.freeze({ scope: 'physical_wall', inherit: true, fallback: null }),
 });
 export const copyBuildingPlanData = (value) =>
   value === undefined
@@ -81,7 +81,7 @@ export function facesOfWall(floor, wallId) {
   );
 }
 
-export const buildingPlanSegmentThickness = (wall, segment) => wall.properties.wall_thickness_m;
+export const buildingPlanSegmentThickness = (wall, segment) => wall.properties.wall_thickness;
 
 /** Defaults are proposals/properties, never measurements or new evidence. */
 export function resolveBuildingPlanProperty(
@@ -138,15 +138,15 @@ export function reconcileBuildingPlanProperties(
       subject.values ||= {};
       subject.values[property] = copyBuildingPlanData(resolved.value);
       const dimensions = {
-        door_width_m: 'width',
-        door_height_m: 'height',
-        window_width_m: 'width',
-        window_height_m: 'height',
-        window_distance_from_floor_m: 'sillHeight',
-        column_cross_section_width_m: 'width',
-        column_cross_section_height_m: 'height',
-        beam_cross_section_width_m: 'width',
-        beam_cross_section_height_m: 'height',
+        door_width: 'width',
+        door_height: 'height',
+        window_width: 'width',
+        window_height: 'height',
+        window_distance_from_floor: 'sillHeight',
+        column_width: 'width',
+        column_depth: 'height',
+        beam_width: 'width',
+        beam_depth: 'height',
       };
       if (dimensions[property])
         subject[dimensions[property]] = copyBuildingPlanData(resolved.value);
@@ -217,7 +217,7 @@ export function rebindBuildingPlanFaces(floor, createId = generateUuidV7) {
       const bindings = [];
       for (const edge of faceEdges(room, face))
         for (const segment of wall.segments) {
-          const thickness = wall.properties.wall_thickness_m;
+          const thickness = wall.properties.wall_thickness;
           const frame = segmentFrame(segment.start, segment.end);
           // Parallelism is judged by endpoint offsets (metres), not by edge direction:
           // a micron-scale edge's direction is rounding noise and depends on world axes.
@@ -325,8 +325,8 @@ export function createBuildingPlanRoom(
     const thickness = resolveBuildingPlanProperty(
       floor,
       wall,
-      'wall_thickness_m',
-      specifications.wall_thickness_m
+      'wall_thickness',
+      specifications.wall_thickness
     ).value;
     const offset = typeof thickness === 'number' && thickness > 0 ? thickness / 2 : 0;
     wall.segments.push({
@@ -482,7 +482,7 @@ function validateSnapshot(snapshot) {
             )
           );
       }
-      for (const property of ['wall_thickness_m', 'wall_height_m']) {
+      for (const property of ['wall_thickness', 'wall_height']) {
         const value = wall.properties?.[property];
         if (value != null && (!Number.isFinite(value) || value <= 0))
           issues.push(
@@ -498,7 +498,7 @@ function validateSnapshot(snapshot) {
       for (const opening of openings) {
         register(opening.type || 'opening', opening);
         const segment = wall.segments?.find((entry) => entry.id === opening.segmentId);
-        const hostHeight = wall.properties.wall_height_m;
+        const hostHeight = wall.properties.wall_height;
         if (
           !segment ||
           !Number.isFinite(opening.offset) ||

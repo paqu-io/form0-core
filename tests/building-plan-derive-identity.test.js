@@ -73,16 +73,16 @@ test('a join keeps every answer or is refused; the stationary room keeps its wal
   const stored = unboundFloor();
   const [w3, w5] = ['W3', 'W5'].map((label) => byLabel(stored, label));
   const heights = (a, b) => (primary) => {
-    if (a != null) primary.subjects.get(w3.id).overrides.wall_height_m = a;
-    if (b != null) primary.subjects.get(w5.id).overrides.wall_height_m = b;
+    if (a != null) primary.subjects.get(w3.id).overrides.wall_height = a;
+    if (b != null) primary.subjects.get(w5.id).overrides.wall_height = b;
   };
   assert.equal(
     refusal(() => writeBack(stored, specifications, { edit: heights(2.5, 2.7) })),
     'conflicting_wall_properties'
   );
   const merged = writeBack(stored, specifications, { edit: heights(null, 2.7) }).floor;
-  assert.equal(interior(merged)[0].overrides.wall_height_m, 2.7);
-  assert.equal(byLabel(merged, 'W3').overrides.wall_height_m, undefined);
+  assert.equal(interior(merged)[0].overrides.wall_height, 2.7);
+  assert.equal(byLabel(merged, 'W3').overrides.wall_height, undefined);
   const preferred = writeBack(stored, specifications, { preferredRoomIds: [stored.rooms[1].id] });
   assert.equal(interior(preferred.floor)[0].autoLabel, 'W5.1');
 

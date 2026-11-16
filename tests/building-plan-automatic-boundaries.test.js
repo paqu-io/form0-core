@@ -18,7 +18,7 @@ function fixture(provider, angle = 0, sign = 1) {
       floorId: f.floorId,
       nodeKey: 'floors',
       fieldName: `floor_${provider}_wall_thickness`,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.5,
     }).status,
     'applied'

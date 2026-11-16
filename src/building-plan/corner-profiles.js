@@ -188,7 +188,7 @@ export function completeThicknessCorners(floor, before, wallIds, createId) {
           const frame = segmentFrame(span.start, span.end);
           const point = project(frame, end ? edge.end : edge.start);
           if (
-            Math.abs(Math.abs(point.offset) - wall.properties.wall_thickness_m / 2) <= EPS &&
+            Math.abs(Math.abs(point.offset) - wall.properties.wall_thickness / 2) <= EPS &&
             Math.abs(dot(frame.tangent, edge.tangent)) >= 1 - EPS &&
             point.along >= -EPS &&
             point.along <= frame.length + EPS
@@ -226,8 +226,8 @@ export function completeThicknessCorners(floor, before, wallIds, createId) {
         incoming,
         outgoing,
         room.vertices[i],
-        a.wall.properties.wall_thickness_m,
-        b.wall.properties.wall_thickness_m,
+        a.wall.properties.wall_thickness,
+        b.wall.properties.wall_thickness,
         sign
       );
       if (!polygon) continue;

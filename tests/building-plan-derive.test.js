@@ -45,7 +45,7 @@ function assertDerivedMatchesStored(floor, specifications) {
       `${wall.autoLabel} rooms`
     );
     assert.equal(piece.exposure, wall.exposure, `${wall.autoLabel} exposure`);
-    assert.equal(piece.thickness, wall.properties.wall_thickness_m, `${wall.autoLabel} thickness`);
+    assert.equal(piece.thickness, wall.properties.wall_thickness, `${wall.autoLabel} thickness`);
     const [segment] = wall.segments;
     const gap = Math.min(
       Math.max(distance(segment.start, piece.axis.start), distance(segment.end, piece.axis.end)),
@@ -95,7 +95,7 @@ test('different exterior and interior thicknesses derive from the room geometry'
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   const derived = assertDerivedMatchesStored(f.floor(), f.specifications);
@@ -134,7 +134,7 @@ test('rooms exactly a thickness apart are one shared wall, even before they are 
 test('an explicitly unknown thickness keeps the shared wall at its last width', () => {
   const f = session();
   const shared = f.floor().walls.find((wall) => wall.exposure === 'interior');
-  f.apply({ type: 'set_property', wallId: shared.id, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', wallId: shared.id, property: 'wall_thickness', value: null });
   const derived = deriveBuildingPlanFloor(f.floor(), f.specifications);
   const [piece] = derived.pieces.filter((entry) => entry.subjectId === shared.id);
   assert.equal(piece.exposure, 'interior');

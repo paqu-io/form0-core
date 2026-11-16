@@ -49,11 +49,11 @@ test('room creation allocates stable physical/face/vertex IDs and does not mutat
   const floor = f.floor();
   assert.equal(floor.walls.length, 4);
   assert.equal(floor.rooms[0].faces.length, 4);
-  assert.equal(floor.walls[0].properties.wall_thickness_m, 0.2);
-  assert.equal(floor.walls[0].properties.wall_height_m, null);
+  assert.equal(floor.walls[0].properties.wall_thickness, 0.2);
+  assert.equal(floor.walls[0].properties.wall_height, null);
   const snapshot = f.session.getSnapshot();
-  snapshot.floors[0].walls[0].properties.wall_thickness_m = 99;
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.2);
+  snapshot.floors[0].walls[0].properties.wall_thickness = 99;
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.2);
   assert.deepEqual(f.session.validate(), []);
 });
 
@@ -139,33 +139,33 @@ test('live inherited values update through floor, room, and wall override/reset 
   f.room({ x: 0, y: 0, width: 4, height: 3 });
   const wallId = f.floor().walls[0].id;
   const roomId = f.floor().rooms[0].id;
-  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_thickness_m', value: 0.22 });
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.22);
-  assert.equal(f.floor().walls[0].provenance.wall_thickness_m.scope, 'floor');
+  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_thickness', value: 0.22 });
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.22);
+  assert.equal(f.floor().walls[0].provenance.wall_thickness.scope, 'floor');
   f.apply({
     type: 'set_defaults',
     floorId: f.floorId,
     roomId,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.25,
   });
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.25);
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.25);
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.3,
   });
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.3);
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.3);
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     reset: true,
   });
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.25);
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.25);
   assert.equal(Object.hasOwn(f.floor(), 'observations'), false);
 });
 
@@ -175,7 +175,7 @@ test('conflicting room defaults require one shared wall resolution', () => {
     type: 'set_defaults',
     floorId: f.floorId,
     roomId: f.a,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 2.5,
   });
   const before = f.session.getSnapshot();
@@ -183,7 +183,7 @@ test('conflicting room defaults require one shared wall resolution', () => {
     type: 'set_defaults',
     floorId: f.floorId,
     roomId: f.b,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 3,
   });
   assert.equal(conflict.status, 'pending');
@@ -197,17 +197,17 @@ test('conflicting room defaults require one shared wall resolution', () => {
     type: 'set_property',
     floorId: f.floorId,
     wallId,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 2.8,
   });
   f.apply({
     type: 'set_defaults',
     floorId: f.floorId,
     roomId: f.b,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 3,
   });
-  assert.equal(f.floor().walls.find((wall) => wall.id === wallId).properties.wall_height_m, 2.8);
+  assert.equal(f.floor().walls.find((wall) => wall.id === wallId).properties.wall_height, 2.8);
 });
 
 test('shared thickness change anchors the active face and moves only its opposite piece', () => {
@@ -222,7 +222,7 @@ test('shared thickness change anchors the active face and moves only its opposit
     floorId: f.floorId,
     wallId,
     activeRoomId: f.a,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.25,
   });
   assert.deepEqual(
@@ -243,12 +243,12 @@ test('explicit unknown height and false custom answers do not fall back through 
   });
   f.room({ x: 0, y: 0, width: 4, height: 3 });
   const wallId = f.floor().walls[0].id;
-  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 3 });
+  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 3 });
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: null,
   });
   f.apply({
@@ -258,7 +258,7 @@ test('explicit unknown height and false custom answers do not fall back through 
     property: 'soundproof',
     value: false,
   });
-  assert.equal(f.floor().walls[0].properties.wall_height_m, null);
+  assert.equal(f.floor().walls[0].properties.wall_height, null);
   assert.equal(f.floor().walls[0].properties.soundproof, false);
 });
 
@@ -460,30 +460,30 @@ test('physical owners preserve distinct overrides and reject a lossy Rejoin', ()
   const other = f
     .floor()
     .walls.find((w) => w.id !== wallId && w.lineage?.splitFromWallId === wallId);
-  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 2.4 });
+  f.apply({ type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 2.4 });
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: other.id,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 3,
   });
   const before = f.session.getSnapshot();
   const rejected = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: cut });
   assert.equal(rejected.status, 'conflict');
   assert.deepEqual(f.session.getSnapshot(), before);
-  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height_m, 2.4);
+  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height, 2.4);
   assert.equal(other.segments.length, 1);
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: other.id,
-    property: 'wall_height_m',
+    property: 'wall_height',
     reset: true,
   });
   f.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId: cut });
   assert.equal(f.floor().walls.length, 4);
-  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height_m, 2.4);
+  assert.equal(f.floor().walls.find((w) => w.id === wallId).properties.wall_height, 2.4);
 });
 
 test('physical thickness anchors its captured face and explicit unknown retains valid geometry', () => {
@@ -495,20 +495,20 @@ test('physical thickness anchors its captured face and explicit unknown retains 
     type: 'set_property',
     floorId: f.floorId,
     wallId: wall.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   assert.deepEqual(f.floor().rooms[0].vertices, before);
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, 0.4);
+  assert.equal(f.floor().walls[0].properties.wall_thickness, 0.4);
   const geometry = f.floor().walls[0].segments[0];
   f.apply({
     type: 'set_property',
     floorId: f.floorId,
     wallId: wall.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: null,
   });
-  assert.equal(f.floor().walls[0].properties.wall_thickness_m, null);
+  assert.equal(f.floor().walls[0].properties.wall_thickness, null);
   assert.deepEqual(f.floor().walls[0].segments[0].start, geometry.start);
   assert.deepEqual(f.session.validate(), []);
 });

@@ -9,7 +9,7 @@ const thicker = (f, apply) =>
     floorId: f.floorId,
     type: 'set_property',
     wallId: f.wallId,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.25,
     activeRoomId: f.snapshot.floors[0].rooms[0].id,
   });

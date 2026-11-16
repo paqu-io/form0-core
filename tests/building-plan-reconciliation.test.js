@@ -70,7 +70,7 @@ function fixture(exterior = 0.5, interior = 0.2) {
       floorId,
       nodeKey: 'floors',
       fieldName: `floor_${name}_wall_thickness`,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value,
     })),
   });
@@ -179,7 +179,7 @@ test('changing the floor thickness after a jog uses the same reconciliation as a
     floorId: f.floorId,
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   f.move(f.sharedFaceId, 0.3);
@@ -338,7 +338,7 @@ test('settled geometry and identities remain unchanged by a same-value provider 
     floorId: f.floorId,
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   assert.deepEqual(result.changes, []);
@@ -575,8 +575,8 @@ test('contact isolation retains the reference owner after an uncovered leading e
   let serial = 0;
   const createId = () => `contact-reference-${++serial}`;
   const session = createBuildingPlanSession({ createId });
-  const floorId = session.apply({ type: 'create_floor', defaults: { wall_thickness_m: 0.2 } })
-    .created.id;
+  const floorId = session.apply({ type: 'create_floor', defaults: { wall_thickness: 0.2 } }).created
+    .id;
   session.apply({ type: 'create_room', floorId, rectangle: { x: 3, y: 3.2, width: 5, height: 3 } });
   const floor = session.getSnapshot().floors[0],
     face = floor.rooms[0].faces[0],

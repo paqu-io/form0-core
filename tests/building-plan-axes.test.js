@@ -110,7 +110,7 @@ for (const anchor of ['room_face', 'midline'])
       type: 'set_property',
       wallId: f.wallId,
       activeRoomId: room.id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.4,
     });
     const wall = floor.walls.find((w) => w.id === f.wallId);
@@ -135,7 +135,7 @@ test('floor-wide midline thickness changes solve all adjoining faces atomically'
       floorId: f.floorId,
       nodeKey: 'floors',
       fieldName: `floor_${exposure}_wall_thickness`,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.4,
     })),
   });
@@ -224,7 +224,7 @@ for (const anchor of ['room_face', 'midline'])
       'Changing a preference is not a collected answer.'
     );
     const row = structuredClone(wall.row);
-    const field = nodes.walls.fields.find((f) => f.binding?.property === 'wall_thickness_m');
+    const field = nodes.walls.fields.find((f) => f.binding?.property === 'wall_thickness');
     row.values[field.dataName] = 0.4;
     const result = editor.updateRow('wall', row);
     assert.equal(result.status, 'applied', JSON.stringify(result.issues));
@@ -260,7 +260,7 @@ test('canvas proposals and commits use the current thickness anchor without pers
     floorId: f.floorId,
     wallId: f.wallId,
     activeRoomId: f.initial.floors[0].rooms[0].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   };
   const proposal = controller.previewOperation(operation);
@@ -317,7 +317,7 @@ for (const grouped of [false, true])
       .floors[0].rooms[1].faces.find(
         (face) => face.lineage?.editingOriginFaceId === g.faceB && face.id !== g.faceB
       );
-    g.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
+    g.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness', value: 0.4 });
     g.apply({
       type: 'batch',
       operations: ['interior', 'exterior'].map((exposure) => ({
@@ -325,7 +325,7 @@ for (const grouped of [false, true])
         floorId: g.floorId,
         nodeKey: 'floors',
         fieldName: `floor_${exposure}_wall_thickness`,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.3,
       })),
     });

@@ -41,7 +41,7 @@ export function normalizeBuildingPlanMaterialCaps(floor, createId) {
       continue;
     const frame = segmentFrame(wall.segments[0].start, wall.segments[0].end);
     if (
-      buildingPlanEditingCutStations(floor, frame, wall.properties.wall_thickness_m / 2).some(
+      buildingPlanEditingCutStations(floor, frame, wall.properties.wall_thickness / 2).some(
         (station) => station >= -EPS && station <= frame.length + EPS
       )
     )
@@ -72,7 +72,7 @@ export function normalizeBuildingPlanMaterialCaps(floor, createId) {
       // answers are inherited. Only a compatible end of this same band derives.
       if (!equalValue(wall.properties, source.properties)) continue;
       const far = edge.start.id === end.id ? edge.end : edge.start;
-      const thickness = wall.properties.wall_thickness_m;
+      const thickness = wall.properties.wall_thickness;
       const allowance = buildingPlanJunctionAllowance(floor, room, edge, far, thickness);
       if (!(thickness > EPS) || edge.length > allowance + EPS) continue;
       candidates.push({
@@ -96,7 +96,7 @@ export function normalizeBuildingPlanMaterialCaps(floor, createId) {
   for (const { wall, room, face, edge, source, sideSign } of candidates) {
     if (omitted.has(source.id)) continue;
     const frame = segmentFrame(wall.segments[0].start, wall.segments[0].end);
-    const half = wall.properties.wall_thickness_m / 2;
+    const half = wall.properties.wall_thickness / 2;
     if (
       !buildingPlanMaterialCovered(
         [
@@ -153,7 +153,7 @@ export function materializeBuildingPlanProfiles(floor, createId, identities = ne
         };
         identities.set(edge.id, ids);
       }
-      const half = (source.properties.wall_thickness_m ?? 0) / 2;
+      const half = (source.properties.wall_thickness ?? 0) / 2;
       const sign = Math.sign(polygonArea(room.vertices));
       const direction = profile.sideSign * sign;
       const wall = {
@@ -303,7 +303,7 @@ function retireCopiedProfiles(floor, before) {
   for (const wall of candidates) {
     const segment = wall.segments[0],
       frame = segmentFrame(segment.start, segment.end);
-    const half = (wall.properties.wall_thickness_m ?? 0) / 2;
+    const half = (wall.properties.wall_thickness ?? 0) / 2;
     if (!(half > EPS)) continue;
     const polygon = [
       at(frame, 0, half),
@@ -384,7 +384,7 @@ function absorbCollinearProfiles(floor, createId) {
           })
         )
           continue;
-        const half = (wall.properties.wall_thickness_m ?? 0) / 2;
+        const half = (wall.properties.wall_thickness ?? 0) / 2;
         const side = dot(frame.tangent, edge.tangent) > 0 ? 1 : -1;
         const points = [edge.start, edge.end].map((p) => project(frame, p));
         if (

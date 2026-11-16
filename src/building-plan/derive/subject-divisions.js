@@ -212,7 +212,7 @@ function retirementSurvivor(context, subject, live) {
   const kept = (owner) =>
     Object.fromEntries(
       Object.entries(owner.overrides || {}).filter(
-        ([key]) => !automatic || !['wall_thickness_m', 'wall_height_m'].includes(key)
+        ([key]) => !automatic || !['wall_thickness', 'wall_height'].includes(key)
       )
     );
   const same = (a, b) =>

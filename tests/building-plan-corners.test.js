@@ -102,7 +102,7 @@ test('child Cancel restores a corner and its shared neighbour while keeping earl
   const f = fixture();
   f.session.beginScope({ id: 'floor' });
   f.session.apply(
-    { type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 3.4 },
+    { type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 3.4 },
     { scopeId: 'floor' }
   );
   const before = f.session.getSnapshot(),

@@ -1,0 +1,40 @@
+/**
+ * What each BuildingPlan system dimension measures. Values are always stored in metres; the
+ * presentation shows a length in m or ft and a thickness in mm or in, by the form's
+ * `measurement_system`, and puts that unit in the field's label. Every numeric system field a
+ * person reads or types is listed here or in BUILDING_PLAN_UNITLESS_FIELDS
+ * (tests/building-plan-measures.test.js checks it).
+ */
+export const BUILDING_PLAN_MEASURES = Object.freeze({
+  floor_elevation: 'length',
+  floor_height: 'length',
+  floor_interior_wall_thickness: 'thickness',
+  floor_interior_wall_plaster_thickness: 'thickness',
+  floor_exterior_wall_thickness: 'thickness',
+  floor_exterior_wall_plaster_thickness: 'thickness',
+  room_elevation: 'length',
+  room_structural_clear_height: 'length',
+  wall_height: 'length',
+  wall_thickness: 'thickness',
+  wall_plaster_thickness: 'thickness',
+  wall_plaster_thickness_outside: 'thickness',
+  door_width: 'length',
+  door_height: 'length',
+  door_offset: 'length',
+  window_width: 'length',
+  window_height: 'length',
+  window_distance_from_floor: 'length',
+  window_offset: 'length',
+  column_width: 'length',
+  column_depth: 'length',
+  column_height: 'length',
+  beam_width: 'length',
+  beam_depth: 'length',
+  beam_length: 'length',
+});
+
+/** Numeric system fields that are counts, not dimensions. */
+export const BUILDING_PLAN_UNITLESS_FIELDS = Object.freeze([
+  'floor_upper_number',
+  'floor_basement_number',
+]);

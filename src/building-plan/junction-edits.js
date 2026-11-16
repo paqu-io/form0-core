@@ -94,7 +94,7 @@ export function buildingPlanJunctionAllowance(floor, room, edge, vertex, thickne
       wall.segments.find((s) => s.id === binding.segmentId)
     );
   const adjoining =
-    other ?? floor.walls.find((wall) => wall.id === profile?.wallId)?.properties.wall_thickness_m;
+    other ?? floor.walls.find((wall) => wall.id === profile?.wallId)?.properties.wall_thickness;
   return adjoining > EPS
     ? (adjoining + thickness * Math.abs(dot(edge.tangent, adjacent.tangent))) / sine
     : 0;

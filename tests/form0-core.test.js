@@ -1534,8 +1534,8 @@ assert.ok(
   'Columns meta should expose column_center_u field mapping'
 );
 assert.ok(
-  columnsMeta?.fieldsByOriginalDataName?.column_cross_section_width_m,
-  'Columns meta should expose column_cross_section_width_m field mapping'
+  columnsMeta?.fieldsByOriginalDataName?.column_width,
+  'Columns meta should expose column_width field mapping'
 );
 
 const beamsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.beams;
@@ -1545,8 +1545,8 @@ assert.ok(
   'Beams meta should expose beam_start_u field mapping'
 );
 assert.ok(
-  beamsMeta?.fieldsByOriginalDataName?.beam_length_m,
-  'Beams meta should expose beam_length_m field mapping'
+  beamsMeta?.fieldsByOriginalDataName?.beam_length,
+  'Beams meta should expose beam_length field mapping'
 );
 
 const doorsMeta = buildingPlanMeta[0]?.repeatablesByNodeKey?.doors;
@@ -1575,8 +1575,8 @@ assert.ok(
   'Windows meta should expose window_end_ratio field mapping'
 );
 assert.ok(
-  windowsMeta?.fieldsByOriginalDataName?.window_distance_from_floor_m,
-  'Windows meta should expose window_distance_from_floor_m field mapping'
+  windowsMeta?.fieldsByOriginalDataName?.window_distance_from_floor,
+  'Windows meta should expose window_distance_from_floor field mapping'
 );
 
 console.log('✅ BuildingPlanSection expansion produced default hierarchy');

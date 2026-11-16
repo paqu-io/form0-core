@@ -35,7 +35,7 @@ const walls = (floor) =>
     .map((wall) => {
       const [s] = wall.segments;
       const ends = [s.start, s.end].map((p) => `${round(p.x)},${round(p.y)}`).sort();
-      return `${ends.join('>')}|${wall.exposure}|${wall.properties.wall_thickness_m}`;
+      return `${ends.join('>')}|${wall.exposure}|${wall.properties.wall_thickness}`;
     })
     .sort();
 

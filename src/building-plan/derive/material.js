@@ -18,7 +18,7 @@ function openingRects(floor) {
     for (const opening of [...wall.doors, ...wall.windows]) {
       const segment = wall.segments.find((entry) => entry.id === opening.segmentId);
       const frame = segment && lineFrame(segment.start, segment.end);
-      const width = wall.properties?.wall_thickness_m;
+      const width = wall.properties?.wall_thickness;
       if (!frame || !(width > 0)) continue;
       rects.push({
         axis: frame,

@@ -436,7 +436,7 @@ test('child cancellation restores confirmed geometry/removal while keeping an ea
     wall = [...room, { key: n.walls.preferredKey, index: 3 }];
   editor.openRow({ path: floor, scopeId: 'floor' });
   editor.apply(
-    { type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 3.2 },
+    { type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 3.2 },
     { scopeId: 'floor' }
   );
   editor.openRow({ path: room, scopeId: 'room', parentScopeId: 'floor' });
@@ -458,7 +458,7 @@ test('child cancellation restores confirmed geometry/removal while keeping an ea
   );
   assert.equal(editor.cancelRow('wall').status, 'cancelled');
   assert.deepEqual(editor.getSnapshot(), before);
-  assert.equal(editor.getSnapshot().floors[0].defaults.wall_height_m, 3.2);
+  assert.equal(editor.getSnapshot().floors[0].defaults.wall_height, 3.2);
 });
 test('confirmed removal cannot discard a separately open opening editor', async () => {
   const f = fixture();

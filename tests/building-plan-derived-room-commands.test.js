@@ -66,7 +66,7 @@ test('snapping seats the moved room at the shared thickness; rooms in place do n
   assert.deepEqual(corners(floor), before);
   assert.ok(Math.abs(Math.min(...room(floor, roomB).vertices.map((v) => v.y)) - 3.2) < 1e-9);
   const { wallId } = sharedRows(floor, room(floor, f.roomA), room(floor, roomB));
-  assert.equal(floor.walls.find((wall) => wall.id === wallId).properties.wall_thickness_m, 0.2);
+  assert.equal(floor.walls.find((wall) => wall.id === wallId).properties.wall_thickness, 0.2);
 });
 
 test('Keep previous values seats at the existing width and stores it on the shared piece', () => {
@@ -85,7 +85,7 @@ test('Keep previous values seats at the existing width and stores it on the shar
   const shared = floor.walls.find(
     (wall) => wall.id === sharedRows(floor, room(floor, f.roomA), room(floor, roomB)).wallId
   );
-  assert.equal(shared.overrides.wall_thickness_m, 0.5);
+  assert.equal(shared.overrides.wall_thickness, 0.5);
 });
 
 test('moving a room away and back keeps every wall; Undo restores the plan', () => {

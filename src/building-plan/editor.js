@@ -90,7 +90,7 @@ export function createBuildingPlanEditor(options) {
     operation?.type === 'rejoin_cut' ||
     (operation?.type === 'set_property' &&
       operation.faceId &&
-      operation.property === 'wall_thickness_m') ||
+      operation.property === 'wall_thickness') ||
     (operation?.type === 'batch' && operation.operations?.some(includesFaceEdit));
 
   function createOperation(path) {

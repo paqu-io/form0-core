@@ -26,7 +26,7 @@ function fixture(exterior) {
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: exterior,
   });
   const room = () => session.getSnapshot().floors[0].rooms[1];

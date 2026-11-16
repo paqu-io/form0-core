@@ -24,7 +24,7 @@ function prepared(exterior = 0.5, setup = () => {}, editingPolicy = {}) {
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: exterior,
   });
   const ids = setup((operation) => run(old, operation)) || {};
@@ -57,7 +57,7 @@ test('R1: a dragged face lands at a new contact width; the neighbour keeps its f
   assert.deepEqual(roomBy(floor, t.ids.neighbour).vertices, before);
   assert.ok(near(Math.max(...floor.rooms[1].vertices.map((v) => v.x)), 8.8));
   assert.deepEqual(
-    sharedWith(floor, t.ids.neighbour).map((wall) => wall.properties.wall_thickness_m),
+    sharedWith(floor, t.ids.neighbour).map((wall) => wall.properties.wall_thickness),
     [0.2]
   );
 });
@@ -76,8 +76,8 @@ test('Keep previous values: the face lands at the wall current width, stored on 
   const floor = t.floor();
   assert.ok(near(Math.max(...floor.rooms[1].vertices.map((v) => v.x)), 8.5));
   const [shared] = sharedWith(floor, t.ids.neighbour);
-  assert.equal(shared.properties.wall_thickness_m, 0.5);
-  assert.equal(shared.overrides.wall_thickness_m, 0.5);
+  assert.equal(shared.properties.wall_thickness, 0.5);
+  assert.equal(shared.overrides.wall_thickness, 0.5);
 });
 
 test('R1: a jog placed against the other room lands at the contact width; that wall holds', () => {
@@ -101,7 +101,7 @@ test('R1: a jog placed against the other room lands at the contact width; that w
     wall.sides.some((side) => side.roomId === a.id && wall.autoLabel.startsWith('W2'))
   );
   assert.ok(contact, 'the contact is a division of W2');
-  assert.equal(contact.properties.wall_thickness_m, 0.2);
+  assert.equal(contact.properties.wall_thickness, 0.2);
 });
 
 test('F3: a lengthened line meeting a wall at its current width keeps that width', () => {
@@ -118,8 +118,8 @@ test('F3: a lengthened line meeting a wall at its current width keeps that width
   const floor = t.floor();
   const [shared] = sharedWith(floor, t.ids.c);
   assert.ok(shared, 'B and C share a wall');
-  assert.equal(shared.properties.wall_thickness_m, 0.5);
-  assert.equal(shared.overrides.wall_thickness_m, 0.5, 'the measured width is explicit');
+  assert.equal(shared.properties.wall_thickness, 0.5);
+  assert.equal(shared.overrides.wall_thickness, 0.5, 'the measured width is explicit');
   assert.ok(near(Math.max(...roomBy(floor, b.id).vertices.map((v) => v.x)), 8), 'B holds');
 });
 
@@ -145,7 +145,7 @@ test('the "Keep previous values" answer prepares the face drag again at the curr
   assert.equal(result.status, 'applied', JSON.stringify(result.issues));
   const floor = t.floor();
   assert.ok(near(Math.max(...floor.rooms[1].vertices.map((v) => v.x)), 8.5));
-  assert.equal(sharedWith(floor, t.ids.neighbour)[0].properties.wall_thickness_m, 0.5);
+  assert.equal(sharedWith(floor, t.ids.neighbour)[0].properties.wall_thickness, 0.5);
 });
 
 for (const distance of [2.9, 3, 3.1, 3.2])
@@ -157,7 +157,7 @@ for (const distance of [2.9, 3, 3.1, 3.2])
         type: 'set_provider',
         nodeKey: 'floors',
         fieldName: 'floor_interior_wall_thickness',
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.5,
       });
     });

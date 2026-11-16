@@ -4,7 +4,7 @@ import { own } from './model.js';
 // Boundary faces only: internal partitions never form these contacts.
 const faceEdges = (room, face) =>
   face.freePath ? [] : polygonEdges(room).filter((edge) => face.edgeIds?.includes(edge.id));
-const width = (wall) => wall?.properties?.wall_thickness_m;
+const width = (wall) => wall?.properties?.wall_thickness;
 const rooms = (wall) =>
   wall.sides
     .map((side) => side.roomId)
@@ -56,7 +56,7 @@ export function buildingPlanContactHolds(floor, geometry, before, operation) {
       wall.exposure !== 'interior' ||
       !Number.isFinite(measured) ||
       measured === width(wall) ||
-      own(wall.overrides, 'wall_thickness_m')
+      own(wall.overrides, 'wall_thickness')
     )
       continue;
     const old = previousWall(before, wall);

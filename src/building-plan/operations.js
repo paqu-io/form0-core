@@ -204,7 +204,7 @@ function splitGeometrySegment(wall, segment, low, high, delta, createId) {
       );
     opening.segmentId = pieces[index].id;
     opening.offset -= cuts[index];
-    const offsetField = `${opening.type}_offset_m`;
+    const offsetField = `${opening.type}_offset`;
     if (own(opening.values, offsetField)) opening.values[offsetField] = opening.offset;
   }
   const index = wall.segments.indexOf(segment);
@@ -218,7 +218,7 @@ function addJogGeometry(floor, wall, changedEdges, createId, thicknessProfile = 
     const faces = room.faces.filter((entry) => entry.wallId === wall.id && !entry.freePath);
     if (!faces.length) continue;
     const side = Math.sign(polygonArea(room.vertices));
-    const half = (wall.properties.wall_thickness_m ?? 0) / 2;
+    const half = (wall.properties.wall_thickness ?? 0) / 2;
     // Normalization can replace a temporary connector's edge identity or reverse
     // its room-facing side. Rebuild only the extents declared by this owner,
     // including those replacement edges, from the accepted room orientation.
@@ -566,9 +566,9 @@ function bindFaces(floor, operation, createId, specifications, contactThickness 
     );
   const thickness =
     contactThickness ??
-    (own(operation.resolutions, 'wall_thickness_m')
-      ? operation.resolutions.wall_thickness_m
-      : a.wall.properties.wall_thickness_m);
+    (own(operation.resolutions, 'wall_thickness')
+      ? operation.resolutions.wall_thickness
+      : a.wall.properties.wall_thickness);
   if (!Number.isFinite(thickness) || thickness <= 0)
     failOperation(
       'unknown_wall_thickness',
@@ -599,7 +599,7 @@ function bindFaces(floor, operation, createId, specifications, contactThickness 
   const otherAxis = b.wall.segments.find((segment) => segment.id === bBinding.segmentId);
   const referenceFrame = segmentFrame(referenceAxis.start, referenceAxis.end);
   const changesReferenceWidth =
-    Math.abs((a.wall.properties.wall_thickness_m ?? thickness) - thickness) > EPS;
+    Math.abs((a.wall.properties.wall_thickness ?? thickness) - thickness) > EPS;
   const hasTemporaryRuns = a.wall.segments.length > 1 || b.wall.segments.length > 1;
   // A generated cap can share its planning subject with a long stationary run.
   // Resolve the contacted extent before fitting the width or an offset run;
@@ -616,7 +616,7 @@ function bindFaces(floor, operation, createId, specifications, contactThickness 
   const axis = a.wall.segments.find((segment) => segment.id === aBinding.segmentId);
   const direction = segmentFrame(axis.start, axis.end);
   const side = aBinding.side;
-  const currentHalf = (a.wall.properties.wall_thickness_m ?? thickness) / 2;
+  const currentHalf = (a.wall.properties.wall_thickness ?? thickness) / 2;
   const axisDelta = multiply(direction.normal, side * (currentHalf - thickness / 2));
   axis.start = add(axis.start, axisDelta);
   axis.end = add(axis.end, axisDelta);
@@ -640,7 +640,7 @@ function bindFaces(floor, operation, createId, specifications, contactThickness 
     // Keep the geometric width until the session has divided the combined run
     // by adjacency. Resolving one value on the whole run here loses the metric
     // change needed for its newly interior and remaining exterior pieces.
-    merged.properties.wall_thickness_m = thickness;
+    merged.properties.wall_thickness = thickness;
     rebindBuildingPlanFaces(floor, createId);
     return;
   }
@@ -664,8 +664,8 @@ function prospectiveContactThickness(floor, wall, owner, room, neighbour, specif
   };
   return resolveInheritedProperty(
     { floor, subject: prospective, wall: prospective, nodeKey: 'walls' },
-    'wall_thickness_m',
-    propertySpecification(specifications, 'wall_thickness_m')
+    'wall_thickness',
+    propertySpecification(specifications, 'wall_thickness')
   ).value;
 }
 
@@ -705,7 +705,7 @@ function roomContacts(floor, room, operation, specifications) {
         (entry) => !entry.freePath && entry.bindings.length
       )) {
         const wall = findWall(floor, reference.wallId);
-        const thickness = wall.properties.wall_thickness_m;
+        const thickness = wall.properties.wall_thickness;
         if (!Number.isFinite(thickness)) continue;
         if (owner.lineage?.explicitPhysicalSeparation || wall.lineage?.explicitPhysicalSeparation) {
           const a = owner.segments[0],
@@ -835,7 +835,7 @@ export function applyThicknessChanges(
   if (
     floor.walls.some((wall) => {
       const old = before.walls.find((other) => other.id === wall.id);
-      return old && wall.properties.wall_thickness_m !== old.properties.wall_thickness_m;
+      return old && wall.properties.wall_thickness !== old.properties.wall_thickness;
     })
   ) {
     before = copy(before);
@@ -981,7 +981,7 @@ export function applyBuildingPlanOperation(
       floor.walls.push(wall);
       room.faces.push(face);
       reconcileBuildingPlanProperties(snapshot, specifications);
-      const half = (wall.properties.wall_thickness_m ?? 0) / 2;
+      const half = (wall.properties.wall_thickness ?? 0) / 2;
       wall.segments = path.slice(0, -1).map((start, i) => {
         const frame = segmentFrame(start, path[i + 1]);
         return {
@@ -1170,7 +1170,7 @@ export function applyBuildingPlanOperation(
           'wall_topology_edit_required',
           'Use split/join operations to change the number of wall segments.'
         );
-      const half = (wall.properties.wall_thickness_m ?? 0) / 2;
+      const half = (wall.properties.wall_thickness ?? 0) / 2;
       const previous = copy(wall.segments);
       face.freePath = operation.vertices.map((p, index) =>
         cleanPoint({ ...face.freePath[index], ...p, id: face.freePath[index].id })
@@ -1406,7 +1406,7 @@ export function applyBuildingPlanOperation(
   )
     for (const wall of floor.walls)
       for (const opening of [...wall.doors, ...wall.windows]) {
-        const field = `${opening.type}_offset_m`;
+        const field = `${opening.type}_offset`;
         if (own(opening.values, field)) opening.values[field] = opening.offset;
       }
   return {};

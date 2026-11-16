@@ -46,8 +46,8 @@ export function resolveWallThickness(floor, specifications, subject, roomIds) {
   };
   const result = resolveInheritedProperty(
     { floor, subject: prospective, wall: prospective, nodeKey: 'walls' },
-    'wall_thickness_m',
-    propertySpecification(specifications, 'wall_thickness_m')
+    'wall_thickness',
+    propertySpecification(specifications, 'wall_thickness')
   );
   return result.conflict ? { conflict: result.conflict } : { value: result.value };
 }

@@ -33,7 +33,7 @@ function openings(floor) {
           `${round(start.x + ((end.x - start.x) * d) / length)},${round(start.y + ((end.y - start.y) * d) / length)}`;
         const ends = [at(opening.offset), at(opening.offset + opening.width)].sort();
         const values = { ...opening.values };
-        delete values[`${opening.type}_offset_m`];
+        delete values[`${opening.type}_offset`];
         return JSON.stringify([
           opening.id,
           opening.type,
@@ -113,7 +113,7 @@ test('the shared door keeps its place along the wall when the wall thickens', ()
       t.apply({
         type: 'set_property',
         wallId: t.f.wallId,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.3,
         activeRoomId: t.floor().rooms[0].id,
       }),

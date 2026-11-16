@@ -125,7 +125,7 @@ for (const angle of [0, 0.37])
       type: 'set_property',
       wallId: shared.id,
       activeRoomId: floor().rooms[0].id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.8,
     });
     assert.equal(floor().walls.length, 9, 'Changing thickness must not create a wall owner');
@@ -135,19 +135,19 @@ for (const angle of [0, 0.37])
       offset: 1,
     });
     const second = floor().walls.find(
-      (wall) => wall.id !== shared.id && wall.properties.wall_thickness_m === 0.8
+      (wall) => wall.id !== shared.id && wall.properties.wall_thickness === 0.8
     );
     const before = s.getSnapshot();
     apply({
       type: 'set_property',
       wallId: second.id,
       activeRoomId: floor().rooms[0].id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.3,
     });
     assert.equal(floor().walls.length, 10, 'The 0.5 m shoulder is a profile, not a third wall');
     assert.equal(
-      floor().walls.find((wall) => wall.id === second.id).properties.wall_thickness_m,
+      floor().walls.find((wall) => wall.id === second.id).properties.wall_thickness,
       0.3
     );
     assert.deepEqual(s.validate(), []);
@@ -167,7 +167,7 @@ for (const angle of [0, 0.37])
       floorId: f.floorId,
       wallId: second.id,
       activeRoomId: floor().rooms[0].id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.4,
     });
     assert.equal(changed.status, 'applied', JSON.stringify(changed.issues));
@@ -244,7 +244,7 @@ test('material profiles keep nested inspection rows on the retained physical sou
       floorId: f.floorId,
       wallId: wall.id,
       activeRoomId: floor().rooms[0].id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value,
     });
     assert.equal(result.status, 'applied', JSON.stringify(result.issues));
@@ -688,7 +688,7 @@ for (const thickness of [0.12, 0.4])
         type: 'set_property',
         floorId: f.floorId,
         wallId,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: thickness,
       }).status,
       'applied'
@@ -717,8 +717,8 @@ for (const thickness of [0.12, 0.4])
         )
     );
     assert.ok(shared);
-    assert.equal(shared.properties.wall_thickness_m, thickness);
-    assert.equal(shared.overrides.wall_thickness_m, thickness);
+    assert.equal(shared.properties.wall_thickness, thickness);
+    assert.equal(shared.overrides.wall_thickness, thickness);
     assert.deepEqual(buildingPlanBoundaryClearanceIssues(after), []);
     session.undo();
     assert.deepEqual(session.getSnapshot(), before);

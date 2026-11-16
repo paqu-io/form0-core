@@ -54,7 +54,7 @@ test('derived material follows different exterior and interior thicknesses', () 
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   assertMaterialMatchesFootprints(f.floor(), f.specifications);
@@ -63,7 +63,7 @@ test('derived material follows different exterior and interior thicknesses', () 
 test('a wall of unknown thickness has no material, as in the footprints', () => {
   const f = fixture();
   const exterior = f.floor().walls.find((wall) => wall.exposure === 'exterior');
-  f.apply({ type: 'set_property', wallId: exterior.id, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', wallId: exterior.id, property: 'wall_thickness', value: null });
   const bySubject = assertMaterialMatchesFootprints(f.floor(), f.specifications);
   assert.equal(area(bySubject.get(exterior.id) || []), 0);
 });

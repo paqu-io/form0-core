@@ -176,10 +176,10 @@ export function buildingPlanOperationsForRow({
       values: { ...opening.values, ...plain },
     };
     for (const [name, key] of [
-      [`${prefix}_width_m`, 'width'],
-      [`${prefix}_height_m`, 'height'],
-      [`${prefix}_offset_m`, 'offset'],
-      ['window_distance_from_floor_m', 'sillHeight'],
+      [`${prefix}_width`, 'width'],
+      [`${prefix}_height`, 'height'],
+      [`${prefix}_offset`, 'offset'],
+      ['window_distance_from_floor', 'sillHeight'],
     ])
       if (own(plain, name)) command[key] = plain[name];
     commands.push(command);
@@ -200,8 +200,8 @@ export function buildingPlanOperationsForRow({
               x: bounds.x + values.column_center_u * bounds.width,
               y: bounds.y + values.column_center_v * bounds.height,
             };
-      shape.width = values.column_cross_section_width_m;
-      shape.height = values.column_cross_section_height_m;
+      shape.width = values.column_width;
+      shape.height = values.column_depth;
       shape.rotation = values.column_rotation_deg ?? 0;
     } else if (node.nodeKey === 'beams') {
       shape.start =

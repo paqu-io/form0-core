@@ -284,13 +284,13 @@ test('a child Cancel restores shared cuts without losing earlier floor defaults'
   f.session.beginScope({ id: 'floor' });
   assert.equal(
     f.session.apply(
-      { type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 3.4 },
+      { type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 3.4 },
       { scopeId: 'floor' }
     ).status,
     'applied'
   );
   const before = f.session.getSnapshot();
-  assert.equal(before.floors[0].defaults.wall_height_m, 3.4);
+  assert.equal(before.floors[0].defaults.wall_height, 3.4);
   f.session.beginScope({ id: 'child', parentScopeId: 'floor' });
   const split = f.session.apply(
     { type: 'split_face', floorId: f.floorId, faceId: f.faceA, offset: 1.5 },
@@ -333,7 +333,7 @@ test('the existing Thickness field edits only a split unshared span and child Ca
     record.repeatable[nodes.floors.preferredKey][0].repeatable[nodes.rooms.preferredKey][1]
       .repeatable[nodes.walls.preferredKey];
   const modelField = nodes.walls.fields.find((field) => field.binding?.role === 'storage').dataName;
-  const thicknessField = nodes.walls.fieldsByOriginalDataName.wall_thickness_m.dataName;
+  const thicknessField = nodes.walls.fieldsByOriginalDataName.wall_thickness.dataName;
   const path = [
     { key: nodes.floors.preferredKey, index: 0 },
     { key: nodes.rooms.preferredKey, index: 1 },
@@ -350,7 +350,7 @@ test('the existing Thickness field edits only a split unshared span and child Ca
   const after = editor.getSnapshot();
   const physical = after.floors[0].walls.find((wall) => wall.id === f.wallId);
   assert.ok(after.floors[0].walls.every((wall) => wall.segments.length === 1));
-  assert.equal(physical.properties.wall_thickness_m, 0.2);
+  assert.equal(physical.properties.wall_thickness, 0.2);
   assert.deepEqual(
     after.floors[0].rooms.map((room) => room.vertices),
     before.floors[0].rooms.map((room) => room.vertices)
@@ -383,7 +383,7 @@ test('shared portion thickness anchors the active face, updates both room sides 
     type: 'set_property',
     faceId: f.faceB,
     activeRoomId: before.floors[0].rooms[1].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   const after = f.session.getSnapshot();
@@ -395,8 +395,8 @@ test('shared portion thickness anchors the active face, updates both room sides 
   const selected = floor.rooms[1].faces.find((face) => face.id === f.faceB);
   const counterpart = floor.rooms[0].faces.find((face) => face.wallId === selected.wallId);
   const wall = floor.walls.find((wall) => wall.id === selected.wallId);
-  assert.equal(wall.properties.wall_thickness_m, 0.4);
-  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).properties.wall_thickness_m, 0.2);
+  assert.equal(wall.properties.wall_thickness, 0.4);
+  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).properties.wall_thickness, 0.2);
   assert.deepEqual(
     floor.walls
       .flatMap((wall) => wall.doors)
@@ -425,7 +425,7 @@ test('shared portion thickness anchors the active face, updates both room sides 
     type: 'set_property',
     faceId: f.faceB,
     activeRoomId: floor.rooms[1].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     reset: true,
   });
   for (let i = 0; i < 2; i++)
@@ -444,7 +444,7 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
     .floors[0].rooms[1].faces.find(
       (face) => face.lineage?.editingOriginFaceId === f.faceB && face.id !== f.faceB
     );
-  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness', value: 0.4 });
   f.apply({
     type: 'batch',
     operations: ['interior', 'exterior'].map((exposure) => ({
@@ -452,7 +452,7 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
       floorId: f.floorId,
       nodeKey: 'floors',
       fieldName: `floor_${exposure}_wall_thickness`,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.3,
     })),
   });
@@ -466,7 +466,7 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
     });
   assert.equal(view().walls.find((wall) => wall.id === f.faceB).thickness, 0.3);
   assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, 0.4);
-  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness', value: null });
   assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, null);
   const before = f.session.getSnapshot();
   const restored = readBuildingPlanRecord({
@@ -476,15 +476,15 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
   assert.ok(
     restored.floors[0].walls.some(
       (wall) =>
-        Object.hasOwn(wall.overrides || {}, 'wall_thickness_m') &&
-        wall.overrides.wall_thickness_m === null
+        Object.hasOwn(wall.overrides || {}, 'wall_thickness') &&
+        wall.overrides.wall_thickness === null
     )
   );
   const invalid = f.session.apply({
     type: 'set_property',
     floorId: f.floorId,
     faceId: face.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: -1,
   });
   assert.equal(invalid.status, 'conflict');
@@ -499,19 +499,19 @@ test('portion overrides keep live defaults, explicit unknown and readonly intent
       type: 'set_property',
       floorId: f.floorId,
       faceId: face.id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.5,
     }).status,
     'blocked'
   );
-  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', reset: true });
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness', reset: true });
   assert.equal(view().walls.find((wall) => wall.id === face.id).thickness, 0.3);
 });
 
 test('a portion-property batch infers the selected room anchor without touching another floor', () => {
   const f = fixture();
   f.apply({ type: 'split_face', faceId: f.faceB, offset: 1.5 });
-  f.apply({ type: 'create_floor', defaults: { wall_thickness_m: 0.25 } });
+  f.apply({ type: 'create_floor', defaults: { wall_thickness: 0.25 } });
   const before = f.session.getSnapshot();
   f.apply({
     type: 'batch',
@@ -520,7 +520,7 @@ test('a portion-property batch infers the selected room anchor without touching 
         type: 'set_property',
         floorId: f.floorId,
         faceId: f.faceB,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.4,
       },
     ],
@@ -548,7 +548,7 @@ test('Rejoin checks the selected portions rather than an unrelated thickness pro
       (face) => face.id === source.id || face.lineage?.editingOriginFaceId === source.id
     )
     .at(-1);
-  f.apply({ type: 'set_property', faceId: thirdFace.id, property: 'wall_thickness_m', value: 0.4 });
+  f.apply({ type: 'set_property', faceId: thirdFace.id, property: 'wall_thickness', value: 0.4 });
   f.apply({ type: 'rejoin_cut', cutId: first });
   assert.equal(f.session.getSnapshot().floors[0].rooms[0].faces.length, 6);
   assert.ok(
@@ -578,7 +578,7 @@ test('partition Rejoin retains incompatible local thickness and its explicit cut
     .getSnapshot()
     .floors[0].rooms[0].faces.find((face) => face.wallId === wallId);
   const cutId = f.apply({ type: 'split_face', faceId: face.id, offset: 1.5 }).created.id;
-  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness_m', value: 0.4 });
+  f.apply({ type: 'set_property', faceId: face.id, property: 'wall_thickness', value: 0.4 });
   const before = f.session.getSnapshot();
   const rejected = f.session.apply({ type: 'rejoin_cut', floorId: f.floorId, cutId });
   assert.equal(rejected.status, 'conflict');
@@ -592,7 +592,7 @@ test('thickness profiles do not own rows or retire another open split-piece edit
   f.apply({
     type: 'set_property',
     faceId: f.faceB,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
     activeRoomId: f.session.getSnapshot().floors[0].rooms[1].id,
   });
@@ -628,7 +628,7 @@ test('thickness profiles do not own rows or retire another open split-piece edit
   assert.ok(sibling);
   editor.openRow({ path: path(0, sibling.id), scopeId: 'sibling' });
   assert.equal(
-    editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness_m'] }).status,
+    editor.updateRow('shared', shared.row, { resetProperties: ['wall_thickness'] }).status,
     'applied'
   );
   assert.ok(editor.hasEditor('sibling'));
@@ -643,7 +643,7 @@ test('live thickness changes preserve explicit cuts and readonly sessions refuse
     type: 'set_property',
     wallId: f.wallId,
     activeRoomId: f.snapshot.floors[0].rooms[0].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.3,
   });
   assert.ok(

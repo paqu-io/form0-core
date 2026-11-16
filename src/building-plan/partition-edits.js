@@ -131,7 +131,7 @@ export function movePartitionPortion(floor, operation, { createId, splitSegment,
     if (!end || samePoint(point, end.freePath[0])) continue;
     linked.add(cutId);
     const frame = segmentFrame(point, end.freePath[0]);
-    const half = (wall.properties.wall_thickness_m ?? wall.segments[0].referenceOffset * 2) / 2;
+    const half = (wall.properties.wall_thickness ?? wall.segments[0].referenceOffset * 2) / 2;
     const segment = {
       id: createId(),
       start: at(frame, 0, -half),

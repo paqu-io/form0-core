@@ -86,8 +86,8 @@ export function canonicalFloor(floor) {
       }
     for (const opening of [...wall.doors, ...wall.windows]) {
       opening.offset = length - opening.offset - opening.width;
-      if (Object.hasOwn(opening.values || {}, `${opening.type}_offset_m`))
-        opening.values[`${opening.type}_offset_m`] = opening.offset;
+      if (Object.hasOwn(opening.values || {}, `${opening.type}_offset`))
+        opening.values[`${opening.type}_offset`] = opening.offset;
     }
   }
   return result;

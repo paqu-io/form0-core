@@ -31,7 +31,7 @@ const fail = (code, message, details = {}) => {
 
 function coverage(floor, wall, segment, along) {
   const frame = segmentFrame(segment.start, segment.end);
-  const half = (wall.properties.wall_thickness_m ?? (segment.referenceOffset ?? 0) * 2) / 2;
+  const half = (wall.properties.wall_thickness ?? (segment.referenceOffset ?? 0) * 2) / 2;
   return [-1, 1].map((sign) => {
     const direct = facesOfWall(floor, wall.id).find(({ face }) =>
       face.bindings.some(
@@ -214,7 +214,7 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
       const retainedOverrides = (subject) =>
         Object.fromEntries(
           Object.entries(subject.overrides).filter(
-            ([key]) => !automatic || !['wall_thickness_m', 'wall_height_m'].includes(key)
+            ([key]) => !automatic || !['wall_thickness', 'wall_height'].includes(key)
           )
         );
       const survivor = floor.walls.find(
@@ -287,7 +287,7 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
       const explicitStations = buildingPlanEditingCutStations(
         floor,
         frame,
-        (wall.properties.wall_thickness_m ?? segment.referenceOffset * 2) / 2
+        (wall.properties.wall_thickness ?? segment.referenceOffset * 2) / 2
       ).filter((station) => station > EPS && station < frame.length - EPS);
       const stations = [
         0,
@@ -372,8 +372,8 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
             offset: opening.offset - piece.low,
           }));
       for (const opening of [...target.doors, ...target.windows])
-        if (Object.hasOwn(opening.values || {}, `${opening.type}_offset_m`))
-          opening.values[`${opening.type}_offset_m`] = opening.offset;
+        if (Object.hasOwn(opening.values || {}, `${opening.type}_offset`))
+          opening.values[`${opening.type}_offset`] = opening.offset;
       owners.set(piece.segment.id, target.id);
       return target;
     });
@@ -456,7 +456,7 @@ export function normalizePhysicalPieces(floor, createId, before = null) {
           continue;
         const stations = [0, af.length, project(af, bf.start).along, project(af, bf.end).along];
         if (
-          buildingPlanEditingCutStations(floor, af, (a.properties.wall_thickness_m ?? 0) / 2).some(
+          buildingPlanEditingCutStations(floor, af, (a.properties.wall_thickness ?? 0) / 2).some(
             (station) =>
               station > Math.min(...stations) + EPS && station < Math.max(...stations) - EPS
           )

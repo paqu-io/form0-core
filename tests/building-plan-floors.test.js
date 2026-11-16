@@ -138,7 +138,7 @@ for (const angle of [0, 0.37])
         floorId: f.floorId,
         nodeKey: 'floors',
         fieldName: 'floor_exterior_wall_thickness',
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.5,
       });
       assert.equal(configured.status, 'applied', JSON.stringify(configured.issues));
@@ -189,7 +189,7 @@ for (const angle of [0, 0.37])
       assert.ok(after.walls.filter((w) => w.exposure === 'interior').length > 0);
       assert.ok(
         after.walls.every(
-          (w) => w.properties.wall_thickness_m === (w.exposure === 'interior' ? 0.2 : 0.5)
+          (w) => w.properties.wall_thickness === (w.exposure === 'interior' ? 0.2 : 0.5)
         )
       );
       assert.deepEqual(session.validate(), []);
@@ -238,7 +238,7 @@ for (const type of ['resize_face', 'create_room'])
           floorId: f.floorId,
           nodeKey: 'floors',
           fieldName: 'floor_exterior_wall_thickness',
-          property: 'wall_thickness_m',
+          property: 'wall_thickness',
           value: 0.5,
         }).status,
         'applied'
@@ -307,7 +307,7 @@ test('rooms receive live floor values and preserve override/reset intent through
   const roundtrip = readBuildingPlanRecord({ meta: f.meta, record });
   assert.equal(roundtrip.floors[0].rooms[0].properties.room_elevation, 2);
   assert.equal(Object.hasOwn(roundtrip.floors[0].rooms[0].overrides, 'room_elevation'), false);
-  assert.equal(f.floor().walls[0].properties.wall_height_m, null);
+  assert.equal(f.floor().walls[0].properties.wall_height, null);
 });
 
 test('plaster uses canonical room/outside context independently from physical exposure', () => {

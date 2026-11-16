@@ -104,8 +104,8 @@ export function buildStoredWalls(context, rooms, rows) {
       const points = openingEnds(context, { faceId, from, width: opening.width });
       const offset = points ? Math.min(...points.map((p) => project(axis, p).along)) : from;
       const written = { ...opening, segmentId: segment.id, offset };
-      if (Object.hasOwn(written.values || {}, `${written.type}_offset_m`))
-        written.values[`${written.type}_offset_m`] = offset;
+      if (Object.hasOwn(written.values || {}, `${written.type}_offset`))
+        written.values[`${written.type}_offset`] = offset;
       (openings[written.type] || openings.door).push(written);
     }
     const lineage = { ...(subject.lineage || {}) };

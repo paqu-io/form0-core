@@ -43,7 +43,7 @@ test('the round trip holds for different thicknesses and rotated plans', () => {
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   assertRoundTrip(thick.floor(), thick.specifications);
@@ -65,7 +65,7 @@ test('the round trip holds with an explicit Split, a partition and an unknown th
     ],
   });
   const shared = f.floor().walls.find((wall) => wall.exposure === 'interior' && wall.doors.length);
-  f.apply({ type: 'set_property', wallId: shared.id, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', wallId: shared.id, property: 'wall_thickness', value: null });
   assertRoundTrip(f.floor(), f.specifications);
 });
 

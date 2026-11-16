@@ -288,7 +288,7 @@ test('physical thickness and active-face anchoring control the drawn width at ev
     type: 'set_property',
     wallId: f.wallId,
     activeRoomId: room.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.3,
   });
   const scene = f.scene();
@@ -311,7 +311,7 @@ test('physical thickness and active-face anchoring control the drawn width at ev
     type: 'set_property',
     wallId: f.wallId,
     activeRoomId: room.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   assert.ok(
@@ -324,7 +324,7 @@ test('physical thickness and active-face anchoring control the drawn width at ev
 
 test('explicit unknown thickness stays schematic and never invents a measured wall band', () => {
   const f = fixture();
-  f.apply({ type: 'set_property', wallId: f.wallId, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', wallId: f.wallId, property: 'wall_thickness', value: null });
   const wall = f.scene().wallFootprints.find((w) => w.id === f.wallId);
   assert.equal(wall.polygons.length, 0);
   assert.equal(wall.schematicSegments.length, 1);
@@ -339,7 +339,7 @@ test('jog alignment uses the adjacent physical wall thickness and keeps the acti
   f.apply({
     type: 'set_property',
     wallId: wall.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.3,
   });
   f.apply({ type: 'resize_face', faceId: f.faceA, distance: 0.6 });
@@ -357,7 +357,7 @@ test('jog alignment uses the adjacent physical wall thickness and keeps the acti
 test('a return cannot invent a thickness when the adjacent construction is explicitly unknown', () => {
   const f = fixture(),
     wall = originalFaces(f.snapshot.floors[0].rooms[0])[1].wallId;
-  f.apply({ type: 'set_property', wallId: wall, property: 'wall_thickness_m', value: null });
+  f.apply({ type: 'set_property', wallId: wall, property: 'wall_thickness', value: null });
   const before = f.session.getSnapshot();
   const result = f.session.apply({
     type: 'resize_face',
@@ -485,12 +485,12 @@ for (const moving of [0, 1])
 test('detachment preserves separate physical pieces and their independent overrides', () => {
   const f = fixture();
   f.apply({ type: 'split_face', faceId: f.faceA, offset: 1.5 });
-  f.apply({ type: 'set_property', wallId: f.wallId, property: 'wall_height_m', value: 2.6 });
+  f.apply({ type: 'set_property', wallId: f.wallId, property: 'wall_height', value: 2.6 });
   const before = f.session.getSnapshot();
   f.apply({ type: 'move_room', roomId: before.floors[0].rooms[0].id, delta: { x: 0, y: -5 } });
   const floor = f.session.getSnapshot().floors[0];
   assert.ok(floor.walls.every((wall) => wall.segments.length === 1));
-  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).overrides.wall_height_m, 2.6);
+  assert.equal(floor.walls.find((wall) => wall.id === f.wallId).overrides.wall_height, 2.6);
   assert.deepEqual(f.session.validate(), []);
   f.session.undo();
   assert.deepEqual(f.session.getSnapshot(), before);
@@ -501,7 +501,7 @@ test('child cancellation restores the shared return and detached extents while k
   f.session.beginScope({ id: 'floor' });
   assert.equal(
     f.session.apply(
-      { type: 'set_defaults', floorId: f.floorId, property: 'wall_height_m', value: 3.4 },
+      { type: 'set_defaults', floorId: f.floorId, property: 'wall_height', value: 3.4 },
       { scopeId: 'floor' }
     ).status,
     'applied'

@@ -1,3 +1,5 @@
+import { BUILDING_PLAN_MEASURES } from '../schema/building-plan-measures.js';
+
 /** Presentation only: canonical schemas, answer labels and metre values are never mutated. */
 const TRANSLATIONS = {
   fr: {
@@ -46,8 +48,9 @@ const TRANSLATIONS = {
     Length: 'Longueur',
     Width: 'Largeur',
     Depth: 'Profondeur',
-    'Cross-section width': 'Largeur de section',
-    'Cross-section height': 'Hauteur de section',
+    'Measured across the beam, in the direction of the wall thickness.':
+      'Mesurée en travers de la poutre, dans le sens de l’épaisseur du mur.',
+    'Vertical dimension of the beam.': 'Dimension verticale de la poutre.',
     'Column ID': 'Identifiant du poteau',
     'Beam ID': 'Identifiant de la poutre',
     'Object name': 'Nom de l’objet',
@@ -114,8 +117,9 @@ const TRANSLATIONS = {
     Length: 'Lunghezza',
     Width: 'Larghezza',
     Depth: 'Profondità',
-    'Cross-section width': 'Larghezza della sezione',
-    'Cross-section height': 'Altezza della sezione',
+    'Measured across the beam, in the direction of the wall thickness.':
+      'Misurata trasversalmente alla trave, nella direzione dello spessore del muro.',
+    'Vertical dimension of the beam.': 'Dimensione verticale della trave.',
     'Column ID': 'ID pilastro',
     'Beam ID': 'ID trave',
     'Object name': 'Nome oggetto',
@@ -185,8 +189,9 @@ const TRANSLATIONS = {
     Length: 'Longitud',
     Width: 'Anchura',
     Depth: 'Profundidad',
-    'Cross-section width': 'Anchura de la sección',
-    'Cross-section height': 'Altura de la sección',
+    'Measured across the beam, in the direction of the wall thickness.':
+      'Medida transversalmente a la viga, en la dirección del espesor del muro.',
+    'Vertical dimension of the beam.': 'Dimensión vertical de la viga.',
     'Column ID': 'ID del pilar',
     'Beam ID': 'ID de la viga',
     'Object name': 'Nombre del objeto',
@@ -244,14 +249,7 @@ export function createBuildingPlanPresentation({
   const kindFor = (field) => {
     const entry = managed(field);
     if (!entry || field.type !== 'NumericField') return null;
-    const name = entry.originalDataName || '';
-    return /thickness/.test(name)
-      ? 'thickness'
-      : /(?:_m$|^(?:floor_elevation|floor_height|room_elevation|room_structural_clear_height)$)/.test(
-            name
-          )
-        ? 'length'
-        : null;
+    return BUILDING_PLAN_MEASURES[entry.originalDataName] || null;
   };
   const convert = (value, factor) =>
     typeof value === 'number' && Number.isFinite(value)

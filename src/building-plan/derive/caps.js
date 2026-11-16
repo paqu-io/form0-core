@@ -6,7 +6,7 @@ import { convexPolygonOps as ops } from './polygon-ops.js';
 
 const ANSWER_KEYS = ['values', 'overrides', 'providerOverrides'];
 // F4′: a cap lies inside its source's material and has no thickness or height of its own.
-const PHYSICAL = ['wall_thickness_m', 'wall_height_m'];
+const PHYSICAL = ['wall_thickness', 'wall_height'];
 const answers = (owner, key) =>
   key === 'overrides'
     ? Object.fromEntries(

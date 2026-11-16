@@ -57,7 +57,7 @@ const thickness = (t, value, extra = {}) =>
   t.apply({
     type: 'set_property',
     wallId: t.f.wallId,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value,
     ...extra,
   });
@@ -113,7 +113,7 @@ test('floor defaults change every wall in one command, notches at the new widths
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value,
   });
   bothEngines([
@@ -157,7 +157,7 @@ test('a thicker Split portion steps at the cut, as today', () => {
       return t.apply({
         type: 'set_property',
         wallId: portion.id,
-        property: 'wall_thickness_m',
+        property: 'wall_thickness',
         value: 0.4,
         activeRoomId: t.rooms()[1].id,
       });
@@ -171,7 +171,7 @@ test('an exterior wall grows outward under room_face and moves the room by half 
     t.apply({
       type: 'set_property',
       wallId: t.wall('W1').id,
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: 0.4,
     });
   const kept = bothEngines([exterior]);
@@ -191,7 +191,7 @@ test('rooms disagreeing on defaults: the chosen width moves the rooms as today',
       const t = example(derived);
       const [a, b] = t.rooms();
       const defaults = (room, value) =>
-        t.apply({ type: 'set_defaults', roomId: room.id, property: 'wall_thickness_m', value });
+        t.apply({ type: 'set_defaults', roomId: room.id, property: 'wall_thickness', value });
       assert.equal(defaults(a, 0.2).status, 'applied');
       const pending = defaults(b, 0.3);
       assert.equal(pending.status, 'pending', JSON.stringify(pending.issues));

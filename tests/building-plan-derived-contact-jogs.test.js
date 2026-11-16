@@ -53,7 +53,7 @@ function wrapped() {
     type: 'set_provider',
     nodeKey: 'floors',
     fieldName: 'floor_exterior_wall_thickness',
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.5,
   });
   const room1 = t.floor().rooms[0];

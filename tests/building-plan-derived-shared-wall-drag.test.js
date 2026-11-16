@@ -21,7 +21,7 @@ function example(exterior = 0.2, editingPolicy = {}) {
       floorId: f.floorId,
       nodeKey: 'floors',
       fieldName: 'floor_exterior_wall_thickness',
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: exterior,
     });
   const session = createBuildingPlanSession({
@@ -65,8 +65,8 @@ test('widen (default): away from the neighbour the wall widens; B keeps its face
   assert.ok(near(top(a), 2.8));
   const wall = wallOf(floor, a, 2.8);
   assert.equal(wall.exposure, 'interior');
-  assert.equal(wall.properties.wall_thickness_m, 0.4);
-  assert.equal(wall.overrides.wall_thickness_m, 0.4, 'the widened width is explicit');
+  assert.equal(wall.properties.wall_thickness, 0.4);
+  assert.equal(wall.overrides.wall_thickness, 0.4, 'the widened width is explicit');
 });
 
 test('widen: towards the neighbour the whole wall moves, as move_wall does', () => {
@@ -87,7 +87,7 @@ test('widen: past the limit the face holds; further on the room detaches, B keep
   held.apply({ type: 'resize_face', faceId: held.f.faceA, distance: -0.7 });
   const a = held.floor().rooms[0];
   assert.ok(near(top(a), 2.5), 'held at the 0.7 m limit');
-  assert.equal(wallOf(held.floor(), a, 2.5).properties.wall_thickness_m, 0.7);
+  assert.equal(wallOf(held.floor(), a, 2.5).properties.wall_thickness, 0.7);
 
   const apart = example(0.5);
   apart.apply({ type: 'resize_face', faceId: apart.f.faceA, distance: -1 });
@@ -109,9 +109,9 @@ test('the limit is the thickness field maximum when the form sets one', () => {
   const f = createBuildingPlanExample();
   const primary = extractBuildingPlanPrimary(f.snapshot.floors[0]);
   const specifications = derivedSpecifications(f.meta);
-  specifications.wall_thickness_m = {
-    ...specifications.wall_thickness_m,
-    field: { ...specifications.wall_thickness_m.field, max: 0.3 },
+  specifications.wall_thickness = {
+    ...specifications.wall_thickness,
+    field: { ...specifications.wall_thickness.field, max: 0.3 },
   };
   const plan = (distance) =>
     widenPlan(primary, resolutionFloor(primary), specifications, {

@@ -40,7 +40,7 @@ function partitionState(floor) {
       const openings = [...wall.doors, ...wall.windows].map((o) =>
         [at(along(o.offset)), at(along(o.offset + o.width))].sort().join('>')
       );
-      return `${wall.autoLabel} ${[at(start), at(end)].sort().join('>')} t=${wall.properties.wall_thickness_m} ${openings.join(',')}`;
+      return `${wall.autoLabel} ${[at(start), at(end)].sort().join('>')} t=${wall.properties.wall_thickness} ${openings.join(',')}`;
     })
     .sort();
   const paths = faces
@@ -251,7 +251,7 @@ test('midline: a thicker partition keeps its axis; a run joined to it stays join
   const result = t.apply({
     type: 'set_property',
     wallId: created.created.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   assert.equal(result.status, 'applied', JSON.stringify(result.issues));

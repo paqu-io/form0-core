@@ -163,7 +163,7 @@ for (const preserveWallGrouping of [false, true])
         type: 'set_property',
         floorId: f.floorId,
         wallId: wall.id,
-        property: 'wall_height_m',
+        property: 'wall_height',
         value: 2.6,
       }).status,
       'applied'

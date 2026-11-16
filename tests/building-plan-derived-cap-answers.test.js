@@ -14,9 +14,9 @@ test('a cap has no thickness or height of its own: those answers do not keep it 
     sides: [],
     ...extra,
   });
-  assert.ok(sameCapAnswers(stub({ overrides: { wall_thickness_m: 0.35 } }), source));
+  assert.ok(sameCapAnswers(stub({ overrides: { wall_thickness: 0.35 } }), source));
   assert.ok(
-    sameCapAnswers(stub({ overrides: { wall_thickness_m: 0.35, wall_height_m: 2.4 } }), source)
+    sameCapAnswers(stub({ overrides: { wall_thickness: 0.35, wall_height: 2.4 } }), source)
   );
   // Any other answer, or a custom row, is something the cap would lose.
   assert.ok(!sameCapAnswers(stub({ overrides: { material: 'Timber' } }), source));

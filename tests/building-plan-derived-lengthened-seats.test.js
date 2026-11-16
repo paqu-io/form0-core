@@ -28,7 +28,7 @@ function example(exterior = null) {
       type: 'set_provider',
       nodeKey: 'floors',
       fieldName: 'floor_exterior_wall_thickness',
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       value: exterior,
     });
   // Room 1's east row (W2).
@@ -83,7 +83,7 @@ test('a lengthened stretch that would stand in the neighbour wall lands at the c
   const shared = between(floor, room1, room2);
   assert.equal(shared.length, 2);
   assert.ok(shared.every((wall) => wall.exposure === 'interior'));
-  assert.ok(shared.every((wall) => wall.properties.wall_thickness_m === 0.2));
+  assert.ok(shared.every((wall) => wall.properties.wall_thickness === 0.2));
   const kept = shared.find((wall) => wall.id === door.id);
   assert.deepEqual(
     kept?.doors.map((entry) => entry.id),

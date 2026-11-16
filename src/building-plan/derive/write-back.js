@@ -144,7 +144,7 @@ export function writeBackBuildingPlanFloor(primary, derived, options = {}) {
   for (const piece of context.pieces)
     if (piece.explicitWidth > 0) {
       const subject = context.subjects.get(piece.subjectId);
-      subject.overrides = { ...subject.overrides, wall_thickness_m: piece.explicitWidth };
+      subject.overrides = { ...subject.overrides, wall_thickness: piece.explicitWidth };
     }
   rejoinAutomaticPieces(context);
   retireSubjects(context);

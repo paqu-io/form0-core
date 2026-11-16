@@ -166,8 +166,8 @@ export function buildingPlanCanvasSnapshot({
           windows: [],
           label: physical.values.wall_label || '',
           displayLabel: physical.values.wall_label || physical.autoLabel || `W#${faceIndex + 1}`,
-          thickness: physical.properties.wall_thickness_m,
-          height: physical.properties.wall_height_m,
+          thickness: physical.properties.wall_thickness,
+          height: physical.properties.wall_height,
           provenance: copy(physical.provenance),
         };
         output.walls.push(wall);
@@ -235,9 +235,9 @@ export function buildingPlanCanvasSnapshot({
             floorIndex,
             index,
             path: [...roomPath, { key: key(meta, collection), index }],
-            width: item.width ?? values[`${prefix}_cross_section_width_m`] ?? 0.3,
-            height: item.height ?? values[`${prefix}_cross_section_height_m`] ?? 0.3,
-            vertical: values.column_height_m ?? 3,
+            width: item.width ?? values[`${prefix}_width`] ?? 0.3,
+            height: item.height ?? values[`${prefix}_depth`] ?? 0.3,
+            vertical: values.column_height ?? 3,
             centerU: item.position
               ? (item.position.x - bounds.x) / bounds.width
               : (values.column_center_u ?? 0.5),
@@ -256,7 +256,7 @@ export function buildingPlanCanvasSnapshot({
             wallRatio: values.column_wall_ratio ?? 0,
             startRatio: values.beam_start_ratio ?? 0,
             endRatio: values.beam_end_ratio ?? 1,
-            length: item.start && item.end ? distance(item.start, item.end) : values.beam_length_m,
+            length: item.start && item.end ? distance(item.start, item.end) : values.beam_length,
             label: values[`${prefix}_identifier`] || '',
             displayLabel:
               values[`${prefix}_identifier`] ||
@@ -813,8 +813,8 @@ export class BuildingPlanCanvasController {
     const values = {
       ...(old.values || {}),
       [`${prefix}_identifier`]: input.label ?? '',
-      [`${prefix}_cross_section_width_m`]: input.width ?? 0.3,
-      [`${prefix}_cross_section_height_m`]: input.height ?? 0.3,
+      [`${prefix}_width`]: input.width ?? 0.3,
+      [`${prefix}_depth`]: input.height ?? 0.3,
       [`${prefix}_wall_segment_index`]: input.wallSegmentIndex ?? -1,
     };
     let shape;
@@ -822,13 +822,13 @@ export class BuildingPlanCanvasController {
       Object.assign(values, {
         column_center_u: input.centerU ?? 0.5,
         column_center_v: input.centerV ?? 0.5,
-        column_height_m: input.vertical ?? 3,
+        column_height: input.vertical ?? 3,
         column_wall_ratio: input.wallRatio ?? 0,
       });
       shape = {
         position: point(values.column_center_u, values.column_center_v),
-        width: values.column_cross_section_width_m,
-        height: values.column_cross_section_height_m,
+        width: values.column_width,
+        height: values.column_depth,
         rotation: input.rotation ?? 0,
       };
     } else {
@@ -843,10 +843,10 @@ export class BuildingPlanCanvasController {
       shape = {
         start: point(values.beam_start_u, values.beam_start_v),
         end: point(values.beam_end_u, values.beam_end_v),
-        width: values.beam_cross_section_width_m,
-        height: values.beam_cross_section_height_m,
+        width: values.beam_width,
+        height: values.beam_depth,
       };
-      values.beam_length_m = distance(shape.start, shape.end);
+      values.beam_length = distance(shape.start, shape.end);
     }
     return this[preview ? 'previewOperation' : 'apply']({
       type: id ? 'update_element' : 'create_element',

@@ -61,7 +61,7 @@ function fixture(overrides = {}, policy = {}) {
 const source = (name, exposure) =>
   numericField(name, {
     building_plan: {
-      property: 'wall_thickness_m',
+      property: 'wall_thickness',
       scope: 'physical_wall',
       inherit_to: 'walls',
       applies_to: { exposure },
@@ -69,7 +69,7 @@ const source = (name, exposure) =>
   });
 function adjacent(f) {
   f.add({ x: 0, y: 0, width: 6, height: 3 });
-  f.add({ x: 2, y: 3 + f.floor().walls[0].properties.wall_thickness_m, width: 2, height: 3 });
+  f.add({ x: 2, y: 3 + f.floor().walls[0].properties.wall_thickness, width: 2, height: 3 });
   const floor = f.floor();
   return {
     type: 'bind_faces',
@@ -106,7 +106,7 @@ test('authored schemas round trip without generated controls; expanded structure
   assert.throws(() => expandBuildingPlanSchema(edited), /protected/);
   assert.ok(!JSON.stringify(f.schema).includes('bp_floors_system'));
   assert.throws(
-    () => fixture({ walls: { extra_elements: [numericField('wall_thickness_m')] } }),
+    () => fixture({ walls: { extra_elements: [numericField('wall_thickness')] } }),
     /managed/
   );
   assert.throws(() => fixture({ walls: { mandatory_elements: [] } }), /managed/);
@@ -153,8 +153,8 @@ for (const value of ['apply', 'preserve', 'cancel'])
     if (value === 'cancel') assert.deepEqual(f.session.getSnapshot(), before);
     else {
       const middle = f.floor().walls.find((wall) => wall.exposure === 'interior');
-      assert.equal(middle.properties.wall_thickness_m, value === 'apply' ? 0.2 : 0.4);
-      assert.equal(Object.hasOwn(middle.overrides, 'wall_thickness_m'), value === 'preserve');
+      assert.equal(middle.properties.wall_thickness, value === 'apply' ? 0.2 : 0.4);
+      assert.equal(Object.hasOwn(middle.overrides, 'wall_thickness'), value === 'preserve');
       assert.equal(f.session.undo().status, 'undone');
       assert.deepEqual(f.session.getSnapshot(), before);
       assert.equal(f.session.redo().status, 'redone');
@@ -174,7 +174,7 @@ test('apply preference affects future operations and preserves explicit physical
   assert.deepEqual(f.session.getState(), state);
   f.apply(operation);
   assert.equal(
-    f.floor().walls.find((wall) => wall.exposure === 'interior').properties.wall_thickness_m,
+    f.floor().walls.find((wall) => wall.exposure === 'interior').properties.wall_thickness,
     0.2
   );
   const g = transition({ inheritedChangePolicy: 'apply' });
@@ -185,12 +185,12 @@ test('apply preference affects future operations and preserves explicit physical
     type: 'set_property',
     floorId: g.f.floorId,
     wallId: wall.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   g.f.apply(g.operation);
   assert.equal(
-    g.f.floor().walls.find((wall) => wall.exposure === 'interior').properties.wall_thickness_m,
+    g.f.floor().walls.find((wall) => wall.exposure === 'interior').properties.wall_thickness,
     0.4
   );
 });
@@ -217,7 +217,7 @@ test('equal physical defaults do not ask when only adjacency or sources change',
   f.apply({ type: 'set_values', floorId: f.floorId, values: { internal: 0.4 } });
   f.apply(operation);
   const shared = f.floor().walls.find((wall) => wall.exposure === 'interior');
-  assert.equal(shared.properties.wall_thickness_m, 0.4);
+  assert.equal(shared.properties.wall_thickness, 0.4);
   assert.equal(shared.segments.length, 1);
 });
 
@@ -231,13 +231,10 @@ test('a physical edit from either room addresses the complete shared piece', () 
     type: 'set_property',
     floorId: f.floorId,
     faceId: face.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.3,
   });
-  assert.equal(
-    f.floor().walls.find((wall) => wall.id === shared.id).overrides.wall_thickness_m,
-    0.3
-  );
+  assert.equal(f.floor().walls.find((wall) => wall.id === shared.id).overrides.wall_thickness, 0.3);
   assert.ok(f.floor().walls.every((wall) => wall.segments.every((segment) => !segment.overrides)));
 });
 
@@ -408,7 +405,7 @@ test('splitting a previously detached piece compares defaults with its immediate
     type: 'set_defaults',
     floorId: f.floorId,
     roomId,
-    property: 'wall_height_m',
+    property: 'wall_height',
     value: 4,
   });
   const room = f.floor().rooms[0];
@@ -416,7 +413,7 @@ test('splitting a previously detached piece compares defaults with its immediate
     (face) => f.floor().walls.find((wall) => wall.id === face.wallId).overrides.note
   );
   wall = f.floor().walls.find((wall) => wall.id === face.wallId);
-  assert.equal(wall.properties.wall_height_m, 4);
+  assert.equal(wall.properties.wall_height, 4);
   const result = f.session.apply({
     type: 'split_face',
     floorId: f.floorId,
@@ -458,8 +455,7 @@ test('a field draft waits for valid completion; unchanged and invalid blur leave
     path.push({ key, id: row.id });
   }
   const open = editor.openRow({ path });
-  const field =
-    f.meta.repeatablesByNodeKey.walls.fieldsByOriginalDataName.wall_thickness_m.dataName;
+  const field = f.meta.repeatablesByNodeKey.walls.fieldsByOriginalDataName.wall_thickness.dataName;
   const before = editor.getSnapshot();
   assert.equal(
     editor.completeRow(open.scopeId, open.row, { fieldName: field }).status,
@@ -549,7 +545,7 @@ test('incompatible room providers require a canonical shared resolution', () => 
       extra_elements: [
         numericField('thickness_default', {
           building_plan: {
-            property: 'wall_thickness_m',
+            property: 'wall_thickness',
             scope: 'physical_wall',
             inherit_to: 'walls',
           },
@@ -565,7 +561,7 @@ test('incompatible room providers require a canonical shared resolution', () => 
     floorId: f.floorId,
     nodeKey: 'rooms',
     roomId: rooms[0].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     fieldName: 'thickness_default',
     value: 0.2,
   });
@@ -574,7 +570,7 @@ test('incompatible room providers require a canonical shared resolution', () => 
     floorId: f.floorId,
     nodeKey: 'rooms',
     roomId: rooms[1].id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     fieldName: 'thickness_default',
     value: 0.25,
   });
@@ -582,7 +578,7 @@ test('incompatible room providers require a canonical shared resolution', () => 
   const accepted = answer(f, pending, 'candidate:0');
   assert.equal(accepted.status, 'applied', JSON.stringify(accepted.issues));
   const wall = f.floor().walls.find((entry) => entry.exposure === 'interior');
-  assert.equal(wall.overrides.wall_thickness_m, 0.2);
+  assert.equal(wall.overrides.wall_thickness, 0.2);
 });
 
 test('custom collections copy only after confirmation, with new row identities on new owners', () => {
@@ -772,7 +768,7 @@ for (const value of ['apply', 'preserve', 'cancel'])
       assert.equal(
         readBuildingPlanRecord({ meta: f.meta, record }).floors[0].walls.find(
           (wall) => wall.exposure === 'interior'
-        ).properties.wall_thickness_m,
+        ).properties.wall_thickness,
         value === 'apply' ? 0.2 : 0.4
       );
     controller.dispose();
@@ -909,16 +905,15 @@ test('an unrelated topology edit compares each existing piece with its own accep
     type: 'set_property',
     floorId: f.floorId,
     wallId: wall.id,
-    property: 'wall_thickness_m',
+    property: 'wall_thickness',
     value: 0.4,
   });
   const previous = new Map(
-    f.floor().walls.map((wall) => [wall.id, wall.properties.wall_thickness_m])
+    f.floor().walls.map((wall) => [wall.id, wall.properties.wall_thickness])
   );
   f.add({ x: 20, y: 0, width: 4, height: 3 });
   for (const wall of f.floor().walls)
-    if (previous.has(wall.id))
-      assert.equal(wall.properties.wall_thickness_m, previous.get(wall.id));
+    if (previous.has(wall.id)) assert.equal(wall.properties.wall_thickness, previous.get(wall.id));
 });
 
 test('both surfaces of an internal partition in one room remain independently editable', () => {

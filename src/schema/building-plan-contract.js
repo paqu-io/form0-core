@@ -21,7 +21,7 @@ const SCALAR_TYPES = new Set([
   'DateField',
   'TimeField',
 ]);
-const WALL_PROPERTIES = new Set(['wall_thickness_m', 'wall_height_m']);
+const WALL_PROPERTIES = new Set(['wall_thickness', 'wall_height']);
 const systemDestination = (node, property) =>
   Object.values(FLOOR_SYSTEM_ROUTES).some(
     (route) =>
@@ -319,12 +319,12 @@ export function createBuildingPlanBlueprint(overrides = {}) {
     const prefix = node === 'doors' ? 'door' : 'window';
     const field = clone(
       blueprint.nodes[node].mandatory_elements.find(
-        (field) => field.data_name === `${prefix}_width_m`
+        (field) => field.data_name === `${prefix}_width`
       )
     );
     Object.assign(field, {
-      key: `bp_${prefix}_offset_m`,
-      data_name: `${prefix}_offset_m`,
+      key: `bp_${prefix}_offset`,
+      data_name: `${prefix}_offset`,
       label: 'Distance from wall start (m)',
       min: 0,
     });
@@ -402,7 +402,7 @@ export function createBuildingPlanBlueprint(overrides = {}) {
         nodeKey: 'walls',
         scope: 'physical_wall',
         inherit: true,
-        fallback: property === 'wall_thickness_m' ? 0.2 : null,
+        fallback: property === 'wall_thickness' ? 0.2 : null,
         field: clone(field),
         providers: [],
       };

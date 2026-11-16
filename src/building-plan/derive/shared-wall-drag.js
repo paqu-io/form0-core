@@ -28,7 +28,7 @@ export function sharedWallMode(operation, editingPolicy = {}) {
  *   the dragged room's outward normal (negative: away from the neighbour).
  */
 export function widenPlan(primary, floor, specifications, { subjectId, roomIds, width, distance }) {
-  const field = specifications?.wall_thickness_m?.field;
+  const field = specifications?.wall_thickness?.field;
   const limit = Number.isFinite(field?.max) && field.max > 0 ? field.max : SHARED_WALL_WIDEN_LIMIT;
   const subject = primary.subjects.get(subjectId) || null;
   const exterior = (roomId) =>

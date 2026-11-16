@@ -35,7 +35,7 @@ function floorEditor() {
   const floorId = plan.apply({
     type: 'create_floor',
     values: { floor_elevation: 0, floor_height: 3 },
-    defaults: { wall_height_m: 3 },
+    defaults: { wall_height: 3 },
   }).created.id;
   plan.apply({ type: 'create_room', floorId, rectangle: { x: 0, y: 0, width: 4, height: 3 } });
   const record = writeBuildingPlanRecord({ meta, plan: plan.getSnapshot() });

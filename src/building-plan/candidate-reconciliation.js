@@ -66,15 +66,14 @@ function keepGeometricWidths(floors, geometry) {
   for (const floor of floors) {
     const previous = geometry.floors.find((entry) => entry.id === floor.id);
     for (const wall of floor.walls) {
-      const width = previous.walls.find((entry) => entry.id === wall.id)?.properties
-        .wall_thickness_m;
+      const width = previous.walls.find((entry) => entry.id === wall.id)?.properties.wall_thickness;
       if (
         !Number.isFinite(width) ||
-        width === wall.properties.wall_thickness_m ||
-        own(wall.overrides, 'wall_thickness_m')
+        width === wall.properties.wall_thickness ||
+        own(wall.overrides, 'wall_thickness')
       )
         continue;
-      wall.overrides = { ...wall.overrides, wall_thickness_m: width };
+      wall.overrides = { ...wall.overrides, wall_thickness: width };
       kept = true;
     }
   }
@@ -93,7 +92,7 @@ function contactState(floors) {
       floor.walls
         .map((wall) => [
           wall.segments.map((span) => [span.start.x, span.start.y, span.end.x, span.end.y]),
-          wall.properties.wall_thickness_m,
+          wall.properties.wall_thickness,
           wall.exposure,
           wall.sides.map((side) => [side.sign, side.roomId]),
         ])
@@ -169,8 +168,8 @@ export function reconcileBuildingPlanCandidate(
       if (
         !floor.walls.some(
           (wall) =>
-            wall.properties.wall_thickness_m !==
-            previous.walls.find((entry) => entry.id === wall.id)?.properties.wall_thickness_m
+            wall.properties.wall_thickness !==
+            previous.walls.find((entry) => entry.id === wall.id)?.properties.wall_thickness
         )
       )
         continue;

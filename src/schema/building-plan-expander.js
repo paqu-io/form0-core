@@ -165,7 +165,7 @@ function buildRepeatableTree(
     const flagName = `applicable_${fieldCounter++}`;
     const template = deepClone(
       blueprint.nodes.physical_walls.mandatory_elements.find(
-        (field) => field.data_name === 'wall_thickness_m'
+        (field) => field.data_name === 'wall_thickness'
       )
     );
     Object.assign(template, {
@@ -348,7 +348,7 @@ function expandBuildingPlanSection(field, buildingPlanMeta) {
               entry.field,
               localMeta.properties[propertyKey]?.fallback ??
                 entry.field.default_value ??
-                (binding.property === 'wall_thickness_m' ? 0.2 : null)
+                (binding.property === 'wall_thickness' ? 0.2 : null)
             ),
             field: entry.field,
             nodeKey: semanticNode,

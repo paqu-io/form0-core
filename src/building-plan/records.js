@@ -230,12 +230,12 @@ export function readBuildingPlanRecord(options) {
             id: state.id,
             type: prefix,
             segmentId: state.segmentId,
-            offset: read(meta, collection, openingRow, `${prefix}_offset_m`),
-            width: read(meta, collection, openingRow, `${prefix}_width_m`),
-            height: read(meta, collection, openingRow, `${prefix}_height_m`),
+            offset: read(meta, collection, openingRow, `${prefix}_offset`),
+            width: read(meta, collection, openingRow, `${prefix}_width`),
+            height: read(meta, collection, openingRow, `${prefix}_height`),
             sillHeight:
               collection === 'windows'
-                ? read(meta, collection, openingRow, 'window_distance_from_floor_m')
+                ? read(meta, collection, openingRow, 'window_distance_from_floor')
                 : null,
             values: plainValues(meta, collection, openingRow),
             overrides: readOverrides(meta, collection, openingRow, state),
@@ -305,13 +305,13 @@ export function readBuildingPlanRecord(options) {
           };
           if (collection === 'columns') {
             element.position = location('column_center_u', 'column_center_v');
-            element.width = read(meta, collection, elementRow, 'column_cross_section_width_m');
-            element.height = read(meta, collection, elementRow, 'column_cross_section_height_m');
+            element.width = read(meta, collection, elementRow, 'column_width');
+            element.height = read(meta, collection, elementRow, 'column_depth');
           } else if (collection === 'beams') {
             element.start = location('beam_start_u', 'beam_start_v');
             element.end = location('beam_end_u', 'beam_end_v');
-            element.width = read(meta, collection, elementRow, 'beam_cross_section_width_m');
-            element.height = read(meta, collection, elementRow, 'beam_cross_section_height_m');
+            element.width = read(meta, collection, elementRow, 'beam_width');
+            element.height = read(meta, collection, elementRow, 'beam_depth');
           }
         }
     }
@@ -395,14 +395,13 @@ function writeOpening(meta, node, row, opening, wall) {
     ...(opening.provenance ? { provenance: opening.provenance } : {}),
   });
   for (const [name, value] of [
-    [`${prefix}_width_m`, opening.width],
-    [`${prefix}_height_m`, opening.height],
-    [`${prefix}_offset_m`, opening.offset],
+    [`${prefix}_width`, opening.width],
+    [`${prefix}_height`, opening.height],
+    [`${prefix}_offset`, opening.offset],
     [`${prefix}_wall_reference`, wall.id],
   ])
     write(meta, node, row, name, value);
-  if (node === 'windows')
-    write(meta, node, row, 'window_distance_from_floor_m', opening.sillHeight);
+  if (node === 'windows') write(meta, node, row, 'window_distance_from_floor', opening.sillHeight);
   const index = wall.segments.findIndex((segment) => segment.id === opening.segmentId);
   const segment = wall.segments[index];
   const size = segment ? distance(segment.start, segment.end) : 1;
@@ -546,8 +545,8 @@ export function writeBuildingPlanRecord(options) {
               column_center_v: element.position
                 ? (element.position.y - bounds.y) / bounds.height
                 : (element.values?.column_center_v ?? null),
-              column_cross_section_width_m: element.width,
-              column_cross_section_height_m: element.height,
+              column_width: element.width,
+              column_depth: element.height,
             });
           else if (collection === 'beams')
             Object.assign(presented, {
@@ -563,9 +562,9 @@ export function writeBuildingPlanRecord(options) {
               beam_end_v: element.end
                 ? (element.end.y - bounds.y) / bounds.height
                 : (element.values?.beam_end_v ?? null),
-              beam_cross_section_width_m: element.width,
-              beam_cross_section_height_m: element.height,
-              beam_length_m:
+              beam_width: element.width,
+              beam_depth: element.height,
+              beam_length:
                 element.start && element.end ? distance(element.start, element.end) : null,
             });
           writePlain(meta, collection, entry, presented);
@@ -729,8 +728,8 @@ export function refreshBuildingPlanProjections(options) {
             .filter((row) => {
               const model = modelOf(meta, source, row),
                 prefix = source === 'doors' ? 'door' : 'window';
-              const offset = read(meta, source, row, `${prefix}_offset_m`),
-                width = read(meta, source, row, `${prefix}_width_m`);
+              const offset = read(meta, source, row, `${prefix}_offset`),
+                width = read(meta, source, row, `${prefix}_width`);
               return state.bindings.some(
                 (binding) =>
                   binding.segmentId === model.segmentId &&
