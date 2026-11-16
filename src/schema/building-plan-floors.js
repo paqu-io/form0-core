@@ -1,5 +1,6 @@
 const condition = (field, value) => ({ field_id: `bp_${field}`, operator: 'equal_to', value });
-const enclosedLevel = {
+/** A level with a structure above it: every floor name except Land survey and Roof. */
+export const ENCLOSED_LEVEL = {
   and: ['land_survey', 'roof'].map((value) => ({
     ...condition('floor_name', value),
     operator: 'not_equal_to',
@@ -85,7 +86,7 @@ export function createFloorSystemFields() {
     number('floor_height', 'Structural clear height [m]', {
       description_mode: 'subtext',
       required: false,
-      required_conditions: enclosedLevel,
+      required_conditions: ENCLOSED_LEVEL,
       description:
         'Measured from the finished floor to the underside of the floor or roof structure above. Ignore any suspended or false ceiling.',
     }),
@@ -95,7 +96,7 @@ export function createFloorSystemFields() {
       return [
         number(`floor_${surface}_wall_thickness`, `${title} predominant wall thickness [mm]`, {
           required: false,
-          required_conditions: enclosedLevel,
+          required_conditions: ENCLOSED_LEVEL,
         }),
         choice(status, `Select a default status for ${surface} wall plaster`, plasterChoices, {
           required: false,
@@ -159,3 +160,24 @@ export const FLOOR_SYSTEM_ROUTES = {
     ])
   ),
 };
+
+/**
+ * Room values that set descendants' defaults (decided 2026-11-16): walls and columns stand up to
+ * the room's structural clear height, inherited from the floor or set on the room. A wall shared
+ * by rooms whose heights differ asks which one applies (conflicting_room_defaults).
+ */
+export const ROOM_SYSTEM_ROUTES = Object.freeze([
+  {
+    source: 'room_structural_clear_height',
+    property: 'wall_height',
+    inherit_to: 'walls',
+    scope: 'physical_wall',
+  },
+  { source: 'room_structural_clear_height', property: 'column_height', inherit_to: 'columns' },
+]);
+
+/**
+ * Heights required only on enclosed levels, as the floor's own height is. The condition reads the
+ * owning floor's name; it could later become an ISREQUIRED()-style builtin.
+ */
+export const LEVEL_DEPENDENT_HEIGHTS = Object.freeze(['wall_height', 'column_height']);

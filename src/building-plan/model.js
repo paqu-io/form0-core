@@ -164,6 +164,20 @@ export function reconcileBuildingPlanProperties(
       );
   };
   for (const floor of snapshot.floors) {
+    // Rooms take the floor's values first: walls and columns inherit from rooms in this pass.
+    const assignNodes = (rooms) => {
+      for (const [key, specification] of Object.entries(specifications)) {
+        if (specification.scope !== 'node' || (specification.nodeKey === 'rooms') !== rooms)
+          continue;
+        for (const context of nodeSubjects(floor, specification.nodeKey))
+          assign(context.subject, specification.property || key, specification, {
+            floor,
+            nodeKey: specification.nodeKey,
+            ...context,
+          });
+      }
+    };
+    assignNodes(true);
     for (const wall of floor.walls) {
       wall.properties ||= {};
       wall.provenance ||= {};
@@ -176,15 +190,7 @@ export function reconcileBuildingPlanProperties(
             assign(side, property, specification, { floor, wall, side, nodeKey: 'walls' });
       }
     }
-    for (const [key, specification] of Object.entries(specifications)) {
-      if (specification.scope !== 'node') continue;
-      for (const context of nodeSubjects(floor, specification.nodeKey))
-        assign(context.subject, specification.property || key, specification, {
-          floor,
-          nodeKey: specification.nodeKey,
-          ...context,
-        });
-    }
+    assignNodes(false);
     for (const room of floor.rooms)
       for (const face of room.faces) {
         const side = wallSide(floor, face);

@@ -10,6 +10,7 @@ import {
   createRecordEvaluator,
 } from '../src/index.js';
 import { BUILDING_PLAN_BLUEPRINT } from '../src/schema/building-plan-blueprint.js';
+import { LEVEL_DEPENDENT_HEIGHTS } from '../src/schema/building-plan-floors.js';
 import { normalizePhysicalPieces } from '../src/building-plan/physical-pieces.js';
 import { mergeWallSides } from '../src/building-plan/wall-sides.js';
 import {
@@ -128,8 +129,13 @@ test('system catalog retains names and dimensions in mandatory protected inline 
         !['storage', 'geometry', 'derived'].includes(entry.binding.storageRole) &&
         !['floors', 'rooms'].includes(node.nodeKey) &&
         !entry.originalDataName.startsWith('wall_plaster')
-      )
-        assert.equal(entry.field.required, true, entry.originalDataName);
+      ) {
+        // Wall and column heights are required on enclosed levels only, as the floor height is.
+        if (LEVEL_DEPENDENT_HEIGHTS.includes(entry.originalDataName)) {
+          assert.equal(entry.field.required, false, entry.originalDataName);
+          assert.match(JSON.stringify(entry.field.required_conditions), /floor_name/);
+        } else assert.equal(entry.field.required, true, entry.originalDataName);
+      }
     }
   assert.ok(
     BUILDING_PLAN_BLUEPRINT.nodes.floors.mandatory_elements.some(

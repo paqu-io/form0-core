@@ -754,6 +754,15 @@ test('inherited custom choices keep ordinary values, requiredness, and readonly 
 
 test('physical requiredness produces one finding per wall that navigates to an ordinary facing row', async () => {
   const f = fixture();
+  // Without the floor's height, rooms and so walls have none: every wall's height is missing.
+  f.apply({
+    type: 'set_provider',
+    floorId: f.floorId,
+    nodeKey: 'floors',
+    fieldName: 'floor_height',
+    property: 'room_structural_clear_height',
+    value: null,
+  });
   const record = writeBuildingPlanRecord({ meta: f.meta, plan: f.session.getSnapshot() });
   const result = await createRecordEvaluator({
     schema: f.schema,

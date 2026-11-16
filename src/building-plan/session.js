@@ -14,6 +14,8 @@ import {
 } from './model.js';
 import { createUIRequestRegistry } from '../utilities/ui-requests.js';
 import { reconcileWallLabels } from './wall-labels.js';
+import { assignBuildingPlanDefaultNames } from './default-names.js';
+import { sharedValueQuestion } from './shared-value-question.js';
 import { applyBuildingPlanOperation } from './operations.js';
 import { applyOpeningOperation } from './opening-operations.js';
 import {
@@ -196,6 +198,7 @@ export function createBuildingPlanSession({
   readOnly = false,
   editingPolicy = {},
   derivedCommands = false,
+  locale = 'en',
 } = {}) {
   editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
   // Room commands on the derived core (redesign step 3). Off until every geometry command family
@@ -290,6 +293,7 @@ export function createBuildingPlanSession({
         }
       );
 
+      assignBuildingPlanDefaultNames(current, candidate, locale);
       for (const floor of candidate.floors)
         for (const wall of floor.walls) {
           if (
@@ -477,15 +481,7 @@ export function createBuildingPlanSession({
       } else {
         const question = questions.create(
           {
-            title: 'Resolve shared defaults',
-            message: `Applicable defaults disagree for ${conflict.property}. Choose the common physical value.`,
-            buttons: [
-              ...conflict.candidates.map((candidate, index) => ({
-                id: `candidate:${index}`,
-                label: `${JSON.stringify(candidate.value)} (source ${candidate.id})`,
-              })),
-              { id: 'cancel', label: 'Cancel operation' },
-            ],
+            ...sharedValueQuestion(conflict, prepared.candidate, specifications),
             context: { revision, scopeId: prepared.scopeId },
           },
           (reply) => ({ proposal, reply }),

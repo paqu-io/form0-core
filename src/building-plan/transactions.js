@@ -328,6 +328,7 @@ export function createBuildingPlanRecordSession({
   readOnly = false,
   editingPolicy = {},
   derivedCommands = false,
+  locale = 'en',
 }) {
   const meta = getBuildingPlanRecordMetadata({ meta: suppliedMeta, schema, sectionKey });
   let source = copy(record || { values: {}, repeatable: {} });
@@ -339,6 +340,7 @@ export function createBuildingPlanRecordSession({
     readOnly,
     editingPolicy,
     derivedCommands,
+    locale,
   });
   source = writeBuildingPlanRecord({
     meta,

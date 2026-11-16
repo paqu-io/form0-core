@@ -1,5 +1,10 @@
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
-import { FLOOR_SYSTEM_ROUTES } from './building-plan-floors.js';
+import {
+  ENCLOSED_LEVEL,
+  FLOOR_SYSTEM_ROUTES,
+  LEVEL_DEPENDENT_HEIGHTS,
+  ROOM_SYSTEM_ROUTES,
+} from './building-plan-floors.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const NODE_KEYS = Object.keys(BUILDING_PLAN_BLUEPRINT.nodes);
@@ -23,7 +28,7 @@ const SCALAR_TYPES = new Set([
 ]);
 const WALL_PROPERTIES = new Set(['wall_thickness', 'wall_height']);
 const systemDestination = (node, property) =>
-  Object.values(FLOOR_SYSTEM_ROUTES).some(
+  [...Object.values(FLOOR_SYSTEM_ROUTES), ...ROOM_SYSTEM_ROUTES].some(
     (route) =>
       route.inherit_to === node &&
       (route.property === property ||
@@ -289,8 +294,9 @@ export function createBuildingPlanBlueprint(overrides = {}) {
     for (const field of node.mandatory_elements) {
       const internal = internalField(field);
       if (name !== 'floors' || internal) {
-        field.required = !internal;
-        field.required_conditions = null;
+        const levelDependent = LEVEL_DEPENDENT_HEIGHTS.includes(field.data_name);
+        field.required = !internal && !levelDependent;
+        field.required_conditions = levelDependent ? clone(ENCLOSED_LEVEL) : null;
         field.visible = !internal;
         field.visible_conditions = null;
       }
@@ -466,6 +472,20 @@ export function createBuildingPlanBlueprint(overrides = {}) {
       conditionFields: clone(sourceConditionFields(overrides, 'floors')),
     });
   }
+  const floorHeight = blueprint.nodes.floors.mandatory_elements.find(
+    (field) => field.data_name === 'floor_height'
+  );
+  for (const route of ROOM_SYSTEM_ROUTES)
+    providers.push({
+      sourceNode: 'rooms',
+      sourceOriginalDataName: route.source,
+      property: route.property,
+      ...(route.scope ? { scope: route.scope } : {}),
+      destination: route.inherit_to,
+      field: clone(floorHeight),
+      system: true,
+      conditionFields: clone(sourceConditionFields(overrides, 'rooms')),
+    });
   for (const nodeKey of NODE_KEYS) {
     const source = overrides[nodeKey]?.extra_elements || blueprint.nodes[nodeKey].extra_elements;
     const conditionFields = clone(sourceConditionFields(overrides, nodeKey));

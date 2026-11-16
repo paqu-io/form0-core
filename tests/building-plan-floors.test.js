@@ -307,7 +307,9 @@ test('rooms receive live floor values and preserve override/reset intent through
   const roundtrip = readBuildingPlanRecord({ meta: f.meta, record });
   assert.equal(roundtrip.floors[0].rooms[0].properties.room_elevation, 2);
   assert.equal(Object.hasOwn(roundtrip.floors[0].rooms[0].overrides, 'room_elevation'), false);
-  assert.equal(f.floor().walls[0].properties.wall_height, null);
+  // Walls stand up to their room's structural clear height (2026-11-16), inherited from the floor.
+  assert.equal(f.floor().walls[0].properties.wall_height, 3);
+  assert.equal(f.floor().walls[0].provenance.wall_height.scope, 'room');
 });
 
 test('plaster uses canonical room/outside context independently from physical exposure', () => {
