@@ -30,4 +30,5 @@ export {
 } from './transactions.js';
 
 export { settleBuildingPlanQuestions } from './questions.js';
+export { buildingPlanIssueFocus } from './issue-focus.js';
 export { createBuildingPlanPresentation, normalizeBuildingPlanLocale } from './presentation.js';

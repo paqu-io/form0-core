@@ -140,6 +140,7 @@ export { MESSAGEBOX } from './builtins/event/ui/messagebox.js';
 export { createUIRequestRegistry } from './utilities/ui-requests.js';
 
 export { settleBuildingPlanQuestions } from './building-plan/questions.js';
+export { buildingPlanIssueFocus } from './building-plan/issue-focus.js';
 export {
   createBuildingPlanPresentation,
   normalizeBuildingPlanLocale,
