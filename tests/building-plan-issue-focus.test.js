@@ -53,3 +53,53 @@ test('a floor itself, other repeatables and missing rows open as before', () => 
   ])
     assert.equal(buildingPlanIssueFocus({ metadata, record, instancePath }), null);
 });
+
+test('plan rows are titled by their own name; other rows have none', async () => {
+  const { buildingPlanRowTitle, expandBuildingPlanSchema } = await import('../src/index.js');
+  const schema = {
+    form: {
+      name: 'Building',
+      elements: [
+        {
+          type: 'BuildingPlanSection',
+          key: 'plan',
+          data_name: 'plan',
+          label: 'Plan',
+          description: null,
+          description_mode: null,
+          visible: true,
+          visible_conditions: null,
+          read_only: false,
+          read_only_conditions: null,
+          node_overrides: null,
+        },
+      ],
+    },
+  };
+  const meta = expandBuildingPlanSchema(schema).buildingPlanMeta[0];
+  const nodes = meta.repeatablesByNodeKey;
+  const row = (node, name, value) => ({
+    values: { [nodes[node].fieldsByOriginalDataName[name].dataName]: value },
+  });
+  const title = (node, value, name) =>
+    buildingPlanRowTitle({
+      metadata: [meta],
+      repeatableKey: nodes[node].preferredKey,
+      row: row(node, name, value),
+    });
+  assert.equal(
+    title(
+      'floors',
+      { choice: [{ value: 'ground_floor', label: 'Ground floor' }], other: [] },
+      'floor_name'
+    ),
+    'Ground floor'
+  );
+  assert.equal(title('rooms', { choice: [], other: [{ label: 'Room 2' }] }, 'room_name'), 'Room 2');
+  assert.equal(title('walls', 'W3', 'wall_label'), 'W3');
+  assert.equal(title('columns', 'C1', 'column_identifier'), 'C1');
+  assert.equal(
+    buildingPlanRowTitle({ metadata: [meta], repeatableKey: 'findings', row: {} }),
+    null
+  );
+});
