@@ -165,6 +165,15 @@ export const FLOOR_SYSTEM_ROUTES = {
  * Room values that set descendants' defaults (decided 2026-11-16): walls and columns stand up to
  * the room's structural clear height, inherited from the floor or set on the room. A wall shared
  * by rooms whose heights differ asks which one applies (conflicting_room_defaults).
+ *
+ * Adding a route here or in FLOOR_SYSTEM_ROUTES: when a source is also a value its own row
+ * inherits (the clear height comes from the floor's height and goes on to walls and columns), the
+ * row stores a typed answer as a provider answer of the same name. Two places rely on that name:
+ * `resolveInheritedProperty` treats the row's provider answer as its own value (else the row keeps
+ * the inherited value and the record loses the typed one), and `getBuildingPlanFieldState` shows
+ * that property's ownership and "Reset to inheritance". Keep the source's name equal to the
+ * inherited property's; `tests/building-plan-provider-properties.test.js` finds every such field
+ * and checks that a typed value survives the record.
  */
 export const ROOM_SYSTEM_ROUTES = Object.freeze([
   {

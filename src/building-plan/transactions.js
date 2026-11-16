@@ -468,23 +468,37 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
       : nodeSubjects(floor, selected.node.nodeKey).find(
           (entry) => entry.subject.id === selected.model.id
         )?.subject;
-  const source =
-    binding.role === 'provider'
+  // A system provider that is also its row's own inherited property (the room's structural clear
+  // height, inherited from the floor and passed on to walls and columns) shows that property's
+  // ownership, so the row says where the value comes from and offers "Reset to inheritance".
+  const ownProperty =
+    binding.system &&
+    binding.role === 'provider' &&
+    Object.values(meta.properties).some(
+      (spec) =>
+        spec.nodeKey === selected.node.nodeKey &&
+        spec.property === field.originalDataName &&
+        spec.inherit !== false
+    );
+  const source = ownProperty
+    ? subject?.provenance?.[field.originalDataName]
+    : binding.role === 'provider'
       ? {
           scope: selected.node.nodeKey,
           mode: own(subject?.providerOverrides, field.originalDataName) ? 'override' : 'inherit',
         }
       : subject?.provenance?.[property];
+  const hidden = binding.system && binding.role === 'provider' && !ownProperty;
   return {
     managed,
     dataName,
     scope: binding.scope,
-    property,
+    property: ownProperty ? field.originalDataName : property,
     inheritable:
-      !(binding.system && binding.role === 'provider') &&
+      !hidden &&
       Boolean(binding.inherit || binding.role === 'provider' || binding.role === 'default'),
     value: copy(selected.row.values[dataName]),
-    source: binding.system && binding.role === 'provider' ? null : copy(source || null),
+    source: hidden ? null : copy(source || null),
     subjectId: subject?.id,
     outside: binding.outside === true && Boolean(subject) && subject.roomId == null,
     opposite: binding.outside === true && Boolean(subject?.roomId),

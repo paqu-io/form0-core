@@ -51,6 +51,17 @@ export function resolveInheritedProperty(context, property, specification = {}) 
       },
       mode: 'override',
     };
+  // A field can be both a row's own inherited property and a source its descendants inherit
+  // (the room's structural clear height: inherited from the floor, passed on to walls and
+  // columns). Its row stores the answer as a provider answer of the same name; that answer is
+  // the row's own value too, or the room keeps the floor's height and the record loses the typed
+  // one (2026-11-16). Any future field routed the same way relies on this.
+  if (own(subject.providerOverrides, property))
+    return {
+      value: copy(subject.providerOverrides[property]),
+      source: { scope: context.nodeKey, id: subject.id },
+      mode: 'override',
+    };
   if (specification.inherit !== false) {
     const rooms = side
       ? side.roomId
