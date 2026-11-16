@@ -417,6 +417,20 @@ function writeOpening(meta, node, row, opening, wall) {
 
 /** Preserve unrelated fields/row metadata while replacing this plan's canonical collections. */
 export function writeBuildingPlanRecord(options) {
+  return writeRecord(options);
+}
+
+/**
+ * The throwaway record a canvas preview draws from. A previewed edit may hold questions its commit
+ * asks (rooms that disagree on a shared wall's value); the conflicted value stays as it was in this
+ * record, which is never stored. Every other problem still refuses. Internal: not exported from
+ * the package.
+ */
+export function writeBuildingPlanPreviewRecord(options) {
+  return writeRecord(options, (issue) => issue.code !== 'conflicting_room_defaults');
+}
+
+function writeRecord(options, refuses = () => true) {
   const meta = metadataFor(options);
   const plan = copy(options.plan);
   for (const floor of plan.floors || []) reconcileWallLabels(floor);
@@ -424,7 +438,7 @@ export function writeBuildingPlanRecord(options) {
   const problems = [
     ...reconcileBuildingPlanProperties(plan, meta.properties),
     ...validateBuildingPlanSnapshot(plan),
-  ];
+  ].filter(refuses);
   if (problems.length) {
     const error = new TypeError(problems[0].message);
     error.issues = problems;

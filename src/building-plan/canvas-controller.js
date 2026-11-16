@@ -2,7 +2,11 @@ import { settleBuildingPlanQuestions } from './questions.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
 import { getBuildingPlanFieldState } from './transactions.js';
-import { readBuildingPlanRecord, writeBuildingPlanRecord } from './records.js';
+import {
+  readBuildingPlanRecord,
+  writeBuildingPlanPreviewRecord,
+  writeBuildingPlanRecord,
+} from './records.js';
 import { buildingPlanFaceSegments, copyBuildingPlanData as copy } from './model.js';
 import {
   distance,
@@ -589,22 +593,33 @@ export class BuildingPlanCanvasController {
       },
       { scopeId: this.scopeId() }
     );
-    if (proposal.status === 'ready') {
-      const record = writeBuildingPlanRecord({
+    if (proposal.status !== 'ready') {
+      this.reportIssues(proposal.issues);
+      return proposal;
+    }
+    // Hosts preview from pointer handlers, and the drop handler previews first: a preview that
+    // threw lost the drop (web retest 2026-11-16). It reports instead and keeps the last preview.
+    let previewView;
+    try {
+      previewView = buildingPlanCanvasSnapshot({
         meta: this.meta,
-        record: this.record,
-        plan: proposal.snapshot,
-      });
-      this.previewView = buildingPlanCanvasSnapshot({
-        meta: this.meta,
-        record,
+        record: writeBuildingPlanPreviewRecord({
+          meta: this.meta,
+          record: this.record,
+          plan: proposal.snapshot,
+        }),
         plan: proposal.snapshot,
         gridSize: this.gridSize,
         activeFloorIndex: this.activeFloorIndex,
       });
-      this.reportIssues([]);
-      this.emitUpdate();
-    } else this.reportIssues(proposal.issues);
+    } catch (error) {
+      const issues = error.issues || [{ code: 'invalid_preview', message: error.message }];
+      this.reportIssues(issues);
+      return { status: 'conflict', issues };
+    }
+    this.previewView = previewView;
+    this.reportIssues([]);
+    this.emitUpdate();
     return proposal;
   }
   clearPreview({ clearIssues = false } = {}) {
