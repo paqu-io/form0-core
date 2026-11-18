@@ -1,5 +1,8 @@
-/** The field that names a row of each BuildingPlan node. */
-const TITLE_FIELDS = {
+/**
+ * The field that names a row of each BuildingPlan node. The expander turns it into the node's
+ * `title_field`, so plan rows get their titles the generic way (`resolveDatasetRowTitle`).
+ */
+export const BUILDING_PLAN_TITLE_FIELDS = {
   floors: 'floor_name',
   rooms: 'room_name',
   walls: 'wall_label',
@@ -31,7 +34,7 @@ export function buildingPlanRowTitle({ metadata = [], repeatableKey, row }) {
   for (const meta of metadata)
     for (const node of meta.repeatables || []) {
       if (node.preferredKey !== repeatableKey && node.dataName !== repeatableKey) continue;
-      const field = node.fieldsByOriginalDataName?.[TITLE_FIELDS[node.nodeKey]];
+      const field = node.fieldsByOriginalDataName?.[BUILDING_PLAN_TITLE_FIELDS[node.nodeKey]];
       return field ? text(row?.values?.[field.dataName]) : null;
     }
   return null;

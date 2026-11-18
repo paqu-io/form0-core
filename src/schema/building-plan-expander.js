@@ -6,6 +6,7 @@ import {
   scopeBuildingPlanConditions,
   scopeBuildingPlanExpression,
 } from './building-plan-expressions.js';
+import { BUILDING_PLAN_TITLE_FIELDS } from '../building-plan/row-title.js';
 
 const DATA_NAME_MAX_LENGTH = 42;
 
@@ -33,6 +34,45 @@ function createScopedKey(baseKey, suffix) {
 
 function createScopedDataName(baseDataName, suffix) {
   return appendSuffix(baseDataName, suffix, DATA_NAME_MAX_LENGTH);
+}
+
+/**
+ * A plan section's `title_field`: its rows are titled by the node's name field (floor name,
+ * room name, door label…), the same way any RepeatableSection can declare its title, so list
+ * rows, entry headers and stored records read it through `resolveDatasetRowTitle`. A
+ * `title_field` the node already has keeps its references, mapped to the expanded keys.
+ * @returns {object | undefined}
+ */
+function planTitleField(existing, nodeKey, meta) {
+  const expandedKey = (reference) =>
+    meta.fieldsByOriginalDataName?.[reference]?.key ||
+    meta.fieldsByOriginalKey?.[reference]?.key ||
+    null;
+  if (existing) {
+    return {
+      ...existing,
+      elements: (existing.elements || []).map((reference) => expandedKey(reference) || reference),
+    };
+  }
+  const name = BUILDING_PLAN_TITLE_FIELDS[nodeKey];
+  const entry = meta.fieldsByOriginalDataName?.[name] || meta.fieldsByOriginalKey?.[name];
+  // A name projected from another node (a wall face shows its physical wall's label) is not a
+  // field of this section's records, so dataset titles can't read it; such rows keep no title.
+  if (!entry?.key || entry.binding?.role === 'projection') return undefined;
+  const key = entry.key;
+  return {
+    type: 'TitleField',
+    key: '@title',
+    data_name: 'title',
+    label: 'Record title',
+    display: 'default',
+    enabled: true,
+    visible: true,
+    visible_conditions: null,
+    read_only: true,
+    read_only_conditions: null,
+    elements: [key],
+  };
 }
 
 function recordFieldMeta(container, entry) {
@@ -223,6 +263,8 @@ function buildRepeatableTree(
   );
 
   repeatable.elements.push(...systemSection, ...extraElements, ...children);
+  const titleField = planTitleField(repeatable.title_field, nodeKey, repeatableMeta);
+  if (titleField) repeatable.title_field = titleField;
 
   if (Array.isArray(repeatableMeta.fields) && repeatableMeta.fields.length === 0) {
     delete repeatableMeta.fields;
