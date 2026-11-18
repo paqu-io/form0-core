@@ -191,7 +191,11 @@ const normalizeRecordScope = (record, scope) => {
   });
 
   if (scope.datasetDescriptor) {
-    record['@title'] = resolveDatasetRowTitle(scope.datasetDescriptor, record);
+    // A BuildingPlan row's title is for display only: its record keeps the null title it had.
+    record['@title'] =
+      scope.datasetDescriptor.building_plan === true
+        ? null
+        : resolveDatasetRowTitle(scope.datasetDescriptor, record);
   }
 
   return record;

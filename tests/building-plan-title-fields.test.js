@@ -50,6 +50,7 @@ test('every plan section titles its rows by its name field, the generic way', ()
     ['floors', 'floor_name'],
     ['rooms', 'room_name'],
     ['physical_walls', 'wall_label'],
+    ['walls', 'wall_label'],
     ['doors', 'door_label'],
     ['windows', 'window_label'],
     ['columns', 'column_identifier'],
@@ -61,9 +62,6 @@ test('every plan section titles its rows by its name field, the generic way', ()
     assert.equal(section.title_field?.type, 'TitleField', `${nodeKey} has a title field`);
     assert.deepEqual(section.title_field.elements, [node.fieldsByOriginalDataName[name].key]);
   }
-  // A wall face's label is projected from its physical wall: not a field of the face's records.
-  const faces = findRepeatable(schema.form.elements, meta.repeatablesByNodeKey.walls.key);
-  assert.equal(faces.title_field, undefined);
   // The expanded schema validates: each title field is in scope and title-eligible.
   assert.doesNotThrow(() => validateSchema(schema.form));
 });
@@ -88,6 +86,27 @@ test('a floor and a room are titled by their names in dataset titles', () => {
     resolveDatasetRowTitle(descriptorOf('rooms'), { [field('rooms', 'room_name')]: 'Kitchen' }),
     'Kitchen'
   );
+  // A wall face is titled by its label, projected from its physical wall.
+  assert.equal(
+    resolveDatasetRowTitle(descriptorOf('walls'), { [field('walls', 'wall_label')]: 'W4' }),
+    'W4'
+  );
   // A row without a name has no title, so hosts keep their "Floors 1" fallback.
   assert.equal(resolveDatasetRowTitle(descriptorOf('floors'), {}), null);
+});
+
+test('plan rows are titled for display only: stored records keep no row titles', async () => {
+  const { createBuildingPlanExample } = await import('../examples/building-plan/create-example.js');
+  const { normalizeStructuredRecord } = await import('../src/index.js');
+  const example = createBuildingPlanExample();
+  const titles = [];
+  const visit = (value, root = false) => {
+    if (Array.isArray(value)) return value.forEach((item) => visit(item));
+    if (!value || typeof value !== 'object') return;
+    if (!root && '@title' in value && value['@title'] !== null) titles.push(value['@title']);
+    Object.entries(value).forEach(([key, item]) => key !== '@title' && visit(item));
+  };
+  visit(example.stored, true);
+  visit(normalizeStructuredRecord(example.schema, example.stored, { mode: 'derived' }), true);
+  assert.deepEqual(titles, []);
 });

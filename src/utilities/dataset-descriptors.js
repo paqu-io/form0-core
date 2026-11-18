@@ -478,7 +478,13 @@ const collectFieldsForDataset = (elements, dataset, projections) => {
       return;
     }
 
-    if (projections?.fields.has(element.data_name)) return;
+    if (projections?.fields.has(element.data_name)) {
+      // A BuildingPlan projection (a wall face shows its physical wall's label) is stored on
+      // another row, so it is not one of this dataset's fields; it can still title the rows.
+      const projected = buildDatasetFieldDescriptor(element, dataset);
+      if (projected) (dataset.projected_fields ||= []).push(projected);
+      return;
+    }
 
     const descriptor = buildDatasetFieldDescriptor(element, dataset);
     if (descriptor) {
@@ -530,6 +536,10 @@ const collectRepeatableDatasets = (elements, context, datasets) => {
       title_field: cloneTitleField(element.title_field),
       fields: [],
     };
+    // BuildingPlan rows: titled for display only, so records keep no "@title" for them.
+    if (context.projections?.rows?.has(element.key || element.data_name)) {
+      descriptor.building_plan = true;
+    }
 
     collectFieldsForDataset(element.elements, descriptor, context.projections);
     datasets.push(descriptor);
@@ -785,7 +795,11 @@ export function resolveDatasetRowTitle(descriptor, rowValues) {
 
   const sourceRecord = isRecord(rowValues) ? rowValues : {};
   const source = isRecord(sourceRecord.form_values) ? sourceRecord.form_values : sourceRecord;
-  const fields = Array.isArray(descriptor?.fields) ? descriptor.fields : [];
+  // Projected fields (BuildingPlan) can title rows too: their values are in the row.
+  const fields = [
+    ...(Array.isArray(descriptor?.fields) ? descriptor.fields : []),
+    ...(Array.isArray(descriptor?.projected_fields) ? descriptor.projected_fields : []),
+  ];
   const fieldByReference = new Map();
 
   fields.forEach((field) => {

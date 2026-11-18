@@ -15,8 +15,11 @@ export function getBuildingPlanMetadata(schema) {
 export function getBuildingPlanProjectionNames(schema) {
   const fields = new Set();
   const repeatables = new Set();
+  // Every plan row's repeatable: their titles are for display; stored records keep no title.
+  const rows = new Set();
   for (const meta of getBuildingPlanMetadata(schema)) {
     for (const entry of meta.repeatables) {
+      for (const key of [entry.preferredKey, entry.key, entry.dataName]) if (key) rows.add(key);
       if (entry.role === 'projection') repeatables.add(entry.preferredKey);
       const visit = (entries, projected = false) => {
         for (const field of entries || []) {
@@ -29,7 +32,7 @@ export function getBuildingPlanProjectionNames(schema) {
       visit(entry.fields);
     }
   }
-  return { fields, repeatables };
+  return { fields, repeatables, rows };
 }
 
 export function getBuildingPlanFieldBinding(meta, dataName) {

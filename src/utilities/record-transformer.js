@@ -183,13 +183,17 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
     });
   });
 
+  const titleDescriptorOf = (repInfo) =>
+    repeatableTitleDescriptors.get(repInfo?.preferredKey) ||
+    repeatableTitleDescriptors.get(repInfo?.field?.key) ||
+    repeatableTitleDescriptors.get(repInfo?.field?.data_name);
   const resolveRepeatableTitle = (repInfo, rowValues) => {
-    const descriptor =
-      repeatableTitleDescriptors.get(repInfo?.preferredKey) ||
-      repeatableTitleDescriptors.get(repInfo?.field?.key) ||
-      repeatableTitleDescriptors.get(repInfo?.field?.data_name);
+    const descriptor = titleDescriptorOf(repInfo);
     return descriptor ? resolveDatasetRowTitle(descriptor, rowValues) : null;
   };
+  // A BuildingPlan row's title is for display: its stored record keeps no "@title".
+  const storesRowTitle = (repInfo) =>
+    Boolean(repInfo?.field?.title_field) && titleDescriptorOf(repInfo)?.building_plan !== true;
 
   const hasStructuredRepeatableState =
     state &&
@@ -377,7 +381,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
           childRecord.form_values[childOutputKey] = childRepeatableArray;
         }
 
-        if (repInfo.field?.title_field) {
+        if (storesRowTitle(repInfo)) {
           childRecord['@title'] = resolveRepeatableTitle(repInfo, instanceValues);
         }
 
@@ -499,7 +503,7 @@ function* structuredRecordSteps(state, fields = null, options = {}, id = null) {
           }
         }
 
-        if (repInfo.field?.title_field) {
+        if (storesRowTitle(repInfo)) {
           childRecord['@title'] = resolveRepeatableTitle(
             repInfo,
             i === 0 ? state.values : childRecord.form_values

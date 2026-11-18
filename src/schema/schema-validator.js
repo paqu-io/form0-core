@@ -45,7 +45,8 @@ const validateScopedTitleFields = (form, errors) => {
       return;
     }
 
-    const scopedFields = descriptor.fields || [];
+    // A title may also use a BuildingPlan projection shown in the row (a wall face's label).
+    const scopedFields = [...(descriptor.fields || []), ...(descriptor.projected_fields || [])];
     titleField.elements.forEach((entry) => {
       const reference = toNonEmptyString(entry);
       if (!reference) {

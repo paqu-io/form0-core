@@ -54,12 +54,10 @@ function planTitleField(existing, nodeKey, meta) {
       elements: (existing.elements || []).map((reference) => expandedKey(reference) || reference),
     };
   }
-  const name = BUILDING_PLAN_TITLE_FIELDS[nodeKey];
-  const entry = meta.fieldsByOriginalDataName?.[name] || meta.fieldsByOriginalKey?.[name];
-  // A name projected from another node (a wall face shows its physical wall's label) is not a
-  // field of this section's records, so dataset titles can't read it; such rows keep no title.
-  if (!entry?.key || entry.binding?.role === 'projection') return undefined;
-  const key = entry.key;
+  // The name may be projected from another node (a wall face shows its physical wall's label);
+  // dataset titles read projected fields too.
+  const key = expandedKey(BUILDING_PLAN_TITLE_FIELDS[nodeKey]);
+  if (!key) return undefined;
   return {
     type: 'TitleField',
     key: '@title',
