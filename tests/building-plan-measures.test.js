@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBuildingPlanPresentation, expandBuildingPlanSchema } from '../src/index.js';
+import {
+  BuildingPlanCanvasController,
+  createBuildingPlanPresentation,
+  expandBuildingPlanSchema,
+} from '../src/index.js';
+import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
 import {
   BUILDING_PLAN_MEASURES,
   BUILDING_PLAN_UNITLESS_FIELDS,
@@ -84,4 +89,39 @@ test("a wall face's copy of an opening presents as the opening", () => {
   const width = meta.repeatablesByNodeKey.face_doors.fieldsByOriginalDataName.door_width.field;
   // Float noise from geometry is not shown.
   assert.equal(si.toDisplay(width, 0.9000000000000001), 0.9);
+});
+
+test('an opening placed or moved on the canvas is stored to the millimetre', async () => {
+  const f = createBuildingPlanExample();
+  let record = f.record;
+  const controller = new BuildingPlanCanvasController({
+    meta: f.meta,
+    readRecord: () => record,
+    writeRecord: (next) => ((record = next), true),
+  });
+  // A room side running against its wall, with no opening yet.
+  const face = controller
+    .getSnapshot()
+    .walls.find(
+      (wall) =>
+        wall.bindings[0].direction < 0 &&
+        !wall.doors.length &&
+        !wall.windows.length &&
+        wall.bindings[0].interval[1] - wall.bindings[0].interval[0] > 2
+    );
+  const span = face.bindings[0].interval[1] - face.bindings[0].interval[0];
+  const created = await controller.createDoor(face.id, {
+    segmentIndex: 0,
+    startRatio: 0.7314717950526478 / span,
+    endRatio: (0.7314717950526478 + 0.9) / span,
+    width: 0.9000000000000001,
+  });
+  assert.ok(created);
+  const stored = controller.session
+    .getSnapshot()
+    .floors.flatMap((floor) => floor.walls)
+    .flatMap((wall) => wall.doors)
+    .find((door) => door.id === created.subjectId);
+  assert.equal(stored.width, 0.9);
+  assert.equal(stored.offset, Math.round(stored.offset * 1000) / 1000);
 });

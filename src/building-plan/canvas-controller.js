@@ -912,14 +912,25 @@ export class BuildingPlanCanvasController {
     const binding = wall.bindings[input.segmentIndex ?? 0];
     if (!binding) return null;
     const span = binding.interval[1] - binding.interval[0];
-    const width =
+    // Canvas ratios carry float noise into metres: the stored width and distance from the wall
+    // start are kept to the millimetre, inside this room side's portion of the wall.
+    const mm = (value) => Math.round(value * 1000) / 1000;
+    const width = mm(
       options.width ??
-      previous?.width ??
-      ((input.endRatio ?? 0.5) - (input.startRatio ?? 0.2)) * span;
-    const offset =
-      binding.direction > 0
-        ? binding.interval[0] + (input.startRatio ?? 0.2) * span
-        : binding.interval[1] - (input.startRatio ?? 0.2) * span - width;
+        previous?.width ??
+        ((input.endRatio ?? 0.5) - (input.startRatio ?? 0.2)) * span
+    );
+    const offset = Math.max(
+      binding.interval[0],
+      Math.min(
+        mm(
+          binding.direction > 0
+            ? binding.interval[0] + (input.startRatio ?? 0.2) * span
+            : binding.interval[1] - (input.startRatio ?? 0.2) * span - width
+        ),
+        binding.interval[1] - width
+      )
+    );
     return this[preview ? 'previewOperation' : 'apply']({
       type: previous ? 'update_opening' : 'create_opening',
       floorId: this.floorId,
