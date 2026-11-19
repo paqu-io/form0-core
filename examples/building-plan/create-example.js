@@ -49,7 +49,7 @@ export function createBuildingPlanExample() {
             rooms: { extra_elements: [field('TextField', 'room_note', 'Room note')] },
             walls: {
               extra_elements: [
-                field('TextField', 'finish', 'Room-side finish', {
+                field('TextField', 'finish', 'Finish', {
                   building_plan: { scope: 'wall_face', on_split: 'copy' },
                 }),
                 field('TextField', 'material', 'Construction material', {

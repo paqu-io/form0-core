@@ -70,7 +70,7 @@
                 "type": "TextField",
                 "key": "finish",
                 "data_name": "finish",
-                "label": "Room-side finish",
+                "label": "Finish",
                 "display": "default",
                 "description": null,
                 "description_mode": null,
