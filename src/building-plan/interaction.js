@@ -2,6 +2,11 @@ import { at, dot, polygonArea, project, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
+import { freeWallTargets } from './free-wall-targets.js';
+import {
+  snapFreeWallEnd as snapEnd,
+  snapFreeWallTranslation as snapMove,
+} from './free-wall-snapping.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -292,6 +297,29 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     guides.push({ from: { ...originalPoint }, to: { ...result } });
     return result;
   }
+  // Free walls (`free-wall-snapping.js`): the same reach and hold as the other pulls.
+  function freeWall(run, { roomId, wallId = null, zoom = 1, bypass = false } = {}) {
+    const view = currentScene();
+    const result = run({
+      targets: freeWallTargets(view, { roomId, wallId }),
+      gridSize: view.gridSize || 20,
+      free: bypass || !settings().snapping,
+      tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
+    });
+    latch = new Set(result.keys);
+    guides = result.guides;
+    return result;
+  }
+  function snapFreeWallEnd(point, options = {}) {
+    return freeWall((shared) => snapEnd(point, { ...shared, from: options.from || null }), options)
+      .point;
+  }
+  function snapFreeWallTranslation(points, options = {}) {
+    return freeWall(
+      (shared) => snapMove(points, { ...shared, originalPoints: options.originalPoints || points }),
+      options
+    ).points;
+  }
   function edgePan(point, bounds, now) {
     if (!settings().edgeAutoPan || !bounds?.width || !bounds?.height) {
       edgeSince = null;
@@ -326,6 +354,8 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     snapCorner,
     snapTranslation,
     snapWallTranslation,
+    snapFreeWallEnd,
+    snapFreeWallTranslation,
     edgePan,
     getGuides: () => guides.map((guide) => ({ from: { ...guide.from }, to: { ...guide.to } })),
     reset() {
