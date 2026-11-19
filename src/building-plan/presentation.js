@@ -229,12 +229,22 @@ export function createBuildingPlanPresentation({
     throw new TypeError('measurement_system must be si or imperial');
   const language = normalizeBuildingPlanLocale(locale);
   const entries = new Map();
-  for (const meta of metadata)
+  for (const meta of metadata) {
     for (const node of meta.repeatables || []) {
       entries.set(node.preferredKey, { field: { label: node.fieldLabel || node.nodeKey }, node });
       for (const entry of node.fields || [])
         if (entry.binding?.system) entries.set(entry.dataName, entry);
     }
+    // A wall face's copy of a system field (an opening's, in `face_doors` and `face_windows`)
+    // presents as the field it copies: the same unit, label and conversion.
+    for (const node of meta.repeatables || [])
+      for (const entry of node.fields || [])
+        if (
+          entry.binding?.role === 'projection' &&
+          entries.get(entry.binding.sourceDataName)?.binding?.system
+        )
+          entries.set(entry.dataName, entry);
+  }
   const t = (text) => TRANSLATIONS[language]?.[text] || text;
   const managed = (field) => entries.get(field.data_name) || entries.get(field.key);
   const unitFor = (kind = 'length') =>

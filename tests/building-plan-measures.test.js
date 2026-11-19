@@ -64,3 +64,24 @@ test('names carry no unit and labels follow the measure and the measurement syst
     assert.equal(label('columns', 'column_width'), `Width [${length}]`);
   }
 });
+
+test("a wall face's copy of an opening presents as the opening", () => {
+  const presentation = createBuildingPlanPresentation({
+    metadata: [meta],
+    measurementSystem: 'imperial',
+  });
+  for (const [copy, source] of [
+    ['face_doors', 'doors'],
+    ['face_windows', 'windows'],
+  ])
+    for (const name of [`${source.slice(0, -1)}_width`, `${source.slice(0, -1)}_offset`]) {
+      const field = (node) => meta.repeatablesByNodeKey[node].fieldsByOriginalDataName[name].field;
+      assert.equal(presentation.field(field(copy)).label, presentation.field(field(source)).label);
+      assert.match(presentation.field(field(copy)).label, /\[ft\]$/);
+      assert.equal(presentation.toDisplay(field(copy), 0.3048), 1);
+    }
+  const si = createBuildingPlanPresentation({ metadata: [meta] });
+  const width = meta.repeatablesByNodeKey.face_doors.fieldsByOriginalDataName.door_width.field;
+  // Float noise from geometry is not shown.
+  assert.equal(si.toDisplay(width, 0.9000000000000001), 0.9);
+});
