@@ -3,6 +3,8 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
 import { freeWallTargets } from './free-wall-targets.js';
+import { columnTargets } from './column-targets.js';
+import { snapColumn as snapColumnCentre } from './column-snapping.js';
 import {
   snapFreeWallEnd as snapEnd,
   snapFreeWallTranslation as snapMove,
@@ -320,6 +322,29 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       options
     ).points;
   }
+  /**
+   * A column's centre (`column-snapping.js`): the same reach and hold. `width` and `height` in
+   * metres (the column's width and depth); `from`: where a dragged column last was. Null when the
+   * column fits nowhere near.
+   */
+  function snapColumn(
+    centre,
+    { roomId, columnId = null, width, height, from = null, zoom = 1, bypass = false } = {}
+  ) {
+    const view = currentScene();
+    const gridSize = view.gridSize || 20;
+    const result = snapColumnCentre(centre, {
+      size: { width: width * gridSize, height: height * gridSize },
+      from,
+      targets: columnTargets(view, { roomId, columnId }),
+      gridSize,
+      free: bypass || !settings().snapping,
+      tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
+    });
+    latch = new Set(result.keys);
+    guides = result.guides;
+    return result.fits ? result.centre : null;
+  }
   function edgePan(point, bounds, now) {
     if (!settings().edgeAutoPan || !bounds?.width || !bounds?.height) {
       edgeSince = null;
@@ -356,6 +381,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     snapWallTranslation,
     snapFreeWallEnd,
     snapFreeWallTranslation,
+    snapColumn,
     edgePan,
     getGuides: () => guides.map((guide) => ({ from: { ...guide.from }, to: { ...guide.to } })),
     reset() {

@@ -2,7 +2,8 @@
  * What free walls snap to (`free-wall-snapping.js`), in canvas units, from the canvas snapshot.
  */
 
-const columnCorners = (column, room, gridSize) => {
+/** A column's corners in canvas units, from its room's box and its fractions of it. */
+export const columnCorners = (column, room, gridSize) => {
   const rect = room?.rect;
   if (!rect) return [];
   const centre = {
@@ -35,11 +36,12 @@ const isFreeWall = (wall) => !wall.isBoundary && !wall.isCutPortion;
  * corners) and lines (the room's faces, other free walls' sides, columns' sides) in the room;
  * corners and ends anywhere on the floor to line up with.
  * @param {object} view
- * @param {{ roomId: string, wallId?: string | null }} options `wallId`: the free wall being
- *   edited (its face), left out with its physical wall
+ * @param {{ roomId: string, wallId?: string | null, columnId?: string | null }} options `wallId`:
+ *   the free wall being edited (its face), left out with its physical wall; `columnId`: a column
+ *   being moved, left out (`column-targets.js`)
  * @returns {FreeWallTargets}
  */
-export function freeWallTargets(view, { roomId, wallId = null }) {
+export function freeWallTargets(view, { roomId, wallId = null, columnId = null }) {
   const gridSize = view.gridSize || 20;
   const rooms = view.rooms || [];
   const walls = view.walls || [];
@@ -52,14 +54,16 @@ export function freeWallTargets(view, { roomId, wallId = null }) {
   );
   const body = (wall) =>
     (view.wallFootprints || []).find((entry) => entry.id === wall.physicalWallId)?.polygons || [];
-  const columns = (view.columns || []).map((column) => ({
-    roomId: column.roomId,
-    corners: columnCorners(
-      column,
-      rooms.find((entry) => entry.id === column.roomId),
-      gridSize
-    ),
-  }));
+  const columns = (view.columns || [])
+    .filter((column) => column.id == null || column.id !== columnId)
+    .map((column) => ({
+      roomId: column.roomId,
+      corners: columnCorners(
+        column,
+        rooms.find((entry) => entry.id === column.roomId),
+        gridSize
+      ),
+    }));
   const inRoom = others.filter((wall) => wall.roomId === roomId);
   const shapes = [
     outline,
