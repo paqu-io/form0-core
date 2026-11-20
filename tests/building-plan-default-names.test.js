@@ -91,8 +91,8 @@ test('doors, windows, columns, beams and objects get their automatic names', () 
   const [named] = floor.rooms;
   assert.deepEqual(
     named.columns.map((column) => column.values.column_identifier),
-    ['C1', 'C2']
+    ['C#1', 'C#2']
   );
-  assert.equal(named.beams[0].values.beam_identifier, 'B1');
+  assert.equal(named.beams[0].values.beam_identifier, 'B#1');
   assert.equal(named.objects[0].values.object_name, 'Object 1');
 });

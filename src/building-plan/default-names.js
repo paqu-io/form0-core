@@ -1,6 +1,6 @@
 import { normalizeBuildingPlanLocale } from './presentation.js';
 
-/** Words for automatic names; columns and beams use language-neutral codes (C1, B1). */
+/** Words for automatic names; columns and beams use language-neutral codes (C#1, B#1). */
 const WORDS = {
   en: { room: 'Room', door: 'Door', window: 'Window', object: 'Object' },
   it: { room: 'Stanza', door: 'Porta', window: 'Finestra', object: 'Oggetto' },
@@ -28,8 +28,9 @@ function nextName(names, prefix, separator) {
 /**
  * Give every room, door, window, column, beam and object that `candidate` adds without a name an
  * automatic one (decided 2026-11-16): "Room 2" (an Other answer), "Door 1", "Window 1",
- * "Object 1", "C1", "B1", numbered per floor after the highest number in use, in the editor's
- * language. Names are set once, at creation; a person can change them like any answer.
+ * "Object 1", "C#1", "B#1" (the canvas's style for codes, F#1, R#1, W#1: 2026-11-20), numbered per
+ * floor after the highest number in use, in the editor's language. Names are set once, at
+ * creation; a person can change them like any answer.
  */
 export function assignBuildingPlanDefaultNames(before, candidate, locale = 'en') {
   const words = WORDS[normalizeBuildingPlanLocale(locale)];
@@ -65,13 +66,13 @@ export function assignBuildingPlanDefaultNames(before, candidate, locale = 'en')
       floor.rooms.flatMap((room) => room.columns),
       'column_identifier',
       'C',
-      ''
+      '#'
     );
     name(
       floor.rooms.flatMap((room) => room.beams),
       'beam_identifier',
       'B',
-      ''
+      '#'
     );
     name(
       floor.rooms.flatMap((room) => room.objects),
