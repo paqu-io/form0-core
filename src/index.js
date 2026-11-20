@@ -78,6 +78,11 @@ export {
   BUILDING_PLAN_ZOOM_LIMITS,
 } from './building-plan/interaction.js';
 export {
+  placeBuildingPlanColumn,
+  placeBuildingPlanOpening,
+} from './building-plan/element-placement.js';
+export { openingStretches as buildingPlanOpeningStretches } from './building-plan/opening-stretches.js';
+export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,
   refreshBuildingPlanProjections,

@@ -17,6 +17,8 @@ export {
   BUILDING_PLAN_EDITING_DEFAULTS,
 } from './editing-policy.js';
 export { createBuildingPlanInteraction, BUILDING_PLAN_ZOOM_LIMITS } from './interaction.js';
+export { placeBuildingPlanColumn, placeBuildingPlanOpening } from './element-placement.js';
+export { openingStretches as buildingPlanOpeningStretches } from './opening-stretches.js';
 export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,
