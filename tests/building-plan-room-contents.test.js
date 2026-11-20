@@ -109,3 +109,158 @@ test('an entry previewing its unchanged row (an empty batch): no refusal for a c
   const result = t.session.preview({ type: 'batch', operations: [], floorId: t.f.floorId });
   assert.deepEqual(result.issues || [], []);
 });
+
+// 4a-2 (2026-11-20): a free wall's line (today the face path it is drawn by) lies inside its
+// room's outline, touching allowed; the derived engine refuses any edit that breaks it, room edits
+// included, naming the wall.
+
+const freeWall = (t, vertices, roomId = t.room().id) =>
+  t.apply({ type: 'create_wall', roomId, vertices, values: {} });
+const freeFace = (t, room = t.room()) => room.faces.find((face) => face.freePath);
+const pathOf = (face) => face.freePath.map(({ x, y }) => [x, y]);
+
+test('a free wall drawn or moved out of its room: refused, naming it', () => {
+  const result = freeWall(example(), [
+    { x: 3, y: 1 },
+    { x: 7, y: 1 },
+  ]);
+  assert.notEqual(result.status, 'applied');
+  assert.deepEqual(codes(result), ['free_wall_outside_room']);
+  assert.equal(result.issues[0].message, 'Wall W9 would leave its room.');
+  assert.equal(result.issues[0].subject.type, 'room_face');
+  // Its end on the right face touches the outline: accepted.
+  const t = example();
+  assert.equal(
+    freeWall(t, [
+      { x: 3, y: 1 },
+      { x: 5, y: 1 },
+    ]).status,
+    'applied'
+  );
+  const face = freeFace(t);
+  const move = (vertices) =>
+    t.apply({ type: 'update_wall', wallId: face.wallId, faceId: face.id, vertices });
+  const moved = move([
+    { x: 4, y: 1 },
+    { x: 6, y: 1 },
+  ]);
+  assert.deepEqual(codes(moved), ['free_wall_outside_room']);
+  assert.equal(moved.issues[0].subject.id, face.id);
+  assert.equal(
+    move([
+      { x: 2, y: 1.5 },
+      { x: 4, y: 1.5 },
+    ]).status,
+    'applied'
+  );
+  assert.deepEqual(t.session.validate(), []);
+});
+
+test('a room face moved in past a free wall: refused; moved out, or the room moved: accepted', () => {
+  const t = example();
+  freeWall(t, [
+    { x: 3, y: 1 },
+    { x: 5, y: 1 },
+  ]);
+  const w2 = t.floor().walls.find((wall) => wall.autoLabel === 'W2');
+  const face = () => t.room().faces.find((entry) => entry.wallId === w2.id);
+  const inwards = t.apply({ type: 'resize_face', faceId: face().id, distance: -0.5 });
+  assert.deepEqual(codes(inwards), ['free_wall_outside_room']);
+  assert.equal(inwards.issues[0].message, 'Wall W9 would leave its room.');
+  // Outwards, the free wall stays where it was (following its wall is 4b).
+  assert.equal(
+    t.apply({ type: 'resize_face', faceId: face().id, distance: 0.3 }).status,
+    'applied'
+  );
+  assert.deepEqual(pathOf(freeFace(t)), [
+    [3, 1],
+    [5, 1],
+  ]);
+  // The whole room moved: the free wall goes with it.
+  const moved = t.apply({ type: 'move_room', roomId: t.room().id, delta: { x: 0, y: -1 } });
+  assert.equal(moved.status, 'applied');
+  assert.deepEqual(pathOf(freeFace(t)), [
+    [3, 0],
+    [5, 0],
+  ]);
+});
+
+test('an L-shaped room’s notch, a corner touched, a slanted face within 0.1 mm', () => {
+  const t = example();
+  const room = (x) => t.floor().rooms.find((entry) => entry.vertices[0].x === x);
+  const create = (vertices) => t.apply({ type: 'create_room', vertices, values: {} });
+  assert.equal(
+    create(
+      [
+        [12, 0],
+        [16, 0],
+        [16, 2],
+        [14, 2],
+        [14, 4],
+        [12, 4],
+      ].map(([x, y]) => ({ x, y }))
+    ).status,
+    'applied'
+  );
+  // Both ends inside, the line across the notch: refused. Through its corner: accepted.
+  const across = freeWall(
+    t,
+    [
+      { x: 13.5, y: 3.5 },
+      { x: 15.5, y: 1.5 },
+    ],
+    room(12).id
+  );
+  assert.deepEqual(codes(across), ['free_wall_outside_room']);
+  assert.equal(
+    freeWall(
+      t,
+      [
+        { x: 13, y: 3 },
+        { x: 15, y: 1 },
+      ],
+      room(12).id
+    ).status,
+    'applied'
+  );
+  // A slanted face from (22, 3) to (18, 4): an end on it, 0.05 mm past it, accepted; 2 mm, not.
+  assert.equal(
+    create(
+      [
+        [18, 0],
+        [22, 0],
+        [22, 3],
+        [18, 4],
+      ].map(([x, y]) => ({ x, y }))
+    ).status,
+    'applied'
+  );
+  const onFace = { x: 19.3, y: 3 + (22 - 19.3) / 4 };
+  const end = (dy) => [
+    { x: 19.3, y: 1 },
+    { ...onFace, y: onFace.y + dy },
+  ];
+  assert.deepEqual(codes(freeWall(t, end(0.002), room(18).id)), ['free_wall_outside_room']);
+  assert.equal(freeWall(t, end(0.00005), room(18).id).status, 'applied');
+});
+
+test('today’s engine, and an entry’s empty batch: no free wall rule', () => {
+  // Today's engine retires at the switch and gets no new rule; an entry previewing its unchanged
+  // row sends an empty batch, which runs there even on derived pages.
+  const old = example(false);
+  assert.equal(
+    freeWall(old, [
+      { x: 3, y: 1 },
+      { x: 7, y: 1 },
+    ]).status,
+    'applied'
+  );
+  const f = createBuildingPlanExample();
+  const derived = createBuildingPlanSession({
+    snapshot: old.session.getSnapshot(),
+    properties: f.meta.properties,
+    derivedCommands: true,
+  });
+  const result = derived.preview({ type: 'batch', operations: [], floorId: old.f.floorId });
+  assert.deepEqual(result.issues || [], []);
+});
