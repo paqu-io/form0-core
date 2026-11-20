@@ -192,32 +192,25 @@ export function buildingPlanOperationsForRow({
     const values = { ...element.values, ...plain };
     const bounds = roomBounds(room);
     const shape = { ...element, values };
+    // The position fields are geometry, not plain values: an edit without them (a typed width)
+    // keeps the element where it is.
+    const point = (uName, vName, current) =>
+      values[uName] == null || values[vName] == null
+        ? (current ?? null)
+        : {
+            x: bounds.x + values[uName] * bounds.width,
+            y: bounds.y + values[vName] * bounds.height,
+          };
     if (node.nodeKey === 'columns') {
-      shape.position =
-        values.column_center_u == null || values.column_center_v == null
-          ? null
-          : {
-              x: bounds.x + values.column_center_u * bounds.width,
-              y: bounds.y + values.column_center_v * bounds.height,
-            };
+      shape.position = point('column_center_u', 'column_center_v', element.position);
       shape.width = values.column_width;
       shape.height = values.column_depth;
       shape.rotation = values.column_rotation_deg ?? 0;
     } else if (node.nodeKey === 'beams') {
-      shape.start =
-        values.beam_start_u == null || values.beam_start_v == null
-          ? null
-          : {
-              x: bounds.x + values.beam_start_u * bounds.width,
-              y: bounds.y + values.beam_start_v * bounds.height,
-            };
-      shape.end =
-        values.beam_end_u == null || values.beam_end_v == null
-          ? null
-          : {
-              x: bounds.x + values.beam_end_u * bounds.width,
-              y: bounds.y + values.beam_end_v * bounds.height,
-            };
+      shape.start = point('beam_start_u', 'beam_start_v', element.start);
+      shape.end = point('beam_end_u', 'beam_end_v', element.end);
+      shape.width = values.beam_width;
+      shape.height = values.beam_depth;
     }
     commands.push({
       type: 'update_element',
