@@ -56,8 +56,8 @@ function viewOf(floor) {
         };
       })
   );
-  // The rooms' walls with their midlines, as the canvas snapshot has them (a column centred on
-  // one may stand out of it).
+  // The rooms' walls with their faces and midlines, as the canvas snapshot has them (a column
+  // may stand out of a wall it is centred on, or sits in flush with its interior face).
   const same = (point) => point;
   const walls = floor.rooms.flatMap((room) =>
     room.faces.map((face) => {
@@ -71,6 +71,7 @@ function viewOf(floor) {
         physicalWallId: face.wallId,
         isBoundary: !face.freePath,
         isCutPortion: Boolean(face.freePath?.some((point) => point.editingCutId)),
+        points: portions.flatMap((part, index) => (index ? [part.end] : [part.start, part.end])),
         axisPoints: physical ? buildingPlanFaceAxes(physical, portions, same) : [],
       };
     })

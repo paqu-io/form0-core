@@ -12,7 +12,7 @@ import {
  * rectangle square to the page, moved by its centre. Pulls, in order:
  *
  * 1. a corner into a corner (the room's, its walls', free walls' corners and ends, other columns',
- *    the jambs');
+ *    the jambs'), or its centre where wall midlines meet (a corner, a T-junction);
  * 2. per axis, a contact: a side flush with a line it is next to (the room's faces, its walls' far
  *    faces, free walls' sides, other columns' sides, the jambs), or its centre on one of its walls'
  *    midlines; on a slanted line, the nearest corner goes onto it;
@@ -102,6 +102,12 @@ function offers(centre, half, settings) {
       for (const corner of corners)
         if (distance(target, corner) <= tolerance(key))
           whole.push({ rank: 0, delta: subtract(target, corner), keys: [key], guides: [] });
+    });
+    // Its centre where wall midlines meet (a corner, a T-junction).
+    (targets.junctions || []).forEach((target, index) => {
+      const key = `junction:${index}`;
+      if (distance(target, centre) <= tolerance(key))
+        whole.push({ rank: 0, delta: subtract(target, centre), keys: [key], guides: [] });
     });
     targets.lines.forEach(([a, b], index) => {
       const key = `line:${index}`;

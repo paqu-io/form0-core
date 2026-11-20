@@ -14,14 +14,22 @@ const box = (x0, y0, x1, y1) => [
   { x: x1, y: y1 },
   { x: x0, y: y1 },
 ];
-const face = (id, axisPoints) => ({
-  id,
-  roomId: 'a',
-  isBoundary: true,
-  physicalWallId: `p-${id}`,
-  points: [],
-  axisPoints,
-});
+// A room wall: its interior face (the room's side) and its midline, 10 units out.
+const face = (id, axisPoints) => {
+  const [a, b] = axisPoints;
+  const inward = {
+    x: Math.sign(500 - a.x) * (a.x === b.x ? 10 : 0),
+    y: Math.sign(500 - a.y) * (a.y === b.y ? 10 : 0),
+  };
+  return {
+    id,
+    roomId: 'a',
+    isBoundary: true,
+    physicalWallId: `p-${id}`,
+    points: axisPoints.map((point) => ({ x: point.x + inward.x, y: point.y + inward.y })),
+    axisPoints,
+  };
+};
 const footprint = (id, ...polygons) => ({ id: `p-${id}`, roomIds: ['a'], polygons });
 const room = {
   id: 'a',
@@ -142,6 +150,21 @@ test('against a wall: flush inside, flush with the far face, centred where it fi
   assert.deepEqual(snap({ x: 1009, y: 500 }).centre, { x: 1010, y: 500 }, 'centred, wider');
   // A 20 cm column fits the wall exactly.
   assert.deepEqual(snap({ x: 1008, y: 500 }, { size: 20 }).centre, { x: 1010, y: 500 });
+  // In the wall, its room-side face flush with the wall's interior face: it stands out past the
+  // exterior face by the rest of its depth.
+  assert.deepEqual(snap({ x: 1013, y: 500 }).centre, { x: 1015, y: 500 }, 'interior face flush');
+});
+
+test('its centre where wall midlines meet: at a corner, standing out of both walls', () => {
+  const targets = columnTargets(viewWith(), { roomId: 'a', columnId: 'c' });
+  assert.deepEqual(targets.junctions.map(({ x, y }) => [Math.round(x), Math.round(y)]).sort(), [
+    [-10, -10],
+    [-10, 1010],
+    [1010, -10],
+    [1010, 1010],
+  ]);
+  assert.deepEqual(snap({ x: 1010.5, y: -10.5 }).centre, { x: 1010, y: -10 });
+  assert.deepEqual(snap({ x: 1011, y: -9 }, { size: 20 }).centre, { x: 1010, y: -10 });
 });
 
 test('a free wall holds a column: flush with either side, or centred on it', () => {
@@ -185,8 +208,9 @@ test('openings: beside a jamb yes, flush across the opening no', () => {
 });
 
 test('placing where it does not fit: the nearest place that does', () => {
-  // Out of reach of every pull (the midline included): the nearest place that fits.
-  assert.deepEqual(snap({ x: 1030, y: 500 }).centre, { x: 1005, y: 500 });
+  // Out of reach of every pull (the midline included): the nearest place that fits, in the wall
+  // with its room-side face flush with the interior face.
+  assert.deepEqual(snap({ x: 1030, y: 500 }).centre, { x: 1015, y: 500 });
   assert.equal(snap({ x: 5000, y: 5000 }).fits, false);
 });
 

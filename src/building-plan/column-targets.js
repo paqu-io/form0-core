@@ -1,4 +1,5 @@
 import { columnCorners, edgesOf, freeWallTargets } from './free-wall-targets.js';
+import { columnWallTargets } from './column-wall-targets.js';
 
 /**
  * What a column snaps to and where it may stand (`column-snapping.js`, unit 3 of the building plan
@@ -15,8 +16,6 @@ import { columnCorners, edgesOf, freeWallTargets } from './free-wall-targets.js'
  * an opening overlaps it (it would block it), one beside it touching a jamb doesn't.
  */
 const OPENING_REACH_M = 0.001;
-
-const segmentsOf = (points = []) => points.slice(1).map((point, index) => [points[index], point]);
 
 /** An opening's box across its wall, `reach` past both faces, from its axis and thickness. */
 function openingBox(opening, gridSize, reach) {
@@ -40,6 +39,8 @@ function openingBox(opening, gridSize, reach) {
  *   lines: object[][],
  *   midlines: object[][],
  *   straddles: object[][],
+ *   junctions: object[],
+ *   faces: Array<{ a: object, b: object, side: number }>,
  *   align: object[],
  *   centres: object[],
  *   rects: Array<{ minX: number, minY: number, maxX: number, maxY: number, id?: string }>,
@@ -53,9 +54,10 @@ function openingBox(opening, gridSize, reach) {
  * - `region`: the polygons it must stay inside (the room's outline, its walls' bodies);
  * - `points` (corners) and `lines` (sides): the free wall targets in the room, plus its walls'
  *   bodies (far faces, ends, corner pieces) and the doors' and windows' boxes (jambs);
- * - `midlines`: the midlines of its room's walls and free walls, for its centre;
- * - `straddles`: the midlines of the room's own walls, where a column centred on one may stand out
- *   of it on both sides (a column wider than its wall, 2026-11-20);
+ * - `midlines` and `junctions` (where midlines meet: corners, T-junctions), for its centre;
+ *   `straddles` (centred on one of the room's walls, it may stand out of it on both sides) and
+ *   `faces` (in a wall with its room-side face flush with the wall's interior face, it may stand
+ *   out past the exterior face): `column-wall-targets.js`;
  * - `align` (corners and ends anywhere on the floor) and `centres` (other columns' centres), to
  *   line up with;
  * - `rects` (other columns, with their ids) and `boxes` (openings, reaching just past their faces;
@@ -97,12 +99,7 @@ export function columnTargets(view, { roomId, columnId = null }) {
     region: [base.outline, ...bodies].filter((polygon) => polygon.length > 2),
     points: [...base.points, ...bodies.flat(), ...jambs.flat()],
     lines: [...base.lines, ...bodies.flatMap(edgesOf), ...jambs.flatMap(edgesOf)],
-    midlines: (view.walls || [])
-      .filter((wall) => wall.roomId === roomId)
-      .flatMap((wall) => segmentsOf(wall.axisPoints)),
-    straddles: (view.walls || [])
-      .filter((wall) => wall.roomId === roomId && (wall.isBoundary || wall.isCutPortion))
-      .flatMap((wall) => segmentsOf(wall.axisPoints)),
+    ...columnWallTargets(view, roomId),
     align: base.align,
     centres: placed.map(({ corners: [a, , c] }) => ({ x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 })),
     rects: placed.map(({ id, corners: [a, , c] }) => ({

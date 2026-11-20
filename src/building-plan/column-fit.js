@@ -126,12 +126,25 @@ function overlapsPolygon(rect, polygon, tolerance) {
   });
 }
 
+/** A strip along segment `a`-`b` (unit `tangent`), from `near` to `far` across it on the normal. */
+function strip(a, b, tangent, near, far, extend = 0) {
+  const normal = { x: -tangent.y, y: tangent.x };
+  const from = { x: a.x - tangent.x * extend, y: a.y - tangent.y * extend };
+  const to = { x: b.x + tangent.x * extend, y: b.y + tangent.y * extend };
+  const at = (point, offset) => ({
+    x: point.x + normal.x * offset,
+    y: point.y + normal.y * offset,
+  });
+  return [at(from, near), at(to, near), at(to, far), at(from, far)];
+}
+
 /**
- * Centred on one of its room's own walls, a column may stand out of it on both sides, into the
- * next room or outside, along the wall's length: the strip along that wall's midline reaching the
- * column's half size past it each side (a column wider than its wall, 2026-11-20).
+ * Where a column may stand out of its room and walls (2026-11-20): centred on one of its room's
+ * walls (its midline carried on to where it meets others), it may stand out on both sides, along
+ * the wall and past a junction it is centred on; in a wall with its room-side face flush with the
+ * wall's interior face, it may stand out past the wall's exterior face, along the wall.
  */
-function straddleStrips(centre, half, targets, tolerance) {
+function allowances(centre, half, rect, targets, tolerance) {
   const strips = [];
   for (const [a, b] of targets.straddles || []) {
     const length = distance(a, b);
@@ -145,14 +158,22 @@ function straddleStrips(centre, half, targets, tolerance) {
       along > length + tolerance
     )
       continue;
-    const reach = Math.abs(tangent.y) * half.x + Math.abs(tangent.x) * half.y + tolerance;
-    const normal = { x: -tangent.y * reach, y: tangent.x * reach };
-    strips.push([
-      { x: a.x + normal.x, y: a.y + normal.y },
-      { x: b.x + normal.x, y: b.y + normal.y },
-      { x: b.x - normal.x, y: b.y - normal.y },
-      { x: a.x - normal.x, y: a.y - normal.y },
-    ]);
+    const across = Math.abs(tangent.y) * half.x + Math.abs(tangent.x) * half.y + tolerance;
+    const lengthwise = Math.abs(tangent.x) * half.x + Math.abs(tangent.y) * half.y + tolerance;
+    strips.push(strip(a, b, tangent, -across, across, lengthwise));
+  }
+  const corners = rectCorners(rect);
+  for (const { a, b, side } of targets.faces || []) {
+    const length = distance(a, b);
+    if (!length) continue;
+    const tangent = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    // Offsets of the column's corners towards the wall's body.
+    const offsets = corners.map((corner) => side * cross(tangent, subtract(corner, a)));
+    const [low, high] = [Math.min(...offsets), Math.max(...offsets)];
+    const alongs = corners.map((corner) => dot(subtract(corner, a), tangent));
+    if (Math.abs(low) > tolerance || high <= tolerance) continue;
+    if (Math.max(...alongs) < -tolerance || Math.min(...alongs) > length + tolerance) continue;
+    strips.push(strip(a, b, tangent, -side * tolerance, side * (high + tolerance)));
   }
   return strips;
 }
@@ -175,7 +196,7 @@ export function columnClash(centre, half, targets, gridSize) {
     targets.region.length &&
     !rectInside(
       rect,
-      [...targets.region, ...straddleStrips(centre, half, targets, tolerance)],
+      [...targets.region, ...allowances(centre, half, rect, targets, tolerance)],
       tolerance
     )
   )

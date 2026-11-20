@@ -41,10 +41,16 @@ test('a column may stand in its room’s wall, up to the far face', () => {
   assert.deepEqual(validateBuildingPlanSnapshot(t.session.getSnapshot()), []);
 });
 
-test('past the far face: refused, naming the column', () => {
-  // Off the midline, a 30 cm column standing out of the wall is refused.
+test('standing out of a wall: centred on it, or flush with its interior face; else refused', () => {
+  const t = example();
+  // In W2, its room-side face on the wall's interior face (x 5): 10 cm past the exterior face.
+  assert.equal(t.column(5.15, 1.5).status, 'applied');
+  // Centred where W1's and W2's midlines meet, a 30 cm column stands out of both.
+  assert.equal(t.column(5.1, -0.1).status, 'applied');
+  // Off the midline, partly in the room: refused.
   assert.equal(example().column(5.12, 1.5).issues[0].code, 'column_outside_room');
-  const result = example().column(5.15, 1.5);
+  // In the wall but not flush with its interior face: refused, naming the column.
+  const result = example().column(5.18, 1.5);
   assert.notEqual(result.status, 'applied');
   assert.deepEqual(codes(result), ['column_outside_room']);
   assert.equal(result.issues[0].message, 'Column C#1 would leave its room.');
