@@ -20,6 +20,13 @@ import {
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
+import {
+  freeWallCutPoints,
+  freeWallSideDistance,
+  newFreeWallFace,
+  newFreeWallWidth,
+  offsetLine,
+} from './free-wall-lines.js';
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
@@ -77,6 +84,7 @@ export function buildingPlanCanvasSnapshot({
     const roomRows = floorRow.repeatable[key(meta, 'rooms')] || [];
     for (const room of floor.rooms) {
       const cuts = new Set();
+      const onCentreline = freeWallCutPoints(floor, room);
       for (const point of [
         ...room.vertices,
         ...room.faces.flatMap((face) => face.freePath || []),
@@ -95,7 +103,12 @@ export function buildingPlanCanvasSnapshot({
         const token = `${marker}:${point.x}:${point.y}`;
         if (!marker || (!point.editingCutId && !automatic) || cuts.has(token)) continue;
         cuts.add(token);
-        output.editingCuts.push({ id: marker, automatic, roomId: room.id, point: pixels(point) });
+        output.editingCuts.push({
+          id: marker,
+          automatic,
+          roomId: room.id,
+          point: pixels(onCentreline.get(point.id) || point),
+        });
       }
       const roomIndex = roomRows.findIndex((row) => subjectId(meta, 'rooms', row) === room.id);
       const roomRow = roomRows[roomIndex];
@@ -151,6 +164,7 @@ export function buildingPlanCanvasSnapshot({
         const points = portions.flatMap((part, i) =>
           i ? [pixels(part.end)] : [pixels(part.start), pixels(part.end)]
         );
+        const axisPoints = buildingPlanFaceAxes(physical, portions, pixels);
         const wall = {
           id: face.id,
           physicalWallId: physical.id,
@@ -163,8 +177,9 @@ export function buildingPlanCanvasSnapshot({
           floorIndex,
           index: faceIndex,
           path: wallPath,
-          points,
-          axisPoints: buildingPlanFaceAxes(physical, portions, pixels),
+          // A free wall is given by its centreline (4a-3); `sidePoints` is its row's face.
+          ...(face.freePath ? { points: axisPoints, sidePoints: points } : { points }),
+          axisPoints,
           bindings: copy(face.bindings),
           doors: [],
           windows: [],
@@ -691,12 +706,18 @@ export class BuildingPlanCanvasController {
           },
         };
   }
+  /** A free wall drawn by its centreline (4a-3): the row keeps the face it lies along. */
   createWall(roomId, points) {
+    const floor = this.session?.getSnapshot().floors.find((entry) => entry.id === this.floorId);
+    const width = newFreeWallWidth(floor, roomId, this.meta.properties);
     return this.apply({
       type: 'create_wall',
       floorId: this.floorId,
       roomId,
-      vertices: points.map((p) => this.metric(p)),
+      vertices: newFreeWallFace(
+        points.map((p) => this.metric(p)),
+        width
+      ),
     });
   }
   getCornerPlacement(point, { roomId, preferredRoomId, zoom = 1 } = {}) {
@@ -781,13 +802,20 @@ export class BuildingPlanCanvasController {
     const floor = this.session.getSnapshot().floors.find((entry) => entry.id === this.floorId);
     const room = floor.rooms.find((entry) => entry.id === info.roomId);
     const face = room.faces.find((entry) => entry.id === id);
+    // A free wall moves by its centreline (4a-3); its row's face keeps its side and distance.
     if (face.freePath)
       return {
         type: 'update_wall',
         faceId: id,
         floorId: floor.id,
         wallId: face.wallId,
-        vertices: points.map((p) => this.metric(p)),
+        vertices: offsetLine(
+          points.map((p) => this.metric(p)),
+          freeWallSideDistance(
+            info.points.map((p) => this.metric(p)),
+            info.sidePoints?.map((p) => this.metric(p))
+          )
+        ),
       };
     const binding = face.bindings[0];
     const old = segmentFrame(this.metric(info.points[0]), this.metric(info.points[1]));

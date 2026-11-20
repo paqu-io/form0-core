@@ -1,6 +1,7 @@
 import { columnTargets } from './column-targets.js';
 import { snapColumn } from './column-snapping.js';
 import { bindingScale, openingStretches, segmentFrame } from './opening-stretches.js';
+import { freeWallSideDistance } from './free-wall-lines.js';
 
 /**
  * Adding a column, door or window by "select, then add" (3b of the building plan UI round,
@@ -128,11 +129,17 @@ function againstWall(view, wall, mark, half) {
     ? [Math.min(...offsets, 0), Math.max(...offsets, 0)]
     : [0, thickness];
   let side;
-  if (wall.isBoundary || wall.isCutPortion) {
-    // The room is on the face's other side from the wall's body.
+  if (!wall.sidePoints && (wall.isBoundary || wall.isCutPortion)) {
+    // The room is on the face's other side from the wall's body (a free wall, Split or not, comes
+    // by its centreline with `sidePoints`, 4a-3: the nearer side of its body, below).
     side = Math.abs(high) > Math.abs(low) ? { offset: 0, sign: -1 } : { offset: 0, sign: 1 };
   } else {
-    const at = offsetOf(mark);
+    // A free wall comes by its centreline (4a-3): a mark on it goes to the row's own side.
+    const offset = offsetOf(mark);
+    const at =
+      Math.abs(offset) > 1e-6
+        ? offset
+        : freeWallSideDistance(wall.points, wall.sidePoints) || offset;
     side =
       Math.abs(at - low) <= Math.abs(at - high)
         ? { offset: low, sign: -1 }

@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBuildingPlanSession, validateBuildingPlanSnapshot } from '../src/index.js';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
+import {
+  faceCentreline,
+  newFreeWallFace,
+  newFreeWallWidth,
+} from '../src/building-plan/free-wall-lines.js';
 
 // 4a-1 (2026-11-20): a column lies inside its room plus the room's own walls, and may touch but
 // not overlap another column, a door or a window; the derived engine refuses any edit that breaks
@@ -110,14 +115,20 @@ test('an entry previewing its unchanged row (an empty batch): no refusal for a c
   assert.deepEqual(result.issues || [], []);
 });
 
-// 4a-2 (2026-11-20): a free wall's line (today the face path it is drawn by) lies inside its
+// 4a-2 (2026-11-20): a free wall's centreline (since 4a-3; its drawn face before) lies inside its
 // room's outline, touching allowed; the derived engine refuses any edit that breaks it, room edits
-// included, naming the wall.
+// included, naming the wall. The walls here are given by their centreline, as the canvas draws
+// them; the operations take the face, half the wall's width (20 cm here) to the centreline's left.
 
-const freeWall = (t, vertices, roomId = t.room().id) =>
-  t.apply({ type: 'create_wall', roomId, vertices, values: {} });
+const faceOf = (t, centreline, roomId) =>
+  newFreeWallFace(centreline, newFreeWallWidth(t.floor(), roomId, t.f.meta.properties));
+const freeWall = (t, centreline, roomId = t.room().id) =>
+  t.apply({ type: 'create_wall', roomId, vertices: faceOf(t, centreline, roomId), values: {} });
 const freeFace = (t, room = t.room()) => room.faces.find((face) => face.freePath);
-const pathOf = (face) => face.freePath.map(({ x, y }) => [x, y]);
+const centrelineOf = (t) =>
+  faceCentreline(t.floor(), t.room(), freeFace(t)).map(({ x, y }) =>
+    [x, y].map((value) => Math.round(value * 1e6) / 1e6)
+  );
 
 test('a free wall drawn or moved out of its room: refused, naming it', () => {
   const result = freeWall(example(), [
@@ -138,8 +149,13 @@ test('a free wall drawn or moved out of its room: refused, naming it', () => {
     'applied'
   );
   const face = freeFace(t);
-  const move = (vertices) =>
-    t.apply({ type: 'update_wall', wallId: face.wallId, faceId: face.id, vertices });
+  const move = (centreline) =>
+    t.apply({
+      type: 'update_wall',
+      wallId: face.wallId,
+      faceId: face.id,
+      vertices: faceOf(t, centreline, t.room().id),
+    });
   const moved = move([
     { x: 4, y: 1 },
     { x: 6, y: 1 },
@@ -172,14 +188,14 @@ test('a room face moved in past a free wall: refused; moved out, or the room mov
     t.apply({ type: 'resize_face', faceId: face().id, distance: 0.3 }).status,
     'applied'
   );
-  assert.deepEqual(pathOf(freeFace(t)), [
+  assert.deepEqual(centrelineOf(t), [
     [3, 1],
     [5, 1],
   ]);
   // The whole room moved: the free wall goes with it.
   const moved = t.apply({ type: 'move_room', roomId: t.room().id, delta: { x: 0, y: -1 } });
   assert.equal(moved.status, 'applied');
-  assert.deepEqual(pathOf(freeFace(t)), [
+  assert.deepEqual(centrelineOf(t), [
     [3, 0],
     [5, 0],
   ]);

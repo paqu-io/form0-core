@@ -19,6 +19,7 @@ export {
 export { createBuildingPlanInteraction, BUILDING_PLAN_ZOOM_LIMITS } from './interaction.js';
 export { placeBuildingPlanColumn, placeBuildingPlanOpening } from './element-placement.js';
 export { openingStretches as buildingPlanOpeningStretches } from './opening-stretches.js';
+export { freeWallSideLine as buildingPlanFreeWallSide } from './free-wall-lines.js';
 export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,

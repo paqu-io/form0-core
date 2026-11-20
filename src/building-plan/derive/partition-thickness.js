@@ -17,7 +17,8 @@ function crossing(p, u, q, v) {
 }
 
 /**
- * J5: under `midline` a partition whose thickness changes keeps its axis, so its path (the face)
+ * J5: a partition whose thickness changes keeps its axis (whatever the anchor since 4a-3: free
+ * walls are drawn by their centreline), so its path (the face)
  * moves by half the change away from its body. Runs meeting at a point (the runs of a drawn
  * polyline, a Split portion and its return) stay joined: the point goes to where their lines,
  * moved or not, now cross; parallel runs moved alike stay joined by moving alike.

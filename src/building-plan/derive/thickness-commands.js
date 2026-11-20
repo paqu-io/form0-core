@@ -148,8 +148,9 @@ export function changeThickness(primary, before, operation, { createId, specific
   const all = primary.rooms.map((room) => room.id);
   const derived = deriveBuildingPlanPieces(before, specifications);
   const { moving, staying } = plannedStretches(primary, derived, operation, specifications);
-  // J5: under midline a partition's face moves by half the change; under room_face it holds.
-  if (operation.thicknessAnchor === 'midline') shiftPartitions(primary, before, specifications);
+  // J5: a free wall keeps its centreline whatever the anchor, since it is drawn by it (4a-3,
+  // 2026-11-20): its face moves by half the change.
+  shiftPartitions(primary, before, specifications);
   if (!moving.length) return { result: { carvedRoomIds: [] }, preferredRoomIds: all };
   prepareEnds(derived, [...moving, ...staying]);
   // Ends paired at the current width; jogs keep clear of the wall at its new width.

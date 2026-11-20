@@ -12,13 +12,14 @@ import {
 import { buildingPlanFaceSegments, planIssue } from './model.js';
 import { columnTargets } from './column-targets.js';
 import { columnClash } from './column-fit.js';
+import { faceCentreline } from './free-wall-lines.js';
 
 /**
  * What a room holds stays where it may (the room contents rules, 2026-11-19; 4a-1 for columns,
  * 2026-11-20; 4a-2 for free walls). A column lies inside its room plus the room's own walls (it
  * may stand in them: flush inside, centred on a wall's midline, flush with its far face) and may
- * touch, but not overlap, another column, a door or a window. A free wall's line lies inside its
- * room's outline, its ends and sides allowed to touch it. Checked on the derived engine's edits,
+ * touch, but not overlap, another column, a door or a window. A free wall's centreline lies inside
+ * its room's outline, touching it allowed. Checked on the derived engine's edits,
  * whatever the edit (an element moved or resized, a wall moved or thinned, a room reshaped, an
  * opening moved onto a column); records that break it still read.
  */
@@ -204,8 +205,7 @@ function segmentInside(a, b, vertices) {
 /**
  * The free walls of `floor` whose line leaves their room's outline, one issue per row (a wall
  * drawn with turns has a row per straight run, W9 and W9.1, each named). The line is the one the
- * wall is drawn by: today its stored face path, the line the canvas keeps inside (4a-2, D1; it
- * becomes the centreline when free walls are drawn by it, 4a-3).
+ * wall is drawn by and the canvas keeps inside: its centreline (4a-3; its stored face before).
  * @param {object} floor the edited floor
  * @returns {object[]} issues
  */
@@ -214,8 +214,9 @@ export function freeWallPlacementIssues(floor) {
   for (const room of floor.rooms) {
     if (!(room.vertices?.length >= 3)) continue;
     for (const face of room.faces || []) {
-      const path = face.freePath;
-      if (!path?.length) continue;
+      if (!face.freePath?.length) continue;
+      const path = faceCentreline(floor, room, face);
+      if (!path.length) continue;
       if (
         path.every((point, index) => !index || segmentInside(path[index - 1], point, room.vertices))
       )
