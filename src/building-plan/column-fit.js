@@ -127,23 +127,68 @@ function overlapsPolygon(rect, polygon, tolerance) {
 }
 
 /**
- * Whether a column centred at `centre` (`half` its half sizes) fits: its centre where core wants
- * it, inside the region, clear of other columns and of openings.
+ * Centred on one of its room's own walls, a column may stand out of it on both sides, into the
+ * next room or outside, along the wall's length: the strip along that wall's midline reaching the
+ * column's half size past it each side (a column wider than its wall, 2026-11-20).
+ */
+function straddleStrips(centre, half, targets, tolerance) {
+  const strips = [];
+  for (const [a, b] of targets.straddles || []) {
+    const length = distance(a, b);
+    if (!length) continue;
+    const tangent = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    const offset = subtract(centre, a);
+    const along = dot(offset, tangent);
+    if (
+      Math.abs(cross(tangent, offset)) > tolerance ||
+      along < -tolerance ||
+      along > length + tolerance
+    )
+      continue;
+    const reach = Math.abs(tangent.y) * half.x + Math.abs(tangent.x) * half.y + tolerance;
+    const normal = { x: -tangent.y * reach, y: tangent.x * reach };
+    strips.push([
+      { x: a.x + normal.x, y: a.y + normal.y },
+      { x: b.x + normal.x, y: b.y + normal.y },
+      { x: b.x - normal.x, y: b.y - normal.y },
+      { x: a.x - normal.x, y: a.y - normal.y },
+    ]);
+  }
+  return strips;
+}
+
+/**
+ * What a column centred at `centre` (`half` its half sizes) runs into: out of its region (its
+ * room and the room's walls), another column, or an opening; null when it fits. Core refuses an
+ * edit with it (`room-contents.js`), the canvas snapping skips such a place.
  * @param {{ x: number, y: number }} centre
  * @param {{ x: number, y: number }} half
  * @param {import('./column-targets.js').ColumnTargets} targets
  * @param {number} gridSize
+ * @returns {{ kind: 'outside' } | { kind: 'column', id?: string } | { kind: 'opening', id?: string }
+ *   | null}
  */
-export function columnFits(centre, half, targets, gridSize) {
+export function columnClash(centre, half, targets, gridSize) {
   const tolerance = COLUMN_TOUCH_M * gridSize;
-  // Core's rule today: the centre in the room (to its own precision, a micrometre).
-  if (targets.centreRegion?.length > 2 && !inPolygon(centre, targets.centreRegion, 1e-6 * gridSize))
-    return false;
   const rect = columnRect(centre, half);
-  if (targets.region.length && !rectInside(rect, targets.region, tolerance)) return false;
-  if (targets.rects.some((other) => rectsOverlap(rect, other, tolerance))) return false;
-  return !targets.boxes.some((box) => overlapsPolygon(rect, box, tolerance));
+  if (
+    targets.region.length &&
+    !rectInside(
+      rect,
+      [...targets.region, ...straddleStrips(centre, half, targets, tolerance)],
+      tolerance
+    )
+  )
+    return { kind: 'outside' };
+  const column = targets.rects.find((other) => rectsOverlap(rect, other, tolerance));
+  if (column) return { kind: 'column', id: column.id };
+  const index = targets.boxes.findIndex((box) => overlapsPolygon(rect, box, tolerance));
+  return index >= 0 ? { kind: 'opening', id: targets.boxIds?.[index] } : null;
 }
+
+/** Whether a column centred at `centre` fits (`columnClash` finds nothing). */
+export const columnFits = (centre, half, targets, gridSize) =>
+  !columnClash(centre, half, targets, gridSize);
 
 /** The farthest point from `from` (which fits) towards `to` that still fits. */
 function reach(from, to, fits) {

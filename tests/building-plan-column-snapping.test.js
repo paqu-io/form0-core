@@ -118,7 +118,8 @@ test('targets: the room and its walls as the region, the moved column left out',
   const targets = columnTargets(viewWith([column('d', 600, 500)]), { roomId: 'a', columnId: 'c' });
   assert.equal(targets.region.length, 1 + 8);
   assert.equal(targets.midlines.length, 4);
-  assert.deepEqual(targets.rects, [{ minX: 585, minY: 485, maxX: 615, maxY: 515 }]);
+  assert.deepEqual(targets.rects, [{ minX: 585, minY: 485, maxX: 615, maxY: 515, id: 'd' }]);
+  assert.deepEqual(targets.boxIds, ['door']);
   assert.deepEqual(targets.centres, [{ x: 600, y: 500 }]);
   // The door's box reaches a tenth of a millimetre past both faces.
   assert.deepEqual(
@@ -133,15 +134,14 @@ test('nothing near: its sides on the 1 cm step', () => {
   assert.deepEqual(snap({ x: 503.4, y: 497.6 }).centre, { x: 503, y: 498 });
 });
 
-test('against a wall: flush inside; in the wall only while its centre stays in the room', () => {
+test('against a wall: flush inside, flush with the far face, centred where it fits', () => {
   assert.deepEqual(snap({ x: 980, y: 500 }).centre, { x: 985, y: 500 }, 'flush inside');
-  // Flush with the far face, a 30 cm column in a 20 cm wall has its centre in the wall: core
-  // refuses that until 4a, so it goes flush inside.
-  assert.deepEqual(snap({ x: 1003, y: 500 }).centre, { x: 985, y: 500 });
-  // A 50 cm column is deep enough to be flush with the far face.
-  assert.deepEqual(snap({ x: 997, y: 500 }, { size: 50 }).centre, { x: 995, y: 500 }, 'far face');
-  // Centred on the midline, the centre is in the wall: not offered yet.
-  assert.notEqual(snap({ x: 1008, y: 500 }, { size: 20 }).centre.x, 1010);
+  // A 30 cm column in a 20 cm wall: 10 cm in the room, its centre in the wall.
+  assert.deepEqual(snap({ x: 1003, y: 500 }).centre, { x: 1005, y: 500 }, 'far face');
+  // Centred, a 30 cm column stands out of a 20 cm wall on both sides: allowed when centred.
+  assert.deepEqual(snap({ x: 1009, y: 500 }).centre, { x: 1010, y: 500 }, 'centred, wider');
+  // A 20 cm column fits the wall exactly.
+  assert.deepEqual(snap({ x: 1008, y: 500 }, { size: 20 }).centre, { x: 1010, y: 500 });
 });
 
 test('a free wall holds a column: flush with either side, or centred on it', () => {
@@ -153,16 +153,14 @@ test('a free wall holds a column: flush with either side, or centred on it', () 
 
 test('a corner into a corner', () => {
   assert.deepEqual(snap({ x: 20, y: 18 }).centre, { x: 15, y: 15 }, "the room's corner");
-  // A 50 cm column flush with the far faces of both walls: into the corner piece.
-  assert.deepEqual(snap({ x: 997, y: 996 }, { size: 50 }).centre, { x: 995, y: 995 });
+  // Flush with the far faces of both walls: into the corner piece.
+  assert.deepEqual(snap({ x: 1003, y: 1004 }).centre, { x: 1005, y: 1005 });
 });
 
-test('a drag stops where the column would leave: its centre on the face, for now', () => {
+test('a drag stops where the column would leave the room and its walls', () => {
   const result = snap({ x: 1100, y: 500 }, { from: { x: 500, y: 500 } });
-  assert.deepEqual(result.centre, { x: 1000, y: 500 });
+  assert.deepEqual(result.centre, { x: 1005, y: 500 });
   assert.equal(result.fits, true);
-  const deep = snap({ x: 1100, y: 500 }, { from: { x: 500, y: 500 }, size: 50 });
-  assert.deepEqual(deep.centre, { x: 995, y: 500 }, 'a deep one stops at the far face');
 });
 
 test('columns may touch but not overlap', () => {
@@ -187,7 +185,8 @@ test('openings: beside a jamb yes, flush across the opening no', () => {
 });
 
 test('placing where it does not fit: the nearest place that does', () => {
-  assert.deepEqual(snap({ x: 1015, y: 500 }).centre, { x: 985, y: 500 });
+  // Out of reach of every pull (the midline included): the nearest place that fits.
+  assert.deepEqual(snap({ x: 1030, y: 500 }).centre, { x: 1005, y: 500 });
   assert.equal(snap({ x: 5000, y: 5000 }).fits, false);
 });
 
@@ -202,7 +201,7 @@ test('free (Alt): no pulls, still the step and the room', () => {
   assert.deepEqual(snap({ x: 980.4, y: 500 }, { free: true }).centre, { x: 980, y: 500 });
   assert.deepEqual(
     snap({ x: 1100, y: 500 }, { free: true, from: { x: 500, y: 500 } }).centre.x,
-    1000
+    1005
   );
 });
 

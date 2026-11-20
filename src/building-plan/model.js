@@ -604,10 +604,14 @@ function validateSnapshot(snapshot) {
         for (const item of room[kind] || []) {
           register({ columns: 'column', beams: 'beam', objects: 'object' }[kind], item);
           const points = [item.position, item.start, item.end].filter((point) => point != null);
+          // A column may stand in its room's walls (4a-1, 2026-11-20): where it may stand is
+          // checked on the derived engine's edits (`room-contents.js`), so a record holding one
+          // still reads. Today's engine has no rule of its own for it: it also checks edits the
+          // derived engine leaves to it (an unchanged row's empty batch) on derived pages.
+          const inside = (point) =>
+            kind === 'columns' || problem || pointInPolygon(point, room.vertices);
           if (
-            points.some(
-              (point) => !isPoint(point) || (!problem && !pointInPolygon(point, room.vertices))
-            ) ||
+            points.some((point) => !isPoint(point) || !inside(point)) ||
             (item.start && item.end && distance(item.start, item.end) <= EPS) ||
             ['width', 'height'].some(
               (key) => item[key] != null && (!Number.isFinite(item[key]) || item[key] <= 0)

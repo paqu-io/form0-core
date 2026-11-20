@@ -1,5 +1,6 @@
 import { buildingPlanPinIssues } from '../corner-edits.js';
 import { buildingPlanBoundaryClearanceIssues } from '../footprints.js';
+import { columnPlacementIssues } from '../room-contents.js';
 import { findBuildingPlanFloor } from '../model.js';
 import { extractBuildingPlanPrimary } from './extract.js';
 import { deriveBuildingPlanPrimary } from './index.js';
@@ -154,7 +155,8 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
 /**
  * Split the write-back's issues as today's reconciliation does: conflicting room defaults become
  * a question; any other issue refuses the edit. Pins and wall clearance are checked as today; a
- * face or corner drag must not leave a slit against the room's own wall (Q5).
+ * face or corner drag must not leave a slit against the room's own wall (Q5); columns stay where
+ * they may (`room-contents.js`).
  */
 export function derivedCandidateIssues(before, candidate, operation, writeIssues) {
   const defaultConflicts = writeIssues.filter(
@@ -177,6 +179,13 @@ export function derivedCandidateIssues(before, candidate, operation, writeIssues
       ...buildingPlanPinIssues(before, candidate, operation.pinnedFaceIds),
       ...floors.flatMap((floor) => buildingPlanBoundaryClearanceIssues(floor)),
       ...selfFacing,
+      // Columns stay in their room and its walls, clear of each other and of openings (4a-1).
+      ...floors.flatMap((floor) =>
+        columnPlacementIssues(
+          floor,
+          before.floors.find((entry) => entry.id === floor.id)
+        )
+      ),
     ],
   };
 }

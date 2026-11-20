@@ -36,31 +36,30 @@ function openingBox(opening, gridSize, reach) {
 /**
  * @typedef {{
  *   region: object[][],
- *   centreRegion: object[],
  *   points: object[],
  *   lines: object[][],
  *   midlines: object[][],
+ *   straddles: object[][],
  *   align: object[],
  *   centres: object[],
- *   rects: Array<{ minX: number, minY: number, maxX: number, maxY: number }>,
+ *   rects: Array<{ minX: number, minY: number, maxX: number, maxY: number, id?: string }>,
  *   boxes: object[][],
+ *   boxIds: Array<string | undefined>,
  * }} ColumnTargets
  */
 
 /**
  * What a column in `roomId` is pulled to and kept clear of:
  * - `region`: the polygons it must stay inside (the room's outline, its walls' bodies);
- * - `centreRegion`: where its centre must be, core's rule for room elements today (`model.js`,
- *   `invalid_room_element`: inside the room's outline). Until core takes the region above as its
- *   rule for columns (4a, decided 2026-11-20), a column stands in a wall only as far as its centre
- *   stays in the room;
  * - `points` (corners) and `lines` (sides): the free wall targets in the room, plus its walls'
  *   bodies (far faces, ends, corner pieces) and the doors' and windows' boxes (jambs);
  * - `midlines`: the midlines of its room's walls and free walls, for its centre;
+ * - `straddles`: the midlines of the room's own walls, where a column centred on one may stand out
+ *   of it on both sides (a column wider than its wall, 2026-11-20);
  * - `align` (corners and ends anywhere on the floor) and `centres` (other columns' centres), to
  *   line up with;
- * - `rects` (other columns) and `boxes` (openings, reaching just past their faces): what it may
- *   touch but not overlap.
+ * - `rects` (other columns, with their ids) and `boxes` (openings, reaching just past their faces;
+ *   their ids in `boxIds`): what it may touch but not overlap.
  * @param {object} view the canvas snapshot, with `gridSize`
  * @param {{ roomId: string, columnId?: string | null }} options `columnId`: the column being moved
  * @returns {ColumnTargets}
@@ -77,31 +76,43 @@ export function columnTargets(view, { roomId, columnId = null }) {
   const others = (view.columns || []).filter(
     (column) => columnId == null || column.id !== columnId
   );
-  const corners = others.map((column) =>
-    columnCorners(
-      column,
-      rooms.find((room) => room.id === column.roomId),
-      gridSize
-    )
-  );
+  const placed = others
+    .map((column) => ({
+      id: column.id,
+      corners: columnCorners(
+        column,
+        rooms.find((room) => room.id === column.roomId),
+        gridSize
+      ),
+    }))
+    .filter((column) => column.corners.length === 4);
+  const boxed = openings
+    .map((opening) => ({
+      id: opening.id,
+      box: openingBox(opening, gridSize, OPENING_REACH_M * gridSize),
+    }))
+    .filter((opening) => opening.box);
   const jambs = openings.map((opening) => opening.polygon || []).filter((box) => box.length > 2);
   return {
     region: [base.outline, ...bodies].filter((polygon) => polygon.length > 2),
     points: [...base.points, ...bodies.flat(), ...jambs.flat()],
-    centreRegion: base.outline,
     lines: [...base.lines, ...bodies.flatMap(edgesOf), ...jambs.flatMap(edgesOf)],
     midlines: (view.walls || [])
       .filter((wall) => wall.roomId === roomId)
       .flatMap((wall) => segmentsOf(wall.axisPoints)),
+    straddles: (view.walls || [])
+      .filter((wall) => wall.roomId === roomId && (wall.isBoundary || wall.isCutPortion))
+      .flatMap((wall) => segmentsOf(wall.axisPoints)),
     align: base.align,
-    centres: corners
-      .filter((points) => points.length === 4)
-      .map(([a, , c]) => ({ x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 })),
-    rects: corners
-      .filter((points) => points.length === 4)
-      .map(([a, , c]) => ({ minX: a.x, minY: a.y, maxX: c.x, maxY: c.y })),
-    boxes: openings
-      .map((opening) => openingBox(opening, gridSize, OPENING_REACH_M * gridSize))
-      .filter(Boolean),
+    centres: placed.map(({ corners: [a, , c] }) => ({ x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 })),
+    rects: placed.map(({ id, corners: [a, , c] }) => ({
+      minX: a.x,
+      minY: a.y,
+      maxX: c.x,
+      maxY: c.y,
+      id,
+    })),
+    boxes: boxed.map((opening) => opening.box),
+    boxIds: boxed.map((opening) => opening.id),
   };
 }
