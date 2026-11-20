@@ -65,8 +65,10 @@ test('names carry no unit and labels follow the measure and the measurement syst
     const label = (node, name) => presentation.field(field(node, name)).label;
     assert.equal(label('walls', 'wall_height'), `Height [${length}]`);
     assert.equal(label('walls', 'wall_thickness'), `Thickness [${thickness}]`);
-    assert.equal(label('beams', 'beam_depth'), `Depth [${length}]`);
-    assert.equal(label('columns', 'column_width'), `Width [${length}]`);
+    assert.equal(label('beams', 'beam_depth'), `Depth [${thickness}]`);
+    assert.equal(label('columns', 'column_width'), `Width [${thickness}]`);
+    assert.equal(label('columns', 'column_height'), `Height [${length}]`);
+    assert.equal(label('beams', 'beam_length'), `Length [${length}]`);
   }
 });
 

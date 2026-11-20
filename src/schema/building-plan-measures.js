@@ -25,11 +25,12 @@ export const BUILDING_PLAN_MEASURES = Object.freeze({
   window_height: 'length',
   window_distance_from_floor: 'length',
   window_offset: 'length',
-  column_width: 'length',
-  column_depth: 'length',
+  // A column's and a beam's cross-section in mm or in, like a wall's thickness (2026-11-20).
+  column_width: 'thickness',
+  column_depth: 'thickness',
   column_height: 'length',
-  beam_width: 'length',
-  beam_depth: 'length',
+  beam_width: 'thickness',
+  beam_depth: 'thickness',
   beam_length: 'length',
 });
 
