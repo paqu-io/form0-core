@@ -201,7 +201,7 @@ test('a room face moved in past a free wall: refused; moved out, or the room mov
   ]);
 });
 
-test('an L-shaped room’s notch, a corner touched, a slanted face within 0.1 mm', () => {
+test('an L-shaped room’s notch and corner, a slanted face within 0.1 mm', () => {
   const t = example();
   const room = (x) => t.floor().rooms.find((entry) => entry.vertices[0].x === x);
   const create = (vertices) => t.apply({ type: 'create_room', vertices, values: {} });
@@ -218,7 +218,8 @@ test('an L-shaped room’s notch, a corner touched, a slanted face within 0.1 mm
     ).status,
     'applied'
   );
-  // Both ends inside, the line across the notch: refused. Through its corner: accepted.
+  // Both ends inside, the line across the notch: refused. Its centreline through the notch's
+  // corner: its body cuts the corner, refused (4a-3b); beside it, its body clear: accepted.
   const across = freeWall(
     t,
     [
@@ -228,12 +229,21 @@ test('an L-shaped room’s notch, a corner touched, a slanted face within 0.1 mm
     room(12).id
   );
   assert.deepEqual(codes(across), ['free_wall_outside_room']);
+  const corner = freeWall(
+    t,
+    [
+      { x: 13, y: 3 },
+      { x: 15, y: 1 },
+    ],
+    room(12).id
+  );
+  assert.deepEqual(codes(corner), ['free_wall_outside_room']);
   assert.equal(
     freeWall(
       t,
       [
-        { x: 13, y: 3 },
-        { x: 15, y: 1 },
+        { x: 13, y: 2.85 },
+        { x: 15, y: 0.85 },
       ],
       room(12).id
     ).status,

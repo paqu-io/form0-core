@@ -7,6 +7,8 @@ import {
   subtract,
 } from './geometry.js';
 import { edgesOf } from './free-wall-targets.js';
+import { TOUCH_M, freeWallFits } from './free-wall-body.js';
+import { holdFreeWallMove, settleFreeWallEnd } from './free-wall-hold.js';
 
 /**
  * Snapping for free walls, the walls that stand in a room (2026-11-19, web UI round). A free
@@ -18,7 +20,7 @@ import { edgesOf } from './free-wall-targets.js';
  *   columns' corners), a line (the room's faces, other free walls' sides, columns' sides), lining
  *   up with corners and ends anywhere on the floor (a dashed guide), else the 1 cm step;
  * - a free wall never leaves its room: an end stops on the room's outline, a moved wall stops
- *   where it would leave it.
+ *   where it would leave it; with `half` (its half-thickness), its body neither (4a-3b).
  *
  * Pure functions in canvas units; the interaction helper holds what was caught between calls
  * (`tolerance(key)` is larger for a key it holds) and shows the guides.
@@ -119,7 +121,7 @@ function onStep(point, outline, round) {
  */
 export function snapFreeWallEnd(
   point,
-  { from = null, targets, gridSize, tolerance, free = false }
+  { from = null, targets, gridSize, tolerance, free = false, half = 0, last = null }
 ) {
   const step = STEP_M * gridSize;
   const round = (value) => Math.round(value / step) * step;
@@ -188,7 +190,13 @@ export function snapFreeWallEnd(
       }
   }
   const kept = keepInside(result, from, targets.outline);
-  return { point: kept === result ? result : onStep(kept, targets.outline, round), guides, keys };
+  const stepped = kept === result ? result : onStep(kept, targets.outline, round);
+  // Its body stays in the room too (4a-3b): an end near a face meets it, else it stops.
+  const settled =
+    from && half > 0
+      ? settleFreeWallEnd(from, stepped, half, targets.outline, TOUCH_M * gridSize, last)
+      : stepped;
+  return { point: settled, guides, keys };
 }
 
 const samples = (path) =>
@@ -217,7 +225,7 @@ const samples = (path) =>
  */
 export function snapFreeWallTranslation(
   points,
-  { originalPoints, targets, gridSize, tolerance, free = false }
+  { originalPoints, targets, gridSize, tolerance, free = false, half = 0 }
 ) {
   const step = STEP_M * gridSize;
   const ends = [points[0], points.at(-1)];
@@ -267,28 +275,18 @@ export function snapFreeWallTranslation(
       delta[coordinate] ??= Math.round(ends[0][coordinate] / step) * step - ends[0][coordinate];
   }
   let moved = points.map((point) => ({ ...point, x: point.x + delta.x, y: point.y + delta.y }));
+  // Its body too (4a-3b): a move stops flush against a face it would run into.
   const inside = (path) =>
-    samples(path).every((point) => pointInPolygon(point, targets.outline, true));
+    half > 0
+      ? freeWallFits(path, half, targets.outline, TOUCH_M * gridSize)
+      : samples(path).every((point) => pointInPolygon(point, targets.outline, true));
   if (targets.outline.length >= 3 && !inside(moved) && inside(originalPoints)) {
-    // As far as it goes towards the pointer while it stays in the room.
-    const shift = subtract(moved[0], originalPoints[0]);
-    let low = 0;
-    let high = 1;
-    for (let i = 0; i < 20; i += 1) {
-      const middle = (low + high) / 2;
-      const path = originalPoints.map((point) => ({
-        ...point,
-        x: point.x + shift.x * middle,
-        y: point.y + shift.y * middle,
-      }));
-      if (inside(path)) low = middle;
-      else high = middle;
-    }
-    moved = originalPoints.map((point) => ({
-      ...point,
-      x: point.x + shift.x * low,
-      y: point.y + shift.y * low,
-    }));
+    // As far as it goes towards the pointer while it stays in the room, then onto the step.
+    moved = holdFreeWallMove(originalPoints, moved, inside, step, {
+      outline: targets.outline,
+      half,
+      touch: TOUCH_M * gridSize,
+    });
     guides.length = 0;
   }
   return { points: moved, guides, keys };

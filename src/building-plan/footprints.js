@@ -14,6 +14,7 @@ import { buildingPlanSegmentThickness, planIssue } from './model.js';
 import { createBuildingPlanAxisNetwork } from './axis-network.js';
 import { junctionIntersection } from './junction-edits.js';
 import { wallCornerPolygon } from './corner-profiles.js';
+import { freeWallSegmentBodies } from './free-wall-body.js';
 
 const EPS = GEOMETRY_EPSILON;
 const area = (points) => Math.abs(polygonArea(points));
@@ -137,6 +138,8 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
     axesByPolygon = new WeakMap();
   const openings = [];
   const boundaryRooms = new Map(floor.walls.map((wall) => [wall.id, new Set()]));
+  // Free walls' bodies, their ends cut along what they stop on (4a-3b).
+  const freeBodies = freeWallSegmentBodies(floor);
   for (const room of floor.rooms)
     for (const face of room.faces) if (!face.freePath) boundaryRooms.get(face.wallId).add(room.id);
   for (const wall of floor.walls) {
@@ -156,7 +159,8 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
       const frame = segmentFrame(segment.start, segment.end);
       const thickness = buildingPlanSegmentThickness(wall, segment);
       if (thickness > 0) {
-        const polygon = rect(frame, 0, frame.length, thickness / 2);
+        const polygon =
+          freeBodies.get(`${wall.id}:${segment.id}`) || rect(frame, 0, frame.length, thickness / 2);
         entry.polygons.push(polygon);
         clipsByPolygon.set(polygon, network.roomsForSegment(wall, segment));
         axesByPolygon.set(polygon, [frame]);

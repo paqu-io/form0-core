@@ -1,4 +1,4 @@
-import { at, dot, polygonArea, project, segmentFrame } from './geometry.js';
+import { at, distance, dot, polygonArea, project, segmentFrame } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
@@ -24,6 +24,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   let referenceScene = null;
   let cornerAxis = null;
   let wallAxis = null;
+  let lastEnd = null;
   const currentScene = () => referenceScene || scene();
   const settings = () => normalizeBuildingPlanEditingPolicy(policy());
   const captureError = (entry) => entry.captureError ?? entry.error;
@@ -302,19 +303,30 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   // Free walls (`free-wall-snapping.js`): the same reach and hold as the other pulls.
   function freeWall(run, { roomId, wallId = null, zoom = 1, bypass = false } = {}) {
     const view = currentScene();
+    const gridSize = view.gridSize || 20;
+    // Its body stays in the room (4a-3b): its thickness, else a new wall's in the room.
+    const width =
+      (view.walls || []).find((wall) => wall.id === wallId)?.thickness ??
+      (view.rooms || []).find((room) => room.id === roomId)?.freeWallWidth;
     const result = run({
       targets: freeWallTargets(view, { roomId, wallId }),
-      gridSize: view.gridSize || 20,
+      gridSize,
       free: bypass || !settings().snapping,
       tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
+      half: width > 0 ? (width * gridSize) / 2 : 0,
     });
     latch = new Set(result.keys);
     guides = result.guides;
     return result;
   }
   function snapFreeWallEnd(point, options = {}) {
-    return freeWall((shared) => snapEnd(point, { ...shared, from: options.from || null }), options)
-      .point;
+    const from = options.from || null;
+    // Where this end last fitted while the other end holds (an end stops there).
+    const last =
+      from && lastEnd?.from && distance(lastEnd.from, from) < 1e-9 ? lastEnd.point : null;
+    const settled = freeWall((shared) => snapEnd(point, { ...shared, from, last }), options).point;
+    lastEnd = from ? { from: { ...from }, point: { ...settled } } : null;
+    return settled;
   }
   function snapFreeWallTranslation(points, options = {}) {
     return freeWall(
@@ -374,6 +386,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       referenceScene = copyBuildingPlanData(scene());
       cornerAxis = null;
       wallAxis = null;
+      lastEnd = null;
     },
     snapPoint,
     snapCorner,
@@ -388,6 +401,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       referenceScene = null;
       cornerAxis = null;
       wallAxis = null;
+      lastEnd = null;
       latch.clear();
       guides = [];
       edgeSince = null;

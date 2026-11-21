@@ -149,6 +149,8 @@ export function buildingPlanCanvasSnapshot({
         },
         color: COLORS[roomIndex % COLORS.length],
         displayLabel: label(room.values.room_name, `R#${roomIndex + 1}`),
+        // A new free wall's thickness here (metres), for snapping it while it is drawn (4a-3b).
+        freeWallWidth: newFreeWallWidth(floor, room.id, meta.properties),
       });
       const faceRows = roomRow.repeatable[key(meta, 'walls')] || [];
       for (const face of room.faces) {

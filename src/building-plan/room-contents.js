@@ -1,31 +1,20 @@
 import { buildingPlanFaceAxes, buildingPlanFootprints } from './footprints.js';
-import {
-  GEOMETRY_EPSILON as EPS,
-  cross,
-  dot,
-  pointInPolygon,
-  project,
-  roomBounds,
-  segmentFrame,
-  subtract,
-} from './geometry.js';
+import { roomBounds } from './geometry.js';
 import { buildingPlanFaceSegments, planIssue } from './model.js';
 import { columnTargets } from './column-targets.js';
 import { columnClash } from './column-fit.js';
 import { faceCentreline } from './free-wall-lines.js';
+import { TOUCH_M, freeWallFits } from './free-wall-body.js';
 
 /**
  * What a room holds stays where it may (the room contents rules, 2026-11-19; 4a-1 for columns,
  * 2026-11-20; 4a-2 for free walls). A column lies inside its room plus the room's own walls (it
  * may stand in them: flush inside, centred on a wall's midline, flush with its far face) and may
- * touch, but not overlap, another column, a door or a window. A free wall's centreline lies inside
- * its room's outline, touching it allowed. Checked on the derived engine's edits,
+ * touch, but not overlap, another column, a door or a window. A free wall's centreline and body lie
+ * inside its room's outline, touching it allowed (`free-wall-body.js`). Checked on the derived engine's edits,
  * whatever the edit (an element moved or resized, a wall moved or thinned, a room reshaped, an
  * opening moved onto a column); records that break it still read.
  */
-
-/** Within this distance of a room's outline a point counts as on it (as columns touch, 0.1 mm). */
-const TOUCH_M = 1e-4;
 
 const textOf = (value) =>
   typeof value === 'string'
@@ -162,50 +151,11 @@ export function columnPlacementIssues(floor, before = null) {
   return issues;
 }
 
-/** Whether `point` lies inside `vertices` or within `TOUCH_M` of its outline. */
-function inOrOn(point, vertices) {
-  if (pointInPolygon(point, vertices, true)) return true;
-  return vertices.some((start, index) => {
-    const frame = segmentFrame(start, vertices[(index + 1) % vertices.length]);
-    const { along, offset } = project(frame, point);
-    if (along >= 0 && along <= frame.length) return Math.abs(offset) <= TOUCH_M;
-    return Math.hypot(point.x - start.x, point.y - start.y) <= TOUCH_M;
-  });
-}
-
 /**
- * Whether segment `a`–`b` lies inside the outline, touching allowed: cut where it meets the
- * outline's edges and passes its corners, every piece lies on one side of the outline, so its
- * middle tells (an L-shaped room's notch is caught even with both ends inside).
- */
-function segmentInside(a, b, vertices) {
-  if (!inOrOn(a, vertices) || !inOrOn(b, vertices)) return false;
-  const span = subtract(b, a);
-  const lengthSquared = dot(span, span);
-  if (lengthSquared <= EPS * EPS) return true;
-  const cuts = [0, 1];
-  vertices.forEach((start, index) => {
-    const edge = subtract(vertices[(index + 1) % vertices.length], start);
-    const offset = subtract(start, a);
-    const denominator = cross(span, edge);
-    if (Math.abs(denominator) > EPS) {
-      const u = cross(offset, span) / denominator;
-      if (u >= 0 && u <= 1) cuts.push(cross(offset, edge) / denominator);
-    }
-    cuts.push(dot(offset, span) / lengthSquared);
-  });
-  const sorted = cuts.filter((t) => t >= 0 && t <= 1).sort((p, q) => p - q);
-  return sorted.every((t, index) => {
-    if (!index || t - sorted[index - 1] <= EPS) return true;
-    const middle = (t + sorted[index - 1]) / 2;
-    return inOrOn({ x: a.x + span.x * middle, y: a.y + span.y * middle }, vertices);
-  });
-}
-
-/**
- * The free walls of `floor` whose line leaves their room's outline, one issue per row (a wall
- * drawn with turns has a row per straight run, W9 and W9.1, each named). The line is the one the
- * wall is drawn by and the canvas keeps inside: its centreline (4a-3; its stored face before).
+ * The free walls of `floor` that leave their room's outline, one issue per row (a wall drawn with
+ * turns has a row per straight run, W9 and W9.1, each named): their centreline, the line the wall
+ * is drawn by (4a-3; its stored face before), and their body, its ends cut along the faces they
+ * stop on (4a-3b), so a free wall doesn't run into the room's walls.
  * @param {object} floor the edited floor
  * @returns {object[]} issues
  */
@@ -217,11 +167,10 @@ export function freeWallPlacementIssues(floor) {
       if (!face.freePath?.length) continue;
       const path = faceCentreline(floor, room, face);
       if (!path.length) continue;
-      if (
-        path.every((point, index) => !index || segmentInside(path[index - 1], point, room.vertices))
-      )
-        continue;
       const wall = floor.walls.find((entry) => entry.id === face.wallId);
+      const thickness = wall?.properties?.wall_thickness;
+      const half = typeof thickness === 'number' && thickness > 0 ? thickness / 2 : 0;
+      if (freeWallFits(path, half, room.vertices, TOUCH_M)) continue;
       const name = textOf(wall?.values?.wall_label) || wall?.autoLabel || null;
       issues.push(
         planIssue(
