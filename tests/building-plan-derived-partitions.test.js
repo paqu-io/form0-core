@@ -49,15 +49,20 @@ function partitionState(floor) {
   return { walls, paths };
 }
 
-/** The same steps on both engines: statuses, refusal codes and partitions must match each time. */
-function bothEngines(steps) {
+/**
+ * The same steps on both engines: statuses, refusal codes and partitions must match each time;
+ * `geometry(index)` false skips the partitions after that step (a free wall's return stands
+ * centred on its split point on the derived core, 4a-4, and on one side of it on today's engine).
+ */
+function bothEngines(steps, { geometry = () => true } = {}) {
   const [now, derived] = [example(false), example(true)];
-  for (const step of steps) {
+  steps.forEach((step, index) => {
     const [a, b] = [now, derived].map((t) => step(t));
     assert.equal(b.status, a.status, JSON.stringify(b.issues));
     assert.equal(b.issues?.[0]?.code, a.issues?.[0]?.code);
-    assert.deepEqual(partitionState(derived.floor()), partitionState(now.floor()));
-  }
+    if (geometry(index))
+      assert.deepEqual(partitionState(derived.floor()), partitionState(now.floor()));
+  });
   assert.deepEqual(derived.session.validate(), []);
   return { now, derived };
 }
@@ -140,19 +145,19 @@ test('a whole partition moves; its door keeps its distance from the start, or th
   ]);
 });
 
-test('a Split portion moves square with a return at its cut, and back without it, as today', () => {
+test('a Split portion moves square with a return at its cut, centred on it, and back without it', () => {
   const portion = (t) => t.partitions().find((face) => face.freePath[0].editingCutId);
+  // Moves translate the portion's stored face (on the derived core it starts half the wall's
+  // width along once its return is centred).
+  const shifted = (t, dx, y) => portion(t).freePath.map((p) => ({ x: p.x + dx, y }));
   const move = (t, y) =>
     t.apply({
       type: 'update_wall',
       wallId: portion(t).wallId,
       faceId: portion(t).id,
-      vertices: [
-        { x: 2, y },
-        { x: 4, y },
-      ],
+      vertices: shifted(t, 0, y),
     });
-  bothEngines([
+  const steps = [
     (t) => draw(t, line),
     (t) => t.apply({ type: 'split_face', faceId: t.partitions()[0].id, offset: 1 }),
     (t) => move(t, 1.5),
@@ -162,13 +167,19 @@ test('a Split portion moves square with a return at its cut, and back without it
         type: 'update_wall',
         wallId: portion(t).wallId,
         faceId: portion(t).id,
-        vertices: [
-          { x: 2.2, y: 1.8 },
-          { x: 4.2, y: 1.8 },
-        ],
+        vertices: shifted(t, 0.2, 1.8),
       }),
     (t) => move(t, 1),
-  ]);
+  ];
+  // While the return stands (steps 2 to 4) the derived core centres it on the split point (4a-4).
+  bothEngines(steps, { geometry: (index) => index < 2 || index > 4 });
+  const t = example(true);
+  steps.slice(0, 3).forEach((step) => step(t));
+  // The return's centreline on the split point (x 2); the portions' faces meet its far face (1.9).
+  assert.deepEqual(partitionState(t.floor()), {
+    paths: ['1,1 1.9,1:cut', '1.9,1.5:cut 4,1.5', '1.9,1:cut 1.9,1.5:cut'],
+    walls: ['W9 1,0.9>1.9,0.9 t=0.2 ', 'W9.1 1.9,1.4>4,1.4 t=0.2 ', 'W9.2 2,1>2,1.5 t=0.2 '],
+  });
 });
 
 test('a return holding a door asks before the portion moves back; confirmed, both go', () => {
@@ -179,40 +190,40 @@ test('a return holding a door asks before the portion moves back; confirmed, bot
       type: 'update_wall',
       wallId: portion(t).wallId,
       faceId: portion(t).id,
-      vertices: [
-        { x: 2, y: 1 },
-        { x: 4, y: 1 },
-      ],
+      vertices: portion(t).freePath.map((p) => ({ x: p.x, y: 1 })),
       ...extra,
     });
-  const { derived } = bothEngines([
-    (t) => draw(t, line),
-    (t) => t.apply({ type: 'split_face', faceId: t.partitions()[0].id, offset: 1 }),
-    (t) =>
-      t.apply({
-        type: 'update_wall',
-        wallId: portion(t).wallId,
-        faceId: portion(t).id,
-        vertices: [
-          { x: 2, y: 2 },
-          { x: 4, y: 2 },
-        ],
-      }),
-    (t) => {
-      const ret = t.partitions().find((face) => face.lineage?.editingReturn);
-      return t.apply({
-        type: 'create_opening',
-        id: 'door-r',
-        wallId: ret.wallId,
-        kind: 'door',
-        offset: 0.1,
-        width: 0.7,
-        height: 2,
-      });
-    },
-    (t) => back(t),
-    (t) => back(t, { removeOpeningIds: ['door-r'] }),
-  ]);
+  const { derived } = bothEngines(
+    [
+      (t) => draw(t, line),
+      (t) => t.apply({ type: 'split_face', faceId: t.partitions()[0].id, offset: 1 }),
+      (t) =>
+        t.apply({
+          type: 'update_wall',
+          wallId: portion(t).wallId,
+          faceId: portion(t).id,
+          vertices: [
+            { x: 2, y: 2 },
+            { x: 4, y: 2 },
+          ],
+        }),
+      (t) => {
+        const ret = t.partitions().find((face) => face.lineage?.editingReturn);
+        return t.apply({
+          type: 'create_opening',
+          id: 'door-r',
+          wallId: ret.wallId,
+          kind: 'door',
+          offset: 0.1,
+          width: 0.7,
+          height: 2,
+        });
+      },
+      (t) => back(t),
+      (t) => back(t, { removeOpeningIds: ['door-r'] }),
+    ],
+    { geometry: (index) => index < 2 || index > 4 }
+  );
   assert.equal(derived.partitions().length, 2);
 });
 

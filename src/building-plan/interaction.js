@@ -3,6 +3,7 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
 import { freeWallTargets } from './free-wall-targets.js';
+import { snapFreeWallBend as snapBend } from './free-wall-bend.js';
 import { columnTargets } from './column-targets.js';
 import { snapColumn as snapColumnCentre } from './column-snapping.js';
 import {
@@ -276,6 +277,20 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     return result;
   }
   function snapCorner(point, { roomId, vertexId, originalPoint, zoom = 1, bypass = false } = {}) {
+    // A free wall's split point bends the wall (4a-4): pulled as an end, both runs kept inside.
+    const view = currentScene();
+    const bend = (view.corners || []).find((corner) => corner.id === vertexId)?.freeWall;
+    const [earlier, later] = (bend?.faceIds || []).map((id) =>
+      view.walls?.find((w) => w.id === id)
+    );
+    if (earlier && later) {
+      const ends = [earlier.points[0], later.points.at(-1)];
+      const last = lastEnd?.bend === vertexId ? lastEnd.point : originalPoint;
+      const shared = { roomId, wallId: earlier.id, zoom, bypass };
+      const { point: held } = freeWall((o) => snapBend(point, { ...o, ends, last }), shared);
+      lastEnd = { bend: vertexId, point: held };
+      return held;
+    }
     guides = [];
     if (bypass || !settings().snapping || !originalPoint) return { ...point };
     const dx = point.x - originalPoint.x,

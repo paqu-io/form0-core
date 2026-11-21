@@ -3,6 +3,7 @@ import { copyBuildingPlanData as copy } from '../model.js';
 import { createWallSides } from '../wall-sides.js';
 import { SAME, lineFrame } from './grid.js';
 import { movePartitionPortion } from './partition-portions.js';
+import { bendPartition } from './partition-bend.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -90,10 +91,10 @@ function createWall(primary, operation, { createId }) {
  * An opening keeps its distance from the path's start, or from its end when only the start moved
  * (or the operation anchors it at the end), as today.
  */
-function updateWall(primary, operation, { createId }) {
+function updateWall(primary, operation, options) {
   const partition = primary.partitions.find((entry) => entry.faceId === operation.faceId);
   if (partition?.path.some((point) => point.editingCutId))
-    return movePartitionPortion(primary, partition, operation, { createId });
+    return movePartitionPortion(primary, partition, operation, options);
   const rows = [
     ...primary.anchors.filter((anchor) => anchor.subjectId === operation.wallId),
     ...primary.partitions.filter((entry) => entry.subjectId === operation.wallId),
@@ -154,9 +155,10 @@ function removeFace(primary, operation) {
   return { result: {}, preferredRoomIds: all(primary) };
 }
 
-/** The partition operations on the derived core (item 4d), by operation type. */
+/** The partition operations on the derived core (item 4d; the bend, 4a-4), by operation type. */
 export const PARTITION_COMMANDS = Object.freeze({
   create_wall: createWall,
   update_wall: updateWall,
   remove_face: removeFace,
+  move_free_wall_point: bendPartition,
 });

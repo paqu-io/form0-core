@@ -1,6 +1,6 @@
 import { BUILDING_PLAN_PROPERTIES, buildingPlanFaceSegments } from './model.js';
 import { buildingPlanFaceAxes } from './footprints.js';
-import { lineFrame } from './derive/grid.js';
+import { SAME, lineFrame } from './derive/grid.js';
 import { resolveWallThickness } from './derive/thickness.js';
 
 /**
@@ -146,4 +146,40 @@ export function freeWallCutPoints(floor, room) {
 export function freeWallSideLine(wall, points = wall?.points) {
   if (!wall?.sidePoints?.length || !(points?.length > 1)) return points;
   return offsetLine(points, freeWallSideDistance(wall.points, wall.sidePoints));
+}
+
+/** Where the lines through `a1`–`a2` and `b1`–`b2` cross, or null when they are parallel. */
+function crossingOf([a1, a2], [b1, b2]) {
+  const u = { x: a2.x - a1.x, y: a2.y - a1.y };
+  const v = { x: b2.x - b1.x, y: b2.y - b1.y };
+  const det = cross(u, v);
+  if (Math.abs(det) <= 1e-12) return null;
+  const t = cross({ x: b1.x - a1.x, y: b1.y - a1.y }, v) / det;
+  return { x: a1.x + u.x * t, y: a1.y + u.y * t };
+}
+
+/**
+ * The room's free wall split points where two portions meet with no return between them (4a-4):
+ * each a corner a host can drag to bend the wall there, at the centrelines' meeting point (metres).
+ * @returns {Array<{ id: string, cutId: string, faceIds: [string, string], point: object }>}
+ */
+export function freeWallBendCorners(floor, room) {
+  const faces = (room.faces || []).filter((face) => face.freePath && !face.lineage?.editingReturn);
+  const corners = [];
+  for (const earlier of faces) {
+    const end = earlier.freePath.at(-1);
+    if (!end?.editingCutId) continue;
+    const later = faces.find(
+      (face) =>
+        face !== earlier &&
+        face.freePath[0].editingCutId === end.editingCutId &&
+        Math.hypot(face.freePath[0].x - end.x, face.freePath[0].y - end.y) <= SAME
+    );
+    if (!later) continue;
+    const [a, b] = [faceCentreline(floor, room, earlier), faceCentreline(floor, room, later)];
+    if (a.length < 2 || b.length < 2) continue;
+    const point = crossingOf(a.slice(-2), b.slice(0, 2)) || a.at(-1);
+    corners.push({ id: end.id, cutId: end.editingCutId, faceIds: [earlier.id, later.id], point });
+  }
+  return corners;
 }

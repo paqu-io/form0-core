@@ -21,6 +21,7 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 import {
+  freeWallBendCorners,
   freeWallCutPoints,
   freeWallSideDistance,
   newFreeWallFace,
@@ -51,6 +52,7 @@ export function buildingPlanCanvasSnapshot({
   plan,
   gridSize = 20,
   activeFloorIndex = 0,
+  freeWallBends = false,
 }) {
   const output = {
     floors: [],
@@ -133,6 +135,16 @@ export function buildingPlanCanvasSnapshot({
             point: pixels(point),
           }))
       );
+      // A free wall's split point bends it when dragged (4a-4, derived engine only).
+      if (freeWallBends)
+        output.corners.push(
+          ...freeWallBendCorners(floor, room).map(({ point, cutId, faceIds, id }) => ({
+            id,
+            roomId: room.id,
+            point: pixels(point),
+            freeWall: { cutId, faceIds },
+          }))
+        );
       const bounds = roomBounds(room);
       output.rooms.push({
         id: room.id,
@@ -376,6 +388,7 @@ export class BuildingPlanCanvasController {
       plan,
       gridSize: this.gridSize,
       activeFloorIndex: this.activeFloorIndex,
+      freeWallBends: this.derivedCommands,
     });
     this.floors = this.snapshot.floors;
     this.floorCount = this.floors.length;
@@ -639,6 +652,7 @@ export class BuildingPlanCanvasController {
         plan: proposal.snapshot,
         gridSize: this.gridSize,
         activeFloorIndex: this.activeFloorIndex,
+        freeWallBends: this.derivedCommands,
       });
     } catch (error) {
       const issues = error.issues || [{ code: 'invalid_preview', message: error.message }];
@@ -759,21 +773,19 @@ export class BuildingPlanCanvasController {
   }
   previewCorner(roomId, vertexId, point) {
     return this.previewOperation({
-      type: 'move_corner',
-      floorId: this.floorId,
-      roomId,
-      vertexId,
+      ...this.cornerOperation(roomId, vertexId),
       point: this.metric(point),
     });
   }
   updateCorner(roomId, vertexId, point) {
-    return this.apply({
-      type: 'move_corner',
-      floorId: this.floorId,
-      roomId,
-      vertexId,
-      point: this.metric(point),
-    });
+    return this.apply({ ...this.cornerOperation(roomId, vertexId), point: this.metric(point) });
+  }
+  /** A room corner moves; a free wall's split point bends the wall (4a-4). */
+  cornerOperation(roomId, vertexId) {
+    const bend = (this.snapshot.corners || []).find((corner) => corner.id === vertexId)?.freeWall;
+    return bend
+      ? { type: 'move_free_wall_point', floorId: this.floorId, roomId, cutId: bend.cutId }
+      : { type: 'move_corner', floorId: this.floorId, roomId, vertexId };
   }
   updateWall(id, points) {
     const operation = this.wallOperation(id, points);

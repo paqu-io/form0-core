@@ -154,3 +154,22 @@ export function settleFreeWallEnd(from, end, half, outline, touch = TOUCH_M, las
   const settled = along(low);
   return gap(settled, from) > touch ? settled : end;
 }
+
+/**
+ * A free wall's split point being dragged to bend it (4a-4): where both runs (from `a` to it, and
+ * from it to `b`) still fit their room; else as far from `last` (where it last fitted) towards it
+ * as still fits; else where it is (core then refuses, naming the wall).
+ */
+export function holdFreeWallBend([a, b], point, last, half, outline, touch = TOUCH_M) {
+  const fits = (p) =>
+    freeWallFits([a, p], half, outline, touch) && freeWallFits([p, b], half, outline, touch);
+  if (fits(point) || !last || !fits(last)) return point;
+  const along = (t) => ({ x: last.x + (point.x - last.x) * t, y: last.y + (point.y - last.y) * t });
+  let [low, high] = [0, 1];
+  for (let i = 0; i < 24; i += 1) {
+    const middle = (low + high) / 2;
+    if (fits(along(middle))) low = middle;
+    else high = middle;
+  }
+  return along(low);
+}
