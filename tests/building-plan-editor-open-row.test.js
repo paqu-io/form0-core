@@ -82,3 +82,34 @@ test('a new row whose opening throws is removed, and its floor still saves', () 
   assert.equal(rooms(), before);
   assert.equal(editor.acceptRow('floor').status, 'accepted');
 });
+
+// Web round 2026-11-21: Undo in a new floor's entry removed the floor, and the open entry's row
+// no longer existed (the form broke). Cancel removes the new row; Undo leaves it.
+test("a new row's creation is cancelled with its editor, not undone inside it", () => {
+  const { editor, meta, floorPath } = floorEditor();
+  assert.equal(editor.openRow({ path: floorPath, scopeId: 'floor' }).status, 'opened');
+  const rooms = () => editor.getSnapshot().floors[0].rooms.length;
+  const before = rooms();
+  const roomPath = [...floorPath, { key: meta.repeatablesByNodeKey.rooms.preferredKey, id: 'new' }];
+  const open = () =>
+    editor.openRow({
+      path: roomPath,
+      scopeId: 'room',
+      parentScopeId: 'floor',
+      row: { id: 'new', values: {} },
+    });
+  assert.equal(open().status, 'opened');
+  assert.equal(rooms(), before + 1);
+  assert.equal(editor.getState().canUndo, false);
+  assert.equal(editor.getState().undoScopeId, null);
+  assert.equal(editor.undo({ scopeId: 'room' }).status, 'unchanged');
+  assert.equal(rooms(), before + 1);
+  assert.equal(editor.cancelRow('room').status, 'cancelled');
+  assert.equal(rooms(), before);
+  // Saved, the creation is the floor's to undo.
+  assert.equal(open().status, 'opened');
+  assert.equal(editor.acceptRow('room').status, 'accepted');
+  assert.equal(editor.getState().undoScopeId, 'floor');
+  assert.equal(editor.undo({ scopeId: 'floor' }).status, 'undone');
+  assert.equal(rooms(), before);
+});

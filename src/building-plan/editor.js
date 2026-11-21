@@ -194,7 +194,8 @@ export function createBuildingPlanEditor(options) {
   function fillOpenedRow({ path, scopeId, row, existing, opened }) {
     if (!existing) {
       const operation = createOperation(path);
-      const created = session.apply(operation, { scopeId });
+      // The row's creation: cancelled with the editor, never undone inside it.
+      const created = session.apply(operation, { scopeId, opening: true });
       if (created.status !== 'applied') {
         session.cancelScope(scopeId);
         return created;

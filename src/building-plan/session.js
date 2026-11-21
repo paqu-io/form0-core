@@ -267,7 +267,12 @@ export function createBuildingPlanSession({
     ]);
   const getSnapshot = () => copy(current);
 
-  function preview(operation, { scopeId = null } = {}) {
+  /**
+   * `opening`: the edit that creates the row an editor scope opened on (`openRow`). Cancel
+   * reverses it; Undo does not (it would remove the editor's own row), until the scope is saved
+   * and the edit becomes its parent's.
+   */
+  function preview(operation, { scopeId = null, opening = false } = {}) {
     if (readOnly) return locked();
     if (!scopeExists(scopeId)) return stale();
     try {
@@ -344,6 +349,7 @@ export function createBuildingPlanSession({
         operation: copy(operation),
         changes,
         scopeId,
+        opening,
         result,
         divisions,
         defaultConflicts,
@@ -602,6 +608,7 @@ export function createBuildingPlanSession({
         changes: prepared.changes,
         operation: prepared.operation,
         scopeId: prepared.scopeId,
+        ...(prepared.opening ? { opening: true } : {}),
       });
       future = [];
       revision++;
@@ -656,7 +663,12 @@ export function createBuildingPlanSession({
       return response('blocked', [
         planIssue('open_child_editor', 'Save or cancel the child editor before saving its parent.'),
       ]);
-    for (const entry of past) if (entry.scopeId === scopeId) entry.scopeId = scope.parentScopeId;
+    for (const entry of past)
+      if (entry.scopeId === scopeId) {
+        entry.scopeId = scope.parentScopeId;
+        // Saved, the row's creation is an ordinary edit of the parent (Undo removes the row).
+        delete entry.opening;
+      }
     scopes.delete(scopeId);
     questions.cancelAll();
     pendingGeneration++;
@@ -708,6 +720,8 @@ export function createBuildingPlanSession({
           'Undo and Redo belong to the editor that owns the operation.'
         ),
       ]);
+    // The edit that created the editor's own row: Cancel reverses it, Undo leaves it.
+    if (entry.opening) return response('unchanged', [], { snapshot: getSnapshot() });
     const candidate = copy(current);
     if (!applyChanges(candidate, entry.changes, direction === 'undo')) return stale();
     const issues = validate(candidate);
@@ -777,10 +791,11 @@ export function createBuildingPlanSession({
     getState: () => ({
       revision,
       readOnly,
-      canUndo: past.length > 0,
+      canUndo: past.length > 0 && !past.at(-1).opening,
       canRedo: future.length > 0,
-      // The editor that owns the next undo and redo: only that one may take them.
-      undoScopeId: past.at(-1)?.scopeId ?? null,
+      // The editor that owns the next undo and redo: only that one may take them (none when the
+      // next undo would remove an editor's own new row).
+      undoScopeId: past.at(-1)?.opening ? null : (past.at(-1)?.scopeId ?? null),
       redoScopeId: future.at(-1)?.scopeId ?? null,
       scopes: copy([...scopes.values()]),
     }),
