@@ -10,7 +10,7 @@ import {
 
 // 4b (2026-11-21): attached contents follow their wall (rule 3), on the derived engine. Whatever
 // touches a line an edit moves moves with it: a free wall's end (the wall gets longer or shorter,
-// or turns), a free wall lying along a face, a free wall's end on a moved free wall.
+// or turns), a free wall lying along a face, a free wall's end on a moved free wall, a column.
 // The example's bedroom is 0..5 × 0..3 m (W1 above, W2 right, both 20 cm, outside it); the room
 // below it shares W3 (y 3..3.2, x 3..5). Free walls are given by their centreline, 20 cm thick.
 
@@ -48,6 +48,16 @@ const faceOf = (t, label, room = t.room()) =>
   room.faces.find((face) => face.wallId === wallOf(t, label).id);
 const moveFace = (t, label, distance) =>
   t.apply({ type: 'resize_face', faceId: faceOf(t, label).id, distance });
+const column = (t, x, y, size = 0.3) =>
+  t.apply({
+    type: 'create_element',
+    roomId: t.room().id,
+    collection: 'columns',
+    element: { position: { x, y }, width: size, height: size },
+    values: {},
+  });
+const columns = (t) => t.room().columns.map(({ position }) => [position.x, position.y].map(round));
+
 test('a free wall’s end on a face follows it, out and in; too short, or touching nothing: refused', () => {
   const t = example();
   freeWall(t, [
@@ -214,4 +224,59 @@ test('its openings keep their place in the room; flush with a face, a thicker wa
     [1, 0.2],
     [3, 0.2],
   ]);
+});
+
+test('a column flush with a face follows it; a free-standing one still blocks it', () => {
+  const t = example();
+  column(t, 4.85, 1.5);
+  assert.equal(moveFace(t, 'W2', -0.35).status, 'applied');
+  assert.deepEqual(columns(t), [[4.5, 1.5]]);
+  // One clear of it, passed by the wall's far face: refused (D8, rule 1).
+  const clear = example();
+  column(clear, 2, 0.6);
+  assert.deepEqual(codes(moveFace(clear, 'W1', -0.8)), ['column_outside_room']);
+});
+
+test('a thicker wall: a column keeps to its midline or far face, or stays flush with its face', () => {
+  const t = example();
+  column(t, 5.1, 2.4, 0.2); // centred, as wide as the wall
+  column(t, 5.05, 1.5); // flush with the far face
+  column(t, 5.15, 0.8); // in the wall from its face, standing out
+  column(t, 5.1, -0.1); // centred where W1's and W2's midlines meet
+  const thicker = t.apply({
+    type: 'set_property',
+    faceId: faceOf(t, 'W2').id,
+    property: 'wall_thickness',
+    value: 0.4,
+  });
+  assert.equal(thicker.status, 'applied');
+  assert.deepEqual(columns(t), [
+    [5.2, 2.4],
+    [5.25, 1.5],
+    [5.15, 0.8],
+    [5.2, -0.1],
+  ]);
+  assert.equal(moveFace(t, 'W2', 0.5).status, 'applied');
+  assert.deepEqual(columns(t), [
+    [5.7, 2.4],
+    [5.75, 1.5],
+    [5.65, 0.8],
+    [5.7, -0.1],
+  ]);
+});
+
+test('a column flush with a face, made wider, keeps its side on the face (D6)', () => {
+  const t = example();
+  column(t, 4.85, 1.5);
+  const { id, position } = t.room().columns[0];
+  const resized = t.apply({
+    type: 'update_element',
+    roomId: t.room().id,
+    collection: 'columns',
+    elementId: id,
+    element: { position, width: 0.6, height: 0.3 },
+    values: { column_width: 0.6 },
+  });
+  assert.equal(resized.status, 'applied');
+  assert.deepEqual(columns(t), [[4.7, 1.5]]);
 });

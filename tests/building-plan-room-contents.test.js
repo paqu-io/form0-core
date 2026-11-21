@@ -84,27 +84,31 @@ test('a door: beside its jamb yes, flush across it no', () => {
   assert.equal(t.column(3.45, 2.85).status, 'applied');
 });
 
-test('a wall moved in past a column, or a size typed out of the room: refused', () => {
-  // (Moved in by 20 cm, the wall's body would hold the column: allowed.)
+test('a wall moved in past a column clear of it, or a size typed out of the room: refused', () => {
+  // A column flush with the face follows it (4b, `building-plan-attached-follow.test.js`); one
+  // clear of it, left past the wall's far face, is refused.
   const t = example();
-  assert.equal(t.column(4.85, 1.5).status, 'applied');
+  assert.equal(t.column(4.9, 1.5, 0.1).status, 'applied');
   const w2 = t.floor().walls.find((wall) => wall.autoLabel === 'W2');
   const face = t.room().faces.find((entry) => entry.wallId === w2.id);
   assert.deepEqual(codes(t.apply({ type: 'resize_face', faceId: face.id, distance: -0.35 })), [
     'column_outside_room',
   ]);
-  const column = t.room().columns[0];
+  // Clear of the walls, a resized column keeps its centre: into the wall yes, past it no.
+  const s = example();
+  assert.equal(s.column(4.5, 1.5).status, 'applied');
+  const column = s.room().columns[0];
   const resize = (width) =>
-    t.apply({
+    s.apply({
       type: 'update_element',
-      roomId: t.room().id,
+      roomId: s.room().id,
       collection: 'columns',
       elementId: column.id,
       element: { position: column.position, width, height: 0.3 },
       values: { column_width: width },
     });
-  assert.equal(resize(0.6).status, 'applied');
-  assert.deepEqual(codes(resize(0.8)), ['column_outside_room']);
+  assert.equal(resize(1.2).status, 'applied');
+  assert.deepEqual(codes(resize(1.6)), ['column_outside_room']);
 });
 
 test('an entry previewing its unchanged row (an empty batch): no refusal for a column in a wall', () => {

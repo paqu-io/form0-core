@@ -5,16 +5,19 @@ import { CUT_REACH, TOUCH_M } from '../free-wall-body.js';
 /**
  * What touches what in a room (4b, 2026-11-21; rule 2, attachment from contact: nothing is
  * stored, the contacts are read from the floor as it was before an edit). A free wall's end on a
- * room face or on another free wall, a free wall lying along a face or another free wall's side.
- * `follow-attached.js` moves whatever touches a line the edit moved. Metres.
+ * room face or on another free wall, a free wall lying along a face or another free wall's side,
+ * a column flush with a line, centred on a midline or standing in a wall. `follow-attached.js`
+ * moves whatever touches a line the edit moved. Metres.
  */
 
-/** Closer than this, an end or a side touches a line: 1 mm, the reach a cut has (4a-3b). */
+/** Closer than this, an end, a side or a column touches a line: 1 mm, the reach a cut has (4a-3b). */
 export const ATTACH_M = TOUCH_M * CUT_REACH;
 
 const gap = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
 const cross = (u, v) => u.x * v.y - u.y * v.x;
 const parallel = (a, b) => Math.abs(cross(a.tangent, b.tangent)) <= 1e-6;
+/** How far a column (half sizes `half`, never turned) reaches from its centre along `u`. */
+export const reach = (half, u) => half.x * Math.abs(u.x) + half.y * Math.abs(u.y);
 
 /** The room's faces, each by the vertices it runs between, with the side outside the room. */
 export function roomFaces(room) {
@@ -68,6 +71,7 @@ const contactOn = (anchor, frame, point, extra = {}) => {
     ...extra,
   };
 };
+const spans = (frame, from, to) => Math.min(frame.length, to) - Math.max(0, from) > -ATTACH_M;
 
 /** Whether two free wall rows belong together: one wall, a return at a split point of it. */
 export function related(a, b) {
@@ -152,3 +156,57 @@ export const sameAnchor = (a, b) =>
   (a.type === 'face'
     ? a.roomId === b.roomId && a.startId === b.startId && a.endId === b.endId
     : a.faceId === b.faceId && a.line === b.line);
+
+/**
+ * A column's contacts: with each face of its room, flush on the room's side (`flushIn`), standing
+ * in the wall from the face (`flushOut`), centred on the wall's midline (`midline`), flush with its
+ * far face (`far`) or else in the wall (`inWall`); with each free wall of its room, centred on it
+ * or a side flush with one of its sides. `widthAt(roomId, point, tangent)` gives a room wall's width at a
+ * point of its face (read only for a column reaching into a wall).
+ */
+export function columnContacts(primary, room, column, halfOf, widthAt) {
+  const centre = column.position;
+  const half = { x: column.width / 2, y: column.height / 2 };
+  if (!centre || !(half.x > 0) || !(half.y > 0)) return [];
+  const contacts = [];
+  for (const { startId, endId, frame, outward } of roomFaces(room)) {
+    const e = reach(half, frame.normal);
+    const station = along(frame, centre);
+    const wide = reach(half, frame.tangent);
+    if (!spans(frame, station - wide, station + wide)) continue;
+    const out = outward * offset(frame, centre);
+    if (out < -e - ATTACH_M) continue;
+    const anchor = { type: 'face', roomId: room.id, startId, endId };
+    // Its width read on the face (a column at a corner is beside the face's end).
+    const at = pointAt(frame, Math.min(Math.max(station, 0), frame.length));
+    const width = out > -e + ATTACH_M ? widthAt(room.id, at, frame.tangent) : null;
+    if (width > 0 && out - e > width + ATTACH_M) continue;
+    // Centred first: a column as wide as the wall is flush with both its faces too.
+    const kind =
+      Math.abs(out + e) <= ATTACH_M
+        ? 'flushIn'
+        : width > 0 && Math.abs(out - width / 2) <= ATTACH_M
+          ? 'midline'
+          : Math.abs(out - e) <= ATTACH_M
+            ? 'flushOut'
+            : width > 0 && Math.abs(out + e - width) <= ATTACH_M
+              ? 'far'
+              : 'inWall';
+    contacts.push(contactOn(anchor, frame, centre, { kind, outward, out, width, at }));
+  }
+  for (const { faceId, lines } of freeWallAnchors(primary, room.id, null, halfOf)) {
+    const station = along(lines.mid, centre);
+    const wide = reach(half, lines.mid.tangent);
+    if (!spans(lines.mid, station - wide, station + wide)) continue;
+    const e = reach(half, lines.mid.normal);
+    const pick = [
+      ['mid', (d) => Math.abs(d) <= ATTACH_M, 'centred'],
+      ['row', (d) => Math.abs(Math.abs(d) - e) <= ATTACH_M, 'flush'],
+      ['other', (d) => Math.abs(Math.abs(d) - e) <= ATTACH_M, 'flush'],
+    ].find(([line, test]) => test(offset(lines[line], centre)));
+    if (!pick) continue;
+    const [line, , kind] = pick;
+    contacts.push(contactOn({ type: 'wall', faceId, line }, lines[line], centre, { kind }));
+  }
+  return contacts;
+}
