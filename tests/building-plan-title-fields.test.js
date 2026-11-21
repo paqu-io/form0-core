@@ -110,3 +110,29 @@ test('plan rows are titled for display only: stored records keep no row titles',
   visit(normalizeStructuredRecord(example.schema, example.stored, { mode: 'derived' }), true);
   assert.deepEqual(titles, []);
 });
+
+test('a floor named Upper or Basement floor carries its number in the plan titles', async () => {
+  const { buildingPlanFloorTitle } = await import('../src/index.js');
+  const named =
+    (value, label, numbers = {}) =>
+    (name) =>
+      name === 'floor_name' ? { choice: [{ value, label }] } : numbers[name];
+  assert.equal(
+    buildingPlanFloorTitle(named('upper_floor', 'Upper floor', { floor_upper_number: 2 })),
+    'Upper floor 2'
+  );
+  assert.equal(
+    buildingPlanFloorTitle(named('basement', 'Basement floor', { floor_basement_number: -1 })),
+    'Basement floor -1'
+  );
+  // No number yet, another name, or a number left over from another name: the name alone.
+  assert.equal(buildingPlanFloorTitle(named('upper_floor', 'Upper floor')), 'Upper floor');
+  assert.equal(
+    buildingPlanFloorTitle(named('ground_floor', 'Ground floor', { floor_upper_number: 2 })),
+    'Ground floor'
+  );
+  assert.equal(
+    buildingPlanFloorTitle(() => undefined),
+    null
+  );
+});

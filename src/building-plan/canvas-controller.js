@@ -30,6 +30,7 @@ import {
   offsetLine,
 } from './free-wall-lines.js';
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
+import { buildingPlanFloorTitle } from './row-title.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -79,7 +80,7 @@ export function buildingPlanCanvasSnapshot({
       id: floor.id,
       rowId: floorRow.id,
       index,
-      label: label(floor.values.floor_name, `F#${index + 1}`),
+      label: buildingPlanFloorTitle((name) => floor.values[name]) || `F#${index + 1}`,
       path: floorPath,
     });
     if (floorIndex !== activeFloorIndex) continue;

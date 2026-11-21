@@ -147,7 +147,7 @@ export { createUIRequestRegistry } from './utilities/ui-requests.js';
 
 export { settleBuildingPlanQuestions } from './building-plan/questions.js';
 export { buildingPlanIssueFocus } from './building-plan/issue-focus.js';
-export { buildingPlanRowTitle } from './building-plan/row-title.js';
+export { buildingPlanFloorTitle, buildingPlanRowTitle } from './building-plan/row-title.js';
 export {
   createBuildingPlanPresentation,
   normalizeBuildingPlanLocale,

@@ -1,4 +1,5 @@
 import { BUILDING_PLAN_MEASURES } from '../schema/building-plan-measures.js';
+import { buildingPlanFloorTitle } from './row-title.js';
 
 const plainLabel = (field) => (field?.label || '').replace(/\s*[[(](?:m|mm)[\])]$/, '');
 const round = (value, digits) => Number(value.toFixed(digits));
@@ -29,7 +30,8 @@ const nameText = (value) =>
 /** Who gave a candidate value: a room's or floor's name, else its position. */
 function sourceName(snapshot, id) {
   for (const floor of snapshot.floors) {
-    if (floor.id === id) return nameText(floor.values?.floor_name) || 'the floor';
+    if (floor.id === id)
+      return buildingPlanFloorTitle((name) => floor.values?.[name]) || 'the floor';
     const index = floor.rooms.findIndex((room) => room.id === id);
     if (index >= 0) return nameText(floor.rooms[index].values?.room_name) || `Room ${index + 1}`;
     for (const wall of floor.walls)
