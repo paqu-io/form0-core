@@ -31,6 +31,7 @@ import {
 } from './free-wall-lines.js';
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
 import { buildingPlanFloorTitle } from './row-title.js';
+import { buildingPlanFloorsByLevel } from './floor-order.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -72,6 +73,8 @@ export function buildingPlanCanvasSnapshot({
   };
   const pixels = (point) => ({ x: point.x * gridSize, y: point.y * gridSize });
   const floorRows = record.repeatable?.[key(meta, 'floors')] || [];
+  // Where each floor stands in level order (its tab's place); the floors keep their own order.
+  const levels = buildingPlanFloorsByLevel(plan.floors, (floor, name) => floor.values?.[name]);
   for (const [floorIndex, floor] of plan.floors.entries()) {
     const index = floorRows.findIndex((row) => subjectId(meta, 'floors', row) === floor.id);
     const floorRow = floorRows[index];
@@ -81,6 +84,7 @@ export function buildingPlanCanvasSnapshot({
       rowId: floorRow.id,
       index,
       label: buildingPlanFloorTitle((name) => floor.values[name]) || `F#${index + 1}`,
+      order: levels.indexOf(floor),
       path: floorPath,
     });
     if (floorIndex !== activeFloorIndex) continue;
