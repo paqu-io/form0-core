@@ -177,6 +177,26 @@ function applyChanges(snapshot, changes, inverse = false) {
   return true;
 }
 
+/**
+ * What stops an editor's edit from being undone on cancel, for hosts to log: the edit, the path
+ * of its first change whose value is no longer the one it left, and the edits made since in other
+ * editors (none means the value changed outside the history).
+ */
+function dependentEditDetails(current, past, owned, blocked) {
+  const scratch = copy(current);
+  const later = past.slice(past.indexOf(blocked) + 1);
+  for (const entry of [...later].reverse())
+    if (owned.has(entry.scopeId)) applyChanges(scratch, entry.changes, true);
+  const change = [...blocked.changes].reverse().find((entry) => !patch(scratch, entry, true));
+  return {
+    operation: blocked.operation?.type ?? null,
+    path: change ? copy(change.path) : null,
+    laterEdits: later
+      .filter((entry) => !owned.has(entry.scopeId))
+      .map((entry) => ({ operation: entry.operation?.type ?? null, scopeId: entry.scopeId })),
+  };
+}
+
 function validate(snapshot) {
   try {
     return validateBuildingPlanSnapshot(snapshot);
@@ -658,7 +678,9 @@ export function createBuildingPlanSession({
         return response('conflict', [
           planIssue(
             'dependent_edit',
-            'A later independent edit depends on this editor. Resolve that edit before cancelling.'
+            'A later independent edit depends on this editor. Resolve that edit before cancelling.',
+            null,
+            dependentEditDetails(current, past, owned, entry)
           ),
         ]);
     const issues = [
