@@ -1,15 +1,9 @@
 import { cleanPoint } from '../geometry.js';
 import { SAME, along, lineFrame, pointAt } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
+import { columnFollowers, columnTarget, wallWidthAt } from './follow-columns.js';
 import { halfWidth } from './partition-portions.js';
-import {
-  columnContacts,
-  freeWallContacts,
-  freeWallLines,
-  reach,
-  related,
-  roomFaces,
-} from './attached-contacts.js';
+import { freeWallContacts, freeWallLines, related, roomFaces } from './attached-contacts.js';
 
 /**
  * Attached contents follow their wall (4b, 2026-11-21; rule 3). After an edit has moved rooms
@@ -95,7 +89,18 @@ export function followAttached(before, primary, { specifications, operation } = 
     const faces = roomFaces(room);
     const ids = (room?.vertices || []).map((vertex) => vertex.id);
     let index = ids.indexOf(anchor.startId);
-    if (index < 0 || !ids.includes(anchor.endId)) return null;
+    if (index < 0 || !ids.includes(anchor.endId)) {
+      // Moved into line with a neighbour, the face merged with it and lost a vertex (a wall
+      // snapped onto the next one's line, after the 4b hand test): the face that keeps one of
+      // its vertices and runs the same way.
+      const merged = faces.find(
+        (face) =>
+          (face.startId === anchor.startId || face.endId === anchor.endId) &&
+          Math.abs(cross(face.frame.tangent, contact.frame.tangent)) <= 1e-6 &&
+          dot(face.frame.tangent, contact.frame.tangent) > 0
+      );
+      return merged ? { frame: merged.frame, divided: true } : null;
+    }
     // The faces from its start vertex to its end vertex: one, unless a jog divided it.
     const chain = [];
     while (ids[index] !== anchor.endId && chain.length < ids.length) {
@@ -192,50 +197,6 @@ export function followAttached(before, primary, { specifications, operation } = 
   return { shortFaceIds: [...short] };
 }
 
-/**
- * The offset from its line a column keeps (D6): flush, it stays flush (its size as it is now, the
- * line as it turned); centred on a midline, it keeps to the midline as the wall's width changes;
- * flush with the far face, to the far face; in the wall, it keeps its distance from the face.
- */
-function columnTarget(contact, frame, foot, half, widthAfter) {
-  const e = reach(half, frame.normal);
-  const { kind, outward } = contact;
-  if (kind === 'flush') return Math.sign(contact.d) * e;
-  if (kind === 'centred' || kind === 'inWall') return contact.d;
-  if (kind === 'flushIn') return outward * -e;
-  if (kind === 'flushOut') return outward * e;
-  const on = pointAt(frame, Math.min(Math.max(along(frame, foot), 0), frame.length));
-  const width = widthAfter(contact.anchor.roomId, on, frame.tangent) || contact.width;
-  if (kind === 'midline') return outward * (contact.out + (width - contact.width) / 2);
-  return outward * (width - e);
-}
-
-/**
- * A room wall's width at a point of a room's face running along `tangent` (at a corner, the
- * face that way), from the pieces derived; null if none.
- */
-function wallWidthAt(derived, roomId, point, tangent) {
-  for (const line of derived.lines) {
-    if (line.roomId !== roomId || Math.abs(cross(line.frame.tangent, tangent)) > 1e-6) continue;
-    const station = along(line.frame, point);
-    const offset =
-      (point.x - line.frame.start.x) * line.frame.normal.x +
-      (point.y - line.frame.start.y) * line.frame.normal.y;
-    if (Math.abs(offset) > 1e-3 || station < -1e-3 || station > line.frame.length + 1e-3) continue;
-    const piece = derived.pieces.find((entry) =>
-      entry.lines.some(
-        (span) =>
-          span.roomId === roomId &&
-          span.index === line.index &&
-          station >= span.from - 1e-3 &&
-          station <= span.to + 1e-3
-      )
-    );
-    if (piece) return piece.width;
-  }
-  return null;
-}
-
 /** Free wall rows the edit left in place that touch something. */
 function runFollowers(before, primary, halfBefore) {
   return before.partitions.flatMap((partition) => {
@@ -244,22 +205,6 @@ function runFollowers(before, primary, halfBefore) {
     const contacts = freeWallContacts(before, partition, halfBefore);
     if (!contacts || !contacts.ends.some((list) => list.length)) return [];
     return [{ partition, now, contacts }];
-  });
-}
-
-/** Columns the edit didn't move that touch something (a column only resized keeps its contacts). */
-function columnFollowers(before, primary, halfBefore, widthBefore) {
-  return before.rooms.flatMap((room) => {
-    const after = primary.rooms.find((entry) => entry.id === room.id);
-    return (room.columns || []).flatMap((column) => {
-      const now = after?.columns?.find((entry) => entry.id === column.id);
-      if (!now?.position || !column.position || gap(now.position, column.position) > 1e-9)
-        return [];
-      const contacts = columnContacts(before, room, column, halfBefore, widthBefore);
-      if (!contacts.length) return [];
-      const sized = now.width !== column.width || now.height !== column.height;
-      return [{ column, now, contacts, sized }];
-    });
   });
 }
 

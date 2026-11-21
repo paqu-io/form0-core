@@ -280,3 +280,45 @@ test('a column flush with a face, made wider, keeps its side on the face (D6)', 
   assert.equal(resized.status, 'applied');
   assert.deepEqual(columns(t), [[4.7, 1.5]]);
 });
+
+test('a face moved into line with its neighbour (they merge) still carries what touches it', () => {
+  // After the 4b hand test: the top wall split at x 3, its right part raised 0.5 m; a column
+  // flush with it and a free wall ending on it. Snapped back onto the left part's line, the two
+  // faces merge into one (the jog's vertices go): both still follow.
+  const t = example();
+  const faceAlong = (test) =>
+    t.room().faces.find((face) =>
+      (face.edgeIds || []).some((id) => {
+        const edge = t.room().edges.find((entry) => entry.id === id);
+        const [a, b] = [edge.startId, edge.endId].map((v) =>
+          t.room().vertices.find((entry) => entry.id === v)
+        );
+        return test(a, b);
+      })
+    );
+  t.apply({
+    type: 'split_face',
+    faceId: faceAlong((a, b) => a.y === 0 && b.y === 0).id,
+    offset: 3,
+  });
+  const raise = (distance, y) =>
+    t.apply({
+      type: 'resize_face',
+      faceId: faceAlong((a, b) => a.y === y && b.y === y && Math.min(a.x, b.x) >= 2.99).id,
+      distance,
+    });
+  assert.equal(raise(0.5, 0).status, 'applied');
+  column(t, 4, -0.35);
+  freeWall(t, [
+    [4.5, -0.5],
+    [4.5, 1.5],
+  ]);
+  const back = raise(-0.5, -0.5);
+  assert.equal(back.status, 'applied', JSON.stringify(back.issues));
+  assert.equal(t.room().vertices.length, 6);
+  assert.deepEqual(columns(t), [[4, 0.15]]);
+  assert.deepEqual(centrelines(t)[0], [
+    [4.5, 0],
+    [4.5, 1.5],
+  ]);
+});
