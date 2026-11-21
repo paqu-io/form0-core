@@ -249,8 +249,17 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
       if (!(thickness > 0) || !walls.has(wall.id)) continue;
       if (room.faces.some((face) => face.bindings?.some((binding) => binding.edgeId === edge.id)))
         continue;
-      // Both ways from the face; the room's clear space takes the inner half away.
-      const polygon = rect(edges[i], 0, edges[i].length, thickness);
+      // On the face's outer side only. Both ways, with the room's clear space taking the inner
+      // half away, left a piece where that space is shallower than the wall: a 16 cm strip of a
+      // room above another room's pushed wall kept 4 cm of the cap past the strip, in the next
+      // wall's band, drawn at the other room's level (2026-11-21).
+      const out = -side * thickness;
+      const polygon = [
+        at(edges[i], 0),
+        at(edges[i], edges[i].length),
+        at(edges[i], edges[i].length, out),
+        at(edges[i], 0, out),
+      ];
       walls.get(wall.id).polygons.push(polygon);
       clipsByPolygon.set(polygon, [room.id]);
     }
