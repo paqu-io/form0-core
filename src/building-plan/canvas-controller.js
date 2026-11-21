@@ -18,6 +18,7 @@ import {
   segmentFrame,
 } from './geometry.js';
 import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
+import { faceExtent } from './face-extent.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 import {
@@ -179,6 +180,12 @@ export function buildingPlanCanvasSnapshot({
           i ? [pixels(part.end)] : [pixels(part.start), pixels(part.end)]
         );
         const axisPoints = buildingPlanFaceAxes(physical, portions, pixels);
+        // The face up to the room's corner, over the caps next to it (drawn when selected).
+        const extent = faceExtent(
+          room,
+          face,
+          portions.flatMap((part, i) => (i ? [part.end] : [part.start, part.end]))
+        );
         const wall = {
           id: face.id,
           physicalWallId: physical.id,
@@ -193,6 +200,7 @@ export function buildingPlanCanvasSnapshot({
           path: wallPath,
           // A free wall is given by its centreline (4a-3); `sidePoints` is its row's face.
           ...(face.freePath ? { points: axisPoints, sidePoints: points } : { points }),
+          ...(extent ? { extentPoints: extent.map(pixels) } : {}),
           axisPoints,
           bindings: copy(face.bindings),
           doors: [],

@@ -296,17 +296,17 @@ test('physical thickness and active-face anchoring control the drawn width at ev
   assert.ok(covers(shared, { x: 320, y: 329 }));
   assert.ok(!covers(shared, { x: 320, y: 299 }));
   const small = f.scene(20);
-  assert.deepEqual(
-    small.wallFootprints.map((w) => w.polygons),
-    scene.wallFootprints.map((w) =>
+  // Both rounded: a cap's band (drawn since 2026-11-21) is clipped at each scale on its own.
+  const at = (scale) => (footprints) =>
+    footprints.map((w) =>
       w.polygons.map((p) =>
         p.map(({ x, y }) => ({
-          x: Math.round((x / 5) * 1e8) / 1e8,
-          y: Math.round((y / 5) * 1e8) / 1e8,
+          x: Math.round((x / scale) * 1e8) / 1e8,
+          y: Math.round((y / scale) * 1e8) / 1e8,
         }))
       )
-    )
-  );
+    );
+  assert.deepEqual(at(1)(small.wallFootprints), at(5)(scene.wallFootprints));
   f.apply({
     type: 'set_property',
     wallId: f.wallId,

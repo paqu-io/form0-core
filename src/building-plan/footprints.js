@@ -17,6 +17,13 @@ import { wallCornerPolygon } from './corner-profiles.js';
 import { freeWallSegmentBodies } from './free-wall-body.js';
 
 const EPS = GEOMETRY_EPSILON;
+/**
+ * A row reaches its edge's end within this (a tenth of a millimetre, the derived grid): a row's
+ * binding is clipped to its wall's segment, built from the wall's reference row, so on a face a
+ * few micrometres longer than that row it ends that much short (2026-11-21: the corner of the
+ * room on that side then went unfilled).
+ */
+const REACH_M = 1e-4;
 const area = (points) => Math.abs(polygonArea(points));
 const rect = (frame, from, to, half) => [
   at(frame, from, half),
@@ -200,7 +207,8 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
         for (const binding of face.bindings)
           if (
             binding.edgeId === edge.id &&
-            Math.abs(binding.roomInterval[atEnd ? 1 : 0] - (atEnd ? edges[index].length : 0)) < 1e-6
+            Math.abs(binding.roomInterval[atEnd ? 1 : 0] - (atEnd ? edges[index].length : 0)) <
+              REACH_M
           ) {
             const wall = floor.walls.find((w) => w.id === face.wallId);
             return {
@@ -230,6 +238,22 @@ export function buildingPlanFootprints(floor, gridSize, { boundaryOnly = false }
       }
       return null;
     };
+    // A cap (an edge with no row, rule F4) is part of its source wall, so its band is drawn with
+    // that wall (2026-11-21): at a room's inner corner two caps can cover each other, and the
+    // corner was left empty.
+    for (let i = 0; !boundaryOnly && i < edges.length; i++) {
+      const edge = room.edges.find((e) => e.startId === room.vertices[i].id);
+      const wall = edge?.profile && floor.walls.find((entry) => entry.id === edge.profile.wallId);
+      const segment = wall?.segments[0];
+      const thickness = segment ? buildingPlanSegmentThickness(wall, segment) : 0;
+      if (!(thickness > 0) || !walls.has(wall.id)) continue;
+      if (room.faces.some((face) => face.bindings?.some((binding) => binding.edgeId === edge.id)))
+        continue;
+      // Both ways from the face; the room's clear space takes the inner half away.
+      const polygon = rect(edges[i], 0, edges[i].length, thickness);
+      walls.get(wall.id).polygons.push(polygon);
+      clipsByPolygon.set(polygon, [room.id]);
+    }
     for (let i = 0; !boundaryOnly && i < edges.length; i++) {
       const previous = (i + edges.length - 1) % edges.length;
       const a = bound(previous, true),
