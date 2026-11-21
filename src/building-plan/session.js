@@ -779,6 +779,9 @@ export function createBuildingPlanSession({
       readOnly,
       canUndo: past.length > 0,
       canRedo: future.length > 0,
+      // The editor that owns the next undo and redo: only that one may take them.
+      undoScopeId: past.at(-1)?.scopeId ?? null,
+      redoScopeId: future.at(-1)?.scopeId ?? null,
       scopes: copy([...scopes.values()]),
     }),
     validate: () => validate(current),

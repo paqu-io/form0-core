@@ -41,3 +41,30 @@ test('a refused cancel names the edit in the way', () => {
   assert.ok(Array.isArray(issue.path) && issue.path.length > 0);
   assert.deepEqual(issue.laterEdits, [{ operation: 'set_property', scopeId: 'floor' }]);
 });
+
+test('the state names the editor that owns the next undo and redo', () => {
+  const f = createBuildingPlanExample();
+  const s = createBuildingPlanSession({
+    snapshot: readBuildingPlanRecord({ meta: f.meta, record: f.record }),
+    properties: f.meta.properties,
+  });
+  const wall = s
+    .getSnapshot()
+    .floors[0].walls.find((entry) => entry.sides.some((side) => side.roomId));
+  const roomId = wall.sides.find((side) => side.roomId).roomId;
+  assert.equal(s.getState().undoScopeId, null);
+  s.beginScope({ id: 'floor' });
+  s.beginScope({ id: 'room', parentScopeId: 'floor' });
+  const change = {
+    type: 'set_property',
+    floorId: f.floorId,
+    wallId: wall.id,
+    activeRoomId: roomId,
+  };
+  s.apply({ ...change, property: 'wall_thickness', value: 0.4 }, { scopeId: 'floor' });
+  assert.equal(s.getState().undoScopeId, 'floor');
+  s.apply({ ...change, property: 'wall_thickness', value: 0.5 }, { scopeId: 'room' });
+  assert.equal(s.getState().undoScopeId, 'room');
+  s.undo({ scopeId: 'room' });
+  assert.deepEqual([s.getState().undoScopeId, s.getState().redoScopeId], ['floor', 'room']);
+});
