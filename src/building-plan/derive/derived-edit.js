@@ -1,6 +1,10 @@
 import { buildingPlanPinIssues } from '../corner-edits.js';
 import { buildingPlanBoundaryClearanceIssues } from '../footprints.js';
-import { columnPlacementIssues, freeWallPlacementIssues } from '../room-contents.js';
+import {
+  columnPlacementIssues,
+  freeWallPlacementIssues,
+  freeWallTooShortIssues,
+} from '../room-contents.js';
 import { findBuildingPlanFloor } from '../model.js';
 import { extractBuildingPlanPrimary } from './extract.js';
 import { deriveBuildingPlanPrimary } from './index.js';
@@ -23,6 +27,7 @@ import {
   thicknessContext,
 } from './data-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
+import { followAttached } from './follow-attached.js';
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
 export const DERIVED_OPERATIONS = Object.freeze([
@@ -67,6 +72,25 @@ function writeFloor(snapshot, floor, primary, options) {
 }
 
 /**
+ * Attached contents follow their wall (4b): what touched a line the edit moved (`before`, the
+ * floor's primary data before it) moves with it; then the floor is written. A free wall that
+ * following would leave too short refuses the edit, named.
+ */
+function followAndWrite(snapshot, floor, before, primary, options, operation) {
+  const { shortFaceIds } = followAttached(before, primary, {
+    specifications: options.specifications,
+    operation,
+  });
+  const written = writeFloor(snapshot, floor, primary, options);
+  if (!shortFaceIds.length) return written;
+  const edited = snapshot.floors.find((entry) => entry.id === floor.id);
+  return {
+    ...written,
+    issues: [...written.issues, ...freeWallTooShortIssues(edited, shortFaceIds)],
+  };
+}
+
+/**
  * Apply a room or face operation to a candidate snapshot through the derived core: extract the
  * floor's primary data, apply the command, derive, and write the floor back in place.
  *
@@ -81,15 +105,19 @@ export function applyDerivedOperation(
     return applyDataOperation(snapshot, operation, { createId, specifications, editingPolicy });
   const floor = findBuildingPlanFloor(snapshot, operation.floorId);
   const primary = extractBuildingPlanPrimary(floor);
+  const before = extractBuildingPlanPrimary(floor);
   const command = FACE_COMMANDS[operation.type];
   const { result, preferredRoomIds } = command
     ? command(primary, operation, { createId, specifications, editingPolicy })
     : applyRoomCommand(primary, operation, { createId, specifications });
-  const written = writeFloor(snapshot, floor, primary, {
-    createId,
-    specifications,
-    preferredRoomIds,
-  });
+  const written = followAndWrite(
+    snapshot,
+    floor,
+    before,
+    primary,
+    { createId, specifications, preferredRoomIds },
+    operation
+  );
   return { result, ...written };
 }
 
@@ -103,7 +131,7 @@ function applyDataOperation(snapshot, operation, options) {
   const carved = [];
   const divisions = [];
   const issues = [];
-  for (const { floor, before, primary } of floors) {
+  for (const { floor, before, original, primary } of floors) {
     const { result, preferredRoomIds } = changeThickness(
       primary,
       before,
@@ -111,7 +139,15 @@ function applyDataOperation(snapshot, operation, options) {
       options
     );
     carved.push(...result.carvedRoomIds);
-    const written = writeFloor(snapshot, floor, primary, { ...options, preferredRoomIds });
+    // Against the floor before any of the edits: a column only resized keeps its contacts (D6).
+    const written = followAndWrite(
+      snapshot,
+      floor,
+      original,
+      primary,
+      { ...options, preferredRoomIds },
+      operation
+    );
     divisions.push(...written.divisions);
     issues.push(...written.issues);
   }
@@ -139,16 +175,16 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
   const floor = findBuildingPlanFloor(snapshot, floorId);
   const primary = extractBuildingPlanPrimary(floor);
   let moved = { result: { carvedRoomIds: [] }, preferredRoomIds: undefined };
+  let before = null;
   if (change && isDataOperation(change.operation)) {
-    const before = extractBuildingPlanPrimary(findBuildingPlanFloor(change.previous, floorId));
+    before = extractBuildingPlanPrimary(findBuildingPlanFloor(change.previous, floorId));
     const context = thicknessContext(change.current, change.operation, editingPolicy);
     moved = changeThickness(primary, before, floorContext(context, floorId), options);
   }
-  const written = writeFloor(snapshot, floor, primary, {
-    createId,
-    specifications,
-    preferredRoomIds: moved.preferredRoomIds,
-  });
+  const writeOptions = { createId, specifications, preferredRoomIds: moved.preferredRoomIds };
+  const written = before
+    ? followAndWrite(snapshot, floor, before, primary, writeOptions, change.operation)
+    : writeFloor(snapshot, floor, primary, writeOptions);
   return { ...written, carvedRoomIds: moved.result.carvedRoomIds };
 }
 

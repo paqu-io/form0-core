@@ -171,7 +171,7 @@ export function freeWallPlacementIssues(floor) {
       const thickness = wall?.properties?.wall_thickness;
       const half = typeof thickness === 'number' && thickness > 0 ? thickness / 2 : 0;
       if (freeWallFits(path, half, room.vertices, TOUCH_M)) continue;
-      const name = textOf(wall?.values?.wall_label) || wall?.autoLabel || null;
+      const name = freeWallName(floor, face);
       issues.push(
         planIssue(
           'free_wall_outside_room',
@@ -182,4 +182,32 @@ export function freeWallPlacementIssues(floor) {
     }
   }
   return issues;
+}
+
+/** A free wall's name, as the canvas shows it: its label, else W9. */
+function freeWallName(floor, face) {
+  const wall = floor.walls.find((entry) => entry.id === face.wallId);
+  return textOf(wall?.values?.wall_label) || wall?.autoLabel || null;
+}
+
+/**
+ * The free wall rows that following their wall would leave shorter than a centimetre, or turned
+ * back (4b, D4), one issue each, naming the wall.
+ * @param {object} floor the edited floor
+ * @param {string[]} faceIds the rows (`follow-attached.js`)
+ * @returns {object[]} issues
+ */
+export function freeWallTooShortIssues(floor, faceIds) {
+  return floor.rooms.flatMap((room) =>
+    (room.faces || [])
+      .filter((face) => faceIds.includes(face.id))
+      .map((face) => {
+        const name = freeWallName(floor, face);
+        return planIssue(
+          'free_wall_too_short',
+          name ? `Wall ${name} would be too short.` : 'A wall would be too short.',
+          { type: 'room_face', id: face.id }
+        );
+      })
+  );
 }

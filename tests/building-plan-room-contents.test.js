@@ -172,32 +172,33 @@ test('a free wall drawn or moved out of its room: refused, naming it', () => {
   assert.deepEqual(t.session.validate(), []);
 });
 
-test('a room face moved in past a free wall: refused; moved out, or the room moved: accepted', () => {
+test('a face moved in past a free wall clear of it: refused; moved out, or the room moved: fine', () => {
+  // A free wall ending on the face follows it (4b, `building-plan-attached-follow.test.js`).
   const t = example();
   freeWall(t, [
     { x: 3, y: 1 },
-    { x: 5, y: 1 },
+    { x: 4.8, y: 1 },
   ]);
   const w2 = t.floor().walls.find((wall) => wall.autoLabel === 'W2');
   const face = () => t.room().faces.find((entry) => entry.wallId === w2.id);
   const inwards = t.apply({ type: 'resize_face', faceId: face().id, distance: -0.5 });
   assert.deepEqual(codes(inwards), ['free_wall_outside_room']);
   assert.equal(inwards.issues[0].message, 'Wall W9 would leave its room.');
-  // Outwards, the free wall stays where it was (following its wall is 4b).
+  // Outwards, the free wall stays where it was: it doesn't touch the face.
   assert.equal(
     t.apply({ type: 'resize_face', faceId: face().id, distance: 0.3 }).status,
     'applied'
   );
   assert.deepEqual(centrelineOf(t), [
     [3, 1],
-    [5, 1],
+    [4.8, 1],
   ]);
   // The whole room moved: the free wall goes with it.
   const moved = t.apply({ type: 'move_room', roomId: t.room().id, delta: { x: 0, y: -1 } });
   assert.equal(moved.status, 'applied');
   assert.deepEqual(centrelineOf(t), [
     [3, 0],
-    [5, 0],
+    [4.8, 0],
   ]);
 });
 

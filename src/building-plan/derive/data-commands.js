@@ -72,15 +72,22 @@ export const floorContext = (context, floorId) => ({
  * Apply the data edits of an operation or batch to the stored floors with today's code (J4, rule
  * 12): openings first, on the walls the host saw, then values, custom rows and room elements in
  * their order, then property answers. Each edited floor is read into primary data with the
- * property answers before (`before`) and after (`primary`); geometry is the same.
+ * property answers before (`before`) and after (`primary`); geometry is the same; `original`
+ * is the floor before any of the edits.
  *
  * @returns {{context: Object, created: Array<Object>, floors: Array<{floor: Object,
- *   before: Object, primary: Object}>}}
+ *   before: Object, original: Object, primary: Object}>}}
  */
 export function applyDataEdits(snapshot, operation, { createId, specifications, editingPolicy }) {
   const context = thicknessContext(snapshot, operation, editingPolicy);
   const entries = entriesOf(operation);
   const created = [];
+  // Each floor before any edit, for its contents' contacts (4b).
+  const original = new Map();
+  for (const entry of entries) {
+    const floor = findBuildingPlanFloor(snapshot, entry.floorId);
+    if (floor && !original.has(floor.id)) original.set(floor.id, extractBuildingPlanPrimary(floor));
+  }
   const edit = (entry) => {
     const floor = findBuildingPlanFloor(snapshot, entry.floorId);
     if (VALUE_OPERATIONS.includes(entry.type)) return applyValueOperation(floor, entry);
@@ -110,7 +117,12 @@ export function applyDataEdits(snapshot, operation, { createId, specifications, 
     created,
     floors: [...before].map(([floorId, primary]) => {
       const floor = findBuildingPlanFloor(snapshot, floorId);
-      return { floor, before: primary, primary: extractBuildingPlanPrimary(floor) };
+      return {
+        floor,
+        before: primary,
+        original: original.get(floorId) || primary,
+        primary: extractBuildingPlanPrimary(floor),
+      };
     }),
   };
 }

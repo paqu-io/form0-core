@@ -2,6 +2,7 @@ import { cleanPoint } from '../geometry.js';
 import { SAME, lineFrame } from './grid.js';
 import { resolutionFloor, resolveWallThickness } from './thickness.js';
 import { derivePartitionPieces } from './partitions.js';
+import { ATTACH_M, roomFaces } from './attached-contacts.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -17,9 +18,40 @@ function crossing(p, u, q, v) {
 }
 
 /**
+ * Which side of a free wall row lies along one of its room's faces (4b, D5): its row's side
+ * (`row`, its stored face), its other side (`other`, `width` away), or neither (null).
+ */
+function flushSide(primary, partition, width) {
+  const frame = lineFrame(partition.path[0], partition.path.at(-1));
+  if (!frame) return null;
+  const room = primary.rooms.find((entry) => entry.id === partition.roomId);
+  const shift = -(partition.sides[0] ?? 1) * width;
+  const sides = {
+    row: [frame.start, frame.end],
+    other: [frame.start, frame.end].map((p) => ({
+      x: p.x + frame.normal.x * shift,
+      y: p.y + frame.normal.y * shift,
+    })),
+  };
+  const along = (face, p) =>
+    (p.x - face.start.x) * face.tangent.x + (p.y - face.start.y) * face.tangent.y;
+  const away = (face, p) =>
+    (p.x - face.start.x) * face.normal.x + (p.y - face.start.y) * face.normal.y;
+  for (const [name, ends] of Object.entries(sides))
+    for (const { frame: face } of roomFaces(room)) {
+      if (ends.some((p) => Math.abs(away(face, p)) > ATTACH_M)) continue;
+      const stations = ends.map((p) => along(face, p));
+      const covered =
+        Math.min(face.length, Math.max(...stations)) - Math.max(0, Math.min(...stations));
+      if (covered > SAME) return name;
+    }
+  return null;
+}
+
+/**
  * J5: a partition whose thickness changes keeps its axis (whatever the anchor since 4a-3: free
- * walls are drawn by their centreline), so its path (the face)
- * moves by half the change away from its body. Runs meeting at a point (the runs of a drawn
+ * walls are drawn by their centreline), so its path (the face) moves by half the change away from
+ * its body; one with a side flush against a face of its room keeps that side (4b, D5). Runs meeting at a point (the runs of a drawn
  * polyline, a Split portion and its return) stay joined: the point goes to where their lines,
  * moved or not, now cross; parallel runs moved alike stay joined by moving alike.
  */
@@ -40,7 +72,10 @@ export function shiftPartitions(primary, before, specifications) {
     if (!(resolved.value > 0))
       refuse('invalid_dimension', 'Wall thickness must be positive or explicitly unknown.');
     const change = resolved.value - piece.width;
-    if (Math.abs(change) > SAME) line.shift = ((partition.sides[0] ?? 1) * change) / 2;
+    if (Math.abs(change) <= SAME) continue;
+    const kept = flushSide(primary, partition, piece.width);
+    line.shift =
+      (partition.sides[0] ?? 1) * (kept === 'row' ? 0 : kept === 'other' ? change : change / 2);
   }
   const movedLine = ({ frame, shift }) => ({
     point: {
