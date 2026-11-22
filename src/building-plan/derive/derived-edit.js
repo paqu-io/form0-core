@@ -93,13 +93,15 @@ function followAndWrite(snapshot, floor, before, primary, options, operation) {
 /**
  * Apply a room or face operation to a candidate snapshot through the derived core: extract the
  * floor's primary data, apply the command, derive, and write the floor back in place.
+ * `entryStates`: the plans the editor the edit runs in went through, earliest first (none outside
+ * an editor).
  *
  * @returns {{result: Object, divisions: Array<Object>, issues: Array<Object>}}
  */
 export function applyDerivedOperation(
   snapshot,
   operation,
-  { createId, specifications, editingPolicy = {} }
+  { createId, specifications, editingPolicy = {}, entryStates = null }
 ) {
   if (isDataOperation(operation))
     return applyDataOperation(snapshot, operation, { createId, specifications, editingPolicy });
@@ -107,8 +109,11 @@ export function applyDerivedOperation(
   const primary = extractBuildingPlanPrimary(floor);
   const before = extractBuildingPlanPrimary(floor);
   const command = FACE_COMMANDS[operation.type];
+  const entryFloors = (entryStates || [])
+    .map((plan) => plan.floors?.find((entry) => entry.id === floor.id))
+    .filter(Boolean);
   const { result, preferredRoomIds } = command
-    ? command(primary, operation, { createId, specifications, editingPolicy })
+    ? command(primary, operation, { createId, specifications, editingPolicy, entryFloors })
     : applyRoomCommand(primary, operation, { createId, specifications });
   const written = followAndWrite(
     snapshot,

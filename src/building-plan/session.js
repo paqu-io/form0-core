@@ -238,6 +238,13 @@ export function createBuildingPlanSession({
   let future = [];
   const proposals = new WeakMap();
   const scopes = new Map();
+  // The plans each open editor went through, earliest first: the plan it opened on, then the plan
+  // after each change. Kept out of `getState()`; a drag back reads them (`entry-return.js`).
+  const scopeStates = new WeakMap();
+  const remember = () => {
+    const plan = copy(current);
+    for (const scope of scopes.values()) scopeStates.get(scope).push(plan);
+  };
   const questions = createUIRequestRegistry({ createId });
   let pendingGeneration = 0;
   const initialIssues = [
@@ -302,6 +309,7 @@ export function createBuildingPlanSession({
             createId,
             specifications,
             editingPolicy,
+            entryStates: scopeId == null ? null : scopeStates.get(scopes.get(scopeId)),
           });
           divisions = applied.divisions;
           derivedIssues = applied.issues;
@@ -612,6 +620,7 @@ export function createBuildingPlanSession({
       });
       future = [];
       revision++;
+      remember();
     }
     return response('applied', [], {
       snapshot: getSnapshot(),
@@ -636,7 +645,9 @@ export function createBuildingPlanSession({
       ]);
     questions.cancelAll();
     pendingGeneration++;
-    scopes.set(id, { id, parentScopeId, subject: copy(subject) });
+    const scope = { id, parentScopeId, subject: copy(subject) };
+    scopes.set(id, scope);
+    scopeStates.set(scope, [copy(current)]);
     return response('opened', [], { scopeId: id });
   }
 
@@ -705,6 +716,7 @@ export function createBuildingPlanSession({
     future = [];
     for (const id of owned) scopes.delete(id);
     revision++;
+    remember();
     return response('cancelled', [], { snapshot: getSnapshot() });
   }
 
@@ -730,6 +742,7 @@ export function createBuildingPlanSession({
     source.pop();
     (direction === 'undo' ? future : past).push(entry);
     revision++;
+    remember();
     return response(direction === 'undo' ? 'undone' : 'redone', [], { snapshot: getSnapshot() });
   }
 
@@ -780,6 +793,7 @@ export function createBuildingPlanSession({
         current = candidate;
         future = [];
         revision++;
+        remember();
       }
       return response('synchronized', [], { snapshot: getSnapshot() });
     },

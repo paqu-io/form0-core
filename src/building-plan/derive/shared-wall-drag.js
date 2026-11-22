@@ -17,6 +17,12 @@ export function sharedWallMode(operation, editingPolicy = {}) {
   return mode;
 }
 
+/** The widest a drag widens a shared wall: the thickness field's `max`, else 0.7 m (F7). */
+export function sharedWallLimit(specifications) {
+  const max = specifications?.wall_thickness?.field?.max;
+  return Number.isFinite(max) && max > 0 ? max : SHARED_WALL_WIDEN_LIMIT;
+}
+
 /**
  * `widen` for a drag away from the neighbour (decision R1, F7). The neighbour keeps its face and
  * the wall widens by the drag, up to the limit (the thickness field's `max`, else 0.7 m). Past the
@@ -28,8 +34,7 @@ export function sharedWallMode(operation, editingPolicy = {}) {
  *   the dragged room's outward normal (negative: away from the neighbour).
  */
 export function widenPlan(primary, floor, specifications, { subjectId, roomIds, width, distance }) {
-  const field = specifications?.wall_thickness?.field;
-  const limit = Number.isFinite(field?.max) && field.max > 0 ? field.max : SHARED_WALL_WIDEN_LIMIT;
+  const limit = sharedWallLimit(specifications);
   const subject = primary.subjects.get(subjectId) || null;
   const exterior = (roomId) =>
     resolveWallThickness(floor, specifications, subject, [roomId, null]).value || 0;

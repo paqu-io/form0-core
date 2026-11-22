@@ -48,6 +48,9 @@ const storage = (meta, key) =>
 const subjectId = (meta, key, row) => JSON.parse(row.values[storage(meta, key)]).id;
 const key = (meta, name) => node(meta, name).preferredKey;
 
+// A managed host's canvas previews in this scope of its own session (`previewScopeId`).
+const PREVIEW_SCOPE_ID = 'canvas-preview';
+
 /** A portable, read-only rendering projection. Row paths retain the host's normal nesting. */
 export function buildingPlanCanvasSnapshot({
   meta,
@@ -364,6 +367,15 @@ export class BuildingPlanCanvasController {
     this.busy = false;
     this.syncFromState();
   }
+  /**
+   * The scope this controller's own session previews in. A managed host commits through its
+   * editor, in the entry's scope there; this session only previews, so it keeps a scope of its
+   * own opened on the plan it started with, the entry's start (a canvas opens with its entry), for
+   * the drags that read it (a shared wall dragged back, `derive/entry-return.js`).
+   */
+  previewScopeId() {
+    return this.managedTransactions ? PREVIEW_SCOPE_ID : this.scopeId();
+  }
   syncFromState() {
     if (this.busy || this.disposed) return;
     if (this.pinScopeId !== undefined && this.pinScopeId !== this.scopeId()) {
@@ -373,7 +385,7 @@ export class BuildingPlanCanvasController {
     try {
       const record = this.readRecord();
       const plan = readBuildingPlanRecord({ meta: this.meta, record });
-      if (!this.session)
+      if (!this.session) {
         this.session = createBuildingPlanSession({
           snapshot: plan,
           properties: this.meta.properties,
@@ -381,7 +393,8 @@ export class BuildingPlanCanvasController {
           editingPolicy: this.editingPolicy,
           derivedCommands: this.derivedCommands,
         });
-      else {
+        if (this.managedTransactions) this.session.beginScope({ id: PREVIEW_SCOPE_ID });
+      } else {
         const result = this.session.synchronize(plan);
         if (result.issues.length)
           throw Object.assign(new Error(result.issues[0].message), { issues: result.issues });
@@ -492,7 +505,7 @@ export class BuildingPlanCanvasController {
       thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
     };
     this.previewView = null;
-    let proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+    let proposal = this.session.preview(operation, { scopeId: this.previewScopeId() });
     const cut = proposal.issues?.find(
       (issue) => issue.code === 'opening_cut_requires_confirmation'
     );
@@ -517,7 +530,7 @@ export class BuildingPlanCanvasController {
         ...operation,
         removeOpeningIds: cut.openingIds,
       };
-      proposal = this.session.preview(operation, { scopeId: this.scopeId() });
+      proposal = this.session.preview(operation, { scopeId: this.previewScopeId() });
     }
 
     if (proposal.status !== 'ready') {
@@ -645,7 +658,7 @@ export class BuildingPlanCanvasController {
         pinnedFaceIds: [...this.pinnedFaceIds],
         thicknessAnchor: operation.thicknessAnchor ?? this.editingPolicy.thicknessAnchor,
       },
-      { scopeId: this.scopeId() }
+      { scopeId: this.previewScopeId() }
     );
     if (proposal.status !== 'ready') {
       this.reportIssues(proposal.issues);
