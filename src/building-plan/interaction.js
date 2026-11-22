@@ -12,6 +12,15 @@ import {
 } from './free-wall-snapping.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+/**
+ * The floor below's corners (F3, 2026-11-22; U5): every corner of its wall bands, inside and
+ * outside faces, from the canvas snapshot's `floorBelow`. Each is marked `below`.
+ */
+const belowCorners = (view) =>
+  (view.floorBelow?.walls || []).flat().map((point) => ({ x: point.x, y: point.y, below: true }));
+// A guide to a corner of the floor below says so (the canvas rings that corner, U7).
+const guideFrom = (target) => ({ x: target.x, y: target.y });
+const marked = (guide, target) => (target?.below ? { ...guide, below: true } : guide);
 
 /** Canvas zoom range shared by every host; 1 is the default 20 px per metre. */
 export const BUILDING_PLAN_ZOOM_LIMITS = Object.freeze({ min: 0.25, max: 20 });
@@ -37,6 +46,7 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
           Number(Boolean(b.contact)) - Number(Boolean(a.contact)) ||
           Number(latch.has(b.key)) - Number(latch.has(a.key)) ||
           a.error - b.error ||
+          Number(Boolean(a.below)) - Number(Boolean(b.below)) ||
           a.key.localeCompare(b.key)
       );
     const first = ranked[0];
@@ -59,11 +69,15 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     latch = new Set(chosen.map((entry) => entry.key));
     guides = chosen.flatMap((entry) =>
       entry.guides.map((guide) => ({
-        from: {
-          x: guide.from.x + delta.x - entry.delta.x,
-          y: guide.from.y + delta.y - entry.delta.y,
-        },
+        // A guide to the floor below keeps its corner where it is (the corner doesn't move).
+        from: guide.below
+          ? { ...guide.from }
+          : {
+              x: guide.from.x + delta.x - entry.delta.x,
+              y: guide.from.y + delta.y - entry.delta.y,
+            },
         to: { x: guide.to.x + delta.x - entry.delta.x, y: guide.to.y + delta.y - entry.delta.y },
+        ...(guide.below ? { below: true } : {}),
       }))
     );
     return { delta };
@@ -172,6 +186,29 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         });
       }
     }
+    // The floor below (F3): an edge pulled into line with one of its corners.
+    const corners = belowCorners(view);
+    for (const [index, [start, end]] of edges.entries()) {
+      if (!corners.length || Math.hypot(end.x - start.x, end.y - start.y) < 1e-6) continue;
+      const own = segmentFrame(start, end);
+      for (const [cornerIndex, corner] of corners.entries()) {
+        const { along, offset } = project(own, corner);
+        candidates.push({
+          key: `below:${index}:${cornerIndex}`,
+          below: true,
+          error: Math.abs(offset),
+          normal: own.normal,
+          delta: { x: own.normal.x * offset, y: own.normal.y * offset },
+          guides: [
+            {
+              from: guideFrom(corner),
+              to: at(own, clamp(along, 0, own.length), offset),
+              below: true,
+            },
+          ],
+        });
+      }
+    }
     if (
       !candidates.some((candidate) => captureError(candidate) * zoom <= 8) &&
       originalPoints.length === points.length
@@ -262,17 +299,23 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   function snapPoint(point, { roomId, zoom = 1, bypass = false } = {}) {
     guides = [];
     if (!settings().snapping || bypass) return { ...point };
-    const targets = (currentScene().rooms || [])
-      .filter((room) => room.id !== roomId)
-      .flatMap((room) => room.vertices);
+    const view = currentScene();
+    const targets = [
+      ...(view.rooms || []).filter((room) => room.id !== roomId).flatMap((room) => room.vertices),
+      ...belowCorners(view),
+    ];
     const result = { ...point };
     for (const axis of ['x', 'y']) {
       const target = targets
         .filter((entry) => Math.abs(entry[axis] - point[axis]) * zoom <= 8)
-        .sort((a, b) => Math.abs(a[axis] - point[axis]) - Math.abs(b[axis] - point[axis]))[0];
+        .sort(
+          (a, b) =>
+            Math.abs(a[axis] - point[axis]) - Math.abs(b[axis] - point[axis]) ||
+            Number(Boolean(a.below)) - Number(Boolean(b.below))
+        )[0];
       if (!target) continue;
       result[axis] = target[axis];
-      guides.push({ from: target, to: { ...result } });
+      guides.push(marked({ from: guideFrom(target), to: { ...result } }, target));
     }
     return result;
   }
@@ -305,15 +348,20 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       ...point,
       [axis === 'x' ? 'y' : 'x']: originalPoint[axis === 'x' ? 'y' : 'x'],
     };
-    const targets = (currentScene().corners || []).filter((corner) => corner.id !== vertexId);
+    const targets = [
+      ...(view.corners || []).filter((corner) => corner.id !== vertexId),
+      ...belowCorners(view).map((point) => ({ point, below: true })),
+    ];
     const nearest = targets
       .filter((c) => Math.abs(c.point[axis] - result[axis]) * zoom <= 8)
       .sort(
-        (a, b) => Math.abs(a.point[axis] - result[axis]) - Math.abs(b.point[axis] - result[axis])
+        (a, b) =>
+          Math.abs(a.point[axis] - result[axis]) - Math.abs(b.point[axis] - result[axis]) ||
+          Number(Boolean(a.below)) - Number(Boolean(b.below))
       )[0];
     if (nearest) {
       result[axis] = nearest.point[axis];
-      guides.push({ from: nearest.point, to: { ...result } });
+      guides.push(marked({ from: guideFrom(nearest.point), to: { ...result } }, nearest));
     }
     guides.push({ from: { ...originalPoint }, to: { ...result } });
     return result;
@@ -414,7 +462,12 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     snapFreeWallTranslation,
     snapColumn,
     edgePan,
-    getGuides: () => guides.map((guide) => ({ from: { ...guide.from }, to: { ...guide.to } })),
+    getGuides: () =>
+      guides.map((guide) => ({
+        from: { ...guide.from },
+        to: { ...guide.to },
+        ...(guide.below ? { below: true } : {}),
+      })),
     reset() {
       referenceScene = null;
       cornerAxis = null;
