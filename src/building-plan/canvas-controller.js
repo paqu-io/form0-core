@@ -322,7 +322,8 @@ export function buildingPlanCanvasSnapshot({
  * Shared canvas rules. Hosts supply record transactions, navigation, and issue presentation.
  * No DOM, framework, lifecycle event, or record persistence belongs in this controller.
  * `derivedCommands` runs the geometry commands on the derived core (see the record session); a
- * host passes the same value to every session of one plan.
+ * host passes the same value to every session of one plan. `floorId`: the floor to show (an
+ * entry's own floor; `showFloor` changes it), else the first.
  */
 export class BuildingPlanCanvasController {
   constructor({
@@ -339,6 +340,7 @@ export class BuildingPlanCanvasController {
     managedTransactions = false,
     presentQuestion,
     derivedCommands = false,
+    floorId = null,
   }) {
     Object.assign(this, {
       meta,
@@ -361,6 +363,9 @@ export class BuildingPlanCanvasController {
     });
     this.gridSize = 20;
     this.activeFloorIndex = 0;
+    // The floor shown, by id, so it stays shown when floors are added or reordered: an entry's own
+    // floor (`floorId`, a host's scope), else the one its tabs chose; none, the first.
+    this.shownFloorId = floorId;
     this.listeners = new Set();
     this.pinnedFaceIds = new Set();
     this.disposed = false;
@@ -407,6 +412,8 @@ export class BuildingPlanCanvasController {
   }
   refresh(plan = this.session.getSnapshot(), record = this.record) {
     this.semanticSnapshot = plan;
+    const shown = plan.floors.findIndex((floor) => floor.id === this.shownFloorId);
+    if (shown >= 0) this.activeFloorIndex = shown;
     this.activeFloorIndex = Math.max(0, Math.min(this.activeFloorIndex, plan.floors.length - 1));
     this.snapshot = buildingPlanCanvasSnapshot({
       meta: this.meta,
@@ -468,7 +475,20 @@ export class BuildingPlanCanvasController {
   setActiveFloor(index) {
     this.pinnedFaceIds.clear();
     this.activeFloorIndex = index;
+    this.shownFloorId = this.semanticSnapshot?.floors[index]?.id ?? null;
     this.refresh();
+    this.emitUpdate();
+  }
+  /**
+   * Shows the floor with this id (an entry's own floor), now and when the plan changes; none, or
+   * one the plan doesn't have yet, keeps the floor shown.
+   * @param {string | null} floorId
+   */
+  showFloor(floorId) {
+    if (floorId === this.shownFloorId) return;
+    this.pinnedFaceIds.clear();
+    this.shownFloorId = floorId;
+    if (this.session) this.refresh();
     this.emitUpdate();
   }
   getActiveFloorPath() {
