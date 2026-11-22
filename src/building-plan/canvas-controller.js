@@ -32,6 +32,7 @@ import {
 import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-placement.js';
 import { buildingPlanFloorTitle } from './row-title.js';
 import { buildingPlanFloorsByLevel } from './floor-order.js';
+import { buildingPlanFloorBelow } from './floor-below.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -59,6 +60,7 @@ export function buildingPlanCanvasSnapshot({
   gridSize = 20,
   activeFloorIndex = 0,
   freeWallBends = false,
+  floorBelow,
 }) {
   const output = {
     floors: [],
@@ -315,6 +317,16 @@ export function buildingPlanCanvasSnapshot({
       }
     }
   }
+  // The floor below, drawn under this one (F2); a preview passes the one it has (an edit of this
+  // floor doesn't change it).
+  output.floorBelow =
+    floorBelow !== undefined
+      ? floorBelow
+      : buildingPlanFloorBelow(plan.floors, plan.floors[activeFloorIndex], gridSize);
+  if (output.floorBelow && floorBelow === undefined)
+    output.floorBelow.label = output.floors.find(
+      (entry) => entry.id === output.floorBelow.id
+    )?.label;
   return output;
 }
 
@@ -699,6 +711,7 @@ export class BuildingPlanCanvasController {
         gridSize: this.gridSize,
         activeFloorIndex: this.activeFloorIndex,
         freeWallBends: this.derivedCommands,
+        floorBelow: this.snapshot?.floorBelow ?? null,
       });
     } catch (error) {
       const issues = error.issues || [{ code: 'invalid_preview', message: error.message }];
