@@ -287,7 +287,10 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       const ends = [earlier.points[0], later.points.at(-1)];
       const last = lastEnd?.bend === vertexId ? lastEnd.point : originalPoint;
       const shared = { roomId, wallId: earlier.id, zoom, bypass };
-      const { point: held } = freeWall((o) => snapBend(point, { ...o, ends, last }), shared);
+      const { point: held } = freeWall(
+        (o) => snapBend(point, { ...o, ends, last, start: originalPoint }),
+        shared
+      );
       lastEnd = { bend: vertexId, point: held };
       return held;
     }

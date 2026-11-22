@@ -95,6 +95,71 @@ test('a dragged bend point is held where both runs fit the room', async () => {
   t.controller.dispose();
 });
 
+test('a dragged split point holds its wall’s line, on whole centimetres', async () => {
+  // Hand test 2026-11-22: nothing pulled it onto its own wall's line. At zoom 5 the pull reaches
+  // 8 px, 8 cm here.
+  const t = controllerFor();
+  await splitWall(t, [1, 1.5], [4, 1.5], 1.5);
+  const corner = t.bends()[0];
+  const options = {
+    roomId: t.room().id,
+    vertexId: corner.id,
+    originalPoint: corner.point,
+    zoom: 5,
+  };
+  const snap = (point, extra = {}) =>
+    t.metres(t.controller.interaction.snapCorner(t.px(point), { ...options, ...extra }));
+  assert.deepEqual(snap([3.004, 1.53]), [3, 1.5]);
+  const guide = t.controller.interaction.getGuides().at(-1);
+  assert.deepEqual(
+    [t.metres(guide.from), t.metres(guide.to)],
+    [
+      [1, 1.5],
+      [3, 1.5],
+    ]
+  );
+  assert.deepEqual(snap([2.2, 1.46]), [2.2, 1.5]);
+  // Out of reach (past the 13 px it holds within once on it), or with Alt: as before (1 cm steps).
+  assert.deepEqual(snap([3, 1.72]), [3, 1.72]);
+  assert.deepEqual(snap([3, 1.53], { bypass: true }), [3, 1.53]);
+  t.controller.dispose();
+});
+
+test('on a bent wall, each run’s line keeps that run’s direction', async () => {
+  const t = controllerFor();
+  await splitWall(t, [1, 1.5], [4, 1.5], 1.5);
+  await t.controller.updateCorner(t.room().id, t.bends()[0].id, t.px([2.5, 0.8]));
+  const corner = t.bends()[0];
+  const options = {
+    roomId: t.room().id,
+    vertexId: corner.id,
+    originalPoint: corner.point,
+    zoom: 5,
+  };
+  const snap = (point) => t.controller.interaction.snapCorner(t.px(point), options);
+  // Along the earlier run (from 1, 1.5 through 2.5, 0.8), a little off it.
+  const along = (from, to, at) => [
+    from[0] + (to[0] - from[0]) * at,
+    from[1] + (to[1] - from[1]) * at,
+  ];
+  for (const [far, at] of [
+    [[1, 1.5], 1.2],
+    [[4, 1.5], 1.3],
+  ]) {
+    const [x, y] = along(far, [2.5, 0.8], at);
+    const point = snap([x, y + 0.03]);
+    const end = t.px(far);
+    const start = t.px([2.5, 0.8]);
+    const u = { x: start.x - end.x, y: start.y - end.y };
+    const length = Math.hypot(u.x, u.y);
+    const off = ((point.x - end.x) * u.y - (point.y - end.y) * u.x) / length;
+    assert.ok(Math.abs(off) < 1e-6, `on the run's line from ${far}`);
+    const metres = Math.hypot(point.x - end.x, point.y - end.y) / t.g;
+    assert.ok(Math.abs(metres * 100 - Math.round(metres * 100)) < 1e-6, 'a whole centimetre long');
+  }
+  t.controller.dispose();
+});
+
 test('no bend corners on today’s engine', async () => {
   const t = controllerFor(false);
   await splitWall(t, [1, 1.5], [4, 1.5], 1.5);

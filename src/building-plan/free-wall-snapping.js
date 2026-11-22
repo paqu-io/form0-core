@@ -27,7 +27,7 @@ import { holdFreeWallMove, settleFreeWallEnd } from './free-wall-hold.js';
  */
 
 /** One centimetre in metres: the step a position takes when nothing pulls it. */
-const STEP_M = 0.01;
+export const STEP_M = 0.01;
 
 const nearest = (candidates) =>
   candidates.reduce((best, entry) => (!best || entry.error < best.error ? entry : best), null);
