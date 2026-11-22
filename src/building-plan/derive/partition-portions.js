@@ -10,12 +10,10 @@ const gap = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
 const ANSWERS = ['overrides', 'providerOverrides', 'values', 'repeatable'];
 const sameAnswers = (a, b) => ANSWERS.every((key) => equalValue(a?.[key] || {}, b?.[key] || {}));
 
-/** The portion's checks, as today: a Split portion, not a return, moved parallel and square. */
+/** The portion's checks, as today: a Split portion moved parallel and square (a return: below). */
 function checkedDelta(partition, operation) {
   if (!partition.lineage?.editingOriginFaceId)
     refuse('invalid_partition_cut', 'Choose a partition portion created with Split.');
-  if (partition.lineage.editingReturn)
-    refuse('derived_partition_return', 'Move an adjacent partition portion to adjust this return.');
   if (!Array.isArray(operation.vertices) || operation.vertices.length !== 2)
     refuse('invalid_partition_edit', 'Choose one straight partition portion to move.');
   const [p, q] = partition.path;
@@ -81,6 +79,8 @@ export function movePartitionPortion(
   operation,
   { createId, specifications } = {}
 ) {
+  if (partition.lineage?.editingOriginFaceId && partition.lineage.editingReturn)
+    return moveReturn(primary, partition, operation);
   const delta = checkedDelta(partition, operation);
   const all = primary.rooms.map((room) => room.id);
   if (Math.hypot(delta.x, delta.y) <= SAME) return { result: {}, preferredRoomIds: all };
@@ -199,4 +199,68 @@ function centre(entry, vertex, amount) {
     );
   [start.point, end.point, ...entry.path].forEach(shift);
   return true;
+}
+
+/**
+ * A return moved (2026-11-22): parallel to itself, by the part of the move across it; its ends
+ * slide along the portions it joins, which lengthen or shorten and keep their direction, as a
+ * room wall's jog does. Refused when a portion would vanish or turn over, or runs nearly along
+ * the return (its end would run off). The stored paths are faces on one side of the wall, all at
+ * the same distance from the centrelines, so moving the faces moves the centrelines alike.
+ */
+function moveReturn(primary, partition, operation) {
+  const all = primary.rooms.map((room) => room.id);
+  if (!Array.isArray(operation.vertices) || operation.vertices.length !== 2)
+    refuse('invalid_partition_edit', 'Choose one straight partition portion to move.');
+  const [p, q] = partition.path;
+  const delta = { x: operation.vertices[0].x - p.x, y: operation.vertices[0].y - p.y };
+  if (gap({ x: q.x + delta.x, y: q.y + delta.y }, operation.vertices[1]) > SAME)
+    refuse('partition_alignment', 'Keep this return parallel while moving it.');
+  const frame = lineFrame(p, q);
+  const across = frame ? frame.normal.x * delta.x + frame.normal.y * delta.y : 0;
+  if (Math.abs(across) <= SAME) return { result: {}, preferredRoomIds: all };
+  const { startVertexId, endVertexId } = partition.lineage.editingReturn;
+  const origin = partition.lineage.editingOriginFaceId;
+  const portions = primary.partitions.filter(
+    (entry) =>
+      entry.roomId === partition.roomId &&
+      entry.lineage?.editingOriginFaceId === origin &&
+      !entry.lineage.editingReturn
+  );
+  const earlier = portions.find((entry) => entry.path.at(-1).id === startVertexId);
+  const later = portions.find((entry) => entry.path[0].id === endVertexId);
+  if (!earlier || !later)
+    refuse(
+      'partition_return_cut',
+      'Rejoin the explicit cuts on this return before moving its neighbouring portions.'
+    );
+  // Where a portion's line meets the return's line moved `across` along its normal.
+  const line = { x: p.x + frame.normal.x * across, y: p.y + frame.normal.y * across };
+  const slide = (far, near) => {
+    const run = { x: near.x - far.x, y: near.y - far.y };
+    const length = Math.hypot(run.x, run.y);
+    const facing = (frame.normal.x * run.x + frame.normal.y * run.y) / (length || 1);
+    if (!length || Math.abs(facing) < 0.05)
+      refuse(
+        'partition_return_parallel',
+        'A portion next to this return runs nearly along it. Move that portion instead.'
+      );
+    const t =
+      (frame.normal.x * (line.x - far.x) + frame.normal.y * (line.y - far.y)) /
+      (frame.normal.x * run.x + frame.normal.y * run.y);
+    if (t * length <= SAME)
+      refuse(
+        'partition_return_collapse',
+        'This would shorten a portion next to the return to nothing. Move the return less far.'
+      );
+    return { x: far.x + run.x * t, y: far.y + run.y * t };
+  };
+  const start = slide(earlier.path.at(-2), earlier.path.at(-1));
+  const end = slide(later.path[1], later.path[0]);
+  const place = (point, to) => Object.assign(point, cleanPoint({ ...point, ...to }));
+  place(earlier.path.at(-1), start);
+  place(partition.path[0], start);
+  place(later.path[0], end);
+  place(partition.path[1], end);
+  return { result: {}, preferredRoomIds: all };
 }
