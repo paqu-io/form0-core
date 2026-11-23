@@ -174,6 +174,37 @@ test('a free wall holds a column: flush with either side, or centred on it', () 
   assert.deepEqual(snap({ x: 500, y: 598 }, { freeWall: true }).centre, { x: 500, y: 595 });
 });
 
+test('beams in its room (3a): its centre under a beam end or a level beam centreline', () => {
+  // Beam B from (200, 400) to (800, 400); a slanted one S from (200, 700) to (500, 900).
+  const beam = (id, [x0, y0], [x1, y1]) => ({
+    id,
+    roomId: 'a',
+    startU: x0 / 1000,
+    startV: y0 / 1000,
+    endU: x1 / 1000,
+    endV: y1 / 1000,
+    width: 0.15,
+  });
+  const view = {
+    ...viewWith(),
+    beams: [beam('b', [200, 400], [800, 400]), beam('s', [200, 700], [500, 900])],
+  };
+  const at = (centre) =>
+    snapColumn(centre, {
+      size: { width: 30, height: 30 },
+      targets: columnTargets(view, { roomId: 'a', columnId: 'c' }),
+      gridSize: 100,
+      tolerance: reach,
+    }).centre;
+  assert.deepEqual(at({ x: 803, y: 404 }), { x: 800, y: 400 }, 'under its end');
+  assert.deepEqual(at({ x: 503.4, y: 395 }), { x: 503, y: 400 }, 'under its centreline');
+  // A slanted beam pulls with its ends only.
+  assert.deepEqual(at({ x: 497, y: 896 }), { x: 500, y: 900 });
+  assert.deepEqual(at({ x: 353.4, y: 806 }), { x: 353, y: 806 });
+  // Without beams, as before: the step.
+  assert.deepEqual(snap({ x: 803, y: 404 }).centre, { x: 803, y: 404 });
+});
+
 test('a corner into a corner', () => {
   assert.deepEqual(snap({ x: 20, y: 18 }).centre, { x: 15, y: 15 }, "the room's corner");
   // Flush with the far faces of both walls: into the corner piece.

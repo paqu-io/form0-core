@@ -13,10 +13,12 @@ import { belowRing, isBelow, pullGuide } from './floor-below-pulls.js';
  * rectangle square to the page, moved by its centre. Pulls, in order:
  *
  * 1. a corner into a corner (the room's, its walls', free walls' corners and ends, other columns',
- *    the jambs'), or its centre where wall midlines meet (a corner, a T-junction);
+ *    the jambs'), or its centre where wall midlines meet (a corner, a T-junction) or under a
+ *    beam's end (3a);
  * 2. per axis, a contact: a side flush with a line it is next to (the room's faces, its walls' far
  *    faces, free walls' sides, other columns' sides, the jambs), or its centre on one of its walls'
- *    midlines; on a slanted line, the nearest corner goes onto it;
+ *    midlines or under a level or plumb beam's centreline (3a); on a slanted line, the nearest
+ *    corner goes onto it;
  * 3. per axis, lining up: a side with corners and ends anywhere on the floor, its centre with
  *    other columns' centres (a dashed guide);
  * 4. per axis, its sides on the 1 cm step.
@@ -120,12 +122,16 @@ function offers(centre, half, settings) {
             guides: isBelow(target) ? [belowRing(target)] : [],
           });
     });
-    // Its centre where wall midlines meet (a corner, a T-junction).
-    (targets.junctions || []).forEach((target, index) => {
-      const key = `junction:${index}`;
-      if (distance(target, centre) <= tolerance(key))
-        whole.push({ rank: 0, delta: subtract(target, centre), keys: [key], guides: [] });
-    });
+    // Its centre where wall midlines meet (a corner, a T-junction), or under a beam's end (3a).
+    for (const [kind, list] of [
+      ['junction', targets.junctions],
+      ['beam-end', targets.beamEnds],
+    ])
+      (list || []).forEach((target, index) => {
+        const key = `${kind}:${index}`;
+        if (distance(target, centre) <= tolerance(key))
+          whole.push({ rank: 0, delta: subtract(target, centre), keys: [key], guides: [] });
+      });
     // Its centre over the centre of a column below, whatever their sizes (U6).
     (targets.columnsBelow || []).forEach((target, index) => {
       const key = `over:${index}`;

@@ -1,5 +1,6 @@
 import { columnCorners, edgesOf, freeWallTargets } from './free-wall-targets.js';
 import { columnWallTargets } from './column-wall-targets.js';
+import { beamEnds } from './beam-targets.js';
 
 /**
  * What a column snaps to and where it may stand (`column-snapping.js`, unit 3 of the building plan
@@ -40,6 +41,7 @@ function openingBox(opening, gridSize, reach) {
  *   midlines: object[][],
  *   straddles: object[][],
  *   junctions: object[],
+ *   beamEnds: object[],
  *   faces: Array<{ a: object, b: object, side: number }>,
  *   align: object[],
  *   centres: object[],
@@ -54,7 +56,9 @@ function openingBox(opening, gridSize, reach) {
  * - `region`: the polygons it must stay inside (the room's outline, its walls' bodies);
  * - `points` (corners) and `lines` (sides): the free wall targets in the room, plus its walls'
  *   bodies (far faces, ends, corner pieces) and the doors' and windows' boxes (jambs);
- * - `midlines` and `junctions` (where midlines meet: corners, T-junctions), for its centre;
+ * - `midlines` and `junctions` (where midlines meet: corners, T-junctions), for its centre; the
+ *   beams in its room too (3a, asked at the 3a-1 hand test): their centrelines with the midlines,
+ *   their ends (`beamEnds`) for its centre to stand under;
  *   `straddles` (centred on one of the room's walls, it may stand out of it on both sides) and
  *   `faces` (in a wall with its room-side face flush with the wall's interior face, it may stand
  *   out past the exterior face): `column-wall-targets.js`;
@@ -95,11 +99,23 @@ export function columnTargets(view, { roomId, columnId = null }) {
     }))
     .filter((opening) => opening.box);
   const jambs = openings.map((opening) => opening.polygon || []).filter((box) => box.length > 2);
+  const walls = columnWallTargets(view, roomId);
+  const beams = (view.beams || [])
+    .filter((beam) => beam.roomId === roomId)
+    .map((beam) =>
+      beamEnds(
+        beam,
+        rooms.find((room) => room.id === roomId)
+      )
+    )
+    .filter((ends) => ends.length === 2);
   return {
     region: [base.outline, ...bodies].filter((polygon) => polygon.length > 2),
     points: [...base.points, ...bodies.flat(), ...jambs.flat()],
     lines: [...base.lines, ...bodies.flatMap(edgesOf), ...jambs.flatMap(edgesOf)],
-    ...columnWallTargets(view, roomId),
+    ...walls,
+    midlines: [...walls.midlines, ...beams],
+    beamEnds: beams.flat(),
     align: base.align,
     centres: placed.map(({ corners: [a, , c] }) => ({ x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 })),
     rects: placed.map(({ id, corners: [a, , c] }) => ({
