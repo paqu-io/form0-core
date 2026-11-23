@@ -21,6 +21,7 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 import { faceExtent } from './face-extent.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
+import { buildingPlanPlasterSurfaces, buildingPlanSidePlaster } from './plaster-surfaces.js';
 import {
   freeWallBendCorners,
   freeWallCutPoints,
@@ -53,6 +54,21 @@ const key = (meta, name) => node(meta, name).preferredKey;
 const PREVIEW_SCOPE_ID = 'canvas-preview';
 
 /** A portable, read-only rendering projection. Row paths retain the host's normal nesting. */
+/**
+ * A row's plaster (step 2, 2b), for the selected wall's name: its own side's and, where the face
+ * across is this row's too (an outside face, a free wall's other side), that one's. Metres.
+ */
+function facePlaster(physical, face) {
+  const own = (physical.sides || []).find((side) => side.id === face.sideId);
+  const other = (physical.sides || []).find((side) => side !== own);
+  const across = Boolean(other) && (other.roomId == null || other.roomId === own?.roomId);
+  return {
+    inside: buildingPlanSidePlaster(own),
+    outside: across ? buildingPlanSidePlaster(other) : null,
+    outsideFace: across,
+  };
+}
+
 export function buildingPlanCanvasSnapshot({
   meta,
   record,
@@ -94,6 +110,12 @@ export function buildingPlanCanvasSnapshot({
     });
     if (floorIndex !== activeFloorIndex) continue;
     Object.assign(output, buildingPlanFootprints(floor, gridSize));
+    // Every visible wall face with its plaster (step 2, 2b): display only, previews included.
+    output.plasterSurfaces = buildingPlanPlasterSurfaces(floor, {
+      footprints: output.wallFootprints,
+      openings: output.physicalOpenings,
+      gridSize,
+    });
     const roomRows = floorRow.repeatable[key(meta, 'rooms')] || [];
     for (const room of floor.rooms) {
       const cuts = new Set();
@@ -219,6 +241,7 @@ export function buildingPlanCanvasSnapshot({
           displayLabel: physical.values.wall_label || physical.autoLabel || `W#${faceIndex + 1}`,
           thickness: physical.properties.wall_thickness,
           height: physical.properties.wall_height,
+          plaster: facePlaster(physical, face),
           provenance: copy(physical.provenance),
         };
         output.walls.push(wall);
