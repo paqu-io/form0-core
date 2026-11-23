@@ -6,6 +6,7 @@ import { freeWallTargets } from './free-wall-targets.js';
 import { snapFreeWallBend as snapBend } from './free-wall-bend.js';
 import { columnTargets } from './column-targets.js';
 import { snapColumn as snapColumnCentre } from './column-snapping.js';
+import { withFloorBelow } from './floor-below-pulls.js';
 import {
   snapFreeWallEnd as snapEnd,
   snapFreeWallTranslation as snapMove,
@@ -374,8 +375,10 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     const width =
       (view.walls || []).find((wall) => wall.id === wallId)?.thickness ??
       (view.rooms || []).find((room) => room.id === roomId)?.freeWallWidth;
+    const targets = freeWallTargets(view, { roomId, wallId });
     const result = run({
-      targets: freeWallTargets(view, { roomId, wallId }),
+      // The floor below's corners and faces too (U6).
+      targets: withFloorBelow(targets, view, [targets.outline]),
       gridSize,
       free: bypass || !settings().snapping,
       tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
@@ -411,10 +414,12 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
   ) {
     const view = currentScene();
     const gridSize = view.gridSize || 20;
+    const targets = columnTargets(view, { roomId, columnId });
     const result = snapColumnCentre(centre, {
       size: { width: width * gridSize, height: height * gridSize },
       from,
-      targets: columnTargets(view, { roomId, columnId }),
+      // The floor below's corners and faces, and the columns below (U6).
+      targets: withFloorBelow(targets, view, targets.region, { columns: true }),
       gridSize,
       free: bypass || !settings().snapping,
       tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
@@ -467,6 +472,8 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
         from: { ...guide.from },
         to: { ...guide.to },
         ...(guide.below ? { below: true } : {}),
+        // A ring around the dragged element's grip (U6): which grip.
+        ...(guide.grip ? { grip: guide.grip } : {}),
       })),
     reset() {
       referenceScene = null;

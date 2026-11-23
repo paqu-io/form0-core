@@ -6,6 +6,7 @@ import {
   rectCorners,
   slideColumn,
 } from './column-fit.js';
+import { belowRing, isBelow, pullGuide } from './floor-below-pulls.js';
 
 /**
  * Snapping for columns (unit 3 of the building plan UI round, 2026-11-20). A column is a
@@ -19,6 +20,10 @@ import {
  * 3. per axis, lining up: a side with corners and ends anywhere on the floor, its centre with
  *    other columns' centres (a dashed guide);
  * 4. per axis, its sides on the 1 cm step.
+ *
+ * The floor below (U6, `floor-below-pulls.js`): its wall corners join the corners (1), its faces
+ * the lines (2), its corners those to line up with (3); its centre over a column below's centre
+ * ranks with the corners (1). Each rings the point it took below; the centre, the column's grip.
  *
  * The first position that fits wins (`column-fit.js`: inside the room and its own walls, clear of
  * other columns and openings). When none fits, a drag stops where the column would leave or
@@ -57,8 +62,15 @@ function axisOptions(axis, centre, rect, { targets, tolerance, step, free }) {
     targets.lines.forEach(([a, b], index) => {
       const key = `${axis}:line:${index}`;
       if (!straight(a, b, axis) || !beside(a, b, key)) return;
+      // A face below: a ring where it meets the column's side.
+      const ring = () => {
+        const [low, high] = [Math.min(a[other], b[other]), Math.max(a[other], b[other])];
+        const middle = Math.max(low, Math.min(high, centre[other]));
+        return [belowRing({ [axis]: a[axis], [other]: middle })];
+      };
       for (const side of [min, max])
-        if (Math.abs(a[axis] - side) <= tolerance(key)) add(1, a[axis] - side, key);
+        if (Math.abs(a[axis] - side) <= tolerance(key))
+          add(1, a[axis] - side, key, isBelow([a, b]) ? ring() : []);
     });
     targets.midlines.forEach(([a, b], index) => {
       const key = `${axis}:mid:${index}`;
@@ -70,10 +82,10 @@ function axisOptions(axis, centre, rect, { targets, tolerance, step, free }) {
       for (const side of [min, max])
         if (Math.abs(target[axis] - side) <= tolerance(key))
           add(2, target[axis] - side, key, [
-            {
-              from: { ...target },
-              to: { [axis]: target[axis], [other]: Math.max(from, Math.min(to, target[other])) },
-            },
+            pullGuide(target, {
+              [axis]: target[axis],
+              [other]: Math.max(from, Math.min(to, target[other])),
+            }),
           ]);
     });
     targets.centres.forEach((target, index) => {
@@ -101,7 +113,12 @@ function offers(centre, half, settings) {
       const key = `point:${index}`;
       for (const corner of corners)
         if (distance(target, corner) <= tolerance(key))
-          whole.push({ rank: 0, delta: subtract(target, corner), keys: [key], guides: [] });
+          whole.push({
+            rank: 0,
+            delta: subtract(target, corner),
+            keys: [key],
+            guides: isBelow(target) ? [belowRing(target)] : [],
+          });
     });
     // Its centre where wall midlines meet (a corner, a T-junction).
     (targets.junctions || []).forEach((target, index) => {
@@ -109,13 +126,29 @@ function offers(centre, half, settings) {
       if (distance(target, centre) <= tolerance(key))
         whole.push({ rank: 0, delta: subtract(target, centre), keys: [key], guides: [] });
     });
+    // Its centre over the centre of a column below, whatever their sizes (U6).
+    (targets.columnsBelow || []).forEach((target, index) => {
+      const key = `over:${index}`;
+      if (distance(target, centre) <= tolerance(key))
+        whole.push({
+          rank: 0,
+          delta: subtract(target, centre),
+          keys: [key],
+          guides: [belowRing(target, 'column')],
+        });
+    });
     targets.lines.forEach(([a, b], index) => {
       const key = `line:${index}`;
       if (straight(a, b, 'x') || straight(a, b, 'y')) return;
       for (const corner of corners) {
         const point = closestOnSegment(corner, a, b);
         if (distance(point, corner) <= tolerance(key))
-          whole.push({ rank: 3, delta: subtract(point, corner), keys: [key], guides: [] });
+          whole.push({
+            rank: 3,
+            delta: subtract(point, corner),
+            keys: [key],
+            guides: isBelow([a, b]) ? [belowRing(point)] : [],
+          });
       }
     });
   }

@@ -1,14 +1,8 @@
-import {
-  GEOMETRY_EPSILON as EPS,
-  cross,
-  distance,
-  pointInPolygon,
-  pointOnSegment,
-  subtract,
-} from './geometry.js';
-import { edgesOf } from './free-wall-targets.js';
+import { GEOMETRY_EPSILON as EPS, distance, pointInPolygon, subtract } from './geometry.js';
+import { closestOnSegment, keepInside, nearest, onStep } from './free-wall-outline.js';
 import { TOUCH_M, freeWallFits } from './free-wall-body.js';
 import { holdFreeWallMove, settleFreeWallEnd } from './free-wall-hold.js';
+import { belowMove, belowRing, isBelow, pullGuide } from './floor-below-pulls.js';
 
 /**
  * Snapping for free walls, the walls that stand in a room (2026-11-19, web UI round). A free
@@ -18,7 +12,9 @@ import { holdFreeWallMove, settleFreeWallEnd } from './free-wall-hold.js';
  *   on a locked line the end slides along it, so a corner off the line never bends the wall;
  * - pulls, in order: a corner or end (the room's corners, other free walls' corners and ends,
  *   columns' corners), a line (the room's faces, other free walls' sides, columns' sides), lining
- *   up with corners and ends anywhere on the floor (a dashed guide), else the 1 cm step;
+ *   up with corners and ends anywhere on the floor (a dashed guide), else the 1 cm step; the
+ *   floor below's corners and faces too (U6, `floor-below-pulls.js`); a moved wall takes the
+ *   floor below as one move, across onto the wall below and along to a face crossing its end;
  * - a free wall never leaves its room: an end stops on the room's outline, a moved wall stops
  *   where it would leave it; with `half` (its half-thickness), its body neither (4a-3b).
  *
@@ -28,23 +24,6 @@ import { holdFreeWallMove, settleFreeWallEnd } from './free-wall-hold.js';
 
 /** One centimetre in metres: the step a position takes when nothing pulls it. */
 export const STEP_M = 0.01;
-
-const nearest = (candidates) =>
-  candidates.reduce((best, entry) => (!best || entry.error < best.error ? entry : best), null);
-
-/** The point of segment `a`–`b` nearest to `point`. */
-function closestOnSegment(point, a, b) {
-  const span = subtract(b, a);
-  const lengthSquared = span.x * span.x + span.y * span.y;
-  const t =
-    lengthSquared <= EPS
-      ? 0
-      : Math.max(
-          0,
-          Math.min(1, ((point.x - a.x) * span.x + (point.y - a.y) * span.y) / lengthSquared)
-        );
-  return { x: a.x + span.x * t, y: a.y + span.y * t };
-}
 
 /** Where a locked line (`fixed` held at `value`) crosses segment `a`–`b`, as the free coordinate. */
 function crossing(a, b, fixed, value) {
@@ -66,44 +45,6 @@ function lineUp(point, axis, align, tolerance) {
       .filter((entry) => entry.error <= tolerance(entry.key))
   );
   return entry;
-}
-
-/** The first point where `from`→`to` leaves `outline`, or `to` when it stays inside. */
-function keepInside(to, from, outline) {
-  if (outline.length < 3 || pointInPolygon(to, outline, true)) return to;
-  if (from && pointInPolygon(from, outline, true)) {
-    const path = subtract(to, from);
-    let first = 1;
-    for (const [a, b] of edgesOf(outline)) {
-      const edge = subtract(b, a);
-      const denominator = cross(path, edge);
-      if (Math.abs(denominator) <= EPS) continue;
-      const t = cross(subtract(a, from), edge) / denominator;
-      const u = cross(subtract(a, from), path) / denominator;
-      if (t > EPS && t < first && u >= -EPS && u <= 1 + EPS) first = t;
-    }
-    return { x: from.x + path.x * first, y: from.y + path.y * first };
-  }
-  return nearest(
-    edgesOf(outline).map(([a, b]) => {
-      const point = closestOnSegment(to, a, b);
-      return { point, error: distance(point, to) };
-    })
-  ).point;
-}
-
-/**
- * An end stopped on the room's outline, moved along the face it stopped on to the 1 cm step when
- * that keeps it on the face (a horizontal or vertical one).
- */
-function onStep(point, outline, round) {
-  const edges = edgesOf(outline);
-  for (const candidate of [
-    { x: point.x, y: round(point.y) },
-    { x: round(point.x), y: point.y },
-  ])
-    if (edges.some(([a, b]) => pointOnSegment(candidate, a, b))) return candidate;
-  return point;
 }
 
 /**
@@ -148,17 +89,18 @@ export function snapFreeWallEnd(
         if (value == null) return [];
         const key = `line:${index}`;
         const error = Math.abs(value - point[along]);
-        return error <= tolerance(key) ? [{ value, key, error }] : [];
+        return error <= tolerance(key) ? [{ value, key, error, below: isBelow([a, b]) }] : [];
       })
     );
     const lined = hit ? null : lineUp(result, along, targets.align, tolerance);
     if (hit) {
       result[along] = hit.value;
       keys.push(hit.key);
+      if (hit.below) guides.push(belowRing(result));
     } else if (lined) {
       result[along] = lined.target[along];
       keys.push(lined.key);
-      guides.push({ from: { ...lined.target }, to: { ...result } });
+      guides.push(pullGuide(lined.target, { ...result }));
     } else result[along] = round(result[along]);
     guides.push({ from: { ...from }, to: { ...result } });
   } else if (!free) {
@@ -173,23 +115,28 @@ export function snapFreeWallEnd(
           targets.lines
             .map(([a, b], index) => {
               const target = closestOnSegment(point, a, b);
-              return { target, key: `line:${index}`, error: distance(target, point) };
+              const below = isBelow([a, b]);
+              return { target, key: `line:${index}`, error: distance(target, point), below };
             })
             .filter((entry) => entry.error <= tolerance(entry.key))
         );
     if (corner || line) {
-      result = { ...(corner || line).target };
+      const { below: _, ...target } = (corner || line).target;
+      result = target;
       keys.push((corner || line).key);
+      if (corner ? isBelow(corner.target) : line.below) guides.push(belowRing(result));
     } else
       for (const coordinate of ['x', 'y']) {
         const lined = lineUp(point, coordinate, targets.align, tolerance);
         if (!lined) continue;
         result[coordinate] = lined.target[coordinate];
         keys.push(lined.key);
-        guides.push({ from: { ...lined.target }, to: result });
+        guides.push(pullGuide(lined.target, result));
       }
   }
   const kept = keepInside(result, from, targets.outline);
+  // Held inside the room, off what it took below: no ring there.
+  if (kept !== result) guides.splice(0, guides.length, ...guides.filter((guide) => !guide.below));
   const stepped = kept === result ? result : onStep(kept, targets.outline, round);
   // Its body stays in the room too (4a-3b): an end near a face meets it, else it stops.
   const settled =
@@ -233,25 +180,28 @@ export function snapFreeWallTranslation(
   const keys = [];
   let delta = null;
   if (!free) {
-    const contact = (kind, list) =>
-      nearest(
-        ends
-          .flatMap((end) =>
-            list.map((target, index) => {
-              const point = kind === 'point' ? target : closestOnSegment(end, ...target);
-              return {
-                key: `${kind}:${index}`,
-                error: distance(point, end),
-                delta: subtract(point, end),
-              };
-            })
-          )
-          .filter((entry) => entry.error <= tolerance(entry.key))
-      );
-    const hit = contact('point', targets.points) || contact('line', targets.lines);
+    // This floor's corners, then lines, take an end, as before; the floor below moves the wall
+    // across onto it and along to a face crossing its end, together (U6). Nearest wins; a tie
+    // goes to this floor.
+    const contacts = (kind, list) =>
+      ends
+        .flatMap((end) =>
+          list.flatMap((target, index) => {
+            if (isBelow(target)) return [];
+            const point = kind === 'point' ? target : closestOnSegment(end, ...target);
+            const error = distance(point, end);
+            return [{ keys: [`${kind}:${index}`], error, delta: subtract(point, end), guides: [] }];
+          })
+        )
+        .filter((entry) => entry.error <= tolerance(entry.keys[0]));
+    const own =
+      nearest(contacts('point', targets.points)) || nearest(contacts('line', targets.lines));
+    const below = belowMove(points, half, targets.lines, tolerance);
+    const hit = below && (!own || below.error < own.error) ? below : own;
     if (hit) {
-      delta = hit.delta;
-      keys.push(hit.key);
+      delta = { x: hit.delta.x, y: hit.delta.y };
+      keys.push(...hit.keys);
+      guides.push(...hit.guides);
     }
   }
   if (!delta) {
@@ -266,10 +216,9 @@ export function snapFreeWallTranslation(
       if (!lined) continue;
       delta[coordinate] = lined.target[coordinate] - lined.end[coordinate];
       keys.push(lined.key);
-      guides.push({
-        from: { ...lined.target },
-        to: { ...lined.end, [coordinate]: lined.target[coordinate] },
-      });
+      guides.push(
+        pullGuide(lined.target, { ...lined.end, [coordinate]: lined.target[coordinate] })
+      );
     }
     for (const coordinate of ['x', 'y'])
       delta[coordinate] ??= Math.round(ends[0][coordinate] / step) * step - ends[0][coordinate];
