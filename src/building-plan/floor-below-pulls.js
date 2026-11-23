@@ -19,6 +19,12 @@ import { edgesOf } from './free-wall-targets.js';
  * centreline end, and a crossing face its end alone, either leaving it half off). Corners below
  * don't take a moved wall: where a running face meets a crossing one is a corner.
  *
+ * A free wall also stacks centred on a wall below (2026-11-23, from U6's hand test): its walls'
+ * midlines join the lines a drawn end snaps to, and where they meet the corners (`midlines`), so a
+ * wall drawn over a wall below stands on its middle; a moved one may go centred on a midline
+ * running with it as well as flush with a face. Midlines take no other part: a moved wall's end
+ * meets faces, and columns don't take them.
+ *
  * Only the drag paths read these (`interaction.js`): placing a column at its room's centre
  * ("select, then add", `element-placement.js`) takes the plain targets.
  */
@@ -34,6 +40,8 @@ const centreOf = (corners) => ({
 
 /** Whether a target (a point, or a line by its ends) is the floor below's. */
 export const isBelow = (target) => Boolean(target?.below || target?.[0]?.below);
+// A midline below (marked `mid` by its ends), not a face.
+const isMidline = (line) => Boolean(line?.[0]?.mid);
 
 /**
  * A ring on a point of the floor below that a pull took: a guide with no length.
@@ -76,19 +84,31 @@ export function pullGuide(target, to) {
  * @param {object} targets `freeWallTargets` or `columnTargets`
  * @param {object} view the canvas snapshot, with `floorBelow` (null when its pulls are off)
  * @param {object[][]} region where the element may stand: corners below outside it are left out
- * @param {{ columns?: boolean }} options `columns`: add `columnsBelow` (their centres)
+ * @param {{ columns?: boolean, midlines?: boolean }} options `columns`: add `columnsBelow` (their
+ *   centres); `midlines`: add the walls' midlines below to the lines and where they meet to the
+ *   corners (a free wall's)
  */
-export function withFloorBelow(targets, view, region, { columns = false } = {}) {
+export function withFloorBelow(targets, view, region, { columns = false, midlines = false } = {}) {
   const below = view.floorBelow;
   if (!below) return columns ? { ...targets, columnsBelow: [] } : targets;
   const inside = (point) =>
     region.some((polygon) => polygon.length > 2 && pointInPolygon(point, polygon, true));
   const bands = (below.walls || []).filter((polygon) => polygon.length > 2);
   const corners = bands.flat().map(mark);
+  const mid = (point) => ({ ...mark(point), mid: true });
+  const middles = midlines ? below.midlines || [] : [];
   return {
     ...targets,
-    points: [...targets.points, ...corners.filter(inside)],
-    lines: [...targets.lines, ...bands.flatMap(edgesOf).map(([a, b]) => [mark(a), mark(b)])],
+    points: [
+      ...targets.points,
+      ...corners.filter(inside),
+      ...(midlines ? (below.junctions || []).map(mark).filter(inside) : []),
+    ],
+    lines: [
+      ...targets.lines,
+      ...bands.flatMap(edgesOf).map(([a, b]) => [mark(a), mark(b)]),
+      ...middles.map(([a, b]) => [mid(a), mid(b)]),
+    ],
     align: [...targets.align, ...corners],
     ...(columns
       ? {
@@ -107,24 +127,24 @@ const unit = (a, b) => {
   return size ? multiply(span, 1 / size) : null;
 };
 
-/** Whether `line` is a face below running with the segment `a`–`b`. */
-function alongFaceBelow(line, a, b) {
+/** Whether `line` is a face or midline below running with the segment `a`–`b`. */
+function runsWithBelow(line, a, b) {
   const u = unit(a, b);
   const v = unit(line[0], line[1]);
   return Boolean(isBelow(line) && u && v && Math.abs(cross(u, v)) < PARALLEL);
 }
 
 /**
- * A moved free wall's side flush with a face below running with it (U6: a wall stacked on the
- * wall below): for each run of the moved path and each side of it (`half` from its centreline),
- * each face below along it within reach and beside it.
+ * A moved free wall onto a wall below running with it (U6: a wall stacked on the wall below): for
+ * each run of the moved path, each face below along it, within reach and beside it, with a side of
+ * the wall (`half` from its centreline) flush with it; each midline below, its centreline on it.
  * @param {Array<{ x: number, y: number }>} path the moved path (its centreline)
  * @param {number} half its half-thickness, canvas units
  * @param {object[][]} lines the targets' lines (the faces below among them)
  * @param {(key: string) => number} tolerance
  * @returns {Array<{ key: string, error: number, delta: object }>}
  */
-function flushWithFacesBelow(path, half, lines, tolerance) {
+function acrossOntoWallsBelow(path, half, lines, tolerance) {
   const entries = [];
   for (let run = 1; run < path.length; run += 1) {
     const [p, q] = [path[run - 1], path[run]];
@@ -133,13 +153,13 @@ function flushWithFacesBelow(path, half, lines, tolerance) {
     const n = { x: -u.y, y: u.x };
     const span = dot(subtract(q, p), u);
     lines.forEach((line, index) => {
-      if (!alongFaceBelow(line, p, q)) return;
-      const key = `flush:${index}`;
+      if (!runsWithBelow(line, p, q)) return;
+      const key = `${isMidline(line) ? 'centre' : 'flush'}:${index}`;
       const along = line.map((point) => dot(subtract(point, p), u));
       const overlap = Math.min(span, Math.max(...along)) - Math.max(0, Math.min(...along));
       if (overlap < -tolerance(key)) return;
       const offset = dot(subtract(line[0], p), n);
-      for (const side of [half, -half]) {
+      for (const side of isMidline(line) ? [0] : [half, -half]) {
         const error = Math.abs(offset - side);
         if (error > tolerance(key)) continue;
         entries.push({ key, error, delta: multiply(n, offset - side) });
@@ -165,7 +185,7 @@ function endsOnFacesBelow(path, lines, tolerance) {
     const u = unit(inner, end);
     if (!u) continue;
     lines.forEach((line, index) => {
-      if (!isBelow(line) || alongFaceBelow(line, inner, end)) return;
+      if (!isBelow(line) || isMidline(line) || runsWithBelow(line, inner, end)) return;
       const v = unit(line[0], line[1]);
       if (!v) return;
       const m = { x: -v.y, y: v.x };
@@ -190,7 +210,7 @@ const nearestOf = (entries) =>
   entries.reduce((best, entry) => (!best || entry.error < best.error ? entry : best), null);
 
 /**
- * The floor below's pull on a moved free wall, as one move: across onto it (`flushWithFacesBelow`),
+ * The floor below's pull on a moved free wall, as one move: across onto it (`acrossOntoWallsBelow`),
  * then along to a face crossing an end (`endsOnFacesBelow`, from where the first puts it). Null
  * when neither is within reach. `error`: how far it moves the wall.
  * @param {Array<{ x: number, y: number }>} path the moved path (its centreline)
@@ -200,7 +220,7 @@ const nearestOf = (entries) =>
  * @returns {{ keys: string[], error: number, delta: object, guides: object[] } | null}
  */
 export function belowMove(path, half, lines, tolerance) {
-  const across = nearestOf(flushWithFacesBelow(path, half, lines, tolerance));
+  const across = nearestOf(acrossOntoWallsBelow(path, half, lines, tolerance));
   const shift = across ? across.delta : { x: 0, y: 0 };
   const moved = path.map((point) => add(point, shift));
   const along = nearestOf(endsOnFacesBelow(moved, lines, tolerance));

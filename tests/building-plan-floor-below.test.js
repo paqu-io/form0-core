@@ -86,3 +86,87 @@ test('a preview on the floor above keeps it', async () => {
   assert.deepEqual(controller.getSnapshot().floorBelow, below);
   controller.dispose();
 });
+
+// A drawn free wall stacking on the wall below (2026-11-23): the floor below's walls' midlines,
+// their axes, and where they meet. Invariants: each runs halfway between its band's faces
+// wherever it crosses a band; each meeting point lies on two midlines' lines.
+function assertMidlines(below) {
+  assert.ok(below.midlines.length > 0);
+  for (const [a, b] of below.midlines) {
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    const u = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    const offset = (p) => (p.x - a.x) * -u.y + (p.y - a.y) * u.x;
+    let inside = 0;
+    for (let i = 1; i < 10; i += 1) {
+      const sample = { x: a.x + (b.x - a.x) * (i / 10), y: a.y + (b.y - a.y) * (i / 10) };
+      const band = below.walls.find((polygon) => pointIn(sample, polygon));
+      if (!band) continue;
+      inside += 1;
+      // The band's edges running with the midline, by their offset from it.
+      const offsets = band
+        .map((p, index) => [p, band[(index + 1) % band.length]])
+        .filter(([p, q]) => Math.abs((q.x - p.x) * u.y - (q.y - p.y) * u.x) < 1e-6)
+        .filter(([p, q]) => Math.hypot(q.x - p.x, q.y - p.y) > 1e-6)
+        .map(([p]) => offset(p));
+      assert.ok(
+        Math.abs(Math.max(...offsets) + Math.min(...offsets)) < 1e-6,
+        `halfway: ${JSON.stringify(offsets)}`
+      );
+    }
+    assert.ok(inside > 0, 'it crosses its band');
+  }
+  const onLine = (point, [a, b]) =>
+    Math.abs((point.x - a.x) * (b.y - a.y) - (point.y - a.y) * (b.x - a.x)) /
+      Math.hypot(b.x - a.x, b.y - a.y) <
+    1e-6;
+  for (const point of below.junctions)
+    assert.ok(below.midlines.filter((line) => onLine(point, line)).length >= 2);
+}
+function pointIn(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [p, q] = [polygon[i], polygon[j]];
+    if (
+      p.y > point.y !== q.y > point.y &&
+      point.x < ((q.x - p.x) * (point.y - p.y)) / (q.y - p.y) + p.x
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+test('its walls’ midlines run halfway between their faces; where they meet', async () => {
+  const t = await plan({ floor_elevation: 3 });
+  const controller = canvas(t, t.upper);
+  const g = controller.gridSize;
+  const below = controller.getSnapshot().floorBelow;
+  assertMidlines(below);
+  // W3.2 (y 3.1) meets W8 (x 2.9): a T where Room 2's wall reaches the shared wall.
+  assert.ok(
+    below.junctions.some((p) => Math.abs(p.x / g - 2.9) < 1e-9 && Math.abs(p.y / g - 3.1) < 1e-9)
+  );
+  controller.dispose();
+  // W3 thickened to 0.3 m, its Bedroom's face kept: still halfway.
+  const ground = canvas(t, t.ground);
+  const floor = ground.semanticSnapshot.floors[0];
+  const w3 = floor.walls.find((wall) => wall.autoLabel === 'W3');
+  assert.ok(
+    await ground.apply({
+      type: 'set_property',
+      floorId: floor.id,
+      wallId: w3.id,
+      activeRoomId: floor.rooms[0].id,
+      property: 'wall_thickness',
+      value: 0.3,
+    })
+  );
+  ground.dispose();
+  const thick = canvas(t, t.upper);
+  const thicker = thick.getSnapshot().floorBelow;
+  assert.ok(
+    thicker.midlines.some(([a, b]) => a.y === b.y && Math.abs(a.y / g - 3.15) < 1e-9),
+    'W3’s midline in its 0.3 m band'
+  );
+  assertMidlines(thicker);
+  thick.dispose();
+});

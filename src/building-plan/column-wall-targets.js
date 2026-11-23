@@ -45,6 +45,28 @@ function carriedTo([a, b], points, reach) {
   ];
 }
 
+/**
+ * Where wall midlines meet (corners, T-junctions, a free wall meeting a wall): the crossings of
+ * their lines no further past either one's end than `JUNCTION_REACH_M`. Shared with the floor
+ * below (`floor-below.js`, 2026-11-23).
+ * @param {object[][]} midlines segments, canvas units
+ * @param {number} gridSize canvas units a metre
+ */
+export function midlineJunctions(midlines, gridSize) {
+  const reach = JUNCTION_REACH_M * (gridSize || 20);
+  const junctions = [];
+  for (let i = 0; i < midlines.length; i += 1)
+    for (let j = i + 1; j < midlines.length; j += 1) {
+      const point = crossingOf(midlines[i], midlines[j]);
+      if (!point) continue;
+      if (placeOn(point, midlines[i]).past > reach || placeOn(point, midlines[j]).past > reach)
+        continue;
+      if (!junctions.some((other) => Math.hypot(other.x - point.x, other.y - point.y) < 1e-6))
+        junctions.push(point);
+    }
+  return junctions;
+}
+
 /** A room wall's interior faces, each with the side of it its body lies on (+1 or -1). */
 function interiorFaces(ownWalls, footprints) {
   return ownWalls.flatMap((wall) => {
@@ -77,16 +99,7 @@ export function columnWallTargets(view, roomId) {
   const roomWalls = (view.walls || []).filter((wall) => wall.roomId === roomId);
   const ownWalls = roomWalls.filter((wall) => wall.isBoundary || wall.isCutPortion);
   const midlines = roomWalls.flatMap((wall) => segmentsOf(wall.axisPoints));
-  const junctions = [];
-  for (let i = 0; i < midlines.length; i += 1)
-    for (let j = i + 1; j < midlines.length; j += 1) {
-      const point = crossingOf(midlines[i], midlines[j]);
-      if (!point) continue;
-      if (placeOn(point, midlines[i]).past > reach || placeOn(point, midlines[j]).past > reach)
-        continue;
-      if (!junctions.some((other) => Math.hypot(other.x - point.x, other.y - point.y) < 1e-6))
-        junctions.push(point);
-    }
+  const junctions = midlineJunctions(midlines, view.gridSize);
   return {
     midlines,
     junctions,

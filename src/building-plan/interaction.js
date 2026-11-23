@@ -377,8 +377,8 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
       (view.rooms || []).find((room) => room.id === roomId)?.freeWallWidth;
     const targets = freeWallTargets(view, { roomId, wallId });
     const result = run({
-      // The floor below's corners and faces too (U6).
-      targets: withFloorBelow(targets, view, [targets.outline]),
+      // The floor below's corners and faces (U6), its walls' midlines and where they meet.
+      targets: withFloorBelow(targets, view, [targets.outline], { midlines: true }),
       gridSize,
       free: bypass || !settings().snapping,
       tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,

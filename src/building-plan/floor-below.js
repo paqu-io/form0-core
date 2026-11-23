@@ -1,5 +1,6 @@
 import { buildingPlanFloorsByLevel } from './floor-order.js';
 import { buildingPlanFootprints } from './footprints.js';
+import { midlineJunctions } from './column-wall-targets.js';
 
 const read = (floor, name) => floor.values?.[name];
 const elevationOf = (floor) => {
@@ -16,8 +17,11 @@ const elevationOf = (floor) => {
  * @param {object | undefined} floor the floor shown (one of `floors`)
  * @param {number} gridSize canvas units a metre
  * @returns {{ id: string, walls: Array<Array<{ x: number, y: number }>>,
- *   columns: Array<Array<{ x: number, y: number }>> } | null} its wall bands' and its columns'
- *   outlines, in canvas units
+ *   columns: Array<Array<{ x: number, y: number }>>,
+ *   midlines: Array<[{ x: number, y: number }, { x: number, y: number }]>,
+ *   junctions: Array<{ x: number, y: number }> } | null} its wall bands' and its columns'
+ *   outlines, its walls' midlines (their axes, halfway between their faces) and where those meet,
+ *   in canvas units (a free wall drawn above stacks on them, 2026-11-23)
  */
 export function buildingPlanFloorBelow(floors, floor, gridSize) {
   const elevation = floor ? elevationOf(floor) : null;
@@ -43,5 +47,17 @@ export function buildingPlanFloorBelow(floors, floor, gridSize) {
       ])
   );
   const { wallFootprints } = buildingPlanFootprints(below, gridSize);
-  return { id: below.id, walls: wallFootprints.flatMap((wall) => wall.polygons), columns };
+  const midlines = below.walls.flatMap((wall) =>
+    (wall.segments || []).map((segment) => [
+      pixels(segment.start.x, segment.start.y),
+      pixels(segment.end.x, segment.end.y),
+    ])
+  );
+  return {
+    id: below.id,
+    walls: wallFootprints.flatMap((wall) => wall.polygons),
+    columns,
+    midlines,
+    junctions: midlineJunctions(midlines, gridSize),
+  };
 }

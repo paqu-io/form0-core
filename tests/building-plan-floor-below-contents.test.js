@@ -169,3 +169,67 @@ test('a column’s side flush with a face below; a corner into a corner below', 
   assert.deepEqual(rings(t.interaction)[0].from, { x: 72, y: 64 });
   t.controller.dispose();
 });
+
+// A drawn free wall stacking on the wall below (2026-11-23, from U6's hand test): its walls'
+// midlines and where they meet pull a drawn end, so the wall stands on the middle of the wall
+// below; a moved wall may go centred on it as well as flush with a face, the nearer winning.
+test('a drawn free wall’s end onto where midlines below meet, or onto a midline; the next end stays on it', async () => {
+  const t = await upperFloor();
+  const end = (point, options = {}) =>
+    t.interaction.snapFreeWallEnd(point, { roomId: t.roomId, zoom: 5, ...options });
+  t.interaction.begin();
+  // Where the shared wall's midline (y 62) meets Room 2's wall's (x 58), nearer than any corner.
+  assert.deepEqual(round(end({ x: 58.9, y: 62.6 })), { x: 58, y: 62 });
+  assert.deepEqual(rings(t.interaction)[0].from, { x: 58, y: 62 });
+  // On the shared wall's midline, nearer than its face at 64.
+  const start = end({ x: 30, y: 62.7 });
+  assert.deepEqual(round(start), { x: 30, y: 62 });
+  // The other end, drawn along it, keeps to it.
+  assert.deepEqual(round(end({ x: 50, y: 62.5 }, { from: start })), { x: 50, y: 62 });
+  t.controller.dispose();
+});
+
+test('a moved thinner free wall goes centred on the wall below, or flush with a face, the nearer', async () => {
+  const t = await upperFloor();
+  await t.controller.createWall(t.roomId, [
+    { x: 10, y: 100 },
+    { x: 50, y: 100 },
+  ]);
+  let wall = t.controller.getSnapshot().walls.find((entry) => entry.roomId === t.roomId);
+  assert.ok(
+    await t.controller.apply({
+      type: 'set_property',
+      floorId: t.controller.floorId,
+      wallId: wall.physicalWallId,
+      activeRoomId: t.roomId,
+      property: 'wall_thickness',
+      value: 0.1,
+    })
+  );
+  wall = t.controller.getSnapshot().walls.find((entry) => entry.roomId === t.roomId);
+  assert.equal(wall.thickness, 0.1);
+  const move = (y) => {
+    t.interaction.begin();
+    return t.interaction
+      .snapFreeWallTranslation(
+        [
+          { x: 10, y },
+          { x: 50, y },
+        ],
+        { roomId: t.roomId, wallId: wall.id, zoom: 4, originalPoints: wall.points }
+      )
+      .map(round);
+  };
+  // 0.3 off the band's middle (62), a side 0.7 off its face: centred.
+  assert.deepEqual(move(62.3), [
+    { x: 10, y: 62 },
+    { x: 50, y: 62 },
+  ]);
+  assert.equal(rings(t.interaction)[0].grip, 'wall');
+  // 1.2 off the middle, a side 0.2 off the face at 64: flush.
+  assert.deepEqual(move(63.2), [
+    { x: 10, y: 63 },
+    { x: 50, y: 63 },
+  ]);
+  t.controller.dispose();
+});
