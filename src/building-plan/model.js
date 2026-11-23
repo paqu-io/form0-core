@@ -607,9 +607,13 @@ function validateSnapshot(snapshot) {
           // A column may stand in its room's walls (4a-1, 2026-11-20): where it may stand is
           // checked on the derived engine's edits (`room-contents.js`), so a record holding one
           // still reads. Today's engine has no rule of its own for it: it also checks edits the
-          // derived engine leaves to it (an unchanged row's empty batch) on derived pages.
+          // derived engine leaves to it (an unchanged row's empty batch) on derived pages. Beams
+          // the same since 3a-3 (`beam-contents.js`: the beam named, its body as well as its ends).
           const inside = (point) =>
-            kind === 'columns' || problem || pointInPolygon(point, room.vertices);
+            kind === 'columns' ||
+            kind === 'beams' ||
+            problem ||
+            pointInPolygon(point, room.vertices);
           if (
             points.some((point) => !isPoint(point) || !inside(point)) ||
             (item.start && item.end && distance(item.start, item.end) <= EPS) ||

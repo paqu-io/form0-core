@@ -83,6 +83,7 @@ export {
 } from './building-plan/element-placement.js';
 export { openingStretches as buildingPlanOpeningStretches } from './building-plan/opening-stretches.js';
 export { freeWallSideLine as buildingPlanFreeWallSide } from './building-plan/free-wall-lines.js';
+export { beamOutline as buildingPlanBeamOutline } from './building-plan/beam-body.js';
 export {
   readBuildingPlanRecord,
   writeBuildingPlanRecord,

@@ -1,3 +1,4 @@
+import { beamPlacementIssues } from '../beam-contents.js';
 import { buildingPlanPinIssues } from '../corner-edits.js';
 import { buildingPlanBoundaryClearanceIssues } from '../footprints.js';
 import {
@@ -197,7 +198,7 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
  * Split the write-back's issues as today's reconciliation does: conflicting room defaults become
  * a question; any other issue refuses the edit. Pins and wall clearance are checked as today; a
  * face or corner drag must not leave a slit against the room's own wall (Q5); columns and free
- * walls stay where they may (`room-contents.js`).
+ * walls stay where they may (`room-contents.js`), beams too (`beam-contents.js`).
  */
 export function derivedCandidateIssues(before, candidate, operation, writeIssues) {
   const defaultConflicts = writeIssues.filter(
@@ -229,6 +230,13 @@ export function derivedCandidateIssues(before, candidate, operation, writeIssues
       ),
       // Free walls stay in their room, room edits included (4a-2).
       ...floors.flatMap((floor) => freeWallPlacementIssues(floor)),
+      // Beams too, their bodies included (3a-3).
+      ...floors.flatMap((floor) =>
+        beamPlacementIssues(
+          floor,
+          before.floors.find((entry) => entry.id === floor.id)
+        )
+      ),
     ],
   };
 }

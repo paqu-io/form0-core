@@ -1,3 +1,4 @@
+import { beamOutline } from './beam-body.js';
 import { settleBuildingPlanQuestions } from './questions.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
@@ -334,6 +335,14 @@ export function buildingPlanCanvasSnapshot({
             startRatio: values.beam_start_ratio ?? 0,
             endRatio: values.beam_end_ratio ?? 1,
             length: item.start && item.end ? distance(item.start, item.end) : values.beam_length,
+            // A beam's outline, its ends cut along the faces they stop on (3a-3, B6).
+            ...(collection === 'beams'
+              ? {
+                  outline: beamOutline(item.start, item.end, item.width / 2, room.vertices).map(
+                    pixels
+                  ),
+                }
+              : {}),
             label: values[`${prefix}_identifier`] || '',
             displayLabel:
               values[`${prefix}_identifier`] ||
