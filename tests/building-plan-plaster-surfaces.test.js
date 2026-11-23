@@ -65,8 +65,9 @@ const along = (a, p) =>
 /** Every surface has an owner; each room's outline, its openings left out, is covered once. */
 function assertCovered(snapshot, freeWallIds = new Set()) {
   const surfaces = snapshot.plasterSurfaces;
+  // A free wall's free end is the one surface left without an owner (no plaster there).
   assert.deepEqual(
-    surfaces.filter((surface) => !surface.sideId),
+    surfaces.filter((surface) => !surface.sideId && !freeWallIds.has(surface.wallId)),
     [],
     'every surface has an owner'
   );
@@ -189,10 +190,15 @@ test("a free wall's two faces and its ends are surfaces of its room", () => {
   freeWallIds = new Set([free.wallId]);
   assertCovered(t.snapshot, freeWallIds);
   const faces = t.snapshot.plasterSurfaces.filter((surface) => surface.wallId === free.wallId);
-  // Two long faces (one per side) and two ends, all facing into the Bedroom.
-  assert.equal(faces.filter((surface) => Math.abs(length(surface) - 2 * G) < 0.5).length, 2);
-  assert.equal(new Set(faces.filter((s) => s.own).map((s) => s.sideId)).size, 2);
-  assert.ok(faces.every((surface) => surface.roomId === bedroom));
+  // Two long faces (one per side), facing into the Bedroom; its two free ends bare (no owner, no
+  // plaster: 2b hand test, 2026-11-23).
+  const long = faces.filter((surface) => Math.abs(length(surface) - 2 * G) < 0.5);
+  assert.equal(long.length, 2);
+  assert.equal(new Set(long.map((s) => s.sideId)).size, 2);
+  assert.ok(long.every((surface) => surface.own && surface.roomId === bedroom));
+  const ends = faces.filter((surface) => !long.includes(surface));
+  assert.equal(ends.length, 2);
+  assert.ok(ends.every((end) => end.sideId === null && end.thickness === null));
   t.controller.dispose();
 });
 

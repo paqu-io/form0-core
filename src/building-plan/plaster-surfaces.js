@@ -10,7 +10,8 @@ import { buildingPlanSegmentThickness } from './model.js';
  * owned by the wall side whose face lies on it (a side's face: its segment's centreline, half the
  * thickness over on the side's sign). A stretch no side lies on takes the owner of the stretch it
  * continues: one in line first, then one of the same wall, then any next to it. So the plaster runs
- * on along each room's outline and the building's outline, round caps, corners and wall ends.
+ * on along each room's outline and the building's outline, round caps, corners and wall ends. A
+ * free wall's free end is left bare: no owner, no plaster.
  *
  * Canvas units throughout (`gridSize` per metre); thicknesses in metres.
  */
@@ -192,12 +193,18 @@ export function buildingPlanPlasterSurfaces(floor, { footprints, openings, gridS
     const face = ownerOf(stretch, faces, eps);
     return { ...stretch, owner: face && { wall: face.wall, side: face.side }, own: Boolean(face) };
   });
+  // A free wall's free end has no plaster (2b hand test, 2026-11-23): it stays without an owner.
+  const freeWalls = new Set(
+    (floor.rooms || []).flatMap((room) =>
+      (room.faces || []).filter((face) => face.freePath).map((face) => face.wallId)
+    )
+  );
   // D2: a stretch with no side of its own continues its neighbour's, in line first, then one of
   // the same wall, then any; passed on until nothing changes.
   for (let changed = true; changed; ) {
     changed = false;
     for (const stretch of stretches) {
-      if (stretch.owner) continue;
+      if (stretch.owner || freeWalls.has(stretch.wallId)) continue;
       const touching = stretches.filter(
         (other) =>
           other !== stretch &&
