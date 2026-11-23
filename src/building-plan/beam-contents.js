@@ -5,7 +5,8 @@ import { beamFits } from './beam-body.js';
  * Room beams stay in their room (rule 1 of the room contents rules; 3a-3, 2026-11-23, B1 and B4
  * of the beams round): a beam's centreline and its body lie inside its room's outline, touching
  * allowed, its ends cut along the faces they stop on (`beam-body.js`). Checked on the derived
- * engine's edits, naming the beam; records that break it still read.
+ * engine's edits, naming the beam; records that break it still read. A beam that following its
+ * wall would leave too short is refused too (3a-4).
  */
 
 const textOf = (value) =>
@@ -46,4 +47,26 @@ export function beamPlacementIssues(floor, before = null) {
     });
   }
   return issues;
+}
+
+/**
+ * The beams that following what they touch would leave shorter than a centimetre, or turned back
+ * (3a-4), one issue each, naming the beam.
+ * @param {object} floor the edited floor
+ * @param {string[]} beamIds the beams (`follow-beams.js`)
+ * @returns {object[]} issues
+ */
+export function beamTooShortIssues(floor, beamIds) {
+  return floor.rooms.flatMap((room) =>
+    (room.beams || []).flatMap((beam, index) =>
+      beamIds.includes(beam.id)
+        ? [
+            planIssue('beam_too_short', `Beam ${beamName(beam, index)} would be too short.`, {
+              type: 'beams',
+              id: beam.id,
+            }),
+          ]
+        : []
+    )
+  );
 }

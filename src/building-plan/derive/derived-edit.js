@@ -1,4 +1,4 @@
-import { beamPlacementIssues } from '../beam-contents.js';
+import { beamPlacementIssues, beamTooShortIssues } from '../beam-contents.js';
 import { buildingPlanPinIssues } from '../corner-edits.js';
 import { buildingPlanBoundaryClearanceIssues } from '../footprints.js';
 import {
@@ -74,20 +74,24 @@ function writeFloor(snapshot, floor, primary, options) {
 
 /**
  * Attached contents follow their wall (4b): what touched a line the edit moved (`before`, the
- * floor's primary data before it) moves with it; then the floor is written. A free wall that
- * following would leave too short refuses the edit, named.
+ * floor's primary data before it) moves with it; then the floor is written. A free wall or a
+ * beam (3a-4) that following would leave too short refuses the edit, named.
  */
 function followAndWrite(snapshot, floor, before, primary, options, operation) {
-  const { shortFaceIds } = followAttached(before, primary, {
+  const { shortFaceIds, shortBeamIds } = followAttached(before, primary, {
     specifications: options.specifications,
     operation,
   });
   const written = writeFloor(snapshot, floor, primary, options);
-  if (!shortFaceIds.length) return written;
+  if (!shortFaceIds.length && !shortBeamIds.length) return written;
   const edited = snapshot.floors.find((entry) => entry.id === floor.id);
   return {
     ...written,
-    issues: [...written.issues, ...freeWallTooShortIssues(edited, shortFaceIds)],
+    issues: [
+      ...written.issues,
+      ...freeWallTooShortIssues(edited, shortFaceIds),
+      ...beamTooShortIssues(edited, shortBeamIds),
+    ],
   };
 }
 

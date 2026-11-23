@@ -2,6 +2,7 @@ import { cleanPoint } from '../geometry.js';
 import { SAME, along, lineFrame, pointAt } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { columnFollowers, columnTarget, wallWidthAt } from './follow-columns.js';
+import { beamFollowers, beamLineNow, followBeam } from './follow-beams.js';
 import { halfWidth } from './partition-portions.js';
 import { freeWallContacts, freeWallLines, related, roomFaces } from './attached-contacts.js';
 
@@ -12,7 +13,9 @@ import { freeWallContacts, freeWallLines, related, roomFaces } from './attached-
  * a column. A point keeps its place along a line that moved whole or only got longer, shorter
  * or moved square to itself, and its fraction along a line that turned or whose corner moved
  * (D1). A free wall touching a free wall that follows follows it too. What the edit itself moved
- * leads; what touches nothing stays. Rule 1 is checked afterwards, as for any edit.
+ * leads; what touches nothing stays. Rule 1 is checked afterwards, as for any edit. Room beams
+ * too (3a-4, `follow-beams.js`): an end on a face, a free wall or another beam, a beam lying
+ * along one.
  */
 
 /** A free wall left shorter than this (or turned back) is refused, naming it (D4). */
@@ -51,7 +54,8 @@ function crossing(p, u, q, v) {
  * @param {object} before the floor's primary data before the edit
  * @param {object} primary the same floor after the edit (changed in place)
  * @param {{ specifications?: object, operation?: object }} options
- * @returns {{ shortFaceIds: string[] }} free wall rows following would leave too short
+ * @returns {{ shortFaceIds: string[], shortBeamIds: string[] }} free wall rows and beams following
+ *   would leave too short
  */
 export function followAttached(before, primary, { specifications, operation } = {}) {
   const byFraction = operation?.type === 'move_corner';
@@ -75,11 +79,13 @@ export function followAttached(before, primary, { specifications, operation } = 
   const followers = [
     ...runFollowers(before, primary, halfBefore),
     ...columnFollowers(before, primary, halfBefore, widthBefore),
+    ...beamFollowers(before, primary, halfBefore),
   ];
-  if (!followers.length) return { shortFaceIds: [] };
+  if (!followers.length) return { shortFaceIds: [], shortBeamIds: [] };
 
   /** The line an anchor is now, with whether a jog divided a room face (then kept in place). */
   const lineNow = (anchor, contact) => {
+    if (anchor.type === 'beam') return beamLineNow(primary, anchor);
     if (anchor.type === 'wall') {
       const partition = primary.partitions.find((entry) => entry.faceId === anchor.faceId);
       const lines = partition && freeWallLines(partition, halfAfter(partition));
@@ -149,6 +155,7 @@ export function followAttached(before, primary, { specifications, operation } = 
   };
 
   const short = new Set();
+  const shortBeams = new Set();
   const followRun = (follower) => {
     const { contacts, now } = follower;
     const ends = contacts.ends.map((list, index) =>
@@ -190,11 +197,16 @@ export function followAttached(before, primary, { specifications, operation } = 
   for (let pass = 0; pass <= followers.length; pass += 1) {
     let changed = false;
     for (const follower of followers)
-      changed = (follower.column ? followColumn(follower) : followRun(follower)) || changed;
+      changed =
+        (follower.beam
+          ? followBeam(follower, place, shortBeams)
+          : follower.column
+            ? followColumn(follower)
+            : followRun(follower)) || changed;
     if (!changed) break;
   }
   for (const follower of followers) if (follower.moved) settleRun(primary, follower);
-  return { shortFaceIds: [...short] };
+  return { shortFaceIds: [...short], shortBeamIds: [...shortBeams] };
 }
 
 /** Free wall rows the edit left in place that touch something. */

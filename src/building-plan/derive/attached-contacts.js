@@ -60,7 +60,7 @@ export function jointEnds(primary, partition) {
   });
 }
 
-const contactOn = (anchor, frame, point, extra = {}) => {
+export const contactOn = (anchor, frame, point, extra = {}) => {
   const station = along(frame, point);
   return {
     anchor,
@@ -86,7 +86,7 @@ export function related(a, b) {
 }
 
 /** The free walls of the room not related to `partition` (if any), with their lines, as anchors. */
-function freeWallAnchors(primary, roomId, partition, halfOf) {
+export function freeWallAnchors(primary, roomId, partition, halfOf) {
   return primary.partitions.flatMap((other) => {
     if (
       other.roomId !== roomId ||
