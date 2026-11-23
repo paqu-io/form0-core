@@ -22,6 +22,7 @@ import { faceExtent } from './face-extent.js';
 import { createBuildingPlanInteraction } from './interaction.js';
 import { buildingPlanFootprints, buildingPlanFaceAxes } from './footprints.js';
 import { buildingPlanPlasterSurfaces, buildingPlanSidePlaster } from './plaster-surfaces.js';
+import { buildingPlanRoomSides } from './room-sides.js';
 import {
   freeWallBendCorners,
   freeWallCutPoints,
@@ -196,6 +197,8 @@ export function buildingPlanCanvasSnapshot({
         displayLabel: label(room.values.room_name, `R#${roomIndex + 1}`),
         // A new free wall's thickness here (metres), for snapping it while it is drawn (4a-3b).
         freeWallWidth: newFreeWallWidth(floor, room.id, meta.properties),
+        // Its sides corner to corner, with their rows and openings, for its lengths (step 2, 2c).
+        sides: buildingPlanRoomSides(floor, room, gridSize),
       });
       const faceRows = roomRow.repeatable[key(meta, 'walls')] || [];
       for (const face of room.faces) {
