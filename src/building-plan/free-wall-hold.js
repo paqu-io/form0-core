@@ -54,17 +54,49 @@ function ontoFace(points, outline, reach, inside) {
 }
 
 /**
+ * A straight `points` (a beam) moved square to itself so that a side, `half` off its centreline,
+ * lies exactly on a parallel face it is within `reach` of (a held move stops a hair past it,
+ * inside the touch allowed), when that still fits.
+ */
+function sideOntoFace(points, outline, half, reach, inside) {
+  const [start, end] = [points[0], points.at(-1)];
+  const tangent = unit(sub(end, start));
+  if (!tangent || !(half > 0)) return points;
+  const normal = { x: -tangent.y, y: tangent.x };
+  const across = (p) => (p.x - start.x) * normal.x + (p.y - start.y) * normal.y;
+  const along = (p) => (p.x - start.x) * tangent.x + (p.y - start.y) * tangent.y;
+  const length = gap(start, end);
+  let best = null;
+  outline.forEach((a, index) => {
+    const b = outline[(index + 1) % outline.length];
+    const edge = unit(sub(b, a));
+    if (!edge || Math.abs(cross(edge, tangent)) > 1e-9) return;
+    const [from, to] = [along(a), along(b)].sort((p, q) => p - q);
+    if (Math.min(to, length) - Math.max(from, 0) <= 0) return;
+    for (const side of [half, -half]) {
+      const d = across(a) - side;
+      if (Math.abs(d) <= reach && (!best || Math.abs(d) < Math.abs(best)) && d !== 0) best = d;
+    }
+  });
+  if (best == null) return points;
+  const moved = points.map((p) => ({ ...p, x: p.x + normal.x * best, y: p.y + normal.y * best }));
+  return inside(moved) ? moved : points;
+}
+
+/**
  * A moved free wall held where it still fits (4a-3b; sliding after the 4a-3b hand test): from
  * `originalPoints` towards `moved` as far as `inside` holds, then on along what stopped it with
  * the rest of the move (across or down the page, or along a face an end or side met), so a wall
  * against a face slides along it as the pointer goes instead of staying where it was. Then back
  * onto the step (`step`) along what it moved, towards where it came from, when that still fits and
  * leaves no end it had on a face off it.
- * @param {{ outline?: object[], half?: number, touch?: number }} [room] the room's outline, the
- *   wall's half-thickness and how near counts as on, in canvas units
+ * @param {{ outline?: object[], half?: number, touch?: number, flush?: boolean }} [room] the
+ *   room's outline, the wall's half-thickness and how near counts as on, in canvas units;
+ *   `flush`: no step back across what stopped it (a beam, 3a: 25 cm wide, its centreline can't
+ *   be both on the step and flush)
  */
 export function holdFreeWallMove(originalPoints, moved, inside, step, room = {}) {
-  const { outline = [], half = 0, touch = 0 } = room;
+  const { outline = [], half = 0, touch = 0, flush = false } = room;
   const by = (base, v, t) =>
     base.map((point) => ({ ...point, x: point.x + v.x * t, y: point.y + v.y * t }));
   const furthest = (base, v) => {
@@ -95,9 +127,15 @@ export function holdFreeWallMove(originalPoints, moved, inside, step, room = {})
   }
   if (best) held = best.points;
   held = ontoFace(held, outline, touch * CUT_REACH, inside);
+  if (flush) held = sideOntoFace(held, outline, half, touch * CUT_REACH, inside);
+  // Whether going on along `c`, the way it moved, would leave the room: it is against a face.
+  const stopped = (c) =>
+    Math.sign(shift[c]) !== 0 &&
+    !inside(by(held, { x: 0, y: 0, [c]: Math.sign(shift[c]) * Math.max(touch, EPS) * 2 }, 1));
   const back = Object.fromEntries(
     ['x', 'y'].map((c) => {
       if (Math.abs(held[0][c] - originalPoints[0][c]) <= touch) return [c, 0];
+      if (flush && stopped(c)) return [c, 0];
       const value = held[0][c] / step;
       const toward = originalPoints[0][c] < held[0][c] ? Math.floor : Math.ceil;
       const onStep = Math.abs(value - Math.round(value)) < 1e-3 ? Math.round(value) : null;

@@ -3,6 +3,7 @@ import { normalizeBuildingPlanEditingPolicy } from './editing-policy.js';
 
 import { copyBuildingPlanData } from './model.js';
 import { freeWallTargets } from './free-wall-targets.js';
+import { beamTargets } from './beam-targets.js';
 import { snapFreeWallBend as snapBend } from './free-wall-bend.js';
 import { columnTargets } from './column-targets.js';
 import { snapColumn as snapColumnCentre } from './column-snapping.js';
@@ -367,18 +368,13 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     guides.push({ from: { ...originalPoint }, to: { ...result } });
     return result;
   }
-  // Free walls (`free-wall-snapping.js`): the same reach and hold as the other pulls.
-  function freeWall(run, { roomId, wallId = null, zoom = 1, bypass = false } = {}) {
-    const view = currentScene();
-    const gridSize = view.gridSize || 20;
-    // Its body stays in the room (4a-3b): its thickness, else a new wall's in the room.
-    const width =
-      (view.walls || []).find((wall) => wall.id === wallId)?.thickness ??
-      (view.rooms || []).find((room) => room.id === roomId)?.freeWallWidth;
-    const targets = freeWallTargets(view, { roomId, wallId });
+  // Free walls and beams (`free-wall-snapping.js`): the same reach and hold as the other pulls;
+  // `width` in metres, its body kept in the room (4a-3b).
+  function pull(run, targets, { width, zoom = 1, bypass = false }, extra = {}) {
+    const gridSize = currentScene().gridSize || 20;
     const result = run({
-      // The floor below's corners and faces (U6), its walls' midlines and where they meet.
-      targets: withFloorBelow(targets, view, [targets.outline], { midlines: true }),
+      ...extra,
+      targets,
       gridSize,
       free: bypass || !settings().snapping,
       tolerance: (key) => (latch.has(key) ? 13 : 8) / zoom,
@@ -388,21 +384,39 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     guides = result.guides;
     return result;
   }
-  function snapFreeWallEnd(point, options = {}) {
+  function freeWall(run, { roomId, wallId = null, ...options } = {}) {
+    const view = currentScene();
+    // Its thickness, else a new wall's in the room.
+    const width =
+      (view.walls || []).find((wall) => wall.id === wallId)?.thickness ??
+      (view.rooms || []).find((room) => room.id === roomId)?.freeWallWidth;
+    const targets = freeWallTargets(view, { roomId, wallId });
+    // The floor below's corners and faces (U6), its walls' midlines and where they meet.
+    const below = withFloorBelow(targets, view, [targets.outline], { midlines: true });
+    return pull(run, below, { ...options, width });
+  }
+  // A room beam (3a): what a beam is pulled to, nothing below; `width` its width in metres;
+  // stopped against a face, it stays flush there.
+  const beam = (run, { roomId, beamId = null, ...options } = {}) =>
+    pull(run, beamTargets(currentScene(), { roomId, beamId }), options, { flush: true });
+  function snapEndWith(via, point, options) {
     const from = options.from || null;
     // Where this end last fitted while the other end holds (an end stops there).
     const last =
       from && lastEnd?.from && distance(lastEnd.from, from) < 1e-9 ? lastEnd.point : null;
-    const settled = freeWall((shared) => snapEnd(point, { ...shared, from, last }), options).point;
+    const settled = via((shared) => snapEnd(point, { ...shared, from, last }), options).point;
     lastEnd = from ? { from: { ...from }, point: { ...settled } } : null;
     return settled;
   }
-  function snapFreeWallTranslation(points, options = {}) {
-    return freeWall(
+  const moveWith = (via, points, options) =>
+    via(
       (shared) => snapMove(points, { ...shared, originalPoints: options.originalPoints || points }),
       options
     ).points;
-  }
+  const snapFreeWallEnd = (point, options = {}) => snapEndWith(freeWall, point, options);
+  const snapFreeWallTranslation = (points, options = {}) => moveWith(freeWall, points, options);
+  const snapBeamEnd = (point, options = {}) => snapEndWith(beam, point, options);
+  const snapBeamTranslation = (points, options = {}) => moveWith(beam, points, options);
   /**
    * A column's centre (`column-snapping.js`): the same reach and hold. `width` and `height` in
    * metres (the column's width and depth); `from`: where a dragged column last was. Null when the
@@ -465,6 +479,8 @@ export function createBuildingPlanInteraction({ scene = () => ({}), policy = () 
     snapWallTranslation,
     snapFreeWallEnd,
     snapFreeWallTranslation,
+    snapBeamEnd,
+    snapBeamTranslation,
     snapColumn,
     edgePan,
     getGuides: () =>

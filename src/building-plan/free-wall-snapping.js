@@ -167,12 +167,14 @@ const samples = (path) =>
  *   gridSize: number,
  *   tolerance: (key: string) => number,
  *   free?: boolean,
- * }} options
+ *   half?: number,
+ *   flush?: boolean,
+ * }} options `flush`: stopped against a face, it stays flush there (a beam, 3a)
  * @returns {{ points: Array<{ x: number, y: number }>, guides: object[], keys: string[] }}
  */
 export function snapFreeWallTranslation(
   points,
-  { originalPoints, targets, gridSize, tolerance, free = false, half = 0 }
+  { originalPoints, targets, gridSize, tolerance, free = false, half = 0, flush = false }
 ) {
   const step = STEP_M * gridSize;
   const ends = [points[0], points.at(-1)];
@@ -235,6 +237,7 @@ export function snapFreeWallTranslation(
       outline: targets.outline,
       half,
       touch: TOUCH_M * gridSize,
+      flush,
     });
     guides.length = 0;
   }
