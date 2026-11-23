@@ -5,6 +5,7 @@ import { copyBuildingPlanData as copy, equalValue, findFace, findRoom, own } fro
 import { roomBounds } from './geometry.js';
 import { wallSide } from './wall-sides.js';
 import { nodeSubjects } from './inheritance.js';
+import { sharedWallRooms } from './shared-value-question.js';
 import {
   getBuildingPlanRecordMetadata,
   readBuildingPlanRecord,
@@ -496,5 +497,7 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
     outside: binding.outside === true && Boolean(subject) && subject.roomId == null,
     opposite: binding.outside === true && Boolean(subject?.roomId),
     applicable: binding.outside ? Boolean(subject) : true,
+    // A whole-wall field of a wall other rooms share: those rooms, named (2026-11-23).
+    sharedWith: physical && wall ? sharedWallRooms(floor, wall, selected.roomId) : [],
   };
 }

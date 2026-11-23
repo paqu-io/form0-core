@@ -53,6 +53,36 @@ function roomNumber(snapshot, id) {
   return null;
 }
 
+/**
+ * The other rooms a physical wall stands between, named as this question names them: a room's
+ * name, with its position when two of the wall's rooms share a name (a shared wall shown as
+ * shared, 2026-11-23: its entry's whole-wall fields name them). Without a room of its own (a
+ * physical wall's own row), every room when there are two or more, else none.
+ * @param {object} floor
+ * @param {object} wall the physical wall
+ * @param {string | null | undefined} roomId the entry's room
+ * @returns {Array<{ roomId: string, name: string }>}
+ */
+export function sharedWallRooms(floor, wall, roomId) {
+  const rooms = floor.rooms.filter(
+    (room) =>
+      wall.sides?.some((side) => side.roomId === room.id) ||
+      room.faces.some((face) => face.wallId === wall.id)
+  );
+  const names = rooms.map(
+    (room) => nameText(room.values?.room_name) || `Room ${floor.rooms.indexOf(room) + 1}`
+  );
+  const named = rooms.map((room, index) => ({
+    roomId: room.id,
+    name:
+      names.filter((name) => name === names[index]).length > 1
+        ? `${names[index]} (room ${floor.rooms.indexOf(room) + 1})`
+        : names[index],
+  }));
+  if (roomId) return named.filter((entry) => entry.roomId !== roomId);
+  return named.length > 1 ? named : [];
+}
+
 /** A wall's name; its automatic label when the typed one is still being chosen. */
 function wallName(snapshot, id, typed = true) {
   for (const floor of snapshot.floors)
