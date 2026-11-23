@@ -369,8 +369,15 @@ export class BuildingPlanCanvasController {
       derivedCommands,
     });
     this.editingPolicy = normalizeBuildingPlanEditingPolicy(editingPolicy);
+    // The floor below's pulls follow the host's switch (step 2, S4): off, the scene the pulls read
+    // has no floor below. The snapshot keeps it, for the host to draw or not.
+    this.floorBelowPulls = true;
     this.interaction = createBuildingPlanInteraction({
-      scene: () => ({ ...this.getSnapshot(), gridSize: this.gridSize }),
+      scene: () => ({
+        ...this.getSnapshot(),
+        gridSize: this.gridSize,
+        ...(this.floorBelowPulls ? {} : { floorBelow: null }),
+      }),
       policy: () => this.editingPolicy,
     });
     this.gridSize = 20;
@@ -678,6 +685,16 @@ export class BuildingPlanCanvasController {
   }
   fieldState(path, name) {
     return getBuildingPlanFieldState(this.meta, this.record, this.semanticSnapshot, path, name);
+  }
+  /**
+   * Whether drawing and dragging pull to the floor below (F3): on by default; a host turns it off
+   * with the floor below's switch (step 2, S4). Every pull reads the floor below from the
+   * interaction's scene, so all of them follow.
+   * @param {boolean} on
+   */
+  setFloorBelowPulls(on) {
+    this.floorBelowPulls = on !== false;
+    this.interaction.reset();
   }
   metric(point) {
     return { x: point.x / this.gridSize, y: point.y / this.gridSize };

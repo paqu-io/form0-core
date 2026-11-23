@@ -106,3 +106,21 @@ test('a room corner and a moved room pull to the floor below', async () => {
   assert.ok(t.interaction.getGuides().every((guide) => guide.below));
   t.controller.dispose();
 });
+
+// Step 2, S4 (2026-11-22): the floor below's switch also stops its pulls; the snapshot keeps it.
+test('the floor below pulls only while its pulls are on', async () => {
+  const t = await upperFloor();
+  const c = lone(t.corners, 2);
+  const near = { x: c.x + 1, y: c.y - 0.8 };
+  t.controller.setFloorBelowPulls(false);
+  t.interaction.begin();
+  const free = t.interaction.snapPoint(near, { zoom: 5 });
+  assert.notDeepEqual(free, { x: c.x, y: c.y });
+  assert.ok(!t.interaction.getGuides().some((guide) => guide.below));
+  assert.ok(t.controller.getSnapshot().floorBelow, 'still there to draw');
+  t.controller.setFloorBelowPulls(true);
+  t.interaction.begin();
+  assert.deepEqual(t.interaction.snapPoint(near, { zoom: 5 }), { x: c.x, y: c.y });
+  assert.ok(t.interaction.getGuides().every((guide) => guide.below));
+  t.controller.dispose();
+});
