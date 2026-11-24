@@ -59,6 +59,13 @@ const TRANSLATIONS = {
     'Window label': 'Repère de la fenêtre',
     'Distance from wall start': 'Distance depuis le début du mur',
     'Distance from floor': 'Distance depuis le sol',
+    'Underside from floor': 'Sous-face depuis le sol',
+    'Measured from the finished floor to the underside of the beam.':
+      'Mesurée du sol fini à la sous-face de la poutre.',
+    "From the wall's left end, seen from this room.":
+      'Depuis l’extrémité gauche du mur, vue depuis cette pièce.',
+    'Along the wall.': 'Le long du mur.',
+    'Beams carried by this wall.': 'Poutres portées par ce mur.',
     'Split distance': 'Distance de division',
     "Measured from the finished floor of the building's ground floor. Ground floor is 0; levels above are positive and levels below are negative.":
       'Mesurée depuis le sol fini du rez-de-chaussée du bâtiment. Le rez-de-chaussée est à 0 ; les niveaux supérieurs sont positifs et les niveaux inférieurs négatifs.',
@@ -128,6 +135,13 @@ const TRANSLATIONS = {
     'Window label': 'Etichetta finestra',
     'Distance from wall start': 'Distanza dall’inizio della parete',
     'Distance from floor': 'Distanza dal pavimento',
+    'Underside from floor': 'Intradosso dal pavimento',
+    'Measured from the finished floor to the underside of the beam.':
+      'Misurata dal pavimento finito all’intradosso della trave.',
+    "From the wall's left end, seen from this room.":
+      'Dall’estremità sinistra della parete, vista da questo locale.',
+    'Along the wall.': 'Lungo la parete.',
+    'Beams carried by this wall.': 'Travi portate da questa parete.',
     'Split distance': 'Distanza di divisione',
     "Measured from the finished floor of the building's ground floor. Ground floor is 0; levels above are positive and levels below are negative.":
       'Misurata dal pavimento finito del piano terra dell’edificio. Il piano terra è a 0; i livelli superiori sono positivi e quelli inferiori negativi.',
@@ -200,6 +214,13 @@ const TRANSLATIONS = {
     'Window label': 'Etiqueta de la ventana',
     'Distance from wall start': 'Distancia desde el inicio del muro',
     'Distance from floor': 'Distancia desde el suelo',
+    'Underside from floor': 'Cara inferior desde el suelo',
+    'Measured from the finished floor to the underside of the beam.':
+      'Medida desde el suelo terminado hasta la cara inferior de la viga.',
+    "From the wall's left end, seen from this room.":
+      'Desde el extremo izquierdo del muro, visto desde esta habitación.',
+    'Along the wall.': 'A lo largo del muro.',
+    'Beams carried by this wall.': 'Vigas soportadas por este muro.',
     'Split distance': 'Distancia de división',
     "Measured from the finished floor of the building's ground floor. Ground floor is 0; levels above are positive and levels below are negative.":
       'Medida desde el suelo terminado de la planta baja del edificio. La planta baja está a 0; los niveles superiores son positivos y los inferiores negativos.',

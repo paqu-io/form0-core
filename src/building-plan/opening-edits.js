@@ -1,5 +1,6 @@
 import { copyBuildingPlanData as copy, planIssue, equalValue } from './model.js';
 import { partialOpeningCuts } from './boundary-edits.js';
+import { labelOf, wallChildren } from './wall-children.js';
 
 /** Discover an exact, reviewable removal set before retrying an edit. All attempts are private
  * candidates; the callback settles and validates the complete candidate, including captured extents.
@@ -8,7 +9,7 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
   const openings = new Map(
     current.floors.flatMap((floor) =>
       floor.walls.flatMap((wall) =>
-        [...wall.doors, ...wall.windows].map((opening) => [
+        wallChildren(wall).map((opening) => [
           opening.id,
           { ...opening, floorId: floor.id, wallId: wall.id },
         ])
@@ -125,7 +126,7 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
   if (requested === undefined) {
     const items = ids.map((id) => {
       const item = openings.get(id);
-      return { id, type: item.type, label: item.values?.[`${item.type}_label`] || item.type };
+      return { id, type: item.type, label: labelOf(item) };
     });
     const message = `This edit cuts through ${items.map((item) => item.label).join(', ')}. Keep the previous layout, or confirm this position and remove ${ids.length === 1 ? 'the opening' : 'these openings'}.`;
     throw Object.assign(new Error(message), {

@@ -12,6 +12,8 @@ import {
 } from './model.js';
 import { at, distance, project, segmentFrame, roomBounds } from './geometry.js';
 import { faceSeesSegmentReversed, offsetSeenFrom } from './opening-sides.js';
+import { WALL_CHILDREN, wallChildForNode } from './wall-children.js';
+import { readWallBeam, writeWallBeam } from './wall-beam-records.js';
 
 const metadataFor = (options) => {
   if (options.meta) return options.meta;
@@ -204,6 +206,7 @@ export function readBuildingPlanRecord(options) {
         values: plainValues(meta, 'physical_walls', wallRow),
         doors: [],
         windows: [],
+        beams: [],
       };
       if (state.autoLabel != null && wall.values.wall_label === state.autoLabel)
         delete wall.values.wall_label;
@@ -247,6 +250,8 @@ export function readBuildingPlanRecord(options) {
             ...(state.provenance ? { provenance: copy(state.provenance) } : {}),
           });
         }
+      for (const beamRow of rows(meta, 'wall_beams', wallRow))
+        wall.beams.push(readWallBeam(ROW_IO, meta, beamRow));
     }
     for (const roomRow of rows(meta, 'rooms', row)) {
       const state = modelOf(meta, 'rooms', roomRow);
@@ -416,6 +421,22 @@ function writeOpening(meta, node, row, opening, wall) {
     write(meta, node, row, name, value);
 }
 
+/** Row accessors for the wall beam rows (`wall-beam-records.js`). */
+const ROW_IO = {
+  modelOf,
+  read,
+  write,
+  plainValues,
+  readOverrides,
+  readProviders,
+  readCustom,
+  writePlain,
+  writeProperties,
+  writeCustom,
+  writeModel,
+  intent,
+};
+
 /** Preserve unrelated fields/row metadata while replacing this plan's canonical collections. */
 export function writeBuildingPlanRecord(options) {
   return writeRecord(options);
@@ -508,6 +529,12 @@ function writeRecord(options, refuses = () => true) {
           return entry;
         });
       }
+      const previousBeams = previousBySubject(meta, 'wall_beams', target);
+      target.repeatable[keyFor(meta, 'wall_beams')] = (wall.beams || []).map((beam) => {
+        const entry = makeRow(previousBeams.get(beam.id), createRowId);
+        writeWallBeam(ROW_IO, meta, entry, beam, wall);
+        return entry;
+      });
       return target;
     });
     const oldRooms = previousBySubject(meta, 'rooms', row);
@@ -629,13 +656,13 @@ function sourceFor(meta, wall, state, binding) {
 
 /** WB3: a room on its segment's side -1 sees an opening's offset from its own left end. */
 function seenFromRoom(meta, projected, source, row, face, wallRow, target) {
-  const prefix = source === 'doors' ? 'door' : 'window';
-  const key = fieldFor(meta, projected, `${prefix}_offset`);
+  const child = wallChildForNode(source);
+  const key = fieldFor(meta, projected, child.offset);
   if (!key) return target;
   const opening = {
     segmentId: modelOf(meta, source, row).segmentId,
-    offset: read(meta, source, row, `${prefix}_offset`),
-    width: read(meta, source, row, `${prefix}_width`),
+    offset: read(meta, source, row, child.offset),
+    width: read(meta, source, row, child.span),
   };
   const { segments } = geometry(read(meta, 'physical_walls', wallRow, 'wall_geometry'), 'wall');
   target.values[key] = offsetSeenFrom(face, opening, segments);
@@ -753,17 +780,13 @@ export function refreshBuildingPlanProjections(options) {
           });
           flags('walls', face, wall, source, flag.dataName);
         }
-        for (const [projected, source] of [
-          ['face_doors', 'doors'],
-          ['face_windows', 'windows'],
-        ]) {
+        for (const { copy: projected, source, offset: offsetName, span } of WALL_CHILDREN) {
           face.repeatable ||= {};
           face.repeatable[keyFor(meta, projected)] = rows(meta, source, wall)
             .filter((row) => {
-              const model = modelOf(meta, source, row),
-                prefix = source === 'doors' ? 'door' : 'window';
-              const offset = read(meta, source, row, `${prefix}_offset`),
-                width = read(meta, source, row, `${prefix}_width`);
+              const model = modelOf(meta, source, row);
+              const offset = read(meta, source, row, offsetName),
+                width = read(meta, source, row, span);
               return state.bindings.some(
                 (binding) =>
                   binding.segmentId === model.segmentId &&
@@ -833,19 +856,12 @@ export function getBuildingPlanProjectionLinks({ meta, record }) {
             }
         }
         links.set(face, entries);
-        for (const [projected, source] of [
-          ['face_doors', 'doors'],
-          ['face_windows', 'windows'],
-        ])
+        for (const { copy: projected, source, offset: offsetName } of WALL_CHILDREN)
           for (const row of rows(meta, projected, face)) {
             const original = rows(meta, source, wall).find((item) => item.id === row.id);
             if (!original) continue;
             // WB3: a reversed copy's offset is its own value, not a mirror of the stored one.
-            const offset = fieldFor(
-              meta,
-              source,
-              `${source === 'doors' ? 'door' : 'window'}_offset`
-            );
+            const offset = fieldFor(meta, source, offsetName);
             const reversed = faceSeesSegmentReversed(
               state,
               modelOf(meta, source, original).segmentId

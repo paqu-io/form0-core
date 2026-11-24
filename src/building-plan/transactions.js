@@ -5,6 +5,7 @@ import { copyBuildingPlanData as copy, equalValue, findFace, findRoom, own } fro
 import { roomBounds } from './geometry.js';
 import { wallSide } from './wall-sides.js';
 import { storedOpeningEdit } from './opening-sides.js';
+import { wallChildForNode } from './wall-children.js';
 import { nodeSubjects } from './inheritance.js';
 import { sharedWallRooms } from './shared-value-question.js';
 import {
@@ -159,17 +160,16 @@ export function buildingPlanOperationsForRow({
       commands.push(command);
     } else plain[field.originalDataName] = normalizeFieldValue(field.field, value);
   }
-  if (['doors', 'windows', 'face_doors', 'face_windows'].includes(node.nodeKey)) {
-    const collection = node.sourceNode || node.nodeKey;
-    const prefix = collection === 'doors' ? 'door' : 'window';
+  const child = wallChildForNode(node.nodeKey);
+  if (child) {
     const floor = readBuildingPlanRecord({ meta, record }).floors.find(
       (entry) => entry.id === floorId
     );
     const wall = floor.walls.find((entry) =>
-      entry[collection].some((opening) => opening.id === model.id)
+      (entry[child.list] || []).some((opening) => opening.id === model.id)
     );
     if (!wall) throw new TypeError('The opening host no longer exists.');
-    const opening = wall[collection].find((entry) => entry.id === model.id);
+    const opening = wall[child.list].find((entry) => entry.id === model.id);
     const command = {
       type: 'update_opening',
       floorId,
@@ -177,13 +177,7 @@ export function buildingPlanOperationsForRow({
       openingId: opening.id,
       values: { ...opening.values, ...plain },
     };
-    for (const [name, key] of [
-      [`${prefix}_width`, 'width'],
-      [`${prefix}_height`, 'height'],
-      [`${prefix}_offset`, 'offset'],
-      ['window_distance_from_floor', 'sillHeight'],
-    ])
-      if (own(plain, name)) command[key] = plain[name];
+    for (const [name, key] of child.fields) if (own(plain, name)) command[key] = plain[name];
     // WB3: a room on the segment's side -1 typed its distance from its own left end.
     const face = floor.rooms.flatMap((entry) => entry.faces).find((entry) => entry.id === faceId);
     commands.push(storedOpeningEdit(command, { opening, face, segments: wall.segments }));

@@ -16,6 +16,7 @@ const PARENT = {
   walls: 'rooms',
   doors: 'walls',
   windows: 'walls',
+  wall_beams: 'walls',
 };
 const SCALAR_TYPES = new Set([
   'TextField',
@@ -355,7 +356,7 @@ export function createBuildingPlanBlueprint(overrides = {}) {
   face.mandatory_elements = [storage('wall_face_model')];
   face.fieldRoles = { wall_face_model: { role: 'storage', system: true } };
   face.extra_elements = [];
-  face.children = ['face_doors', 'face_windows'];
+  face.children = ['face_doors', 'face_windows', 'face_beams'];
   face.role = 'room_faces';
   const sides = {
     repeatable: {
@@ -373,7 +374,7 @@ export function createBuildingPlanBlueprint(overrides = {}) {
   };
   blueprint.nodes.physical_walls = physical;
   blueprint.nodes.wall_sides = sides;
-  physical.children = ['wall_sides', 'doors', 'windows'];
+  physical.children = ['wall_sides', 'doors', 'windows', 'wall_beams'];
   blueprint.nodes.floors.children = ['physical_walls', 'rooms'];
   for (const field of physical.mandatory_elements) {
     if (field.data_name === 'wall_model') continue;
@@ -840,6 +841,7 @@ export function createBuildingPlanBlueprint(overrides = {}) {
   for (const [name, source] of [
     ['face_doors', 'doors'],
     ['face_windows', 'windows'],
+    ['face_beams', 'wall_beams'],
   ]) {
     const projection = clone(blueprint.nodes[source]);
     projection.repeatable.key = `bp_${name}`;

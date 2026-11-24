@@ -2,6 +2,8 @@ import { copyBuildingPlanData as copy } from '../model.js';
 import { at, dot, project, segmentFrame } from '../geometry.js';
 import { lineFrame, pointAt } from './grid.js';
 import { edgeEnds, rowFrame, rowTangent } from './frames.js';
+import { fromAlongWall } from './along-wall.js';
+import { wallChildForType } from '../wall-children.js';
 
 /** A row's binding to its wall segment, computed directly from the edge (as rebinding does). */
 export function bindingFor(id, segment, edgeId, start, end) {
@@ -99,13 +101,13 @@ export function buildStoredWalls(context, rooms, rows) {
       roomId: side.sign > 0 ? reference.roomId : other,
     }));
     const axis = segmentFrame(start, end);
-    const openings = { door: [], window: [] };
+    const openings = { door: [], window: [], beam: [] };
     for (const { faceId, from, ...opening } of copy(subject.openings)) {
       const points = openingEnds(context, { faceId, from, width: opening.width });
       const offset = points ? Math.min(...points.map((p) => project(axis, p).along)) : from;
-      const written = { ...opening, segmentId: segment.id, offset };
-      if (Object.hasOwn(written.values || {}, `${written.type}_offset`))
-        written.values[`${written.type}_offset`] = offset;
+      const written = fromAlongWall({ ...opening, segmentId: segment.id, offset });
+      const offsetField = wallChildForType(written.type)?.offset || `${written.type}_offset`;
+      if (Object.hasOwn(written.values || {}, offsetField)) written.values[offsetField] = offset;
       (openings[written.type] || openings.door).push(written);
     }
     const lineage = { ...(subject.lineage || {}) };
@@ -129,6 +131,7 @@ export function buildStoredWalls(context, rooms, rows) {
       lineage,
       doors: openings.door,
       windows: openings.window,
+      beams: openings.beam,
     };
     for (const row of own) {
       const binding = bindingFor(row.bindingId, segment, row.edgeId, ...rowFrame(rooms, row).ends);

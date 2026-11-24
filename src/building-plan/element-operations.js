@@ -1,4 +1,5 @@
 import { copyBuildingPlanData as copy, findRoom, planIssue } from './model.js';
+import { roomBeamUnderside } from './beam-defaults.js';
 
 /** The room element operations, shared by today's engine and the derived core. */
 export const ELEMENT_OPERATIONS = Object.freeze([
@@ -30,6 +31,9 @@ export function applyElementOperation(floor, operation, createId) {
       ...copy(operation.element || {}),
       values: copy(operation.values || {}),
     };
+    // A new beam's underside, unless given: its top at the room's clear height (2026-11-24).
+    if (operation.collection === 'beams' && item.values.beam_distance_from_floor == null)
+      item.values.beam_distance_from_floor = roomBeamUnderside(room, item.height);
     list.push(item);
     return { created: { type: operation.collection, id: item.id } };
   }

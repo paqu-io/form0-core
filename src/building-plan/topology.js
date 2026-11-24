@@ -482,6 +482,7 @@ export function separatePhysicalWallRuns(floor, wall, createId, selectedIds = nu
       sides: wall.sides.map((side) => ({ ...copy(side), id: createId() })),
       doors: [],
       windows: [],
+      beams: [],
       lineage: {
         ...copy(wall.lineage),
         copiedFromWallId: wall.id,

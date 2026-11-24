@@ -16,6 +16,7 @@ import {
   equalValue,
   planIssue,
 } from './model.js';
+import { labelOf, spanOf, wallChildren } from './wall-children.js';
 
 /** Reconcile captured straight extents with their physical host, retaining its identity and fixed-end offsets. */
 export function repairSharedWallExtents(floor, before) {
@@ -63,9 +64,7 @@ export function repairSharedWallExtents(floor, before) {
       if (to - from <= EPS) continue;
       segment.start = at(frame, from);
       segment.end = at(frame, to);
-      for (const opening of [...wall.doors, ...wall.windows].filter(
-        (item) => item.segmentId === segment.id
-      ))
+      for (const opening of wallChildren(wall).filter((item) => item.segmentId === segment.id))
         opening.offset -= from;
     }
 }
@@ -75,8 +74,9 @@ export function partialOpeningCuts(snapshot) {
   const cuts = [];
   for (const floor of snapshot.floors)
     for (const wall of floor.walls)
-      for (const opening of [...wall.doors, ...wall.windows])
+      for (const opening of wallChildren(wall))
         for (const room of floor.rooms) {
+          const span = spanOf(opening);
           const intervals = room.faces
             .filter((face) => face.wallId === wall.id)
             .flatMap((face) =>
@@ -92,23 +92,20 @@ export function partialOpeningCuts(snapshot) {
           const overlap = merged.reduce(
             (size, [from, to]) =>
               size +
-              Math.max(
-                0,
-                Math.min(to, opening.offset + opening.width) - Math.max(from, opening.offset)
-              ),
+              Math.max(0, Math.min(to, opening.offset + span) - Math.max(from, opening.offset)),
             0
           );
-          if (overlap > EPS && overlap < opening.width - EPS)
+          if (overlap > EPS && overlap < span - EPS)
             cuts.push({
               floorId: floor.id,
               wallId: wall.id,
               roomId: room.id,
               id: opening.id,
               type: opening.type,
-              label: opening.values?.[`${opening.type}_label`] || opening.type,
+              label: labelOf(opening),
               extent: merged,
               offset: opening.offset,
-              width: opening.width,
+              width: span,
               segmentId: opening.segmentId,
             });
         }

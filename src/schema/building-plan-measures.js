@@ -32,6 +32,13 @@ export const BUILDING_PLAN_MEASURES = Object.freeze({
   beam_width: 'thickness',
   beam_depth: 'thickness',
   beam_length: 'length',
+  beam_distance_from_floor: 'length',
+  // Wall beams (2026-11-24): along the wall and their height in m, the cross-section in mm.
+  wall_beam_offset: 'length',
+  wall_beam_length: 'length',
+  wall_beam_distance_from_floor: 'length',
+  wall_beam_width: 'thickness',
+  wall_beam_depth: 'thickness',
 });
 
 /** Numeric system fields that are counts, not dimensions. */

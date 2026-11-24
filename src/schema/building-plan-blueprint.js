@@ -1,4 +1,5 @@
 import { createFloorSystemFields } from './building-plan-floors.js';
+import { createBeamHeightField, createWallBeamsNode } from './building-plan-wall-beams.js';
 
 // Default blueprint describing the generated structure for BuildingPlanSection
 
@@ -402,6 +403,7 @@ export const BUILDING_PLAN_BLUEPRINT = {
           supporting_image_path: null,
           supporting_image_display: null,
         },
+        createBeamHeightField(),
         {
           type: 'NumericField',
           key: 'bp_beam_start_u',
@@ -738,7 +740,7 @@ export const BUILDING_PLAN_BLUEPRINT = {
         },
       ],
       extra_elements: [],
-      children: ['doors', 'windows'],
+      children: ['doors', 'windows', 'wall_beams'],
     },
     doors: {
       repeatable: {
@@ -1108,5 +1110,6 @@ export const BUILDING_PLAN_BLUEPRINT = {
       extra_elements: [],
       children: [],
     },
+    wall_beams: createWallBeamsNode(),
   },
 };

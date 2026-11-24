@@ -416,6 +416,7 @@ function detachRoom(floor, room, createId) {
       })),
       doors: [],
       windows: [],
+      beams: [],
       lineage: {
         ...copy(wall.lineage || {}),
         copiedFromWallId: wall.id,
@@ -967,6 +968,7 @@ export function applyBuildingPlanOperation(
         sides: createWallSides(createId),
         doors: [],
         windows: [],
+        beams: [],
       };
       const face = {
         id: createId(),

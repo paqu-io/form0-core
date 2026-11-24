@@ -1,0 +1,50 @@
+import { copyBuildingPlanData as copy } from './model.js';
+
+/**
+ * A wall beam in the record (2026-11-24): a row under its physical wall, its place and size in its
+ * system fields, its identity and segment in its model. `io`: `records.js`'s row accessors.
+ */
+const NODE = 'wall_beams';
+
+/** A beam row as the model's beam. */
+export function readWallBeam(io, meta, row) {
+  const state = io.modelOf(meta, NODE, row);
+  const field = (name) => io.read(meta, NODE, row, name);
+  return {
+    id: state.id,
+    type: 'beam',
+    segmentId: state.segmentId,
+    offset: field('wall_beam_offset'),
+    length: field('wall_beam_length'),
+    width: field('wall_beam_width'),
+    depth: field('wall_beam_depth'),
+    underside: field('wall_beam_distance_from_floor'),
+    values: io.plainValues(meta, NODE, row),
+    overrides: io.readOverrides(meta, NODE, row, state),
+    providerOverrides: io.readProviders(meta, NODE, row, state),
+    repeatable: io.readCustom(meta, NODE, row),
+    ...(state.provenance ? { provenance: copy(state.provenance) } : {}),
+  };
+}
+
+/** The model's beam into its row (its answers first, then its place and size over them). */
+export function writeWallBeam(io, meta, row, beam, wall) {
+  io.writePlain(meta, NODE, row, beam.values);
+  io.writeProperties(meta, NODE, row, beam);
+  io.writeCustom(meta, NODE, row, beam);
+  io.writeModel(meta, NODE, row, {
+    ...io.intent(beam),
+    id: beam.id,
+    segmentId: beam.segmentId,
+    ...(beam.provenance ? { provenance: beam.provenance } : {}),
+  });
+  for (const [name, value] of [
+    ['wall_beam_offset', beam.offset],
+    ['wall_beam_length', beam.length],
+    ['wall_beam_width', beam.width],
+    ['wall_beam_depth', beam.depth],
+    ['wall_beam_distance_from_floor', beam.underside],
+    ['wall_beam_wall_reference', wall.id],
+  ])
+    io.write(meta, NODE, row, name, value ?? null);
+}

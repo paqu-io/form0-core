@@ -11,6 +11,8 @@ import {
 } from './model.js';
 import { roomBounds, distance } from './geometry.js';
 import { createBuildingPlanRecordSession, resolveBuildingPlanRow } from './transactions.js';
+import { NEW_BEAM_DEPTH, NEW_BEAM_WIDTH, newWallBeamOperation } from './beam-defaults.js';
+import { wallChildForNode, wallChildren } from './wall-children.js';
 
 const nodeFor = (meta, key) =>
   meta.repeatables.find((entry) =>
@@ -135,8 +137,8 @@ export function createBuildingPlanEditor(options) {
             ? {
                 start: { x: bounds.x + bounds.width / 4, y: bounds.y + bounds.height / 2 },
                 end: { x: bounds.x + (bounds.width * 3) / 4, y: bounds.y + bounds.height / 2 },
-                width: 0.25,
-                height: 0.4,
+                width: NEW_BEAM_WIDTH,
+                height: NEW_BEAM_DEPTH,
               }
             : {
                 position: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
@@ -144,6 +146,10 @@ export function createBuildingPlanEditor(options) {
                 height: 0.3,
               },
       };
+    }
+    if (['wall_beams', 'face_beams'].includes(kind)) {
+      const face = parent.faceId && room.faces.find((entry) => entry.id === parent.faceId);
+      return newWallBeamOperation(base, findWall(floor, face?.wallId || parent.model.id), face);
     }
     if (['doors', 'windows', 'face_doors', 'face_windows'].includes(kind)) {
       const face = parent.faceId && room.faces.find((entry) => entry.id === parent.faceId);
@@ -322,10 +328,10 @@ export function createBuildingPlanEditor(options) {
         collection: node.nodeKey,
         elementId: model.id,
       };
-    else if (['doors', 'windows', 'face_doors', 'face_windows'].includes(node.nodeKey)) {
+    else if (wallChildForNode(node.nodeKey)) {
       const floor = findBuildingPlanFloor(session.getSnapshot(), floorId);
       const wall = floor.walls.find((entry) =>
-        [...entry.doors, ...entry.windows].some((opening) => opening.id === model.id)
+        wallChildren(entry).some((opening) => opening.id === model.id)
       );
       operation = { ...base, type: 'remove_opening', wallId: wall.id, openingId: model.id };
     } else fail('Remove this wall through its room relationship.');

@@ -1,5 +1,6 @@
 import { distance } from './geometry.js';
 import { own } from './model.js';
+import { spanOf, wallChildForType } from './wall-children.js';
 
 /**
  * An opening's distance from the wall start as each room's copy shows it (WB3, 2026-11-24).
@@ -39,8 +40,8 @@ export function segmentLength(segments, segmentId) {
 }
 
 /**
- * The offset a room's copy of an opening shows, or the stored one when that room sees the
- * segment run left to right.
+ * The offset a room's copy of a wall child shows, or the stored one when that room sees the
+ * segment run left to right. `opening.width`: how far it reaches along the wall (a beam's length).
  */
 export function offsetSeenFrom(face, opening, segments) {
   const length = segmentLength(segments, opening.segmentId);
@@ -58,14 +59,18 @@ export function offsetSeenFrom(face, opening, segments) {
  * @returns {object} the command
  */
 export function storedOpeningEdit(command, { opening, face, segments }) {
-  if (!own(command, 'offset') && !own(command, 'width')) return command;
+  const child = wallChildForType(opening.type);
+  const spanKey = child?.spanKey || 'width';
+  if (!own(command, 'offset') && !own(command, spanKey)) return command;
   if (!faceSeesSegmentReversed(face, opening.segmentId)) return command;
   const length = segmentLength(segments, opening.segmentId);
-  const width = own(command, 'width') ? command.width : opening.width;
-  const seen = own(command, 'offset') ? command.offset : offsetSeenFrom(face, opening, segments);
-  if (length == null || !finite(width) || !finite(seen)) return command;
-  command.offset = offsetFromOtherEnd(seen, width, length);
-  const key = `${opening.type}_offset`;
+  const span = own(command, spanKey) ? command[spanKey] : spanOf(opening);
+  const seen = own(command, 'offset')
+    ? command.offset
+    : offsetSeenFrom(face, { ...opening, width: spanOf(opening) }, segments);
+  if (length == null || !finite(span) || !finite(seen)) return command;
+  command.offset = offsetFromOtherEnd(seen, span, length);
+  const key = child?.offset || `${opening.type}_offset`;
   if (command.values && own(command.values, key)) command.values[key] = command.offset;
   return command;
 }

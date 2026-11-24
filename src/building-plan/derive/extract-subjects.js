@@ -1,5 +1,6 @@
 import { copyBuildingPlanData as copy } from '../model.js';
 import { along, lineFrame, pointAt } from './grid.js';
+import { alongWall } from './along-wall.js';
 
 /** Segment keys that are geometry, recomputed on write-back; every other key is carried. */
 const GEOMETRY_KEYS = ['id', 'start', 'end', 'referenceOffset'];
@@ -73,7 +74,7 @@ function anchorOpening(opening, wall, reference) {
 export function extractBuildingPlanSubjects(floor) {
   const subjects = new Map();
   for (const wall of floor.walls || []) {
-    const { segments, sides, doors, windows, exposure, ...rest } = copy(wall);
+    const { segments, sides, doors, windows, beams, exposure, ...rest } = copy(wall);
     const segment = segments[0] || {};
     const reference = referenceFaceOf(floor, wall);
     const orientation = storedOrientation(floor, wall);
@@ -89,8 +90,9 @@ export function extractBuildingPlanSubjects(floor) {
         ...side,
         sign: side.sign * orientation,
       })),
-      openings: [...(doors || []), ...(windows || [])].map((opening) =>
-        anchorOpening(opening, wall, reference)
+      // Wall beams ride with the openings (WB2), their length as their width along the wall.
+      openings: [...(doors || []), ...(windows || []), ...(beams || []).map(alongWall)].map(
+        (opening) => anchorOpening(opening, wall, reference)
       ),
     });
   }

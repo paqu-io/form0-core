@@ -42,15 +42,18 @@ export function assignBuildingPlanDefaultNames(before, candidate, locale = 'en')
         known.add(element.id);
     }
     for (const wall of floor.walls)
-      for (const opening of [...wall.doors, ...wall.windows]) known.add(opening.id);
+      for (const opening of [...wall.doors, ...wall.windows, ...(wall.beams || [])])
+        known.add(opening.id);
   }
   for (const floor of candidate.floors) {
+    // `field`: the name's field, or a function giving it per subject (beams: room or wall).
     const name = (subjects, field, prefix, separator, write = (value) => value) => {
-      const names = subjects.map((subject) => textOf(subject.values?.[field]));
+      const fieldOf = typeof field === 'function' ? field : () => field;
+      const names = subjects.map((subject) => textOf(subject.values?.[fieldOf(subject)]));
       for (const subject of subjects) {
-        if (known.has(subject.id) || !isEmpty(subject.values?.[field])) continue;
+        if (known.has(subject.id) || !isEmpty(subject.values?.[fieldOf(subject)])) continue;
         const value = nextName(names, prefix, separator);
-        subject.values = { ...subject.values, [field]: write(value) };
+        subject.values = { ...subject.values, [fieldOf(subject)]: write(value) };
         names.push(value);
       }
     };
@@ -68,9 +71,10 @@ export function assignBuildingPlanDefaultNames(before, candidate, locale = 'en')
       'C',
       '#'
     );
+    // Room beams and wall beams share one numbering per floor (wall beams, 2026-11-24).
     name(
-      floor.rooms.flatMap((room) => room.beams),
-      'beam_identifier',
+      [...floor.rooms.flatMap((room) => room.beams), ...floor.walls.flatMap((w) => w.beams || [])],
+      (beam) => (beam.type === 'beam' ? 'wall_beam_identifier' : 'beam_identifier'),
       'B',
       '#'
     );

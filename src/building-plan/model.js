@@ -326,6 +326,7 @@ export function createBuildingPlanRoom(
       sides: createWallSides(createId),
       doors: [],
       windows: [],
+      beams: [],
     };
     floor.walls.push(wall);
     const thickness = resolveBuildingPlanProperty(
@@ -559,6 +560,26 @@ function validateSnapshot(snapshot) {
               )
             );
         }
+      // Wall beams (2026-11-24): they may lie over openings and each other; each fits its wall.
+      for (const beam of wall.beams || []) {
+        register('beam', beam);
+        const segment = wall.segments?.find((entry) => entry.id === beam.segmentId);
+        if (
+          !segment ||
+          !Number.isFinite(beam.offset) ||
+          !Number.isFinite(beam.length) ||
+          beam.length <= 0 ||
+          beam.offset < -EPS ||
+          beam.offset + beam.length > distance(segment.start, segment.end) + EPS
+        )
+          issues.push(
+            planIssue(
+              'wall_beam_outside_wall',
+              'The beam does not fit on its wall. Shorten or move it.',
+              { type: 'beam', id: beam.id }
+            )
+          );
+      }
     }
     for (const room of floor.rooms) {
       register('room', room);

@@ -11,6 +11,8 @@ export const BUILDING_PLAN_TITLE_FIELDS = {
   face_doors: 'door_label',
   windows: 'window_label',
   face_windows: 'window_label',
+  wall_beams: 'wall_beam_identifier',
+  face_beams: 'wall_beam_identifier',
   columns: 'column_identifier',
   beams: 'beam_identifier',
   objects: 'object_name',
