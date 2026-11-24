@@ -11,6 +11,7 @@ import {
   validateBuildingPlanSnapshot,
 } from './model.js';
 import { at, distance, project, segmentFrame, roomBounds } from './geometry.js';
+import { faceSeesSegmentReversed, offsetSeenFrom } from './opening-sides.js';
 
 const metadataFor = (options) => {
   if (options.meta) return options.meta;
@@ -626,6 +627,21 @@ function sourceFor(meta, wall, state, binding) {
   });
 }
 
+/** WB3: a room on its segment's side -1 sees an opening's offset from its own left end. */
+function seenFromRoom(meta, projected, source, row, face, wallRow, target) {
+  const prefix = source === 'doors' ? 'door' : 'window';
+  const key = fieldFor(meta, projected, `${prefix}_offset`);
+  if (!key) return target;
+  const opening = {
+    segmentId: modelOf(meta, source, row).segmentId,
+    offset: read(meta, source, row, `${prefix}_offset`),
+    width: read(meta, source, row, `${prefix}_width`),
+  };
+  const { segments } = geometry(read(meta, 'physical_walls', wallRow, 'wall_geometry'), 'wall');
+  target.values[key] = offsetSeenFrom(face, opening, segments);
+  return target;
+}
+
 function projectRow(entries, source, previous = source, links = null) {
   const target = { ...copy(previous), values: {}, repeatable: {} };
   const references = new Map();
@@ -755,7 +771,17 @@ export function refreshBuildingPlanProjections(options) {
                   offset + width <= binding.interval[1] + 1e-6
               );
             })
-            .map((row) => projectRow(nodeFor(meta, projected).fields, row));
+            .map((row) =>
+              seenFromRoom(
+                meta,
+                projected,
+                source,
+                row,
+                state,
+                wall,
+                projectRow(nodeFor(meta, projected).fields, row)
+              )
+            );
         }
       }
   }
@@ -813,16 +839,28 @@ export function getBuildingPlanProjectionLinks({ meta, record }) {
         ])
           for (const row of rows(meta, projected, face)) {
             const original = rows(meta, source, wall).find((item) => item.id === row.id);
-            if (original)
-              links.set(
-                row,
-                new Map(
-                  nodeFor(meta, projected).fields.map((field) => [
+            if (!original) continue;
+            // WB3: a reversed copy's offset is its own value, not a mirror of the stored one.
+            const offset = fieldFor(
+              meta,
+              source,
+              `${source === 'doors' ? 'door' : 'window'}_offset`
+            );
+            const reversed = faceSeesSegmentReversed(
+              state,
+              modelOf(meta, source, original).segmentId
+            );
+            links.set(
+              row,
+              new Map(
+                nodeFor(meta, projected)
+                  .fields.filter((field) => !(reversed && field.binding.sourceDataName === offset))
+                  .map((field) => [
                     field.dataName,
                     { record: original, fieldName: field.binding.sourceDataName },
                   ])
-                )
-              );
+              )
+            );
           }
       }
   }

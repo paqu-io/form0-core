@@ -4,6 +4,7 @@ import { createBuildingPlanSession } from './session.js';
 import { copyBuildingPlanData as copy, equalValue, findFace, findRoom, own } from './model.js';
 import { roomBounds } from './geometry.js';
 import { wallSide } from './wall-sides.js';
+import { storedOpeningEdit } from './opening-sides.js';
 import { nodeSubjects } from './inheritance.js';
 import { sharedWallRooms } from './shared-value-question.js';
 import {
@@ -183,7 +184,9 @@ export function buildingPlanOperationsForRow({
       ['window_distance_from_floor', 'sillHeight'],
     ])
       if (own(plain, name)) command[key] = plain[name];
-    commands.push(command);
+    // WB3: a room on the segment's side -1 typed its distance from its own left end.
+    const face = floor.rooms.flatMap((entry) => entry.faces).find((entry) => entry.id === faceId);
+    commands.push(storedOpeningEdit(command, { opening, face, segments: wall.segments }));
   } else if (['columns', 'beams', 'objects'].includes(node.nodeKey)) {
     const floor = readBuildingPlanRecord({ meta, record }).floors.find(
       (entry) => entry.id === floorId
