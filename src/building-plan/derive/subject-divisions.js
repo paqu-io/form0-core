@@ -3,6 +3,7 @@ import { copyBuildingPlanData as copy, equalValue } from '../model.js';
 import { SAME } from './grid.js';
 import { subjectTangent } from './subject-joins.js';
 import { sameCapAnswers } from './caps.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -45,7 +46,7 @@ function placeOpenings(context, subject, pieces) {
     if (crossed)
       refuse(
         'opening_crosses_split',
-        'A required room-adjacency boundary passes through an opening. Move the opening or adjust the room.',
+        `A required room-adjacency boundary passes through ${nameOf(opening)}. Move it or adjust the room.`,
         { subject: subjectRef, openingIds: [opening.id] }
       );
     context.issues.push({ code: 'opening_outside_wall', subject: subjectRef });
@@ -167,7 +168,7 @@ export function retireSubjects(context) {
     if (subject.openings.length)
       refuse(
         'opening_crosses_edit_boundary',
-        'An opening occupies the automatic wall portion removed by this edit.',
+        `${nameOf(subject.openings[0])} occupies the automatic wall portion removed by this edit.`,
         {
           subject: { type: subject.openings[0].type, id: subject.openings[0].id },
           openingIds: subject.openings.map((opening) => opening.id),

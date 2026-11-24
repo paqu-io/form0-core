@@ -23,6 +23,7 @@ import {
   segmentFrame,
   subtract,
 } from './geometry.js';
+import { nameOf } from './wall-children.js';
 
 export const BUILDING_PLAN_VERSION = 2;
 export const BUILDING_PLAN_PROPERTIES = Object.freeze({
@@ -517,7 +518,7 @@ function validateSnapshot(snapshot) {
           issues.push(
             planIssue(
               'opening_outside_wall',
-              'The opening does not fit on its host wall. Move it or change the wall edit.',
+              `${nameOf(opening)} does not fit on its host wall. Move it or change the wall edit.`,
               { type: opening.type || 'opening', id: opening.id }
             )
           );
@@ -575,7 +576,7 @@ function validateSnapshot(snapshot) {
           issues.push(
             planIssue(
               'wall_beam_outside_wall',
-              'The beam does not fit on its wall. Shorten or move it.',
+              `${nameOf(beam)} does not fit on its wall. Shorten or move it.`,
               { type: 'beam', id: beam.id }
             )
           );

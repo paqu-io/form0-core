@@ -1,5 +1,6 @@
 import { copyBuildingPlanData as copy } from '../model.js';
 import { SAME } from './grid.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message, subject) => {
   throw Object.assign(new Error(message), {
@@ -118,7 +119,7 @@ function remapOpenings(primary, room, remapped) {
       if (!holder)
         refuse(
           'opening_crosses_edit_boundary',
-          'An opening crosses this wall edit. Move it or split a different portion.',
+          `${nameOf(opening)} crosses this wall edit. Move it or split a different portion.`,
           { type: opening.type, id: opening.id }
         );
       opening.faceId = holder.faceId;

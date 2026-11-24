@@ -1,6 +1,7 @@
 import { cleanPoint } from '../geometry.js';
 import { SAME, along, lineFrame, offset } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -23,15 +24,13 @@ export function removeStation(primary, room, vertexId, dropEdgeId) {
   const dropped = primary.anchors.filter(
     (anchor) => anchor.roomId === room.id && anchor.edgeId === dropEdgeId
   );
-  const hosts = new Set(
-    [...primary.subjects.values()].flatMap((subject) =>
-      (subject.openings || []).map((opening) => opening.faceId)
-    )
-  );
-  if (dropped.some((anchor) => hosts.has(anchor.faceId)))
+  const crossing = [...primary.subjects.values()]
+    .flatMap((subject) => subject.openings || [])
+    .find((opening) => dropped.some((anchor) => anchor.faceId === opening.faceId));
+  if (crossing)
     refuse(
       'opening_crosses_edit_boundary',
-      'An opening crosses this wall edit. Move it or split a different portion.'
+      `${nameOf(crossing)} crosses this wall edit. Move it or split a different portion.`
     );
   primary.anchors = primary.anchors.filter((anchor) => !dropped.includes(anchor));
   room.vertices = room.vertices.filter((vertex) => vertex.id !== vertexId);

@@ -79,3 +79,14 @@ export function labelOf(element) {
   const field = child?.type === 'beam' ? 'wall_beam_identifier' : `${element?.type}_label`;
   return element?.values?.[field] || child?.type || 'opening';
 }
+
+/**
+ * A wall child as a refusal names it (2026-11-24): "Beam B#1", or a door's or window's label.
+ * Doors, windows and beams are named automatically, so the fallbacks are rare.
+ */
+export function nameOf(element) {
+  const type = wallChildForType(element?.type)?.type;
+  const label = element?.values?.[type === 'beam' ? 'wall_beam_identifier' : `${type}_label`];
+  if (type === 'beam') return label ? `Beam ${label}` : 'A beam';
+  return label || (type === 'window' ? 'A window' : 'A door');
+}

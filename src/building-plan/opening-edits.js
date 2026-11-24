@@ -1,6 +1,6 @@
 import { copyBuildingPlanData as copy, planIssue, equalValue } from './model.js';
 import { partialOpeningCuts } from './boundary-edits.js';
-import { labelOf, wallChildren } from './wall-children.js';
+import { labelOf, nameOf, wallChildren } from './wall-children.js';
 
 /** Discover an exact, reviewable removal set before retrying an edit. All attempts are private
  * candidates; the callback settles and validates the complete candidate, including captured extents.
@@ -78,15 +78,14 @@ export function prepareBuildingPlanEdit(current, operation, apply, validate) {
     }
     if (!discovered.length) break;
     const previous = affected.size;
-    if (discovered.some((id) => editedOpenings.has(id)))
-      throw Object.assign(new Error('The opening does not fit. Move it or reduce its width.'), {
-        issues: [
-          planIssue(
-            'opening_outside_wall',
-            'The opening does not fit. Move it or reduce its width.'
-          ),
-        ],
+    const edited = discovered.find((id) => editedOpenings.has(id));
+    if (edited) {
+      const item = openings.get(edited);
+      const message = `${nameOf(item)} does not fit. Move it or ${item?.type === 'beam' ? 'shorten it' : 'reduce its width'}.`;
+      throw Object.assign(new Error(message), {
+        issues: [planIssue('opening_outside_wall', message)],
       });
+    }
     for (const id of discovered) {
       if (!openings.has(id))
         throw Object.assign(

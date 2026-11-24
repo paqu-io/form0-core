@@ -4,6 +4,7 @@ import { SAME, along } from './grid.js';
 import { deriveBuildingPlanPieces } from './pieces.js';
 import { roomLines } from './room-lines.js';
 import { resizeFace } from './face-commands.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -188,7 +189,7 @@ function scaleRoom(primary, room, old, rectangle) {
       if (start < -SAME || start + opening.width > length + SAME)
         refuse(
           'opening_crosses_edit_boundary',
-          'An opening no longer fits its wall. Move it first.'
+          `${nameOf(opening)} no longer fits its wall. Move it first.`
         );
       opening.from = start;
     }

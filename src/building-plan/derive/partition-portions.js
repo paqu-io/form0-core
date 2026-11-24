@@ -2,6 +2,7 @@ import { cleanPoint } from '../geometry.js';
 import { equalValue } from '../model.js';
 import { SAME, lineFrame } from './grid.js';
 import { resolutionFloor, resolveWallThickness } from './thickness.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -39,7 +40,7 @@ function closeReturn(primary, entry, neighbour) {
   if (openings.length)
     refuse(
       'opening_crosses_edit_boundary',
-      'This edit removes a partition return containing an opening.',
+      `This edit removes a partition return containing ${nameOf(openings[0])}.`,
       {
         subject: { type: openings[0].type, id: openings[0].id },
         openingIds: openings.map((opening) => opening.id),

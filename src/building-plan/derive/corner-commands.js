@@ -5,6 +5,7 @@ import { signedArea } from './room-lines.js';
 import { editRuns, prepareEnds } from './run-edits.js';
 import { cornerNeighbourRuns } from './corner-neighbours.js';
 import { dropPassedStations, snapStations } from './corner-stations.js';
+import { nameOf } from '../wall-children.js';
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -179,7 +180,7 @@ function respanRoom(primary, room, lengths) {
       if (start < -SAME || start + opening.width > next + SAME)
         refuse(
           'opening_crosses_edit_boundary',
-          'An opening crosses this wall edit. Move it or split a different portion.'
+          `${nameOf(opening)} crosses this wall edit. Move it or split a different portion.`
         );
       opening.from = start;
     }

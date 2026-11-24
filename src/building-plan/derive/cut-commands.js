@@ -5,6 +5,7 @@ import { deriveBuildingPlanPieces } from './pieces.js';
 import { pieceAt } from './face-plans.js';
 import { edgeLength, splitEdge } from './cut-edges.js';
 import { rejoinCut } from './cut-rejoin.js';
+import { nameOf } from '../wall-children.js';
 
 export { rejoinCut };
 
@@ -16,13 +17,16 @@ const created = (cutId, primary) => ({
   result: { created: { type: 'editing_cut', id: cutId } },
   preferredRoomIds: primary.rooms.map((room) => room.id),
 });
-const crossesOpening = () =>
+// The cut names what it crosses (2026-11-24: a beam's refusal read "a door or window").
+const crossesOpening = (opening) =>
   refuse(
     'opening_crosses_cut',
-    'This cut crosses a door or window. Choose an opening edge or another position.'
+    opening.type === 'beam'
+      ? `This cut crosses ${nameOf(opening)}. Choose a position outside it, or shorten the beam first.`
+      : `This cut crosses ${nameOf(opening)}. Choose an opening edge or another position.`
   );
 
-/** An opening of the subject lies across the point (on its anchor row's line). */
+/** The subject's opening or beam that lies across the point (on its anchor row's line), if any. */
 function openingAcross(primary, derived, subjectId, point) {
   for (const opening of primary.subjects.get(subjectId)?.openings || []) {
     const anchor = primary.anchors.find((entry) => entry.faceId === opening.faceId);
@@ -35,9 +39,9 @@ function openingAcross(primary, derived, subjectId, point) {
     if (!line) continue;
     const start = line.edges.find((edge) => edge.id === anchor.edgeId).from + opening.from;
     const station = along(line.frame, point);
-    if (station > start + SAME && station < start + opening.width - SAME) return true;
+    if (station > start + SAME && station < start + opening.width - SAME) return opening;
   }
-  return false;
+  return null;
 }
 
 /** Split a partition portion: the row keeps the first part, a new row takes the second. */
@@ -53,7 +57,8 @@ function splitPartition(primary, partition, operation, createId) {
     refuse('invalid_cut', 'Choose an interior position on this wall portion.');
   const openings = primary.subjects.get(partition.subjectId)?.openings || [];
   const own = openings.filter((opening) => opening.faceId === partition.faceId);
-  if (own.some((o) => o.from < at - SAME && o.from + o.width > at + SAME)) crossesOpening();
+  const crossing = own.find((o) => o.from < at - SAME && o.from + o.width > at + SAME);
+  if (crossing) crossesOpening(crossing);
   const cutId = createId();
   const point = cleanPoint(pointAt(frame, at));
   const origin = partition.lineage?.editingOriginFaceId || partition.faceId;
@@ -127,7 +132,8 @@ export function splitFace(primary, operation, { createId, specifications }) {
     refuse('invalid_cut', 'Choose an interior position on this wall portion.');
   const piece = pieceAt(derived, line, edge.from + at);
   if (!piece) refuse('invalid_cut', 'Choose an interior position on this wall portion.');
-  if (openingAcross(primary, derived, piece.subjectId, point)) crossesOpening();
+  const crossing = openingAcross(primary, derived, piece.subjectId, point);
+  if (crossing) crossesOpening(crossing);
   let divisions = 0;
   for (const entry of piece.lines) {
     const target = primary.rooms.find((candidate) => candidate.id === entry.roomId);
