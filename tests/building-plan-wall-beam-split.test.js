@@ -131,3 +131,16 @@ test('a door across the cut still refuses it', () => {
   assert.equal(result.status, 'conflict');
   assert.match(result.issues[0].message, /^This cut crosses Shared door\./);
 });
+
+test('divided parts store their lengths without float noise', () => {
+  const t = example();
+  const w1 = t.wall('W1').id;
+  applied(t.beam(w1, 0, 5));
+  applied(t.beam(w1, 0.3, 2.7));
+  const north = t.floor().rooms[0].faces.find((face) => face.wallId === w1).id;
+  applied(t.apply({ type: 'split_face', faceId: north, offset: 0.986266301 }));
+  const stored = t.floor().walls.flatMap((wall) => wall.beams || []);
+  assert.equal(stored.length, 4);
+  for (const entry of stored)
+    assert.equal(entry.length, Math.round(entry.length * 1e9) / 1e9, String(entry.length));
+});

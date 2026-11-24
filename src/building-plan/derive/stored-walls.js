@@ -108,9 +108,14 @@ export function buildStoredWalls(context, rooms, rows) {
       const offset = cleanLength(
         points ? Math.min(...points.map((p) => project(axis, p).along)) : from
       );
-      const written = fromAlongWall({ ...opening, segmentId: segment.id, offset });
-      const offsetField = wallChildForType(written.type)?.offset || `${written.type}_offset`;
+      // Its reach too: a divided beam's length was stored as 0.9862663009999999.
+      const width = Number.isFinite(opening.width) ? cleanLength(opening.width) : opening.width;
+      const written = fromAlongWall({ ...opening, width, segmentId: segment.id, offset });
+      const child = wallChildForType(written.type);
+      const offsetField = child?.offset || `${written.type}_offset`;
       if (Object.hasOwn(written.values || {}, offsetField)) written.values[offsetField] = offset;
+      if (child && Object.hasOwn(written.values || {}, child.span))
+        written.values[child.span] = written[child.spanKey];
       (openings[written.type] || openings.door).push(written);
     }
     const lineage = { ...(subject.lineage || {}) };

@@ -5,7 +5,11 @@ import { cleanLength as clean } from '../geometry.js';
  * (its underside from the floor); an edit keeps a beam touching what it rested on or under:
  *
  * - a wall beam resting on an opening's head (their stretches along the wall overlapping) follows
- *   that head when the opening's height or sill changes (several under it: the highest);
+ *   that head when the opening's height or sill changes; it comes to rest on the highest head
+ *   still under it;
+ * - an opening rising into a beam above it pushes the beam up (decided 2026-11-24, (a)): one edit
+ *   or two give the same result; past the wall's top the edit is refused
+ *   (`wall-beam-placement.js`), as is an opening moved along the wall into a beam;
  * - else a wall beam flush with its wall's top stays flush when the wall's height or the beam's
  *   depth changes (it grows downwards);
  * - a room beam whose top was at the room's structural clear height stays there.
@@ -41,18 +45,28 @@ export function followBeamHeights(previous, floor) {
     for (const beam of wall.beams || []) {
       const was = wasBeam.get(beam.id);
       if (!was || !finite(was.beam.underside) || beam.underside !== was.beam.underside) continue;
-      const supports = [...was.wall.doors, ...was.wall.windows].filter(
-        (opening) => alongOverlap(opening, was.beam) && near(headOf(opening), was.beam.underside)
-      );
-      const moved = supports.filter((opening) => {
+      // The openings under the beam before the edit, and still under it along the wall.
+      const under = [...was.wall.doors, ...was.wall.windows].filter((opening) => {
         const now = openingsNow.get(opening.id);
-        return now && finite(headOf(now)) && !near(headOf(now), headOf(opening));
+        return (
+          now &&
+          alongOverlap(opening, was.beam) &&
+          alongOverlap(now, beam) &&
+          finite(headOf(opening)) &&
+          headOf(opening) <= was.beam.underside + EPS
+        );
       });
-      if (moved.length) {
-        const heads = supports
-          .map((opening) => headOf(openingsNow.get(opening.id)))
-          .filter((value) => finite(value));
-        beam.underside = clean(Math.max(...heads));
+      const headsNow = under
+        .map((opening) => headOf(openingsNow.get(opening.id)))
+        .filter((value) => finite(value));
+      const top = headsNow.length ? Math.max(...headsNow) : null;
+      const supportMoved = under.some(
+        (opening) =>
+          near(headOf(opening), was.beam.underside) &&
+          !near(headOf(openingsNow.get(opening.id)), headOf(opening))
+      );
+      if (finite(top) && (supportMoved || top > beam.underside + EPS)) {
+        beam.underside = clean(top);
         continue;
       }
       const height = wall.properties?.wall_height;
