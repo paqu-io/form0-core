@@ -93,6 +93,23 @@ test("a wall face's copy of an opening presents as the opening", () => {
   assert.equal(si.toDisplay(width, 0.9000000000000001), 0.9);
 });
 
+test('plan lengths show to the centimetre, sizes to the millimetre; typed values keep theirs', () => {
+  // Wall beams hand test (2026-11-24): a beam following a dragged wall read 5.71405.
+  const field = (node, name) =>
+    meta.repeatablesByNodeKey[node].fieldsByOriginalDataName[name].field;
+  const si = createBuildingPlanPresentation({ metadata: [meta] });
+  assert.equal(si.toDisplay(field('wall_beams', 'wall_beam_length'), 5.71405), 5.71);
+  assert.equal(si.toDisplay(field('face_doors', 'door_offset'), 1.19014), 1.19);
+  assert.equal(si.toDisplay(field('wall_beams', 'wall_beam_width'), 0.2034), 203);
+  assert.equal(si.fromDisplay(field('wall_beams', 'wall_beam_length'), 5.714), 5.714);
+  const imperial = createBuildingPlanPresentation({
+    metadata: [meta],
+    measurementSystem: 'imperial',
+  });
+  assert.equal(imperial.toDisplay(field('wall_beams', 'wall_beam_length'), 5.71405), 18.75);
+  assert.equal(imperial.toDisplay(field('wall_beams', 'wall_beam_width'), 0.2), 7.9);
+});
+
 test('an opening placed or moved on the canvas is stored to the millimetre', async () => {
   const f = createBuildingPlanExample();
   let record = f.record;

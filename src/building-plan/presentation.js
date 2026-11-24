@@ -286,8 +286,18 @@ export function createBuildingPlanPresentation({
     typeof value === 'number' && Number.isFinite(value)
       ? Number((value * factor).toPrecision(14))
       : value;
-  const toDisplay = (field, value) =>
-    kindFor(field) ? convert(value, factorFor(kindFor(field))) : value;
+  // Shown as the canvas shows lengths (2026-11-24: a beam following a wall read 5.71405): metres
+  // to the centimetre, millimetres whole, feet to the hundredth, inches to the tenth. Stored values
+  // keep their precision; a field only writes what is typed (`fromDisplay`).
+  const DECIMALS = { m: 2, mm: 0, ft: 2, in: 1 };
+  const toDisplay = (field, value) => {
+    const kind = kindFor(field);
+    if (!kind) return value;
+    const shown = convert(value, factorFor(kind));
+    return typeof shown === 'number' && Number.isFinite(shown)
+      ? Number(shown.toFixed(DECIMALS[unitFor(kind)]))
+      : shown;
+  };
   const fromDisplay = (field, value) => {
     const entry = managed(field);
     if (!entry) return value;
