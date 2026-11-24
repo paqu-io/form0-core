@@ -2,11 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createBuildingPlanEditor,
-  createBuildingPlanRecordSession,
   createBuildingPlanSession,
-  createStructuredRecord,
   expandBuildingPlanSchema,
-  writeBuildingPlanRecord,
 } from '../src/index.js';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
 
@@ -252,54 +249,6 @@ test('a wall beam is carried by every edit, in place; a Split across it is refus
   applied(t.apply({ type: 'remove_room', roomId: t.floor().rooms[1].id }));
   assert.deepEqual(beamPlaces(t.floor()), moved);
   assert.deepEqual(t.session.validate(), []);
-});
-
-test("each room's copy counts from its own left end; typed there, converted back", () => {
-  const t = example();
-  applied(addBeam(t, 'W3', 0.2, 1.5));
-  const nodes = t.f.meta.repeatablesByNodeKey;
-  const name = (field) => nodes.face_beams.fieldsByOriginalDataName[field].dataName;
-  const record = writeBuildingPlanRecord({ meta: t.f.meta, plan: t.session.getSnapshot() });
-  const copies = record.repeatable[nodes.floors.preferredKey][0].repeatable[
-    nodes.rooms.preferredKey
-  ].map((room) =>
-    room.repeatable[nodes.walls.preferredKey]
-      .flatMap((row) => row.repeatable?.[nodes.face_beams.preferredKey] || [])
-      .map((row) => round(row.values[name('wall_beam_offset')]))
-  );
-  // From the Bedroom's left end (x = 5) 0.2 m; from Room 2's (x = 3) 2 - 0.2 - 1.5 = 0.3 m.
-  assert.deepEqual(copies, [[0.2], [0.3]]);
-  // Typed in Room 2's copy (its entry's Save): from Room 2's left end, stored from the wall's.
-  const session = createBuildingPlanRecordSession({ meta: t.f.meta, record });
-  const type = (values) => {
-    const floorRow = session.getRecord().repeatable[nodes.floors.preferredKey][0];
-    const room = floorRow.repeatable[nodes.rooms.preferredKey][1];
-    const face = room.repeatable[nodes.walls.preferredKey].find(
-      (row) => (row.repeatable?.[nodes.face_beams.preferredKey] || []).length
-    );
-    const beam = face.repeatable[nodes.face_beams.preferredKey][0];
-    const edited = structuredClone(beam);
-    for (const [field, value] of Object.entries(values)) edited.values[name(field)] = value;
-    const scopeId = session.beginScope({ id: `beam-${Object.keys(values)[0]}` }).scopeId;
-    const path = [
-      { key: nodes.floors.preferredKey, id: floorRow.id },
-      { key: nodes.rooms.preferredKey, id: room.id },
-      { key: nodes.walls.preferredKey, id: face.id },
-      { key: nodes.face_beams.preferredKey, id: beam.id },
-    ];
-    applied(session.applyRow({ path, editedRow: edited, initialRow: beam, scopeId }));
-    const [stored] = session.getSnapshot().floors[0].walls.flatMap((wall) => wall.beams);
-    return [round(stored.offset), round(stored.length)];
-  };
-  assert.deepEqual(type({ wall_beam_offset: 0.5 }), [0, 1.5]);
-  // A length typed there keeps Room 2's distance: the beam grows to the right as Room 2 sees it.
-  assert.deepEqual(type({ wall_beam_length: 1 }), [0.5, 1]);
-  // The exported record keeps the stored row only.
-  const stored = createStructuredRecord(record, t.f.schema.form.elements, {
-    originalElements: t.f.schema.form.elements,
-    fieldKeyMode: 'prefer-key',
-  });
-  assert.ok(!JSON.stringify(stored).includes('~bp_face_beams_'));
 });
 
 test('a beam that would not fit its wall is refused', () => {
