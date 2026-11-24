@@ -1,5 +1,5 @@
 import { cleanLength as clean } from '../geometry.js';
-import { bandOf } from '../band-rows.js';
+import { bandOf, withOwnValue } from '../band-rows.js';
 
 /**
  * A beam's height moves only when something runs into it ("push, never pull", decided 2026-11-24,
@@ -75,8 +75,9 @@ export function followBeamHeights(previous, floor) {
     for (const beam of wall.beams || []) {
       const was = wasBeam.get(beam.id);
       if (!was || !finite(was.beam.underside) || beam.underside !== was.beam.underside) continue;
-      // A band row's height is the floor's for now (bands unit 2; its own, pushed, in unit 3).
-      if (!finite(beam.depth) || bandOf(beam)) continue;
+      // The ring beam's top is its wall's (bands unit 2); a lintel or sill band pushed keeps the
+      // height as its own (unit 3), Reset returning the floor's.
+      if (!finite(beam.depth) || bandOf(beam) === 'ring') continue;
       const pushed =
         pushedByOpenings(was, beam, openingsNow) ??
         pushedByTop(beam.underside, beam.depth, wall.properties?.wall_height, {
@@ -84,7 +85,9 @@ export function followBeamHeights(previous, floor) {
           depth: was.beam.depth,
           top: was.wall.properties?.wall_height,
         });
-      if (finite(pushed)) beam.underside = clean(pushed);
+      if (!finite(pushed)) continue;
+      beam.underside = clean(pushed);
+      if (bandOf(beam)) withOwnValue(beam, 'underside', true);
     }
   const rooms = new Map(previous.rooms.map((room) => [room.id, room]));
   for (const room of floor.rooms) {

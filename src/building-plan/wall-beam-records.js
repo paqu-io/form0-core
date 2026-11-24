@@ -28,6 +28,8 @@ export function readWallBeam(io, meta, row) {
     providerOverrides: io.readProviders(meta, NODE, row, state),
     repeatable: io.readCustom(meta, NODE, row),
     ...(state.provenance ? { provenance: copy(state.provenance) } : {}),
+    // A band row's values set on it rather than the floor's or the wall's (bands unit 3).
+    ...(state.ownValues?.length ? { ownValues: [...state.ownValues] } : {}),
   };
 }
 
@@ -41,6 +43,7 @@ export function writeWallBeam(io, meta, row, beam, wall) {
     id: beam.id,
     segmentId: beam.segmentId,
     ...(beam.provenance ? { provenance: beam.provenance } : {}),
+    ...(beam.ownValues?.length ? { ownValues: [...beam.ownValues] } : {}),
   });
   for (const [name, value] of [
     ['wall_beam_offset', beam.offset],

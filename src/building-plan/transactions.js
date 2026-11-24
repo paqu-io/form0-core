@@ -1,3 +1,4 @@
+import { bandFieldState } from './band-field-state.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
 import { createBuildingPlanSession } from './session.js';
@@ -93,6 +94,8 @@ export function buildingPlanOperationsForRow({
     throw new TypeError('An editor cannot replace its BuildingPlan subject identity.');
   const commands = [];
   const plain = {};
+  // A wall child's value reset (a band row's own value, bands unit 3) is sent as a reset.
+  const resetPlain = new Set();
   const wallId =
     node.nodeKey === 'physical_walls' ? model.id : node.nodeKey === 'walls' ? model.wallId : null;
   for (const field of node.fields) {
@@ -158,7 +161,8 @@ export function buildingPlanOperationsForRow({
       if (reset || (modeChanged && !(flags || []).includes(property))) command.reset = true;
       else command.value = normalizeFieldValue(field.field, value);
       commands.push(command);
-    } else plain[field.originalDataName] = normalizeFieldValue(field.field, value);
+    } else if (reset && wallChildForNode(node.nodeKey)) resetPlain.add(field.originalDataName);
+    else plain[field.originalDataName] = normalizeFieldValue(field.field, value);
   }
   const child = wallChildForNode(node.nodeKey);
   if (child) {
@@ -178,6 +182,8 @@ export function buildingPlanOperationsForRow({
       values: { ...opening.values, ...plain },
     };
     for (const [name, key] of child.fields) if (own(plain, name)) command[key] = plain[name];
+    const reset = child.fields.filter(([name]) => resetPlain.has(name)).map(([, key]) => key);
+    if (reset.length) command.reset = reset;
     // WB3: a room on the segment's side -1 typed its distance from its own left end.
     const face = floor.rooms.flatMap((entry) => entry.faces).find((entry) => entry.id === faceId);
     commands.push(storedOpeningEdit(command, { opening, face, segments: wall.segments }));
@@ -442,6 +448,8 @@ export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
   const field = selected.node.fields.find((entry) => entry.dataName === dataName);
   const binding = field?.binding;
   if (!binding) return null;
+  const band = bandFieldState(plan, selected, field);
+  if (band) return band;
   const managed =
     ['storage', 'geometry', 'derived', 'reference'].includes(binding.role) ||
     ['storage', 'geometry', 'derived', 'reference'].includes(binding.storageRole);

@@ -131,10 +131,7 @@ test("a band row's place and size are kept; a beam added by hand sits beside it"
     offset: 1,
   });
   assert.equal(result.status, 'conflict');
-  assert.equal(
-    result.issues[0].message,
-    "The lintel band spans its whole wall at the floor's height."
-  );
+  assert.equal(result.issues[0].message, 'The lintel band spans its whole wall.');
   applied(
     t.apply({
       type: 'create_opening',

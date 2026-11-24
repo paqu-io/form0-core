@@ -1,6 +1,6 @@
 import { copyBuildingPlanData as copy, findWall, own, planIssue } from './model.js';
 import { wallChildForType, wallChildren } from './wall-children.js';
-import { bandKind, bandOf } from './band-rows.js';
+import { BAND_OWN_VALUES, bandKind, bandOf, withOwnValue } from './band-rows.js';
 
 const EDITABLE = ['offset', 'width', 'height', 'sillHeight', 'segmentId', 'values'];
 const BEAM_EDITABLE = ['length', 'depth', 'underside'];
@@ -68,15 +68,23 @@ export function applyOpeningOperation(floor, operation, createId) {
       wall.properties = { ...(wall.properties || {}), [band.wall]: copy(no) };
     }
   } else {
-    // A band row's place, size and height come from its wall and the floor (bands unit 2).
-    const kept = ['segmentId', 'offset', 'width', 'length', 'depth', 'underside'];
-    if (band && kept.some((key) => own(operation, key)))
-      refuse(
-        'band_kept',
-        `The ${band.title.toLowerCase()} spans its whole wall at the floor's height.`
-      );
+    // A band row spans its whole wall (bands unit 2); the ring beam's top is its wall's. Its
+    // underside, depth and width typed here are its own; Reset returns them (unit 3).
+    if (band) bandEdit(band, opening, operation);
     for (const key of [...EDITABLE, ...(opening.type === 'beam' ? BEAM_EDITABLE : [])])
       if (own(operation, key)) opening[key] = copy(operation[key]);
   }
   return {};
+}
+
+function bandEdit(band, row, operation) {
+  const name = band.title.toLowerCase();
+  if (['segmentId', 'offset', 'length'].some((key) => own(operation, key)))
+    refuse('band_kept', `The ${name} spans its whole wall.`);
+  if (band.kind === 'ring' && own(operation, 'underside'))
+    refuse('band_kept', "The ring beam's top is its wall's top: change its depth instead.");
+  for (const key of Object.keys(BAND_OWN_VALUES)) {
+    if (own(operation, key)) withOwnValue(row, key, true);
+    if ((operation.reset || []).includes(key)) withOwnValue(row, key, false);
+  }
 }

@@ -5,11 +5,11 @@ import { cleanLength as clean, distance } from './geometry.js';
 /**
  * Band rows (bands unit 2, decided 2026-11-24, B): a wall whose ring beam, lintel band or sill band
  * answer is Yes has one row of that band in its Beams list per segment, kept by the engine after
- * every edit, the way a room's outline keeps its wall rows. A band row spans its whole segment,
- * as wide as the wall; its underside and depth are the floor's, live (unit 3 lets a row set its
- * own); the ring beam's top is its wall's top. A No removes the row; removing the row sets the
- * wall's answer to No (`opening-operations.js`). Its `wall_beam_band` tells it from a beam added
- * by hand.
+ * every edit, the way a room's outline keeps its wall rows. A band row spans its whole segment;
+ * its underside and depth are the floor's and its width the wall's thickness, unless the row sets
+ * its own (`ownValues`, unit 3: typed in its row, or pushed by an opening; Reset returns it); the
+ * ring beam's top is its wall's top. A No removes the row; removing the row sets the wall's
+ * answer to No (`opening-operations.js`). Its `wall_beam_band` tells it from a beam added by hand.
  */
 
 export const BAND_FIELD = 'wall_beam_band';
@@ -18,6 +18,25 @@ const LINTEL_UNDERSIDE = 2.1;
 const SILL_TOP = 0.9;
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+
+/** What a band row may set itself, and where it comes from otherwise. */
+export const BAND_OWN_VALUES = Object.freeze({
+  underside: 'floor',
+  depth: 'floor',
+  width: 'physical_wall',
+});
+
+/** Whether a band row sets this value itself. */
+export function ownsValue(row, key) {
+  return Array.isArray(row?.ownValues) && row.ownValues.includes(key);
+}
+
+/** A band row's own values with `key` added or taken out. */
+export function withOwnValue(row, key, owned) {
+  const rest = (row.ownValues || []).filter((entry) => entry !== key);
+  row.ownValues = owned ? [...rest, key] : rest;
+  if (!row.ownValues.length) delete row.ownValues;
+}
 
 /** A wall beam's band kind (ring, lintel, sill), or null for a beam added by hand. */
 export function bandOf(beam) {
@@ -34,17 +53,23 @@ function answerOf(wall, band) {
   return wall.properties?.[band.wall]?.choice?.[0]?.value ?? null;
 }
 
-/** A band's size and height from the floor's answers, for this wall. */
-function bandSize(floor, wall, band) {
+/** A band row's size and height: its own values, else the floor's and the wall's. */
+function bandSize(floor, wall, band, row) {
   const value = (suffix) => floor.values?.[`${band.floor}_${suffix}`];
-  const depth = finite(value('depth')) ? value('depth') : NEW_BEAM_DEPTH;
+  const own = (key, inherited) => (ownsValue(row, key) ? row[key] : inherited);
+  const depth = own('depth', finite(value('depth')) ? value('depth') : NEW_BEAM_DEPTH);
+  const width = own('width', wall.properties?.wall_thickness ?? null);
   if (band.kind === 'ring') {
     const height = wall.properties?.wall_height;
-    return { depth, underside: finite(height) ? clean(height - depth) : null };
+    return { depth, width, underside: finite(height) ? clean(height - depth) : null };
   }
   const typed = value('distance_from_floor');
-  if (finite(typed)) return { depth, underside: typed };
-  return { depth, underside: band.kind === 'lintel' ? LINTEL_UNDERSIDE : clean(SILL_TOP - depth) };
+  const inherited = finite(typed)
+    ? typed
+    : band.kind === 'lintel'
+      ? LINTEL_UNDERSIDE
+      : clean(SILL_TOP - depth);
+  return { depth, width, underside: own('underside', inherited) };
 }
 
 /**
@@ -79,8 +104,7 @@ export function keepBandRows(floor, createId) {
         Object.assign(row, {
           offset: 0,
           length: clean(distance(segment.start, segment.end)),
-          width: wall.properties?.wall_thickness ?? null,
-          ...bandSize(floor, wall, band),
+          ...bandSize(floor, wall, band, row),
         });
       }
     // A second row of one band on a segment (a Rejoin of parts that differed) goes with the rest.

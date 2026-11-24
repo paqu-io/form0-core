@@ -54,9 +54,13 @@ const choice = (name, label, description, choices, attributes = {}) => ({
 });
 
 const UNDERSIDE = 'Measured from the finished floor to the underside of the beam.';
-/** A band row's place, size and height are kept by the engine (bands unit 2): read-only there. */
+/** A band row spans its whole wall (bands unit 2): its place is read-only. */
 const KEPT = {
   read_only_conditions: { field_id: 'bp_wall_beam_band', operator: 'is_not_empty', value: null },
+};
+/** The ring beam's top is its wall's: its underside is read-only (unit 3). */
+const RING = {
+  read_only_conditions: { field_id: 'bp_wall_beam_band', operator: 'equal_to', value: 'ring' },
 };
 
 /**
@@ -109,15 +113,14 @@ export function createWallBeamsNode() {
       number('wall_beam_length', 'Length (m)', 'Along the wall.', { min: 0, ...KEPT }),
       number('wall_beam_distance_from_floor', 'Underside from floor (m)', UNDERSIDE, {
         min: 0,
-        ...KEPT,
+        ...RING,
       }),
       number(
         'wall_beam_width',
         'Width (m)',
-        'Measured across the beam, in the direction of the wall thickness.',
-        KEPT
+        'Measured across the beam, in the direction of the wall thickness.'
       ),
-      number('wall_beam_depth', 'Depth (m)', 'Vertical dimension of the beam.', KEPT),
+      number('wall_beam_depth', 'Depth (m)', 'Vertical dimension of the beam.'),
       text(
         'wall_beam_wall_reference',
         'Wall reference',
