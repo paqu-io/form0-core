@@ -5,7 +5,8 @@ import { createBuildingPlanExample } from '../examples/building-plan/create-exam
 
 // Decided 2026-11-24, (a): an opening rising into a beam above it pushes the beam up, as far as the
 // wall's top; one edit or two give the same result (before, one was refused and two carried it).
-// The example's W1 runs above the Bedroom, 5 m from x = 0, 3 m high.
+// 2e, "push, never pull": a sill dropping pushes a beam below down; lowering a head or raising a
+// sill leaves the beam. The example's W1 runs above the Bedroom, 5 m from x = 0, 3 m high.
 
 function example() {
   const f = createBuildingPlanExample();
@@ -63,7 +64,7 @@ test('a window raised into a beam pushes it up, in one edit as in two', () => {
   assert.equal(two.underside(), 2.45);
 });
 
-test("pushed past the wall's top, refused; lowered, it rests on the highest head under it", () => {
+test("pushed past the wall's top, refused; lowered, the window leaves the beam where it is", () => {
   const t = example();
   applied(t.window(0.2, 1.4));
   applied(t.window(2, 1.2));
@@ -71,9 +72,26 @@ test("pushed past the wall's top, refused; lowered, it rests on the highest head
   assert.equal(t.raise(0, 2).issues?.[0]?.message, 'Beam B#1 would stand above its wall.');
   applied(t.raise(0, 1.6));
   assert.equal(t.underside(), 2.5);
-  // Lowered again it comes down with the window, stopping on the other window's head (2.1).
   applied(t.raise(0, 1));
-  assert.equal(t.underside(), 2.1);
+  assert.equal(t.underside(), 2.5);
+});
+
+test('a sill dropping onto a beam below pushes it down, never below the floor', () => {
+  const t = example();
+  applied(t.window(1.9, 1.2));
+  applied(t.beam(1.75, 1.5, 0.7)); // its top (depth 0.2) at the window's sill, 0.9
+  const sill = (value) =>
+    t.apply({
+      type: 'update_opening',
+      wallId: t.w1().id,
+      openingId: t.w1().windows[0].id,
+      sillHeight: value,
+    });
+  applied(sill(0.8));
+  assert.equal(t.underside(), 0.6);
+  applied(sill(1));
+  assert.equal(t.underside(), 0.6);
+  assert.equal(sill(0.1).issues?.[0]?.message, 'Beam B#1 would go below the floor.');
 });
 
 test('a window moved along the wall into a beam is still refused', () => {

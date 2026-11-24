@@ -2,12 +2,13 @@ import { planIssue } from './model.js';
 import { nameOf } from './wall-children.js';
 
 /**
- * Where a wall beam may sit in height (wall beams 2b, 2026-11-24): not above its wall's top, and
- * not through an opening (their stretches along the wall overlapping, their heights too; touching
- * is allowed: a lintel resting on a window's head, a sill beam under it). A beam resting on an
- * opening follows it (`derive/follow-beam-heights.js`), so what is left is a real clash: the edit
- * is refused, naming what moved first ("Window 1 would run into Beam B#2." or the other way).
- * A clash already there before the edit doesn't refuse it. Unknown heights aren't judged.
+ * Where a wall beam may sit in height (wall beams 2b, 2026-11-24): not above its wall's top, not
+ * below the floor (2e: a sill pushing it down), and not through an opening (their stretches along
+ * the wall overlapping, their heights too; touching is allowed: a lintel resting on a window's
+ * head, a sill beam under it). An opening running into a beam pushes it
+ * (`derive/follow-beam-heights.js`), so what is left is a real clash: the edit is refused, naming
+ * what moved first ("Window 1 would run into Beam B#2." or the other way). A clash already there
+ * before the edit doesn't refuse it. Unknown heights aren't judged.
  */
 
 const EPS = 1e-6;
@@ -22,6 +23,7 @@ function clashes(floor) {
       const top = beam.underside + beam.depth;
       if (finite(height) && top > height + EPS)
         found.push({ key: `${beam.id}|above`, beam, opening: null });
+      if (beam.underside < -EPS) found.push({ key: `${beam.id}|below`, beam, opening: null });
       for (const opening of [...wall.doors, ...wall.windows]) {
         if (opening.segmentId !== beam.segmentId || !finite(opening.height)) continue;
         const along =
@@ -64,7 +66,12 @@ export function wallBeamPlacementIssues(floor, previous) {
   );
   return clashes(floor)
     .filter((entry) => !known.has(entry.key))
-    .map(({ beam, opening }) => {
+    .map(({ key, beam, opening }) => {
+      if (key.endsWith('|below'))
+        return planIssue('beam_below_floor', `${nameOf(beam)} would go below the floor.`, {
+          type: 'beam',
+          id: beam.id,
+        });
       if (!opening)
         return planIssue('beam_above_wall', `${nameOf(beam)} would stand above its wall.`, {
           type: 'beam',

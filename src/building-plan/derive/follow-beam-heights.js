@@ -1,26 +1,25 @@
 import { cleanLength as clean } from '../geometry.js';
 
 /**
- * A beam's height follows what it touches (P2, wall beams 2b, 2026-11-24). The height is stored
- * (its underside from the floor); an edit keeps a beam touching what it rested on or under:
+ * A beam's height moves only when something runs into it ("push, never pull", decided 2026-11-24,
+ * after 2b and (a)). The height is stored (its underside from the floor); after an edit:
  *
- * - a wall beam resting on an opening's head (their stretches along the wall overlapping) follows
- *   that head when the opening's height or sill changes; it comes to rest on the highest head
- *   still under it;
- * - an opening rising into a beam above it pushes the beam up (decided 2026-11-24, (a)): one edit
- *   or two give the same result; past the wall's top the edit is refused
- *   (`wall-beam-placement.js`), as is an opening moved along the wall into a beam;
- * - else a wall beam flush with its wall's top stays flush when the wall's height or the beam's
- *   depth changes (it grows downwards);
- * - a room beam whose top was at the room's structural clear height stays there.
+ * - an opening whose head rises past a wall beam above it pushes the beam up (several: the
+ *   highest head); past the wall's top the edit is refused (`wall-beam-placement.js`);
+ * - an opening whose sill drops past a wall beam below it pushes the beam down (several: the
+ *   lowest sill); below the floor the edit is refused;
+ * - a wall's top coming down past a wall beam (the wall lowered, or the beam made deeper) pushes it
+ *   down; a room's structural clear height does the same to a room beam;
+ * - a head lowered, a sill raised, a wall or ceiling raised leave the beam where it is.
  *
- * A beam whose underside this edit typed keeps it. Called after the write-back, with the floor
- * as it was before the edit.
+ * "Under" and "above" are read before the edit, along the wall where the opening and the beam
+ * overlap before and after it; an opening moved along the wall into a beam is a clash, refused. A
+ * beam whose underside this edit typed keeps it. Called after the write-back, with the floor as it
+ * was before the edit.
  */
 
 const EPS = 1e-6;
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
-const near = (a, b) => finite(a) && finite(b) && Math.abs(a - b) <= EPS;
 const headOf = (opening) =>
   finite(opening?.height) ? (opening.sillHeight || 0) + opening.height : null;
 const alongOverlap = (opening, beam) =>
@@ -28,6 +27,36 @@ const alongOverlap = (opening, beam) =>
   Math.min(opening.offset + opening.width, beam.offset + beam.length) -
     Math.max(opening.offset, beam.offset) >
     EPS;
+
+/** The new underside of a wall beam an opening pushed, or null. */
+function pushedByOpenings(was, beam, openingsNow) {
+  const rising = [];
+  const dropping = [];
+  const topBefore = was.beam.underside + (was.beam.depth ?? beam.depth);
+  for (const opening of [...was.wall.doors, ...was.wall.windows]) {
+    const now = openingsNow.get(opening.id);
+    if (!now || !alongOverlap(opening, was.beam) || !alongOverlap(now, beam)) continue;
+    const head = headOf(opening);
+    const headNow = headOf(now);
+    if (finite(head) && finite(headNow) && head <= was.beam.underside + EPS)
+      if (headNow > beam.underside + EPS) rising.push(headNow);
+    const sill = opening.sillHeight || 0;
+    const sillNow = now.sillHeight || 0;
+    if (sill >= topBefore - EPS && sillNow < beam.underside + beam.depth - EPS)
+      dropping.push(sillNow);
+  }
+  if (rising.length) return Math.max(...rising);
+  if (dropping.length) return Math.min(...dropping) - beam.depth;
+  return null;
+}
+
+/** A top (a wall's, a room's clear height) come down past a beam that stood under it. */
+function pushedByTop(underside, depth, top, before) {
+  const { underside: oldUnderside, depth: oldDepth, top: oldTop } = before;
+  if (!finite(top) || !finite(depth) || underside + depth <= top + EPS) return null;
+  if (finite(oldTop) && finite(oldDepth) && oldUnderside + oldDepth > oldTop + EPS) return null;
+  return top - depth;
+}
 
 /**
  * @param {object | null} previous the stored floor before the edit
@@ -45,52 +74,34 @@ export function followBeamHeights(previous, floor) {
     for (const beam of wall.beams || []) {
       const was = wasBeam.get(beam.id);
       if (!was || !finite(was.beam.underside) || beam.underside !== was.beam.underside) continue;
-      // The openings under the beam before the edit, and still under it along the wall.
-      const under = [...was.wall.doors, ...was.wall.windows].filter((opening) => {
-        const now = openingsNow.get(opening.id);
-        return (
-          now &&
-          alongOverlap(opening, was.beam) &&
-          alongOverlap(now, beam) &&
-          finite(headOf(opening)) &&
-          headOf(opening) <= was.beam.underside + EPS
-        );
-      });
-      const headsNow = under
-        .map((opening) => headOf(openingsNow.get(opening.id)))
-        .filter((value) => finite(value));
-      const top = headsNow.length ? Math.max(...headsNow) : null;
-      const supportMoved = under.some(
-        (opening) =>
-          near(headOf(opening), was.beam.underside) &&
-          !near(headOf(openingsNow.get(opening.id)), headOf(opening))
-      );
-      if (finite(top) && (supportMoved || top > beam.underside + EPS)) {
-        beam.underside = clean(top);
-        continue;
-      }
-      const height = wall.properties?.wall_height;
-      if (
-        near(was.beam.underside + was.beam.depth, was.wall.properties?.wall_height) &&
-        finite(height) &&
-        finite(beam.depth)
-      )
-        beam.underside = clean(height - beam.depth);
+      if (!finite(beam.depth)) continue;
+      const pushed =
+        pushedByOpenings(was, beam, openingsNow) ??
+        pushedByTop(beam.underside, beam.depth, wall.properties?.wall_height, {
+          underside: was.beam.underside,
+          depth: was.beam.depth,
+          top: was.wall.properties?.wall_height,
+        });
+      if (finite(pushed)) beam.underside = clean(pushed);
     }
   const rooms = new Map(previous.rooms.map((room) => [room.id, room]));
   for (const room of floor.rooms) {
     const old = rooms.get(room.id);
-    const clear = room.properties?.room_structural_clear_height;
     for (const beam of room.beams || []) {
       const was = (old?.beams || []).find((entry) => entry.id === beam.id);
       const underside = was?.values?.beam_distance_from_floor;
       if (!finite(underside) || beam.values?.beam_distance_from_floor !== underside) continue;
-      if (
-        near(underside + was.height, old.properties?.room_structural_clear_height) &&
-        finite(clear) &&
-        finite(beam.height)
-      )
-        beam.values = { ...beam.values, beam_distance_from_floor: clean(clear - beam.height) };
+      const pushed = pushedByTop(
+        underside,
+        beam.height,
+        room.properties?.room_structural_clear_height,
+        {
+          underside,
+          depth: was.height,
+          top: old.properties?.room_structural_clear_height,
+        }
+      );
+      if (finite(pushed)) beam.values = { ...beam.values, beam_distance_from_floor: clean(pushed) };
     }
   }
 }

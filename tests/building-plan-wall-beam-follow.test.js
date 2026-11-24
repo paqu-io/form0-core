@@ -4,8 +4,8 @@ import { createBuildingPlanSession } from '../src/index.js';
 import { createBuildingPlanExample } from '../examples/building-plan/create-example.js';
 
 // Wall beams 2b (2026-11-24; WB5, WB8, P2): a beam's end at its wall's end follows it; its height
-// follows what it touches (an opening's head under it, the wall's top, a room beam's top at the
-// clear height); a beam typed into an opening, or above its wall, refuses the edit, named. The
+// is pushed by what runs into it (2e: an opening's head under it, the wall's top, a room's clear
+// height), never pulled; a beam typed into an opening, or above its wall, refuses the edit. The
 // example's Bedroom is 0..5 × 0..3, its walls 3 m high: W1 above (5 m, from x = 0, its left end
 // seen from the room), W2 right, W4 left; W3 shared, its Shared door 2 m high.
 
@@ -80,8 +80,27 @@ test('one end at the wall: that end follows; past the free end, refused, named',
   );
 });
 
-test("heights follow: a lintel the door's head, a top beam the wall's top, a room beam the clear height", () => {
+test("heights pushed: a lintel by the door's head, a top beam by the wall's top, a room beam by the ceiling", () => {
   const t = example();
+  const wallHeight = (value) =>
+    t.apply({
+      type: 'set_property',
+      property: 'wall_height',
+      value,
+      nodeKey: 'walls',
+      scope: 'physical_wall',
+      wallId: t.wall('W1').id,
+      faceId: t.face('W1').id,
+      activeRoomId: t.floor().rooms[0].id,
+    });
+  const floorHeight = (value) =>
+    t.apply({
+      type: 'set_provider',
+      nodeKey: 'floors',
+      fieldName: 'floor_height',
+      property: 'room_structural_clear_height',
+      value,
+    });
   applied(t.beam('W3', 0.35, 1.2, { underside: 2, depth: 0.25 }));
   applied(t.beam('W1', 0, 5));
   const door = t.wall('W3').doors[0];
@@ -89,41 +108,15 @@ test("heights follow: a lintel the door's head, a top beam the wall's top, a roo
     t.apply({ type: 'update_opening', wallId: t.wall('W3').id, openingId: door.id, height: 2.1 })
   );
   assert.equal(t.wall('W3').beams[0].underside, 2.1);
-  // Deeper, the top beam grows downwards; the wall higher, it goes up with its top.
+  // Deeper, the top beam grows downwards; the wall higher, it stays; lower, it's pushed down.
   const top = t.wall('W1').beams[0];
   applied(
     t.apply({ type: 'update_opening', wallId: t.wall('W1').id, openingId: top.id, depth: 0.4 })
   );
   assert.equal(t.wall('W1').beams[0].underside, 2.6);
-  applied(
-    t.apply({
-      type: 'set_property',
-      property: 'wall_height',
-      value: 3.2,
-      nodeKey: 'walls',
-      scope: 'physical_wall',
-      wallId: t.wall('W1').id,
-      faceId: t.face('W1').id,
-      activeRoomId: t.floor().rooms[0].id,
-    })
-  );
-  assert.equal(t.wall('W1').beams[0].underside, 2.8);
-  // A typed height is kept: no longer flush, the wall's height doesn't move it.
-  applied(
-    t.apply({ type: 'update_opening', wallId: t.wall('W1').id, openingId: top.id, underside: 2.5 })
-  );
-  applied(
-    t.apply({
-      type: 'set_property',
-      property: 'wall_height',
-      value: 3.3,
-      nodeKey: 'walls',
-      scope: 'physical_wall',
-      wallId: t.wall('W1').id,
-      faceId: t.face('W1').id,
-      activeRoomId: t.floor().rooms[0].id,
-    })
-  );
+  applied(wallHeight(3.2));
+  assert.equal(t.wall('W1').beams[0].underside, 2.6);
+  applied(wallHeight(2.9));
   assert.equal(t.wall('W1').beams[0].underside, 2.5);
   applied(
     t.apply({
@@ -134,16 +127,12 @@ test("heights follow: a lintel the door's head, a top beam the wall's top, a roo
       values: {},
     })
   );
-  applied(
-    t.apply({
-      type: 'set_provider',
-      nodeKey: 'floors',
-      fieldName: 'floor_height',
-      property: 'room_structural_clear_height',
-      value: 3.4,
-    })
-  );
-  assert.equal(t.floor().rooms[0].beams[0].values.beam_distance_from_floor, 3.1);
+  const roomBeam = () => t.floor().rooms[0].beams[0].values.beam_distance_from_floor;
+  assert.equal(roomBeam(), 2.7);
+  applied(floorHeight(3.4));
+  assert.equal(roomBeam(), 2.7);
+  applied(floorHeight(2.8));
+  assert.equal(roomBeam(), 2.5);
 });
 
 test('a beam typed into an opening, or above its wall, refuses the edit, named', () => {
