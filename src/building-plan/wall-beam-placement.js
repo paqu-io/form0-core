@@ -1,5 +1,6 @@
 import { planIssue } from './model.js';
 import { nameOf } from './wall-children.js';
+import { bandOf } from './band-rows.js';
 
 /**
  * Where a wall beam may sit in height (wall beams 2b, 2026-11-24): not above its wall's top, not
@@ -19,7 +20,8 @@ function clashes(floor) {
   for (const wall of floor?.walls || []) {
     const height = wall.properties?.wall_height;
     for (const beam of wall.beams || []) {
-      if (!finite(beam.underside) || !finite(beam.depth)) continue;
+      // Bands meeting openings are asked about, then shown as errors (bands unit 4).
+      if (!finite(beam.underside) || !finite(beam.depth) || bandOf(beam)) continue;
       const top = beam.underside + beam.depth;
       if (finite(height) && top > height + EPS)
         found.push({ key: `${beam.id}|above`, beam, opening: null });

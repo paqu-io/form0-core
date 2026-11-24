@@ -10,6 +10,10 @@ const NODE = 'wall_beams';
 export function readWallBeam(io, meta, row) {
   const state = io.modelOf(meta, NODE, row);
   const field = (name) => io.read(meta, NODE, row, name);
+  // The band kind is internal, so not among the row's plain answers (bands unit 2).
+  const band = field('wall_beam_band');
+  const values = io.plainValues(meta, NODE, row);
+  if (band?.choice?.length) values.wall_beam_band = band;
   return {
     id: state.id,
     type: 'beam',
@@ -19,7 +23,7 @@ export function readWallBeam(io, meta, row) {
     width: field('wall_beam_width'),
     depth: field('wall_beam_depth'),
     underside: field('wall_beam_distance_from_floor'),
-    values: io.plainValues(meta, NODE, row),
+    values,
     overrides: io.readOverrides(meta, NODE, row, state),
     providerOverrides: io.readProviders(meta, NODE, row, state),
     repeatable: io.readCustom(meta, NODE, row),
@@ -45,6 +49,7 @@ export function writeWallBeam(io, meta, row, beam, wall) {
     ['wall_beam_depth', beam.depth],
     ['wall_beam_distance_from_floor', beam.underside],
     ['wall_beam_wall_reference', wall.id],
+    ['wall_beam_band', beam.values?.wall_beam_band],
   ])
     io.write(meta, NODE, row, name, value ?? null);
 }

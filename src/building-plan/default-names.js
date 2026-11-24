@@ -1,4 +1,6 @@
 import { normalizeBuildingPlanLocale } from './presentation.js';
+import { BAND_TEXTS } from './presentation-band-texts.js';
+import { bandKind, bandOf } from './band-rows.js';
 
 /** Words for automatic names; columns and beams use language-neutral codes (C#1, B#1). */
 const WORDS = {
@@ -71,6 +73,14 @@ export function assignBuildingPlanDefaultNames(before, candidate, locale = 'en')
       'C',
       '#'
     );
+    // A band row is named by its band, in the editor's language (bands unit 2, 2026-11-24).
+    const language = normalizeBuildingPlanLocale(locale);
+    for (const beam of floor.walls.flatMap((w) => w.beams || [])) {
+      const band = bandKind(bandOf(beam));
+      if (!band || !isEmpty(beam.values?.wall_beam_identifier)) continue;
+      const title = BAND_TEXTS[language]?.[band.title] || band.title;
+      beam.values = { ...beam.values, wall_beam_identifier: title };
+    }
     // Room beams and wall beams share one numbering per floor (wall beams, 2026-11-24).
     name(
       [...floor.rooms.flatMap((room) => room.beams), ...floor.walls.flatMap((w) => w.beams || [])],

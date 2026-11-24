@@ -1,5 +1,6 @@
 import { copyBuildingPlanData as copy, findWall, own, planIssue } from './model.js';
 import { wallChildForType, wallChildren } from './wall-children.js';
+import { bandKind, bandOf } from './band-rows.js';
 
 const EDITABLE = ['offset', 'width', 'height', 'sillHeight', 'segmentId', 'values'];
 const BEAM_EDITABLE = ['length', 'depth', 'underside'];
@@ -56,10 +57,26 @@ export function applyOpeningOperation(floor, operation, createId) {
   const opening = wallChildren(wall).find((entry) => entry.id === operation.openingId);
   if (!opening) refuse('missing_opening', 'The opening no longer exists.');
   const list = wallChildForType(opening.type).list;
-  if (operation.type === 'remove_opening')
+  const band = bandKind(bandOf(opening));
+  if (operation.type === 'remove_opening') {
     wall[list] = wall[list].filter((entry) => entry.id !== opening.id);
-  else
+    // A band row removed from the list: the wall's answer becomes No (bands unit 2), so the
+    // engine doesn't bring it back; Reset to the floor's answer does.
+    if (band) {
+      const no = { choice: [{ value: 'no', label: 'No' }], other: [] };
+      wall.overrides = { ...(wall.overrides || {}), [band.wall]: no };
+      wall.properties = { ...(wall.properties || {}), [band.wall]: copy(no) };
+    }
+  } else {
+    // A band row's place, size and height come from its wall and the floor (bands unit 2).
+    const kept = ['segmentId', 'offset', 'width', 'length', 'depth', 'underside'];
+    if (band && kept.some((key) => own(operation, key)))
+      refuse(
+        'band_kept',
+        `The ${band.title.toLowerCase()} spans its whole wall at the floor's height.`
+      );
     for (const key of [...EDITABLE, ...(opening.type === 'beam' ? BEAM_EDITABLE : [])])
       if (own(operation, key)) opening[key] = copy(operation[key]);
+  }
   return {};
 }

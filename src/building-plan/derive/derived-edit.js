@@ -31,6 +31,7 @@ import { writeBackBuildingPlanFloor } from './write-back.js';
 import { followAttached } from './follow-attached.js';
 import { heldBeamRefusal, holdWallBeamEnds, releaseWallBeamEnds } from './wall-beam-ends.js';
 import { followBeamHeights } from './follow-beam-heights.js';
+import { keepBandRows } from '../band-rows.js';
 import { wallBeamPlacementIssues } from '../wall-beam-placement.js';
 
 /** Edits a wall beam's ends don't follow through: a cut across a beam is refused (WB8). */
@@ -144,10 +145,9 @@ export function applyDerivedOperation(
     { createId, specifications, preferredRoomIds },
     operation
   );
-  followBeamHeights(
-    previous,
-    snapshot.floors.find((entry) => entry.id === floor.id)
-  );
+  const edited = snapshot.floors.find((entry) => entry.id === floor.id);
+  keepBandRows(edited, createId);
+  followBeamHeights(previous, edited);
   return { result, ...written, issues: [...written.issues, ...short] };
 }
 
@@ -185,10 +185,9 @@ function applyDataOperation(snapshot, operation, options) {
     );
     divisions.push(...written.divisions);
     issues.push(...written.issues);
-    followBeamHeights(
-      previous.get(floor.id),
-      snapshot.floors.find((entry) => entry.id === floor.id)
-    );
+    const edited = snapshot.floors.find((entry) => entry.id === floor.id);
+    keepBandRows(edited, options.createId);
+    followBeamHeights(previous.get(floor.id), edited);
   }
   const result =
     operation.type === 'batch'
@@ -224,6 +223,8 @@ export function rederiveFloor(snapshot, floorId, options, change = null) {
   const written = before
     ? followAndWrite(snapshot, floor, before, primary, writeOptions, change.operation)
     : writeFloor(snapshot, floor, primary, writeOptions);
+  // A decision can change a wall's band answers (bands unit 2).
+  keepBandRows(findBuildingPlanFloor(snapshot, floorId), createId);
   return { ...written, carvedRoomIds: moved.result.carvedRoomIds };
 }
 

@@ -87,6 +87,9 @@ export function labelOf(element) {
 export function nameOf(element) {
   const type = wallChildForType(element?.type)?.type;
   const label = element?.values?.[type === 'beam' ? 'wall_beam_identifier' : `${type}_label`];
+  // A band row goes by its band's name ("Lintel band", bands unit 2).
+  const band = type === 'beam' && element?.values?.wall_beam_band?.choice?.[0]?.label;
+  if (band) return label || band;
   if (type === 'beam') return label ? `Beam ${label}` : 'A beam';
   return label || (type === 'window' ? 'A window' : 'A door');
 }
