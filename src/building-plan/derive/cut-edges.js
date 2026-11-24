@@ -60,12 +60,15 @@ export function splitEdge(primary, room, edgeId, at, vertex, createId) {
 
 /**
  * Remove a vertex on a straight run: the edge into it reaches on to the far end of the edge out
- * of it, whose rows move onto it (their stations shift by the first edge's length).
+ * of it, whose rows move onto it (their stations shift by the first edge's length). Openings
+ * anchored to those rows count from their row's edge start, so they shift too (2026-11-24: a
+ * Rejoin moved an opening by the cut's distance).
  */
 export function joinEdges(primary, room, vertexId) {
   const into = room.edges.find((edge) => edge.endId === vertexId);
   const out = room.edges.find((edge) => edge.startId === vertexId);
   const shift = edgeLength(room, into);
+  const moved = new Set();
   for (const anchor of primary.anchors) {
     if (anchor.roomId !== room.id) continue;
     if (anchor.edgeId === into.id && anchor.to == null) anchor.to = shift;
@@ -73,7 +76,11 @@ export function joinEdges(primary, room, vertexId) {
     anchor.edgeId = into.id;
     anchor.from += shift;
     if (anchor.to != null) anchor.to += shift;
+    moved.add(anchor.faceId);
   }
+  for (const subject of primary.subjects.values())
+    for (const opening of subject.openings || [])
+      if (moved.has(opening.faceId)) opening.from += shift;
   into.endId = out.endId;
   room.edges = room.edges.filter((edge) => edge !== out);
   room.vertices = room.vertices.filter((vertex) => vertex.id !== vertexId);

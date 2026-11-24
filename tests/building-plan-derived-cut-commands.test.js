@@ -208,3 +208,57 @@ test('Rejoin gives back the wall the Split divided, even when its piece became s
   assert.equal(t.floor().walls.filter((wall) => /^W1(\.|$)/.test(wall.autoLabel)).length, 1);
   assert.deepEqual(t.session.validate(), []);
 });
+
+/** Each opening's ends on the floor, rounded to 1 mm, as `type x0,y0..x1,y1` (ends sorted). */
+const openingPlaces = (floor) =>
+  floor.walls
+    .flatMap((wall) =>
+      [...wall.doors, ...wall.windows].map((opening) => {
+        const segment = wall.segments.find((entry) => entry.id === opening.segmentId);
+        const length = Math.hypot(segment.end.x - segment.start.x, segment.end.y - segment.start.y);
+        const at = (station) =>
+          ['x', 'y']
+            .map((axis) =>
+              round(
+                segment.start[axis] + ((segment.end[axis] - segment.start[axis]) * station) / length
+              )
+            )
+            .join(',');
+        const ends = [at(opening.offset), at(opening.offset + opening.width)].sort();
+        return `${opening.type} ${ends.join('..')}`;
+      })
+    )
+    .sort();
+
+test('Split before a door or window, then Rejoin: the opening keeps its place (2026-11-24)', () => {
+  // Found while aligning wall beams: the Rejoin moved an opening by the cut's distance when the
+  // cut lay before it along its row (the row moved onto the first edge, the opening didn't).
+  const t = example(true);
+  const w1 = t.floor().walls.find((wall) => wall.autoLabel === 'W1');
+  const created = t.apply({
+    type: 'create_opening',
+    wallId: w1.id,
+    kind: 'window',
+    offset: 2,
+    width: 1,
+    height: 1.2,
+    sillHeight: 0.9,
+    values: {},
+  });
+  assert.equal(created.status, 'applied', JSON.stringify(created.issues));
+  const before = openingPlaces(t.floor());
+  const north = t.floor().rooms[0].faces.find((face) => face.wallId === w1.id).id;
+  // The shared door 0.3 m along its row, the window 1 m along W1's: each cut before the opening.
+  for (const [faceId, offset] of [
+    [t.f.faceA, 0.3],
+    [north, 1],
+  ]) {
+    const cut = t.apply({ type: 'split_face', faceId, offset });
+    assert.equal(cut.status, 'applied', JSON.stringify(cut.issues));
+    assert.deepEqual(openingPlaces(t.floor()), before);
+    const rejoined = t.apply({ type: 'rejoin_cut', cutId: cutOf(cut) });
+    assert.equal(rejoined.status, 'applied', JSON.stringify(rejoined.issues));
+    assert.deepEqual(openingPlaces(t.floor()), before);
+  }
+  assert.deepEqual(t.session.validate(), []);
+});
