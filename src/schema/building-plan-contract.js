@@ -1,9 +1,12 @@
 import { BUILDING_PLAN_BLUEPRINT } from './building-plan-blueprint.js';
 import {
+  BAND_CHOICES,
+  BAND_KINDS,
   ENCLOSED_LEVEL,
   FLOOR_SYSTEM_ROUTES,
   LEVEL_DEPENDENT_HEIGHTS,
   ROOM_SYSTEM_ROUTES,
+  WALL_BAND_GROUP,
 } from './building-plan-floors.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -274,6 +277,7 @@ function internalField(field) {
     field.data_name.endsWith('_model') ||
     field.data_name === 'wall_geometry' ||
     field.data_name === 'room_vertices' ||
+    field.data_name === 'wall_beam_band' ||
     /_(?:u|v|ratio|segment_index|wall_reference)$/.test(field.data_name)
   );
 }
@@ -374,6 +378,9 @@ export function createBuildingPlanBlueprint(overrides = {}) {
   };
   blueprint.nodes.physical_walls = physical;
   blueprint.nodes.wall_sides = sides;
+  // The wall's band answers together in its System fields, and in a room's copy of the wall.
+  physical.system_groups = [clone(WALL_BAND_GROUP)];
+  face.system_groups = [clone(WALL_BAND_GROUP)];
   physical.children = ['wall_sides', 'doors', 'windows', 'wall_beams'];
   blueprint.nodes.floors.children = ['physical_walls', 'rooms'];
   for (const field of physical.mandatory_elements) {
@@ -688,6 +695,12 @@ export function createBuildingPlanBlueprint(overrides = {}) {
           { value: 'plastered', label: 'Plastered' },
           { value: 'not_plastered', label: 'Not plastered' },
         ];
+        field.required = false;
+      }
+      const band = managed && BAND_KINDS.find((entry) => entry.wall === property);
+      if (band) {
+        field.label = band.title;
+        field.choices = BAND_CHOICES.map(([value, label]) => ({ value, label }));
         field.required = false;
       }
       if (managed && property === 'wall_plaster_thickness') {

@@ -1,4 +1,5 @@
 import { BUILDING_PLAN_MEASURES } from '../schema/building-plan-measures.js';
+import { BAND_TEXTS } from './presentation-band-texts.js';
 
 /** Presentation only: canonical schemas, answer labels and metre values are never mutated. */
 const TRANSLATIONS = {
@@ -266,7 +267,7 @@ export function createBuildingPlanPresentation({
         )
           entries.set(entry.dataName, entry);
   }
-  const t = (text) => TRANSLATIONS[language]?.[text] || text;
+  const t = (text) => TRANSLATIONS[language]?.[text] || BAND_TEXTS[language]?.[text] || text;
   const managed = (field) => entries.get(field.data_name) || entries.get(field.key);
   const unitFor = (kind = 'length') =>
     measurementSystem === 'imperial'

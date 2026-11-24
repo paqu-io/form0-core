@@ -46,6 +46,63 @@ const plasterChoices = [
   ['not_plastered', 'Not plastered'],
 ];
 
+/**
+ * Ring beam and bands (decided 2026-11-24, F2 to F5, B): each a floor answer giving every wall its
+ * default (a wall overrides it, as plaster), with the band's underside (the ring beam's top is its
+ * wall's top) and depth. `wall`: the physical wall's answer the floor's answer routes to.
+ */
+export const BAND_KINDS = Object.freeze([
+  { kind: 'ring', title: 'Ring beam', floor: 'floor_ring_beam', wall: 'wall_ring_beam' },
+  { kind: 'lintel', title: 'Lintel band', floor: 'floor_lintel_band', wall: 'wall_lintel_band' },
+  { kind: 'sill', title: 'Sill band', floor: 'floor_sill_band', wall: 'wall_sill_band' },
+]);
+/** Both levels' answers share their values; the floor words them for every wall. */
+export const BAND_CHOICES = Object.freeze([
+  ['yes', 'Yes'],
+  ['no', 'No'],
+]);
+/** System fields shown together in an inline Section inside a node's System fields. */
+export const FLOOR_BAND_GROUP = Object.freeze({
+  key: 'bands',
+  label: 'Ring beam and bands',
+  fields: BAND_KINDS.flatMap(({ kind, floor }) => [
+    floor,
+    ...(kind === 'ring' ? [] : [`${floor}_distance_from_floor`]),
+    `${floor}_depth`,
+  ]),
+});
+export const WALL_BAND_GROUP = Object.freeze({
+  key: 'bands',
+  label: 'Ring beam and bands',
+  fields: BAND_KINDS.map(({ wall }) => wall),
+});
+
+function bandFields() {
+  return BAND_KINDS.flatMap(({ kind, title, floor }) => {
+    const name = title.toLowerCase();
+    const present = {
+      required: false,
+      visible: false,
+      min: 0,
+      required_conditions: condition(floor, 'yes'),
+      visible_conditions: condition(floor, 'yes'),
+    };
+    return [
+      choice(floor, title, BAND_CHOICES, {
+        required: false,
+        choices: [
+          { value: 'yes', label: `Every wall has a ${name}` },
+          { value: 'no', label: `No wall has a ${name}` },
+        ],
+      }),
+      ...(kind === 'ring'
+        ? []
+        : [number(`${floor}_distance_from_floor`, `${title} underside [m]`, present)]),
+      number(`${floor}_depth`, `${title} depth [mm]`, present),
+    ];
+  });
+}
+
 /** Compiler-owned definitions. Requiredness is independent of system ownership. */
 export function createFloorSystemFields() {
   return [
@@ -116,6 +173,7 @@ export function createFloorSystemFields() {
         }),
       ];
     }),
+    ...bandFields(),
   ];
 }
 
@@ -157,6 +215,13 @@ export const FLOOR_SYSTEM_ROUTES = {
           },
         },
       ],
+    ])
+  ),
+  // Every wall, free walls included (F5); a split's pieces keep the answer.
+  ...Object.fromEntries(
+    BAND_KINDS.map(({ floor, wall }) => [
+      floor,
+      { property: wall, inherit_to: 'walls', scope: 'physical_wall', on_split: 'copy' },
     ])
   ),
 };

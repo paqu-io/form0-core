@@ -128,7 +128,9 @@ test('system catalog retains names and dimensions in mandatory protected inline 
         !['storage', 'geometry', 'derived'].includes(entry.binding.role) &&
         !['storage', 'geometry', 'derived'].includes(entry.binding.storageRole) &&
         !['floors', 'rooms'].includes(node.nodeKey) &&
-        !entry.originalDataName.startsWith('wall_plaster')
+        !entry.originalDataName.startsWith('wall_plaster') &&
+        // A wall's ring beam and bands are optional, as its plaster (bands 1, 2026-11-24).
+        !/^wall_(?:ring_beam|lintel_band|sill_band)$/.test(entry.originalDataName)
       ) {
         // Wall and column heights are required on enclosed levels only, as the floor height is.
         if (LEVEL_DEPENDENT_HEIGHTS.includes(entry.originalDataName)) {

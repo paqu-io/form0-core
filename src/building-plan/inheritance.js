@@ -39,6 +39,22 @@ export function providerApplies(provider, { floor, room, wall, side }, source) {
   return true;
 }
 
+/**
+ * An inherited choice in the words of the field receiving it (2026-11-24): the floor's "Every wall
+ * has a lintel band" reads "Yes" on a wall, as "All the interior walls are plastered" reads
+ * "Plastered". Values are unchanged.
+ */
+function inReceivingWords(field, value) {
+  if (!Array.isArray(field?.choices) || !Array.isArray(value?.choice)) return value;
+  return {
+    ...value,
+    choice: value.choice.map((entry) => {
+      const own = field.choices.find((choice) => choice.value === entry?.value);
+      return own ? { ...entry, label: own.label } : entry;
+    }),
+  };
+}
+
 /** Resolve explicit intent without materializing inherited defaults as overrides. */
 export function resolveInheritedProperty(context, property, specification = {}) {
   const { floor, subject, room, wall, side } = context;
@@ -135,7 +151,7 @@ export function resolveInheritedProperty(context, property, specification = {}) 
           },
         };
       return {
-        value: copy(candidates[0].value),
+        value: inReceivingWords(specification.field, copy(candidates[0].value)),
         source: {
           scope:
             nodeKey === 'rooms'

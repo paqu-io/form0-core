@@ -1,3 +1,5 @@
+import { BAND_KINDS } from './building-plan-floors.js';
+
 /**
  * Beams carried by a wall (decided 2026-11-24, WB1 to WB10; form0-react
  * `analyses/building-plan-ui.md`, "Wall beams"). Stored once on the physical wall, like its doors
@@ -41,7 +43,32 @@ const text = (name, label, description, attributes = {}) => ({
   ...attributes,
 });
 
+const choice = (name, label, description, choices, attributes = {}) => ({
+  ...base(name, label, description),
+  type: 'SingleChoiceField',
+  allow_other: false,
+  is_searchable: false,
+  is_searchable_mode: null,
+  choices,
+  ...attributes,
+});
+
 const UNDERSIDE = 'Measured from the finished floor to the underside of the beam.';
+
+/**
+ * Which band a wall beam is (bands 1, 2026-11-24, B): kept by the engine on the rows it keeps for
+ * the wall's ring beam and bands, empty on a beam added by hand. Internal (hidden, read-only): a
+ * band's row is titled by its kind.
+ */
+function bandKindField() {
+  return choice(
+    'wall_beam_band',
+    'Band',
+    "Kept from the wall's ring beam and bands.",
+    BAND_KINDS.map(({ kind, title }) => ({ value: kind, label: title })),
+    { required: false, read_only: true, visible: false }
+  );
+}
 
 /** A room beam's height: its underside from the floor, filled when the beam is added. */
 export function createBeamHeightField() {
@@ -67,6 +94,7 @@ export function createWallBeamsNode() {
     },
     canvas: null,
     mandatory_elements: [
+      bandKindField(),
       text('wall_beam_identifier', 'Beam ID', 'Identifier shown on the canvas.'),
       number(
         'wall_beam_offset',

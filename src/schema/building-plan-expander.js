@@ -232,21 +232,33 @@ function buildRepeatableTree(
     applicability.push(flag);
   }
   extraElements.push(...applicability);
+  const inlineSection = (name, label, elements) => ({
+    type: 'Section',
+    key: createScopedKey(`bp_${nodeKey}_${name}`, repeatableSuffix),
+    data_name: createScopedDataName(`bp_${nodeKey}_${name}`, repeatableSuffix),
+    label,
+    display: 'inline',
+    description: null,
+    description_mode: null,
+    visible: true,
+    visible_conditions: null,
+    elements,
+  });
+  // A node's `system_groups` (2026-11-24: the ring beam and bands) gather some of its system
+  // fields in an inline Section of their own, where the first of them stands.
+  let systemElements = mandatoryElements;
+  for (const group of mergedNode.system_groups || []) {
+    const names = (mergedNode.mandatory_elements || []).map((field) => field.data_name);
+    const members = systemElements.filter((field) =>
+      group.fields.includes(names[mandatoryElements.indexOf(field)])
+    );
+    if (!members.length) continue;
+    const at = systemElements.indexOf(members[0]);
+    systemElements = systemElements.filter((field) => !members.includes(field));
+    systemElements.splice(at, 0, inlineSection(group.key, group.label, members));
+  }
   const systemSection = mandatoryElements.length
-    ? [
-        {
-          type: 'Section',
-          key: createScopedKey(`bp_${nodeKey}_system`, repeatableSuffix),
-          data_name: createScopedDataName(`bp_${nodeKey}_system`, repeatableSuffix),
-          label: 'System fields',
-          display: 'inline',
-          description: null,
-          description_mode: null,
-          visible: true,
-          visible_conditions: null,
-          elements: mandatoryElements,
-        },
-      ]
+    ? [inlineSection('system', 'System fields', systemElements)]
     : [];
 
   const children = (mergedNode.children || []).map((childKey) =>

@@ -39,6 +39,12 @@ export const BUILDING_PLAN_MEASURES = Object.freeze({
   wall_beam_distance_from_floor: 'length',
   wall_beam_width: 'thickness',
   wall_beam_depth: 'thickness',
+  // Ring beam and bands (2026-11-24): undersides in m, depths in mm, as wall beams.
+  floor_ring_beam_depth: 'thickness',
+  floor_lintel_band_distance_from_floor: 'length',
+  floor_lintel_band_depth: 'thickness',
+  floor_sill_band_distance_from_floor: 'length',
+  floor_sill_band_depth: 'thickness',
 });
 
 /** Numeric system fields that are counts, not dimensions. */

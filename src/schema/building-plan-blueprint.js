@@ -1,4 +1,4 @@
-import { createFloorSystemFields } from './building-plan-floors.js';
+import { FLOOR_BAND_GROUP, createFloorSystemFields } from './building-plan-floors.js';
 import { createBeamHeightField, createWallBeamsNode } from './building-plan-wall-beams.js';
 
 // Default blueprint describing the generated structure for BuildingPlanSection
@@ -27,6 +27,7 @@ export const BUILDING_PLAN_BLUEPRINT = {
         allow_selection: true,
       },
       mandatory_elements: createFloorSystemFields(),
+      system_groups: [FLOOR_BAND_GROUP],
       extra_elements: [],
       children: ['rooms'],
     },
