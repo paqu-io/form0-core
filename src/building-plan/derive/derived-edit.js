@@ -6,7 +6,7 @@ import {
   freeWallPlacementIssues,
   freeWallTooShortIssues,
 } from '../room-contents.js';
-import { findBuildingPlanFloor } from '../model.js';
+import { copyBuildingPlanData as copy, findBuildingPlanFloor } from '../model.js';
 import { extractBuildingPlanPrimary } from './extract.js';
 import { deriveBuildingPlanPrimary } from './index.js';
 import { applyRoomCommand } from './room-commands.js';
@@ -29,6 +29,12 @@ import {
 } from './data-commands.js';
 import { writeBackBuildingPlanFloor } from './write-back.js';
 import { followAttached } from './follow-attached.js';
+import { heldBeamRefusal, holdWallBeamEnds, releaseWallBeamEnds } from './wall-beam-ends.js';
+import { followBeamHeights } from './follow-beam-heights.js';
+import { wallBeamPlacementIssues } from '../wall-beam-placement.js';
+
+/** Edits a wall beam's ends don't follow through: a cut across a beam is refused (WB8). */
+const CUT_OPERATIONS = ['split_face', 'rejoin_cut'];
 
 /** Operations that run on the derived core (step 3); the others stay on today's engine. */
 export const DERIVED_OPERATIONS = Object.freeze([
@@ -111,15 +117,25 @@ export function applyDerivedOperation(
   if (isDataOperation(operation))
     return applyDataOperation(snapshot, operation, { createId, specifications, editingPolicy });
   const floor = findBuildingPlanFloor(snapshot, operation.floorId);
+  const previous = copy(floor);
   const primary = extractBuildingPlanPrimary(floor);
   const before = extractBuildingPlanPrimary(floor);
   const command = FACE_COMMANDS[operation.type];
   const entryFloors = (entryStates || [])
     .map((plan) => plan.floors?.find((entry) => entry.id === floor.id))
     .filter(Boolean);
-  const { result, preferredRoomIds } = command
-    ? command(primary, operation, { createId, specifications, editingPolicy, entryFloors })
-    : applyRoomCommand(primary, operation, { createId, specifications });
+  // A wall beam's end at its wall's end follows it (wall beams 2b): held as a point meanwhile.
+  const held = CUT_OPERATIONS.includes(operation.type) ? [] : holdWallBeamEnds(primary);
+  let applied;
+  try {
+    applied = command
+      ? command(primary, operation, { createId, specifications, editingPolicy, entryFloors })
+      : applyRoomCommand(primary, operation, { createId, specifications });
+  } catch (error) {
+    throw heldBeamRefusal(error, held);
+  }
+  const { result, preferredRoomIds } = applied;
+  const short = releaseWallBeamEnds(primary, held);
   const written = followAndWrite(
     snapshot,
     floor,
@@ -128,7 +144,11 @@ export function applyDerivedOperation(
     { createId, specifications, preferredRoomIds },
     operation
   );
-  return { result, ...written };
+  followBeamHeights(
+    previous,
+    snapshot.floors.find((entry) => entry.id === floor.id)
+  );
+  return { result, ...written, issues: [...written.issues, ...short] };
 }
 
 /**
@@ -137,17 +157,22 @@ export function applyDerivedOperation(
  * written back.
  */
 function applyDataOperation(snapshot, operation, options) {
+  // Each floor as it was, for the beams' heights to follow what they touch (wall beams 2b).
+  const previous = new Map(snapshot.floors.map((floor) => [floor.id, copy(floor)]));
   const { context, created, floors } = applyDataEdits(snapshot, operation, options);
   const carved = [];
   const divisions = [];
   const issues = [];
   for (const { floor, before, original, primary } of floors) {
-    const { result, preferredRoomIds } = changeThickness(
-      primary,
-      before,
-      floorContext(context, floor.id),
-      options
-    );
+    const held = holdWallBeamEnds(primary);
+    let moved;
+    try {
+      moved = changeThickness(primary, before, floorContext(context, floor.id), options);
+    } catch (error) {
+      throw heldBeamRefusal(error, held);
+    }
+    const { result, preferredRoomIds } = moved;
+    issues.push(...releaseWallBeamEnds(primary, held));
     carved.push(...result.carvedRoomIds);
     // Against the floor before any of the edits: a column only resized keeps its contacts (D6).
     const written = followAndWrite(
@@ -160,6 +185,10 @@ function applyDataOperation(snapshot, operation, options) {
     );
     divisions.push(...written.divisions);
     issues.push(...written.issues);
+    followBeamHeights(
+      previous.get(floor.id),
+      snapshot.floors.find((entry) => entry.id === floor.id)
+    );
   }
   const result =
     operation.type === 'batch'
@@ -237,6 +266,13 @@ export function derivedCandidateIssues(before, candidate, operation, writeIssues
       // Beams too, their bodies included (3a-3).
       ...floors.flatMap((floor) =>
         beamPlacementIssues(
+          floor,
+          before.floors.find((entry) => entry.id === floor.id)
+        )
+      ),
+      // Wall beams not above their wall, nor through an opening (wall beams 2b).
+      ...floors.flatMap((floor) =>
+        wallBeamPlacementIssues(
           floor,
           before.floors.find((entry) => entry.id === floor.id)
         )
