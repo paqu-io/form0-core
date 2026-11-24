@@ -18,6 +18,9 @@ export const cleanPoint = (p) => ({
   y: Math.round(p.y * 1e9) / 1e9 + 0,
 });
 
+/** A length or a station along a wall, rounded as `cleanPoint` rounds coordinates. */
+export const cleanLength = (value) => Math.round(value * 1e9) / 1e9 + 0;
+
 export function segmentFrame(start, end) {
   const delta = subtract(end, start);
   const size = length(delta);

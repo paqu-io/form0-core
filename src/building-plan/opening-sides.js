@@ -1,4 +1,4 @@
-import { distance } from './geometry.js';
+import { cleanLength as clean, distance } from './geometry.js';
 import { own } from './model.js';
 import { spanOf, wallChildForType } from './wall-children.js';
 
@@ -12,7 +12,6 @@ import { spanOf, wallChildForType } from './wall-children.js';
  * in that room's copy converts back the same way.
  */
 
-const clean = (value) => Math.round(value * 1e9) / 1e9;
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
 /**

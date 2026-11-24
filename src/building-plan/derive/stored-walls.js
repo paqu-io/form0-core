@@ -1,5 +1,5 @@
 import { copyBuildingPlanData as copy } from '../model.js';
-import { at, dot, project, segmentFrame } from '../geometry.js';
+import { at, cleanLength, dot, project, segmentFrame } from '../geometry.js';
 import { lineFrame, pointAt } from './grid.js';
 import { edgeEnds, rowFrame, rowTangent } from './frames.js';
 import { fromAlongWall } from './along-wall.js';
@@ -104,7 +104,10 @@ export function buildStoredWalls(context, rooms, rows) {
     const openings = { door: [], window: [], beam: [] };
     for (const { faceId, from, ...opening } of copy(subject.openings)) {
       const points = openingEnds(context, { faceId, from, width: opening.width });
-      const offset = points ? Math.min(...points.map((p) => project(axis, p).along)) : from;
+      // Rounded as coordinates are (2026-11-24: a typed 0.3 was stored as 0.2999999999999998).
+      const offset = cleanLength(
+        points ? Math.min(...points.map((p) => project(axis, p).along)) : from
+      );
       const written = fromAlongWall({ ...opening, segmentId: segment.id, offset });
       const offsetField = wallChildForType(written.type)?.offset || `${written.type}_offset`;
       if (Object.hasOwn(written.values || {}, offsetField)) written.values[offsetField] = offset;

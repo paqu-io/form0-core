@@ -1,4 +1,4 @@
-import { distance } from './geometry.js';
+import { cleanLength as clean, distance } from './geometry.js';
 
 /**
  * Where a new beam sits (wall beams, 2026-11-24, P2: the height is stored, filled once here).
@@ -7,7 +7,6 @@ import { distance } from './geometry.js';
 export const NEW_BEAM_WIDTH = 0.15;
 export const NEW_BEAM_DEPTH = 0.3;
 
-const clean = (value) => Math.round(value * 1e9) / 1e9;
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
 /**
