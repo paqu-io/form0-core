@@ -222,7 +222,7 @@ test('a room beam: 15 by 30 cm from its list, its underside filled at the clear 
   );
 });
 
-test('a wall beam is carried by every edit, in place; a Split across it is refused', () => {
+test('a wall beam is carried by every edit, in place', () => {
   const t = example();
   applied(addBeam(t, 'W3', 0.2, 1.5));
   applied(addBeam(t, 'W1', 1, 3));
@@ -244,7 +244,7 @@ test('a wall beam is carried by every edit, in place; a Split across it is refus
     applied(t.apply({ type: 'rejoin_cut', cutId: cut.created.id }));
     assert.deepEqual(beamPlaces(t.floor()), moved);
   }
-  assert.equal(t.apply({ type: 'split_face', faceId: north, offset: 2 }).status, 'conflict');
+  // A Split across a beam divides it since 2c (building-plan-wall-beam-split.test.js).
   // Room 2 removed: the shared wall stays the Bedroom's, its beam with it.
   applied(t.apply({ type: 'remove_room', roomId: t.floor().rooms[1].id }));
   assert.deepEqual(beamPlaces(t.floor()), moved);

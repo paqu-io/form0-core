@@ -4,6 +4,7 @@ import { SAME } from './grid.js';
 import { subjectTangent } from './subject-joins.js';
 import { sameCapAnswers } from './caps.js';
 import { nameOf } from '../wall-children.js';
+import { divideBeamsOnPieces } from './beam-divisions.js';
 
 const refuse = (code, message, details = {}) => {
   throw Object.assign(new Error(message), { issues: [{ code, message, ...details }] });
@@ -128,8 +129,14 @@ export function divideSubjects(context) {
   for (const [id, pieces] of bySubject) {
     if (pieces.length < 2) continue;
     const subject = context.subjects.get(id);
-    const placed = placeOpenings(context, subject, pieces);
     const kept = keptPiece(context, subject, pieces);
+    // Beams across the pieces divide as the wall does (wall beams 2c); openings refuse.
+    divideBeamsOnPieces(subject, pieces, kept, {
+      spanOf: (beam) => anchoredSpan(context, beam.faceId, beam.from, beam.width),
+      entryOn,
+      createId: context.createId,
+    });
+    const placed = placeOpenings(context, subject, pieces);
     context.divided.add(id);
     const source = copy(subject);
     const division = divisionLineage(source);

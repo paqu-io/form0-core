@@ -6,6 +6,12 @@ import { pieceAt } from './face-plans.js';
 import { joinEdges } from './cut-edges.js';
 import { prepareJoinChoice } from './value-choices.js';
 import { carrySharedChoices } from './shared-choices.js';
+import { mergeMeetingBeams } from './beam-divisions.js';
+
+const beamIds = (subject) =>
+  new Set(
+    (subject?.openings || []).filter((entry) => entry.type === 'beam').map((entry) => entry.id)
+  );
 
 const refuse = (code, message) => {
   throw Object.assign(new Error(message), { issues: [{ code, message }] });
@@ -126,13 +132,17 @@ function rejoinPartitions(primary, roomId, cutId, createId) {
     for (const opening of subject.openings || [])
       if (opening.faceId === after.faceId)
         Object.assign(opening, { faceId: before.faceId, from: opening.from + length });
-  if (a !== b) absorbDivision(primary, ...(divisionSurvivor(a, b) || [a, b]), () => 1);
+  const pair = a !== b ? divisionSurvivor(a, b) || [a, b] : [a, a];
+  const keepIds = beamIds(pair[0]);
+  if (a !== b) absorbDivision(primary, ...pair, () => 1);
   Object.assign(before, {
     path: [before.path[0], after.path.at(-1)],
     freeEdges: [createId()],
     sides: [before.sides[0]],
     bindingIds: [null],
   });
+  // The beams the Split divided are one again when they meet and match (wall beams 2c).
+  mergeMeetingBeams(primary, pair[0], keepIds);
   primary.partitions = primary.partitions.filter((entry) => entry !== after);
   const room = primary.rooms.find((entry) => entry.id === roomId);
   if (room.faceOrder) room.faceOrder = room.faceOrder.filter((id) => id !== after.faceId);
@@ -185,8 +195,11 @@ export function rejoinCut(primary, { cutId }, { createId, specifications }) {
     compatible(a, b, facing, rooms(p) === rooms(q));
     joins.push({ room, vertex, subjects: [a, b], facing });
   }
+  const merges = [];
   for (const { subjects, facing } of joins) {
     const pair = subjects[0] !== subjects[1] && divisionSurvivor(...subjects);
+    const survivor = pair ? pair[0] : subjects[0];
+    merges.push({ survivor, keepIds: beamIds(survivor) });
     if (pair && primary.subjects.has(pair[1].id)) absorbDivision(primary, ...pair, facing);
   }
   for (const { room, vertex, subjects } of joins) {
@@ -198,5 +211,9 @@ export function rejoinCut(primary, { cutId }, { createId, specifications }) {
         subject.lineage = lineage;
       }
   }
+  // The beams the Split divided are one again when they meet and match (wall beams 2c).
+  for (const { survivor, keepIds } of merges)
+    if (survivor && primary.subjects.has(survivor.id))
+      mergeMeetingBeams(primary, survivor, keepIds);
   return { result: {}, preferredRoomIds: primary.rooms.map((room) => room.id) };
 }
