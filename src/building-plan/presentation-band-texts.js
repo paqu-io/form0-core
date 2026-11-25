@@ -21,6 +21,10 @@ export const BAND_TEXTS = Object.freeze({
     'Sill band depth': "Hauteur du bandeau d'allège",
     Yes: 'Oui',
     No: 'Non',
+    'Spans the whole wall. For part of it, set it to No on the wall and add the beam yourself.':
+      'Couvre tout le mur. Pour une partie seulement, mettez-le à Non sur le mur et ajoutez la poutre vous-même.',
+    "The ring beam's top is the wall's top: change its depth instead.":
+      'Le dessus du chaînage est le sommet du mur : modifiez plutôt sa hauteur.',
   },
   it: {
     'Ring beam and bands': 'Cordolo e fasce',
@@ -40,6 +44,10 @@ export const BAND_TEXTS = Object.freeze({
     'Sill band depth': 'Altezza della fascia davanzali',
     Yes: 'Sì',
     No: 'No',
+    'Spans the whole wall. For part of it, set it to No on the wall and add the beam yourself.':
+      'Copre tutto il muro. Per una parte soltanto, impostalo su No nel muro e aggiungi la trave tu stesso.',
+    "The ring beam's top is the wall's top: change its depth instead.":
+      "L'estradosso del cordolo è la sommità del muro: modifica piuttosto la sua altezza.",
   },
   es: {
     'Ring beam and bands': 'Zuncho y bandas',
@@ -59,5 +67,9 @@ export const BAND_TEXTS = Object.freeze({
     'Sill band depth': 'Canto de la banda de alféizares',
     Yes: 'Sí',
     No: 'No',
+    'Spans the whole wall. For part of it, set it to No on the wall and add the beam yourself.':
+      'Cubre todo el muro. Para solo una parte, ponlo en No en el muro y añade la viga tú mismo.',
+    "The ring beam's top is the wall's top: change its depth instead.":
+      'La cara superior del zuncho es la coronación del muro: cambia mejor su canto.',
   },
 });

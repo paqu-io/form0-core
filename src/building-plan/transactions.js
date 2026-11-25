@@ -99,6 +99,8 @@ export function buildingPlanOperationsForRow({
   const wallId =
     node.nodeKey === 'physical_walls' ? model.id : node.nodeKey === 'walls' ? model.wallId : null;
   for (const field of node.fields) {
+    // Display only (a note an author may add): nothing to write; normalising it would refuse.
+    if (['LabelField', 'TitleField'].includes(field.type)) continue;
     const binding = field.binding;
     const property = binding?.property;
     const reset =
@@ -438,17 +440,17 @@ export function createBuildingPlanRecordSession({
     applyRow: (options) => rowOperation(options, false),
     resolveRow: (path) => selection(meta, source, path),
     fieldState: (path, dataName) =>
-      getBuildingPlanFieldState(meta, source, session.getSnapshot(), path, dataName),
+      getBuildingPlanFieldState(meta, source, session.getSnapshot(), path, dataName, locale),
   };
 }
 
 /** Display ownership without altering schema visibility or record storage. */
-export function getBuildingPlanFieldState(meta, record, plan, path, dataName) {
+export function getBuildingPlanFieldState(meta, record, plan, path, dataName, locale = 'en') {
   const selected = selection(meta, record, path);
   const field = selected.node.fields.find((entry) => entry.dataName === dataName);
   const binding = field?.binding;
   if (!binding) return null;
-  const band = bandFieldState(plan, selected, field);
+  const band = bandFieldState(plan, selected, field, locale);
   if (band) return band;
   const managed =
     ['storage', 'geometry', 'derived', 'reference'].includes(binding.role) ||

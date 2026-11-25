@@ -175,3 +175,47 @@ test('the form shows where a band value comes from, and Reset returns it', async
   assert.deepEqual(source('wall_beam_distance_from_floor'), { scope: 'floor', mode: 'inherit' });
   assert.equal(rowAt(editor.getRecord(), path).values[name('wall_beam_distance_from_floor')], 2.2);
 });
+
+test("a band row's read-only values say why, in the editor's language", () => {
+  const t = example();
+  applied(t.answer('lintel'));
+  applied(t.answer('ring'));
+  applied(
+    t.apply({
+      type: 'create_opening',
+      kind: 'beam',
+      wallId: t.wall('W1').id,
+      offset: 1,
+      length: 2,
+      width: 0.2,
+      depth: 0.3,
+      underside: 1.2,
+      values: {},
+    })
+  );
+  const meta = t.f.meta;
+  const record = writeBuildingPlanRecord({ meta, plan: t.session.getSnapshot() });
+  const node = meta.repeatablesByNodeKey.face_beams;
+  const name = (field) => node.fieldsByOriginalDataName[field].dataName;
+  const beams = (locale) => {
+    const editor = createBuildingPlanEditor({ meta, derivedCommands: true, record, locale });
+    const path = firstPath(editor.getRecord(), meta.repeatablesByNodeKey.walls.preferredKey);
+    const face = rowAt(editor.getRecord(), path);
+    return face.repeatable[node.preferredKey].map((row) => {
+      const at = [...path, { key: node.preferredKey, id: row.id }];
+      return (field) => editor.fieldState(at, name(field));
+    });
+  };
+  const [lintel, ring, byHand] = beams('en');
+  const spans =
+    'Spans the whole wall. For part of it, set it to No on the wall and add the beam yourself.';
+  assert.equal(lintel('wall_beam_offset').description, spans);
+  assert.equal(lintel('wall_beam_length').description, spans);
+  assert.equal(lintel('wall_beam_offset').source, null);
+  assert.equal(
+    ring('wall_beam_distance_from_floor').description,
+    "The ring beam's top is the wall's top: change its depth instead."
+  );
+  assert.equal(byHand('wall_beam_offset')?.description, undefined);
+  assert.match(beams('it')[0]('wall_beam_length').description, /^Copre tutto il muro\./);
+});
