@@ -1,4 +1,5 @@
 import { isFieldValueEmpty } from '../engine/submission-validation.js';
+import { refusedFields } from './refused-fields.js';
 import { validateFieldValue } from '../schema/field-value-registry.js';
 import { normalizeFieldValue } from '../utilities/field-value-normalization.js';
 import { generateUuidV7 } from '../utilities/uuid.js';
@@ -454,7 +455,22 @@ export function createBuildingPlanEditor(options) {
         )
       )
         return { status: 'invalid', issues: [], record: session.getRecord() };
-      return updateRow(scopeId, row);
+      const result = updateRow(scopeId, row);
+      if (result.status !== 'conflict') return result;
+      // The fields the refusal is about, for their field errors (2026-11-25).
+      const previewRow = (editedRow) =>
+        session.previewRow({
+          path: editor.path,
+          initialRow: editor.initialRow,
+          editedRow,
+          scopeId,
+        });
+      const { initialRow } = editor;
+      const issues = result.issues || [];
+      return {
+        ...result,
+        refusedFields: refusedFields({ previewRow, initialRow, row, changed, issues }),
+      };
     },
     resolveUIRequest(id, response) {
       const result = session.resolveUIRequest(id, response);
