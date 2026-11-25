@@ -16,7 +16,7 @@ import { createUIRequestRegistry } from '../utilities/ui-requests.js';
 import { reconcileWallLabels } from './wall-labels.js';
 import { assignBuildingPlanDefaultNames } from './default-names.js';
 import { sharedValueQuestion } from './shared-value-question.js';
-import { bandClashQuestion, fitOpenings, newBandClashes } from './band-clash-question.js';
+import { nextBandQuestion } from './band-questions.js';
 import {
   applySharedValueChoice,
   carriedJoinChoices,
@@ -609,13 +609,11 @@ export function createBuildingPlanSession({
       if (issues.length) return response('conflict', issues);
       if (prepared.defaultConflicts.length) return commit(proposal);
     }
-    // Bands run into openings by this edit (bands 4b): fit them, keep them, or cancel.
-    if (decision === 'fit' || decision === 'keep') prepared.bandAnswer = decision;
-    const clashes =
-      prepared.bandAnswer === 'keep' ? [] : newBandClashes(current, prepared.candidate);
-    if (clashes.length && !prepared.bandAnswer) {
+    // Bands (4b, 4c): own values removed by a No, bands run into openings; answered in place.
+    const band = nextBandQuestion(prepared, current, decision);
+    if (band.question) {
       const question = questions.create(
-        { ...bandClashQuestion(clashes), context: { revision, scopeId: prepared.scopeId } },
+        { ...band.question, context: { revision, scopeId: prepared.scopeId } },
         (reply) => ({ proposal, reply }),
         () =>
           !readOnly &&
@@ -625,10 +623,7 @@ export function createBuildingPlanSession({
       );
       return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
     }
-    if (clashes.length && prepared.bandAnswer === 'fit') {
-      fitOpenings(clashes);
-      prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
-    }
+    if (band.changed) prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
     proposals.delete(proposal);
     questions.cancelAll();
     if (prepared.changes.length) {

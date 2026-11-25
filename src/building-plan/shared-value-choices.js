@@ -1,4 +1,5 @@
 import { copyBuildingPlanData as copy } from './model.js';
+import { writeBandChoice } from './derive/band-join-values.js';
 
 /**
  * Choices the session asks before it accepts an edit (2026-11-16). Two sources report them, both
@@ -130,7 +131,10 @@ export function applySharedValueChoice(snapshot, choice, index) {
       write((owner.overrides ||= {}), entry.key, value);
       if (isWall) markChoice(owner, entry.key, value != null && option.marks?.[at] !== false);
     } else if (entry.kind === 'answer') write((owner.values ||= {}), entry.key, value);
-    else {
+    else if (entry.kind === 'band') {
+      if (!isWall) return false;
+      writeBandChoice(owner, entry, value, option.marks?.[at] === true);
+    } else {
       const side = owner.sides?.find((candidate) => candidate.id === entry.sideId);
       if (!side) return false;
       write((side[entry.target] ||= {}), entry.key, value);

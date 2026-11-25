@@ -1,4 +1,5 @@
 import { copyBuildingPlanData as copy, equalValue, own } from '../model.js';
+import { bandDifferences, bandOption } from './band-join-values.js';
 
 /** Thickness is decided by the geometry at a join (seating, the contact's width): never a choice. */
 const GEOMETRIC = ['wall_thickness'];
@@ -60,6 +61,8 @@ export function joinDifferences(survivor, members, direction) {
           entries.push({ kind: 'side', sideId: side.id, sign: side.sign, target, key });
       }
     }
+  // Band rows giving a value differently (bands 4c).
+  entries.push(...bandDifferences(subjects));
   return entries;
 }
 
@@ -74,6 +77,7 @@ const chosenMark = (subject, key) =>
 function valueFor(member, entry, direction) {
   if (entry.kind === 'property') return copy(effectiveValue(member.subject, entry.key));
   if (entry.kind === 'answer') return copy(answerOf(member.subject.values, entry.key));
+  if (entry.kind === 'band') return bandOption(member.subject, entry)?.value ?? null;
   return copy(answerOf(sideOf(member, entry.sign, direction)?.[entry.target], entry.key));
 }
 
@@ -108,12 +112,17 @@ export function prepareJoinChoice(survivor, members, direction, origin) {
   for (const member of ordered) {
     const values = entries.map((entry) => valueFor(member, entry, direction));
     if (options.some((option) => equalValue(option.values, values))) continue;
-    const marks = entries.map(
-      (entry) => entry.kind !== 'property' || chosenMark(member.subject, entry.key)
+    // A band entry's mark: whether that wall's row set the value itself (bands 4c).
+    const marks = entries.map((entry) =>
+      entry.kind === 'band'
+        ? Boolean(bandOption(member.subject, entry)?.own)
+        : entry.kind !== 'property' || chosenMark(member.subject, entry.key)
     );
     options.push({ roomId: member.roomId ?? null, label: member.label ?? null, values, marks });
   }
   for (const [index, entry] of entries.entries()) {
+    // A band's rows join as rows do; the answer writes the chosen values (`writeBandChoice`).
+    if (entry.kind === 'band') continue;
     const value = options[0].values[index];
     if (entry.kind === 'property') (survivor.overrides ||= {})[entry.key] = copy(value);
     else if (entry.kind === 'answer') write((survivor.values ||= {}), entry.key, value);

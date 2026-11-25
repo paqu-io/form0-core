@@ -1,5 +1,6 @@
 import { BUILDING_PLAN_MEASURES } from '../schema/building-plan-measures.js';
 import { buildingPlanFloorTitle } from './row-title.js';
+import { bandEntryLabel } from './derive/band-join-values.js';
 
 const plainLabel = (field) => (field?.label || '').replace(/\s*[[(](?:m|mm)[\])]$/, '');
 const round = (value, digits) => Number(value.toFixed(digits));
@@ -102,6 +103,7 @@ function specificationFor(specifications, key) {
 
 /** What a difference is about, as a person reads it: the field, and the side for a surface. */
 function entryLabel(entry, choice, snapshot, specifications) {
+  if (entry.kind === 'band') return bandEntryLabel(entry);
   const field =
     plainLabel(specificationFor(specifications, entry.key)?.field) ||
     (entry.key === 'wall_label' ? 'Wall label' : entry.key);
