@@ -38,6 +38,7 @@ import { buildingPlanFloorsByLevel } from './floor-order.js';
 import { buildingPlanFloorBelow } from './floor-below.js';
 import { buildingPlanProblems, problemRowPaths } from './plan-problems.js';
 import { newOpeningHeights } from './opening-heights.js';
+import { canvasWallBeams } from './canvas-wall-beams.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -91,6 +92,7 @@ export function buildingPlanCanvasSnapshot({
     beams: [],
     doors: [],
     windows: [],
+    wallBeams: [],
     wallFootprints: [],
     physicalOpenings: [],
     editingCuts: [],
@@ -244,6 +246,7 @@ export function buildingPlanCanvasSnapshot({
           bindings: copy(face.bindings),
           doors: [],
           windows: [],
+          wallBeams: [],
           label: physical.values.wall_label || '',
           displayLabel: physical.values.wall_label || physical.autoLabel || `W#${faceIndex + 1}`,
           thickness: physical.properties.wall_thickness,
@@ -296,6 +299,21 @@ export function buildingPlanCanvasSnapshot({
             wall[collection].push(entry.id);
           }
         }
+        // Its wall's beams and bands (D1a).
+        if (meta.repeatablesByNodeKey.face_beams)
+          for (const entry of canvasWallBeams({
+            physical,
+            face,
+            copies: faceRow.repeatable?.[key(meta, 'face_beams')] || [],
+            idOf: (row) => subjectId(meta, 'face_beams', row),
+            wallPath,
+            copiesKey: key(meta, 'face_beams'),
+            pixels,
+            at: { roomId: room.id, floorIndex },
+          })) {
+            output.wallBeams.push(entry);
+            wall.wallBeams.push(entry.id);
+          }
       }
       for (const collection of ['columns', 'beams']) {
         const rows = roomRow.repeatable?.[key(meta, collection)] || [];
@@ -484,7 +502,15 @@ export class BuildingPlanCanvasController {
     });
     this.floors = this.snapshot.floors;
     this.floorCount = this.floors.length;
-    for (const collection of ['rooms', 'walls', 'columns', 'beams', 'doors', 'windows'])
+    for (const collection of [
+      'rooms',
+      'walls',
+      'columns',
+      'beams',
+      'doors',
+      'windows',
+      'wallBeams',
+    ])
       this[collection] = new Map(this.snapshot[collection].map((item) => [item.id, item]));
     for (const id of this.pinnedFaceIds) if (!this.walls.has(id)) this.pinnedFaceIds.delete(id);
   }
@@ -509,6 +535,7 @@ export class BuildingPlanCanvasController {
           beams: [],
           doors: [],
           windows: [],
+          wallBeams: [],
         }),
       history: this.session?.getState(),
       guides: this.interaction?.getGuides() || [],
