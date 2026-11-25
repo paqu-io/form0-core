@@ -58,8 +58,11 @@ export function newBandClashes(before, after) {
   return clashes;
 }
 
-/** An opening's sill and head once fitted to the bands it clashes with, or null if no height is left. */
-function fitted(opening, bands) {
+/**
+ * An opening's sill and head once fitted to the bands it clashes with, or null if no height is left.
+ * New openings take the same rule (unit 5, `opening-heights.js`).
+ */
+export function fitToBands(opening, bands) {
   let sill = opening.sillHeight || 0;
   let head = sill + opening.height;
   for (const band of bands) {
@@ -96,7 +99,7 @@ export function bandClashQuestion(clashes) {
   const shown = groups.slice(0, SHOWN).map(named);
   const more = groups.length - shown.length;
   const openings = more ? [...shown, `${more} more`] : shown;
-  const stuck = groups.filter((group) => !fitted(group.opening, group.bands)).map(named);
+  const stuck = groups.filter((group) => !fitToBands(group.opening, group.bands)).map(named);
   const count = groups.length === 1 ? '1 opening' : `${groups.length} openings`;
   return {
     title: 'Openings in the way',
@@ -122,7 +125,7 @@ export function bandClashQuestion(clashes) {
  */
 export function fitOpenings(clashes) {
   for (const group of byOpening(clashes)) {
-    const fit = fitted(group.opening, group.bands);
+    const fit = fitToBands(group.opening, group.bands);
     if (!fit) continue;
     if (group.opening.type === 'window') group.opening.sillHeight = clean(fit.sill);
     group.opening.height = clean(fit.head - fit.sill);

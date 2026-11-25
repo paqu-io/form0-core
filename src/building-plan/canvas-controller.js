@@ -37,6 +37,7 @@ import { buildingPlanFloorTitle } from './row-title.js';
 import { buildingPlanFloorsByLevel } from './floor-order.js';
 import { buildingPlanFloorBelow } from './floor-below.js';
 import { buildingPlanProblems, problemRowPaths } from './plan-problems.js';
+import { newOpeningHeights } from './opening-heights.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -1088,6 +1089,14 @@ export class BuildingPlanCanvasController {
         binding.interval[1] - width
       )
     );
+    // A new opening's heights from the bands on its segment (bands unit 5); an edit sends the
+    // opening's own, blank ones included.
+    const heights = previous
+      ? { height: null, sillHeight: null }
+      : newOpeningHeights(
+          this.session?.getSnapshot()?.floors?.find((floor) => floor.id === this.floorId),
+          { wallId: wall.physicalWallId, segmentId: binding.segmentId, kind }
+        );
     return this[preview ? 'previewOperation' : 'apply']({
       type: previous ? 'update_opening' : 'create_opening',
       floorId: this.floorId,
@@ -1096,8 +1105,8 @@ export class BuildingPlanCanvasController {
       segmentId: binding.segmentId,
       offset,
       width,
-      height: input.height ?? (kind === 'door' ? 2 : 1.2),
-      sillHeight: input.distanceFromFloor ?? (kind === 'window' ? 0.9 : null),
+      height: input.height ?? heights.height,
+      sillHeight: input.distanceFromFloor ?? heights.sillHeight,
       values: { [`${kind}_label`]: input.label || '' },
     });
   }

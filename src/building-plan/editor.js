@@ -14,6 +14,7 @@ import { roomBounds, distance } from './geometry.js';
 import { createBuildingPlanRecordSession, resolveBuildingPlanRow } from './transactions.js';
 import { NEW_BEAM_DEPTH, NEW_BEAM_WIDTH, newWallBeamOperation } from './beam-defaults.js';
 import { wallChildForNode, wallChildren } from './wall-children.js';
+import { newOpeningHeights } from './opening-heights.js';
 
 const nodeFor = (meta, key) =>
   meta.repeatables.find((entry) =>
@@ -170,8 +171,12 @@ export function createBuildingPlanEditor(options) {
         kind: window ? 'window' : 'door',
         offset: low + Math.max(0, (high - low - width) / 2),
         width,
-        height: window ? 1.2 : 2,
-        sillHeight: window ? 0.9 : null,
+        // From the bands on its segment (bands unit 5).
+        ...newOpeningHeights(floor, {
+          wallId: wall.id,
+          segmentId: segment.id,
+          kind: window ? 'window' : 'door',
+        }),
       };
     }
     fail('Create physical walls through a room wall row or the canvas.');
