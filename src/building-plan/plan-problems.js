@@ -122,9 +122,10 @@ const indexOf = (meta, name, rows, id) => rows.findIndex((row) => idOf(meta, nam
 
 /**
  * The problems with the rows that show them (index paths from the floors, as canvas entries carry
- * them), to mark and select: an opening's copy in each room's wall row; otherwise the wall rows
- * facing the band's segment. Until bands are drawn (D1), a problem between bands, or of one band,
- * marks its wall.
+ * them). `paths`, to select (D1c, 2026-11-25): the band's copy in each room's wall row facing it,
+ * the lower band of two overlapping (named first); without a `face_beams` node, the wall rows
+ * facing the band's segment. `markPaths`, where the marker stands: an opening's copies where one
+ * runs into the band (where they clash), else the same rows.
  * @param {ReturnType<typeof buildingPlanProblems>} problems
  * @param {{ meta: object, record: object, floor: object }} plan the plan's metadata, its record
  *   and the problems' floor
@@ -133,31 +134,37 @@ export function problemRowPaths(problems, { meta, record, floor }) {
   const floorRows = rowsOf(meta, 'floors', record);
   const floorIndex = indexOf(meta, 'floors', floorRows, floor.id);
   const roomRows = rowsOf(meta, 'rooms', floorRows[floorIndex]);
+  const beams = node(meta, 'face_beams') ? 'face_beams' : null;
   return problems.map((problem) => {
     const opening = problem.elements.find((element) => element.type !== 'beam');
+    const band = problem.elements.find((element) => element.type === 'beam');
     const projection = opening?.type === 'door' ? 'face_doors' : 'face_windows';
     const paths = [];
+    const markPaths = [];
+    // A copy of `id` in a wall row's `name` rows, as an index path, or null.
+    const copy = (path, faceRow, name, id) => {
+      const index = indexOf(meta, name, rowsOf(meta, name, faceRow), id);
+      return index >= 0 ? [...path, { key: node(meta, name).preferredKey, index }] : null;
+    };
     for (const room of floorIndex < 0 ? [] : floor.rooms) {
       const roomIndex = indexOf(meta, 'rooms', roomRows, room.id);
       const faceRows = rowsOf(meta, 'walls', roomRows[roomIndex]);
       for (const face of room.faces) {
         const faceIndex = indexOf(meta, 'walls', faceRows, face.id);
         if (face.wallId !== problem.wallId || roomIndex < 0 || faceIndex < 0) continue;
+        if (!face.bindings.some((binding) => binding.segmentId === problem.segmentId)) continue;
         const path = [
           { key: node(meta, 'floors').preferredKey, index: floorIndex },
           { key: node(meta, 'rooms').preferredKey, index: roomIndex },
           { key: node(meta, 'walls').preferredKey, index: faceIndex },
         ];
-        if (opening) {
-          const copies = rowsOf(meta, projection, faceRows[faceIndex]);
-          const index = indexOf(meta, projection, copies, opening.id);
-          if (index >= 0)
-            paths.push([...path, { key: node(meta, projection).preferredKey, index }]);
-        } else if (face.bindings.some((binding) => binding.segmentId === problem.segmentId))
-          paths.push(path);
+        const selected = beams && band ? copy(path, faceRows[faceIndex], beams, band.id) : path;
+        if (selected) paths.push(selected);
+        const mark = opening ? copy(path, faceRows[faceIndex], projection, opening.id) : selected;
+        if (mark) markPaths.push(mark);
       }
     }
-    return { ...problem, paths };
+    return { ...problem, paths, markPaths };
   });
 }
 

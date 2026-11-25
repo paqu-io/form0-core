@@ -20,7 +20,9 @@ import {
  * - a piece is a row's stretch (its face bound to the room's edges), or a cap (an edge with no
  *   row) given to the row it continues: one of the same wall next to it in line first, then any
  *   row next to it in line; a side of caps alone goes to a row of the cap's wall, else none;
- * - an opening is a door or window standing in one of the side's rows, by its ends along the side.
+ * - an opening is a door or window standing in one of the side's rows, by its ends along the side;
+ * - a beam is a wall beam or band of one of the side's rows (D1c, 2026-11-25), by the ends of the
+ *   stretch the side's rows cover, for an open beam entry's lengths.
  *
  * Canvas units throughout (`gridSize` per metre).
  */
@@ -31,6 +33,7 @@ import {
  *   start: Point, end: Point, normal: Point,
  *   pieces: Array<{ from: Point, to: Point, faceId: string | null, cap: boolean }>,
  *   openings: Array<{ subjectId: string, kind: 'door' | 'window', from: Point, to: Point }>,
+ *   beams: Array<{ subjectId: string, from: Point, to: Point }>,
  * }} RoomSide `normal`: into the room
  */
 
@@ -100,6 +103,11 @@ export function buildingPlanRoomSides(floor, room, gridSize) {
         from: pixels(opening.from),
         to: pixels(opening.to),
       })),
+      beams: sideBeams(floor, run, rows, frame).map((beam) => ({
+        ...beam,
+        from: pixels(beam.from),
+        to: pixels(beam.to),
+      })),
     };
   });
 }
@@ -159,4 +167,41 @@ function sideOpenings(floor, run, rows, frame) {
       }
   }
   return result.sort((a, b) => distance(frame.start, a.from) - distance(frame.start, b.from));
+}
+
+// The wall beams and bands of the side's rows, by the ends along the side of what those rows
+// cover of them; a beam over two of the side's rows is one stretch.
+function sideBeams(floor, run, rows, frame) {
+  const stretches = new Map();
+  for (const edge of run) {
+    const row = rows.get(edge.id);
+    if (!row) continue;
+    const { face, binding } = row;
+    const wall = (floor.walls || []).find((entry) => entry.id === face.wallId);
+    const segment = wall?.segments.find((entry) => entry.id === binding.segmentId);
+    if (!segment) continue;
+    const along = segmentFrame(segment.start, segment.end);
+    const [low, high] = binding.interval;
+    for (const beam of wall.beams || []) {
+      if (beam.segmentId !== segment.id) continue;
+      const from = Math.max(beam.offset, low);
+      const to = Math.min(beam.offset + beam.length, high);
+      if (!(to - from > 1e-6)) continue;
+      const ends = [at(along, from), at(along, to)].map((point) =>
+        dot(subtract(point, frame.start), frame.tangent)
+      );
+      const known = stretches.get(beam.id);
+      stretches.set(beam.id, [
+        Math.min(...ends, ...(known || [])),
+        Math.max(...ends, ...(known || [])),
+      ]);
+    }
+  }
+  return [...stretches.entries()]
+    .map(([subjectId, [low, high]]) => ({
+      subjectId,
+      from: add(frame.start, multiply(frame.tangent, low)),
+      to: add(frame.start, multiply(frame.tangent, high)),
+    }))
+    .sort((a, b) => distance(frame.start, a.from) - distance(frame.start, b.from));
 }

@@ -189,6 +189,44 @@ test('the example: the sides cover each room once; a side with two rows and a do
   t.controller.dispose();
 });
 
+test("a side lists its rows' wall beams and bands by their ends along it (D1c)", () => {
+  const t = plan(({ apply, wallOf }) => {
+    // A beam over the Shared door (x 3.45..4.65), and W3.2's own band from end to end.
+    apply({
+      type: 'create_opening',
+      kind: 'beam',
+      wallId: wallOf('W3').id,
+      offset: 0.35,
+      length: 1.2,
+      depth: 0.25,
+      underside: 2,
+    });
+    apply({
+      type: 'create_opening',
+      kind: 'beam',
+      wallId: wallOf('W3.2').id,
+      offset: 0,
+      length: 3,
+      depth: 0.3,
+      underside: 2.7,
+    });
+  });
+  const [bedroom, other] = t.snapshot.rooms;
+  const bottom = sideAt(bedroom, 5, 3, 0, 3);
+  const ends = (side) =>
+    side.beams.map((beam) => [along(side, beam.from), along(side, beam.to)].map(Math.round));
+  // From the Bedroom's right end: the beam 0.35..1.55 m in, W3.2's band 2..5 m.
+  assert.deepEqual(ends(bottom), [
+    [35, 155],
+    [200, 500],
+  ]);
+  const [beam] = t.floor.walls.find((wall) => wall.autoLabel === 'W3').beams;
+  assert.equal(bottom.beams[0].subjectId, beam.id);
+  // Room 2 sees the same beam from its own left end; W3.2 isn't on its side.
+  assert.deepEqual(ends(sideAt(other, 3, 3.2, 8, 3.2)), [[45, 165]]);
+  t.controller.dispose();
+});
+
 test("a cap goes to the row it continues: W3's after W3.2's drag down, the return's below it", () => {
   const t = plan(({ apply, faceOf }) =>
     apply({ type: 'resize_face', faceId: faceOf('W3.2'), distance: 0.752 })
