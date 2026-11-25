@@ -16,18 +16,20 @@ const plans = {
   },
   'the lintel band into the Shared door': (t) => {
     applied(t.answer('lintel'));
-    applied(t.floorValues({ floor_lintel_band_distance_from_floor: 1.9 }));
+    applied(t.keep(t.floorValues({ floor_lintel_band_distance_from_floor: 1.9 })));
   },
   'the lintel band into the ring beam, the sill band into a window': (t) => {
     for (const kind of ['ring', 'lintel', 'sill']) applied(t.answer(kind));
     applied(t.window('W1', 0.5, 0.9, 1.2, 'Window 1'));
     applied(
-      t.floorValues({
-        floor_lintel_band_distance_from_floor: 2.6,
-        floor_lintel_band_depth: 0.25,
-        floor_sill_band_distance_from_floor: 0.8,
-        floor_sill_band_depth: 0.2,
-      })
+      t.keep(
+        t.floorValues({
+          floor_lintel_band_distance_from_floor: 2.6,
+          floor_lintel_band_depth: 0.25,
+          floor_sill_band_distance_from_floor: 0.8,
+          floor_sill_band_depth: 0.2,
+        })
+      )
     );
   },
   'the lintel band above every wall, one row of its own': (t) => {

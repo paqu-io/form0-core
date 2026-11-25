@@ -16,6 +16,7 @@ import { createUIRequestRegistry } from '../utilities/ui-requests.js';
 import { reconcileWallLabels } from './wall-labels.js';
 import { assignBuildingPlanDefaultNames } from './default-names.js';
 import { sharedValueQuestion } from './shared-value-question.js';
+import { bandClashQuestion, fitOpenings, newBandClashes } from './band-clash-question.js';
 import {
   applySharedValueChoice,
   carriedJoinChoices,
@@ -607,6 +608,26 @@ export function createBuildingPlanSession({
       const issues = reconcilePrepared(prepared);
       if (issues.length) return response('conflict', issues);
       if (prepared.defaultConflicts.length) return commit(proposal);
+    }
+    // Bands run into openings by this edit (bands 4b): fit them, keep them, or cancel.
+    if (decision === 'fit' || decision === 'keep') prepared.bandAnswer = decision;
+    const clashes =
+      prepared.bandAnswer === 'keep' ? [] : newBandClashes(current, prepared.candidate);
+    if (clashes.length && !prepared.bandAnswer) {
+      const question = questions.create(
+        { ...bandClashQuestion(clashes), context: { revision, scopeId: prepared.scopeId } },
+        (reply) => ({ proposal, reply }),
+        () =>
+          !readOnly &&
+          revision === prepared.revision &&
+          prepared.generation === pendingGeneration &&
+          scopeExists(prepared.scopeId)
+      );
+      return response('pending', [], { snapshot: getSnapshot(), uiOperations: [question] });
+    }
+    if (clashes.length && prepared.bandAnswer === 'fit') {
+      fitOpenings(clashes);
+      prepared.changes = diffBuildingPlanSnapshots(current, prepared.candidate);
     }
     proposals.delete(proposal);
     questions.cancelAll();

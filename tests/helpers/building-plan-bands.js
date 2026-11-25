@@ -59,11 +59,18 @@ export function example() {
         return `${label} ${problem.code} ${names}`;
       })
       .sort();
+  // A band edit running bands into openings asks first (4b): "Keep them", as a test that wants
+  // the problems does.
+  const keep = (result) =>
+    result.status === 'pending'
+      ? session.resolveUIRequest(result.uiOperations[0].params.requestId, { value: 'keep' })
+      : result;
   return {
     f,
     session,
     floor,
     apply,
+    keep,
     wall,
     band,
     floorValues,

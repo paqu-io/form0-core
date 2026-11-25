@@ -24,7 +24,9 @@ test('an opening reaching into a band is a problem; touching or clear of it is n
   const t = example();
   applied(t.answer('lintel'));
   applied(
-    t.floorValues({ floor_lintel_band_distance_from_floor: 1.9, floor_lintel_band_depth: 0.25 })
+    t.keep(
+      t.floorValues({ floor_lintel_band_distance_from_floor: 1.9, floor_lintel_band_depth: 0.25 })
+    )
   );
   assert.deepEqual(t.listed(), ['W3 opening_into_band Shared door + Lintel band']);
   assert.equal(t.problems()[0].message, 'Shared door runs into Lintel band.');
@@ -42,7 +44,9 @@ test('an opening reaching into a band is a problem; touching or clear of it is n
   // reaches into it. The Shared door passes through it.
   applied(t.answer('sill'));
   assert.deepEqual(t.listed(), []);
-  applied(t.floorValues({ floor_sill_band_distance_from_floor: 0.8, floor_sill_band_depth: 0.2 }));
+  applied(
+    t.keep(t.floorValues({ floor_sill_band_distance_from_floor: 0.8, floor_sill_band_depth: 0.2 }))
+  );
   assert.deepEqual(t.listed(), ['W1 opening_into_band Window 1 + Sill band']);
 });
 
@@ -123,7 +127,7 @@ function canvas(t) {
 test("the canvas snapshot lists the floor's problems with the rows that show them", () => {
   const t = example();
   applied(t.answer('lintel'));
-  applied(t.floorValues({ floor_lintel_band_distance_from_floor: 1.9 }));
+  applied(t.keep(t.floorValues({ floor_lintel_band_distance_from_floor: 1.9 })));
   const snapshot = canvas(t);
   assert.equal(snapshot.problems.length, 1);
   const [door] = snapshot.problems;
