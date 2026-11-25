@@ -36,6 +36,7 @@ import { buildingPlanCutPlacement, buildingPlanJoinPlacement } from './cut-place
 import { buildingPlanFloorTitle } from './row-title.js';
 import { buildingPlanFloorsByLevel } from './floor-order.js';
 import { buildingPlanFloorBelow } from './floor-below.js';
+import { buildingPlanProblems, problemRowPaths } from './plan-problems.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -93,6 +94,7 @@ export function buildingPlanCanvasSnapshot({
     physicalOpenings: [],
     editingCuts: [],
     corners: [],
+    problems: [],
   };
   const pixels = (point) => ({ x: point.x * gridSize, y: point.y * gridSize });
   const floorRows = record.repeatable?.[key(meta, 'floors')] || [];
@@ -351,6 +353,8 @@ export function buildingPlanCanvasSnapshot({
         }
       }
     }
+    // Problems to fix before saving (bands unit 4a), with the rows that show them.
+    output.problems = problemRowPaths(buildingPlanProblems(floor), { meta, record, floor });
   }
   // The floor below, drawn under this one (F2); a preview passes the one it has (an edit of this
   // floor doesn't change it).

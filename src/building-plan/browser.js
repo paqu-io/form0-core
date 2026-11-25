@@ -35,6 +35,7 @@ export {
 
 export { settleBuildingPlanQuestions } from './questions.js';
 export { buildingPlanIssueFocus } from './issue-focus.js';
+export { getBuildingPlanProblems } from './plan-problems.js';
 export { buildingPlanFloorTitle, buildingPlanRowTitle } from './row-title.js';
 export { buildingPlanFloorsByLevel } from './floor-order.js';
 export { createBuildingPlanPresentation, normalizeBuildingPlanLocale } from './presentation.js';

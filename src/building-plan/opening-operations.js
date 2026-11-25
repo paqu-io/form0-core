@@ -1,5 +1,5 @@
 import { copyBuildingPlanData as copy, findWall, own, planIssue } from './model.js';
-import { wallChildForType, wallChildren } from './wall-children.js';
+import { nameOf, wallChildForType, wallChildren } from './wall-children.js';
 import { BAND_OWN_VALUES, bandKind, bandOf, withOwnValue } from './band-rows.js';
 
 const EDITABLE = ['offset', 'width', 'height', 'sillHeight', 'segmentId', 'values'];
@@ -73,8 +73,26 @@ export function applyOpeningOperation(floor, operation, createId) {
     if (band) bandEdit(band, opening, operation);
     for (const key of [...EDITABLE, ...(opening.type === 'beam' ? BEAM_EDITABLE : [])])
       if (own(operation, key)) opening[key] = copy(operation[key]);
+    if (band && (own(operation, 'underside') || own(operation, 'depth')))
+      bandWithinWall(band, opening, wall);
   }
   return {};
+}
+
+/**
+ * A band row's underside or depth typed beyond its wall is refused, as a beam added by hand
+ * (bands unit 4a); from the floor's values or an opening pushing it, it is a problem to fix
+ * before saving (`plan-problems.js`).
+ */
+function bandWithinWall(band, row, wall) {
+  const height = wall.properties?.wall_height;
+  const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+  if (!finite(height) || !finite(row.depth)) return;
+  const underside = band.kind === 'ring' ? height - row.depth : row.underside;
+  if (!finite(underside)) return;
+  if (underside + row.depth > height + 1e-6)
+    refuse('beam_above_wall', `${nameOf(row)} would stand above its wall.`);
+  if (underside < -1e-6) refuse('beam_below_floor', `${nameOf(row)} would go below the floor.`);
 }
 
 function bandEdit(band, row, operation) {
