@@ -4,6 +4,7 @@ import { writeBuildingPlanRecord } from '../src/index.js';
 import { buildingPlanCanvasSnapshot } from '../src/building-plan/canvas-controller.js';
 import { buildingPlanFrontView } from '../src/building-plan/front-view.js';
 import { buildingPlanRoomSides } from '../src/building-plan/room-sides.js';
+import { pointInPolygon, roomBounds } from '../src/building-plan/geometry.js';
 import { newFreeWallFace, newFreeWallWidth } from '../src/building-plan/free-wall-lines.js';
 import { applied, example } from './helpers/building-plan-bands.js';
 
@@ -162,6 +163,7 @@ function ownLength(floor, room, face) {
 
 function assertViews(t, plan) {
   const floor = t.floor();
+  const thickest = Math.max(...floor.walls.map((wall) => wall.properties.wall_thickness || 0));
   const record = writeBuildingPlanRecord({ meta: t.f.meta, plan: t.session.getSnapshot() });
   const canvas = buildingPlanCanvasSnapshot({
     meta: t.f.meta,
@@ -216,6 +218,22 @@ function assertViews(t, plan) {
         assert.ok(
           v.levels.every((level) => level < own.drawnHeight),
           `${name}: above its levels`
+        );
+      const { map } = v;
+      const box = roomBounds(room);
+      const onFloor = (point) => pointInPolygon(point, room.vertices, true);
+      assert.ok(onFloor(map.eye) && map.cone.length >= 3, `${name}: the eye and cone`);
+      assert.ok(map.cone.every(onFloor), `${name}: the cone on the floor`);
+      assert.deepEqual(map.zero, map.shown[0][0], `${name}: from its 0 end`);
+      const drawn = map.shown.reduce((sum, [a, b]) => sum + Math.hypot(b.x - a.x, b.y - a.y), 0);
+      assert.ok(near(drawn, shown), `${name}: the row shown whole on the map`);
+      for (const point of map.walls.flat())
+        assert.ok(
+          point.x >= box.x - thickest - EPS &&
+            point.x <= box.x + box.width + thickest + EPS &&
+            point.y >= box.y - thickest - EPS &&
+            point.y <= box.y + box.height + thickest + EPS,
+          `${name}: walls kept to the room`
         );
       // What the canvas draws on this row is in its view, as long along it.
       for (const opening of [...canvas.doors, ...canvas.windows]) {

@@ -5,6 +5,7 @@ import { at, cleanLength as clean, segmentFrame } from './geometry.js';
 import { alongStrip, freeParts, sideParts } from './front-view-strip.js';
 import { frontViewProblems } from './front-view-problems.js';
 import { frontViewStructure, structureTops } from './front-view-structure.js';
+import { frontViewMap } from './front-view-map.js';
 
 /**
  * The front view of one wall row (A1, decided 2026-11-25): what the read-only Front view draws,
@@ -22,7 +23,8 @@ import { frontViewStructure, structureTops } from './front-view-structure.js';
  * - `levels`: the shown row's, for its chain (the floor, its top when known, each beam's
  *   underside and top, each opening's sill and head);
  * - `fit`: the room's, for one scale across its rows: its longest row and tallest wall as drawn
- *   (its columns and beams included).
+ *   (its columns and beams included);
+ * - `map`: the room in plan for the view's mini-map (2026-11-26, `front-view-map.js`).
  *
  * A wall of unknown height is drawn to the room's highest level plus 0.5 m, at least 1 m: every
  * such wall of the room to the same height (decided 2026-11-25).
@@ -92,6 +94,7 @@ export function buildingPlanFrontView(floor, faceId) {
     problems: frontViewProblems(floor, { openings, beams }, walls),
     levels: levelsOf(heightOf(walls.get(face.wallId)), [...openings, ...beams], faceId),
     fit: { length: clean(fitLength), height: heights.fit },
+    map: frontViewMap(floor, room, face, parts),
   };
 }
 

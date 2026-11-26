@@ -32,7 +32,7 @@ const rect = (frame, from, to, half) => [
   at(frame, from, -half),
 ];
 
-function halfPlane(points, start, end, side) {
+export function halfPlane(points, start, end, side) {
   const result = [];
   const direction = subtract(end, start);
   const signed = (p) => side * cross(direction, subtract(p, start));
