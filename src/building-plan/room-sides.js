@@ -30,11 +30,12 @@ import {
 /** @typedef {{ x: number, y: number }} Point */
 /**
  * @typedef {{
- *   start: Point, end: Point, normal: Point,
+ *   start: Point, end: Point, normal: Point, edgeIds: string[],
  *   pieces: Array<{ from: Point, to: Point, faceId: string | null, cap: boolean }>,
  *   openings: Array<{ subjectId: string, kind: 'door' | 'window', from: Point, to: Point }>,
  *   beams: Array<{ subjectId: string, from: Point, to: Point }>,
- * }} RoomSide `normal`: into the room
+ * }} RoomSide `normal`: into the room; `edgeIds`: the room's edges along it (a row's bindings
+ *   name theirs), for the front view (A1)
  */
 
 // Edges whose directions differ by less than this are in line (as the snapshot's corners).
@@ -97,6 +98,7 @@ export function buildingPlanRoomSides(floor, room, gridSize) {
       start: pixels(start),
       end: pixels(end),
       normal: { x: frame.normal.x * sign + 0, y: frame.normal.y * sign + 0 },
+      edgeIds: run.map((edge) => edge.id),
       pieces: pieces.map((piece) => ({ ...piece, from: pixels(piece.from), to: pixels(piece.to) })),
       openings: sideOpenings(floor, run, rows, frame).map((opening) => ({
         ...opening,

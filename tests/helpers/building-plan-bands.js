@@ -7,7 +7,8 @@ import { createBuildingPlanExample } from '../../examples/building-plan/create-e
 
 const yes = { choice: [{ value: 'yes', label: 'y' }], other: [] };
 
-export function example() {
+/** @param {object} [editingPolicy] the session's, for edits that would ask (a wall dragged) */
+export function example(editingPolicy) {
   const f = createBuildingPlanExample();
   let serial = 0;
   const session = createBuildingPlanSession({
@@ -15,6 +16,7 @@ export function example() {
     properties: f.meta.properties,
     createId: () => `c-${++serial}`,
     derivedCommands: true,
+    ...(editingPolicy ? { editingPolicy } : {}),
   });
   const floor = () => session.getSnapshot().floors[0];
   const apply = (operation) => session.apply({ floorId: f.floorId, ...operation });

@@ -39,6 +39,8 @@ import { buildingPlanFloorBelow } from './floor-below.js';
 import { buildingPlanProblems, problemRowPaths } from './plan-problems.js';
 import { newOpeningHeights } from './opening-heights.js';
 import { canvasWallBeams } from './canvas-wall-beams.js';
+import { buildingPlanFrontView } from './front-view.js';
+import { frontViewWithRefs } from './front-view-refs.js';
 
 const COLORS = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 const label = (value, fallback) =>
@@ -752,6 +754,16 @@ export class BuildingPlanCanvasController {
   }
   fieldState(path, name) {
     return getBuildingPlanFieldState(this.meta, this.record, this.semanticSnapshot, path, name);
+  }
+  /**
+   * The front view of a wall row on the floor shown (A1, `front-view.js`), computed when asked,
+   * each part with its canvas element (`front-view-refs.js`); null when the floor has no such row.
+   * @param {string} faceId
+   */
+  frontView(faceId) {
+    const floor = this.semanticSnapshot?.floors[this.activeFloorIndex];
+    const view = floor ? buildingPlanFrontView(floor, faceId) : null;
+    return view && frontViewWithRefs(view, this);
   }
   /**
    * Whether drawing and dragging pull to the floor below (F3): on by default; a host turns it off
