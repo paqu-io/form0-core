@@ -230,6 +230,12 @@ function assertViews(t, plan) {
       assert.deepEqual(map.zero, map.shown[0][0], `${name}: from its 0 end`);
       const drawn = map.shown.reduce((sum, [a, b]) => sum + Math.hypot(b.x - a.x, b.y - a.y), 0);
       assert.ok(near(drawn, shown), `${name}: the row shown whole on the map`);
+      assert.deepEqual(
+        map.rows.map((row) => row.faceId),
+        room.faces.map((entry) => entry.id),
+        `${name}: every row on the map`
+      );
+      assert.deepEqual(map.rows.find((row) => row.faceId === face.id).segments, map.shown, name);
       for (const point of map.walls.flat())
         assert.ok(
           point.x >= box.x - thickest - EPS &&

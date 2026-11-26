@@ -77,8 +77,10 @@ export function buildingPlanFrontView(floor, faceId) {
   const drawnHeight = (id) =>
     pieces.find((piece) => piece.faceId === id)?.drawnHeight ?? heights.unknown;
   const { columns, roomBeams } = frontViewStructure(room, parts, drawnHeight);
+  // Every row's strip: for the room's fit and each row's face on the map (A3).
+  const strips = new Map(room.faces.map((entry) => [entry.id, stripOf(entry) || []]));
   const fitLength = Math.max(
-    ...room.faces.map((entry) => (stripOf(entry) || []).reduce((sum, part) => sum + part.length, 0))
+    ...[...strips.values()].map((strip) => strip.reduce((sum, part) => sum + part.length, 0))
   );
   return {
     roomId: room.id,
@@ -94,7 +96,7 @@ export function buildingPlanFrontView(floor, faceId) {
     problems: frontViewProblems(floor, { openings, beams }, walls),
     levels: levelsOf(heightOf(walls.get(face.wallId)), [...openings, ...beams], faceId),
     fit: { length: clean(fitLength), height: heights.fit },
-    map: frontViewMap(floor, room, face, parts),
+    map: frontViewMap(floor, room, face, strips),
   };
 }
 

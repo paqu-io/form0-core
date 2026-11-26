@@ -25,6 +25,8 @@ import {
  *   sides is seen from its longest part, a free wall from its row's side;
  * - `sideCone`: from the same eye to the ends of what Front shows (the side's, unfolded), when
  *   the side has other rows (2026-11-26, the hand test: W3.2 is in view beside W3); else empty;
+ * - `rows`: every row of the room with its face, as its own view's `shown` (A3, 2026-11-26: a
+ *   click on a wall's face shows it, in a room's entry);
  * - `bounds`: what the map shows (the outline, walls and lines).
  */
 
@@ -39,15 +41,18 @@ const inward = (part) => ({ x: -part.right.y + 0, y: part.right.x + 0 });
  * @param {object} floor the plan's floor
  * @param {object} room the shown row's room
  * @param {object} face the shown row
- * @param {Array<object>} parts its strip (`front-view-strip.js`), laid out
+ * @param {Map<string, Array<object>>} strips every row's strip (`front-view-strip.js`), laid
+ *   out, by its id
  */
-export function frontViewMap(floor, room, face, parts) {
+export function frontViewMap(floor, room, face, strips) {
   const { walls, lines, footprints } = roomMapWalls(floor, room);
   const outline = room.vertices.map(({ x, y }) => ({ x, y }));
-  const segments = (keep) =>
-    parts.flatMap((part) =>
+  const parts = strips.get(face.id);
+  const segmentsOf = (strip, keep) =>
+    strip.flatMap((part) =>
       part.pieces.filter(keep).map((piece) => [toPlan(part, piece.from), toPlan(part, piece.to)])
     );
+  const segments = (keep) => segmentsOf(parts, keep);
   const runs = parts
     .map((part) => {
       const own = part.pieces.filter((piece) => piece.faceId === face.id);
@@ -82,6 +87,10 @@ export function frontViewMap(floor, room, face, parts) {
     eye,
     cone: coneTo(zero, end),
     sideCone: whole ? [] : coneTo(toPlan(parts[0], 0), toPlan(last, last.x0 + last.length)),
+    rows: [...strips].map(([faceId, strip]) => ({
+      faceId,
+      segments: segmentsOf(strip, (piece) => piece.faceId === faceId),
+    })),
     bounds: boundsOf([...outline, ...walls.flat(), ...lines.flat()]),
   };
 }

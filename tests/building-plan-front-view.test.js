@@ -303,8 +303,9 @@ test('a row on two sides is unfolded; an outline wound the other way reads the s
 });
 
 // The web opens and marks a part by its canvas element (A2, 2026-11-26): `ref`, the snapshot's
-// { collection, id, path } for the piece's wall row, the door or window, the wall beam or band.
-const withoutRefs = (v) => ({
+// { collection, id, path } for the piece's wall row, the door or window, the wall beam or band;
+// and the room's rows in its Walls list's order (A3, `building-plan-front-view-rows.test.js`).
+const withoutRefs = ({ rows, ...v }) => ({
   ...v,
   pieces: v.pieces.map(({ ref, ...rest }) => rest),
   openings: v.openings.map(({ ref, ...rest }) => rest),
