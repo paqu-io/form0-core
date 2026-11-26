@@ -4,7 +4,7 @@ import { nameOf } from './wall-children.js';
 import { at, cleanLength as clean, polygonArea, segmentFrame } from './geometry.js';
 import { alongStrip, freeParts, sideParts } from './front-view-strip.js';
 import { frontViewProblems } from './front-view-problems.js';
-import { frontViewStructure, structureTops } from './front-view-structure.js';
+import { frontViewFreeWalls, frontViewStructure, structureTops } from './front-view-structure.js';
 import { frontViewMap } from './front-view-map.js';
 
 /**
@@ -17,8 +17,8 @@ import { frontViewMap } from './front-view-map.js';
  *   a row on several sides is unfolded, `folds` where the sides meet;
  * - `openings`, `beams` (wall beams and bands): those of every row on the side, by their ends
  *   along it and their heights from the floor; one of unknown height isn't drawn;
- * - `columns`, `roomBeams`: the room's columns and beams against the side (2026-11-26,
- *   `front-view-structure.js`);
+ * - `columns`, `roomBeams`, `freeWalls`: the room's columns, beams and free walls against the
+ *   side (2026-11-26, `front-view-structure.js`);
  * - `problems`: where the floor's problems clash in this view;
  * - `levels`: the shown row's, for its chain (the floor, its top when known, each beam's
  *   underside and top, each opening's sill and head);
@@ -100,6 +100,7 @@ export function buildingPlanFrontView(floor, faceId) {
     beams,
     columns,
     roomBeams,
+    freeWalls: frontViewFreeWalls(floor, room, face, parts, drawnHeight),
     problems: frontViewProblems(floor, { openings, beams }, walls),
     levels: levelsOf(heightOf(walls.get(face.wallId)), [...openings, ...beams], faceId),
     fit: { length: clean(fitLength), height: heights.fit },

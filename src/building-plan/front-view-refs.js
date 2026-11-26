@@ -60,5 +60,9 @@ export function frontViewWithRefs(view, elements) {
       ...beam,
       ref: ref('beams', (entry) => entry.id === beam.subjectId),
     })),
+    freeWalls: (view.freeWalls || []).map((wall) => ({
+      ...wall,
+      ref: ref('walls', (entry) => entry.id === wall.rowId),
+    })),
   };
 }

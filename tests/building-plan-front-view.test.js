@@ -312,6 +312,7 @@ const withoutRefs = ({ rows, ...v }) => ({
   beams: v.beams.map(({ ref, ...rest }) => rest),
   columns: v.columns.map(({ ref, ...rest }) => rest),
   roomBeams: v.roomBeams.map(({ ref, ...rest }) => rest),
+  freeWalls: v.freeWalls.map(({ ref, ...rest }) => rest),
 });
 
 test('the canvas controller gives the front view of a wall row, each part with its element', () => {

@@ -1,6 +1,7 @@
 import { beamOutline } from './beam-body.js';
 import { cleanLength as clean, dot, subtract } from './geometry.js';
 import { alongStrip } from './front-view-strip.js';
+import { freeWallSegmentBodies } from './free-wall-body.js';
 
 /**
  * The columns and room beams a wall row's front view (A1) draws (decided 2026-11-26): its room's,
@@ -105,6 +106,49 @@ export function frontViewStructure(room, parts, drawnHeight) {
   }
   const byPlace = (a, b) => a.from - b.from || a.bottom - b.bottom;
   return { columns: columns.sort(byPlace), roomBeams: roomBeams.sort(byPlace) };
+}
+
+/**
+ * The room's free walls against the strip (asked in A3's hand test, 2026-11-26), as its columns:
+ * a free wall whose body touches the side's face (meeting it, set into it) runs from the floor to
+ * its height (unknown: its wall's drawn height, `height` null), by its stretch along the strip and
+ * the row it stands against (`faceId`), `endOn` when it meets the wall across; `rowId` its own row.
+ * The shown row's own wall isn't one.
+ * @param {object} floor
+ * @param {object} room
+ * @param {object} face the shown row
+ * @param {Array<object>} parts the strip's
+ * @param {(faceId: string | null) => number} drawnHeight
+ */
+export function frontViewFreeWalls(floor, room, face, parts, drawnHeight) {
+  const rows = (room.faces || []).filter((entry) => entry.freePath && entry.wallId !== face.wallId);
+  if (!rows.length) return [];
+  const bodies = freeWallSegmentBodies(floor);
+  const found = [];
+  for (const row of rows) {
+    const wall = (floor.walls || []).find((entry) => entry.id === row.wallId);
+    for (const segment of wall?.segments || []) {
+      const body = bodies.get(`${wall.id}:${segment.id}`);
+      const hit = body && onStrip(parts, body);
+      if (!hit) continue;
+      const height = heightOf(wall, 'wall_height');
+      const run = subtract(segment.end, segment.start);
+      const along = Math.abs(dot(run, hit.part.right)) / Math.hypot(run.x, run.y);
+      found.push({
+        subjectId: wall.id,
+        rowId: row.id,
+        faceId: hit.faceId,
+        name: wall.values?.wall_label || wall.autoLabel || '',
+        ...hit.stretch,
+        bottom: 0,
+        top: clean(height ?? drawnHeight(hit.faceId)),
+        height,
+        endOn: along < PARALLEL,
+      });
+      break;
+    }
+  }
+  return found.sort((a, b) => a.from - b.from);
 }
 
 /** The room's columns' known heights and room beams' tops, for its highest level. */

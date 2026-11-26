@@ -137,6 +137,23 @@ const plans = {
       height: 0.25,
     });
   },
+  'a free wall meeting W1': (t) => {
+    const room = t.floor().rooms[0];
+    applied(
+      t.apply({
+        type: 'create_wall',
+        roomId: room.id,
+        vertices: newFreeWallFace(
+          [
+            { x: 1, y: 0 },
+            { x: 1, y: 1.5 },
+          ],
+          newFreeWallWidth(t.floor(), room.id, t.f.meta.properties)
+        ),
+        values: {},
+      })
+    );
+  },
   'unknown heights, bands and a free wall': (t) => {
     bands(t);
     freeWall(t);
@@ -193,7 +210,13 @@ function assertViews(t, plan) {
       });
       assert.ok(near(shown, ownLength(floor, room, face)), `${name}: the whole row shown`);
       v.folds.forEach((x, k) => assert.ok(x > (v.folds[k - 1] ?? 0) && x < v.length, name));
-      for (const child of [...v.openings, ...v.beams, ...v.columns, ...v.roomBeams]) {
+      for (const child of [
+        ...v.openings,
+        ...v.beams,
+        ...v.columns,
+        ...v.roomBeams,
+        ...v.freeWalls,
+      ]) {
         assert.ok(child.from < child.to && child.bottom < child.top, `${name}: ${child.subjectId}`);
         assert.ok(
           v.pieces.some(
@@ -206,7 +229,8 @@ function assertViews(t, plan) {
         );
         assert.ok(child.top <= v.fit.height + EPS, `${name}: ${child.subjectId} fits`);
       }
-      v.columns.forEach((column) => assert.equal(column.bottom, 0, `${name}: from the floor`));
+      for (const column of [...v.columns, ...v.freeWalls])
+        assert.equal(column.bottom, 0, `${name}: from the floor`);
       // From the floor (a band below it, a problem, starts lower).
       assert.ok(v.levels.includes(0) && v.levels[0] <= 0, name);
       v.levels.forEach(
