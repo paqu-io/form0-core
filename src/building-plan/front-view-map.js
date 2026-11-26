@@ -23,6 +23,8 @@ import {
  *   half its length in but at most 80% of the way to the first wall ahead (the room's outline,
  *   its free walls), the cone from there to the row's ends clipped to the floor; a row on several
  *   sides is seen from its longest part, a free wall from its row's side;
+ * - `sideCone`: from the same eye to the ends of what Front shows (the side's, unfolded), when
+ *   the side has other rows (2026-11-26, the hand test: W3.2 is in view beside W3); else empty;
  * - `bounds`: what the map shows (the outline, walls and lines).
  */
 
@@ -63,11 +65,13 @@ export function frontViewMap(floor, room, face, parts) {
   const eye = cleanPoint(
     add(middle, multiply(normal, Math.min((longest.to - longest.from) / 2, AHEAD * free)))
   );
-  const triangle = [eye, zero, end];
-  const cone =
-    Math.abs(polygonArea(triangle)) > GEOMETRY_EPSILON
-      ? clipToConvex(outline, triangle).map(cleanPoint)
+  /** The floor seen from the eye between two points. */
+  const coneTo = (a, b) =>
+    Math.abs(polygonArea([eye, a, b])) > GEOMETRY_EPSILON
+      ? clipToConvex(outline, [eye, a, b]).map(cleanPoint)
       : [];
+  const last = parts.at(-1);
+  const whole = parts.every((part) => part.pieces.every((piece) => piece.faceId === face.id));
   return {
     outline,
     walls,
@@ -76,7 +80,8 @@ export function frontViewMap(floor, room, face, parts) {
     others: segments((piece) => piece.faceId && piece.faceId !== face.id),
     zero,
     eye,
-    cone,
+    cone: coneTo(zero, end),
+    sideCone: whole ? [] : coneTo(toPlan(parts[0], 0), toPlan(last, last.x0 + last.length)),
     bounds: boundsOf([...outline, ...walls.flat(), ...lines.flat()]),
   };
 }

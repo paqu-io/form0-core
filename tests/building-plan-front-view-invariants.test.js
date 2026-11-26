@@ -224,6 +224,9 @@ function assertViews(t, plan) {
       const onFloor = (point) => pointInPolygon(point, room.vertices, true);
       assert.ok(onFloor(map.eye) && map.cone.length >= 3, `${name}: the eye and cone`);
       assert.ok(map.cone.every(onFloor), `${name}: the cone on the floor`);
+      assert.ok(map.sideCone.every(onFloor), `${name}: the side cone on the floor`);
+      const whole = v.pieces.every((piece) => piece.shown);
+      assert.equal(map.sideCone.length === 0, whole, `${name}: a side cone for other rows`);
       assert.deepEqual(map.zero, map.shown[0][0], `${name}: from its 0 end`);
       const drawn = map.shown.reduce((sum, [a, b]) => sum + Math.hypot(b.x - a.x, b.y - a.y), 0);
       assert.ok(near(drawn, shown), `${name}: the row shown whole on the map`);

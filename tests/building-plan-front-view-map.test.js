@@ -10,7 +10,8 @@ import { applied, example } from './helpers/building-plan-bands.js';
 // as gaps, neighbours left out); the shown row's face, the side's other rows; a ring at the row's
 // 0 end (its left end, WB3); a cone from in front of the row's middle, along its inward normal,
 // half its length in but at most 80% of the way to the first wall ahead (free walls count),
-// to the row's ends, clipped to the room's floor. The example's Bedroom is 0..5 × 0..3 m, walls
+// to the row's ends, clipped to the room's floor; from the same eye, a side cone to the ends of
+// what Front shows when the side has other rows (asked in the hand test, 2026-11-26). The example's Bedroom is 0..5 × 0..3 m, walls
 // 0.2 m outside it; Room 2 is 3..8 × 3.2..6.2, the Shared door on W3 at x 3.6..4.5.
 
 const faceOf = (t, label, roomIndex = 0) =>
@@ -33,6 +34,7 @@ test("W1 from the Bedroom: the room's walls, W1 shown, seen from 80% of the way 
   // Half W1's length would be 2.5 m in; W3 and W3.2 are 3 m ahead, so 2.4.
   assert.deepEqual(map.eye, p(2.5, 2.4));
   assert.ok(Math.abs(area(map.cone) - 6) < 1e-9, 'the whole triangle, inside the floor');
+  assert.deepEqual(map.sideCone, [], 'W1 is its whole side');
   assert.ok(map.cone.every((point) => inside(map, point)));
   // The Bedroom's walls with their corners, the Shared door a gap; Room 2's walls left out, the
   // corner its W3.1 shares with W2 drawn as the Bedroom's.
@@ -53,6 +55,11 @@ test('W3 shares its side with W3.2: W3 shown, W3.2 the other row, half W3 in; fr
   assert.deepEqual(map.zero, p(5, 3));
   assert.deepEqual(map.eye, p(4, 2), 'half its 2 m in: less than 80% of the 3 m to W1');
   assert.ok(Math.abs(area(map.cone) - 1) < 1e-9);
+  // Front shows W3.2 beside it: the side cone from the same eye to the side's ends, x 5 and 0.
+  assert.ok(Math.abs(area(map.sideCone) - 2.5) < 1e-9, `side cone ${area(map.sideCone)}`);
+  for (const end of [p(5, 3), p(0, 3)])
+    assert.ok(map.sideCone.some((point) => point.x === end.x && point.y === end.y));
+  assert.ok(map.sideCone.every((point) => inside(map, point)));
   // Room 2 sees W3 from its own side, from x 3; its map has its own walls, not the Bedroom's.
   const other = mapOf(t, 'W3', 1);
   assert.deepEqual(other.shown, [[p(3, 3.2), p(5, 3.2)]]);
@@ -83,6 +90,7 @@ test("a free wall: seen from its row's side; it counts as the first wall ahead o
   assert.deepEqual(map.shown, [[p(1, 1.6), p(3, 1.6)]]);
   assert.deepEqual(map.zero, p(1, 1.6));
   assert.deepEqual(map.eye, p(2, 2.6), 'half its 2 m: less than 80% of the 1.4 m ahead');
+  assert.deepEqual(map.sideCone, [], 'Front shows the free wall alone');
   assert.ok(material(map, p(2, 1.5)), 'the free wall drawn as a wall');
   // W1's middle looks at the free wall 1.4 m ahead: 80% of it, 1.12 m in.
   assert.deepEqual(mapOf(t, 'W1').eye, p(2.5, 1.12));
