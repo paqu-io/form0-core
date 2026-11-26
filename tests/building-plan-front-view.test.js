@@ -10,7 +10,8 @@ import { applied, example } from './helpers/building-plan-bands.js';
 // side's left end as seen from inside the room (a free wall: from its row's side), the lengths its
 // fields count (WB3). The example's Bedroom is 0..5 × 0..3 m: W1 along the top, W3 (x 5..3, the
 // Shared door 0.5 m in from x 5) and W3.2 (x 3..0) along the bottom; Room 2's top is W3 then W3.1.
-// The floor's bands at their defaults: ring 2.70 + 0.30, lintel 2.10 + 0.30, sill 0.60 + 0.30.
+// The floor's bands at their defaults: ring 2.70 + 0.30, lintel 2.10 + 0.15, sill 0.75 + 0.15 (the
+// depths until typed, 150 mm for lintel and sill since 2026-11-26).
 
 const faceOf = (t, label, roomIndex = 0) =>
   t.floor().rooms[roomIndex].faces.find((face) => face.wallId === t.wall(label).id).id;
@@ -43,12 +44,12 @@ test("W1 from the Bedroom: its bands, a window between them, the shown wall's le
     [['window', 'W1 window', faceOf(t, 'W1'), 1.9, 2.9, 0.9, 2.1]]
   );
   assert.deepEqual(beams(v), [
-    ['lintel', 0, 5, 2.1, 2.4],
+    ['lintel', 0, 5, 2.1, 2.25],
     ['ring', 0, 5, 2.7, 3],
-    ['sill', 0, 5, 0.6, 0.9],
+    ['sill', 0, 5, 0.75, 0.9],
   ]);
   // The floor, each band's underside and top, the window's sill and head (shared), the top.
-  assert.deepEqual(v.levels, [0, 0.6, 0.9, 2.1, 2.4, 2.7, 3]);
+  assert.deepEqual(v.levels, [0, 0.75, 0.9, 2.1, 2.25, 2.7, 3]);
   assert.deepEqual(v.problems, []);
   assert.deepEqual(v.fit, { length: 5, height: 3 });
 });
@@ -115,9 +116,9 @@ test("a free wall from its row's side: its own length, its bands and window", ()
     [[0.5, 1.5]]
   );
   assert.deepEqual(beams(v), [
-    ['lintel', 0, 2, 2.1, 2.4],
+    ['lintel', 0, 2, 2.1, 2.25],
     ['ring', 0, 2, 2.7, 3],
-    ['sill', 0, 2, 0.6, 0.9],
+    ['sill', 0, 2, 0.75, 0.9],
   ]);
   assert.deepEqual(v.fit, { length: 5, height: 3 }, 'the room fits as before');
 });
@@ -128,22 +129,22 @@ test("walls of unknown height: drawn to the room's highest level + 0.5 m, no top
   applied(t.floorValues({ floor_height: null }));
   const w4 = view(t, 'W4');
   assert.equal(w4.pieces[0].height, null);
-  // The lintel band's top, 2.40, is the Bedroom's highest level.
-  assert.equal(w4.pieces[0].drawnHeight, 2.9);
+  // The lintel band's top, 2.25, is the Bedroom's highest level.
+  assert.equal(w4.pieces[0].drawnHeight, 2.75);
   assert.deepEqual(beams(w4), [
-    ['lintel', 0, 3, 2.1, 2.4],
-    ['sill', 0, 3, 0.6, 0.9],
+    ['lintel', 0, 3, 2.1, 2.25],
+    ['sill', 0, 3, 0.75, 0.9],
   ]);
-  assert.deepEqual(w4.levels, [0, 0.6, 0.9, 2.1, 2.4], 'no top level');
-  assert.deepEqual(w4.fit, { length: 5, height: 2.9 });
+  assert.deepEqual(w4.levels, [0, 0.75, 0.9, 2.1, 2.25], 'no top level');
+  assert.deepEqual(w4.fit, { length: 5, height: 2.75 });
   // W1's lintel band raised: every unknown wall of the room is drawn to the new highest level.
   applied(t.edit('W1', 'lintel', { underside: 2.45 }));
   for (const label of ['W1', 'W2', 'W3', 'W4'])
     assert.ok(
-      view(t, label).pieces.every((piece) => piece.drawnHeight === 3.25),
+      view(t, label).pieces.every((piece) => piece.drawnHeight === 3.1),
       label
     );
-  assert.equal(view(t, 'W4').fit.height, 3.25);
+  assert.equal(view(t, 'W4').fit.height, 3.1);
   // At least 1 m: a room of its own with nothing on its walls.
   const bare = example();
   applied(bare.floorValues({ floor_height: null }));
@@ -175,7 +176,7 @@ test('a problem is the overlap: the window and the lintel band; a band above its
       from: 0.5,
       to: 1.5,
       bottom: 1.9,
-      top: 2.1,
+      top: 2.05,
     },
   ]);
   // The lintel band above every wall but W1: W2's part above its top, and the room's fit over it.
@@ -186,9 +187,9 @@ test('a problem is the overlap: the window and the lintel band; a band above its
   const w2 = view(above, 'W2');
   assert.deepEqual(
     w2.problems.map((p) => [p.code, p.from, p.to, p.bottom, p.top]),
-    [['band_above_wall', 0, 3, 3, 3.7]]
+    [['band_above_wall', 0, 3, 3, 3.55]]
   );
-  assert.equal(w2.fit.height, 3.7);
+  assert.equal(w2.fit.height, 3.55);
   assert.deepEqual(view(above, 'W1').problems, []);
 });
 

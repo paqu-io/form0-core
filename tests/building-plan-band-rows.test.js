@@ -105,6 +105,17 @@ test("a Yes gives every wall one band row over its whole length, at the floor's 
   assert.equal(t.wall('W1').beams[1].underside, 2.85);
 });
 
+// Until the floor's depths are typed (decided 2026-11-26): lintel and sill bands 150 mm deep, the
+// sill band's top at a new window's sill (0.9 m); the ring beam, as a beam added by hand, 300 mm.
+test("without the floor's depths: lintel and sill bands 150 mm deep, the ring beam 300 mm", () => {
+  const t = example();
+  for (const kind of ['ring', 'lintel', 'sill']) applied(t.floorAnswer(kind, yes));
+  const band = (kind) => t.wall('W1').beams.find((beam) => kindOf(beam) === kind);
+  assert.deepEqual([band('ring').underside, band('ring').depth], [2.7, 0.3]);
+  assert.deepEqual([band('lintel').underside, band('lintel').depth], [2.1, 0.15]);
+  assert.deepEqual([band('sill').underside, band('sill').depth], [0.75, 0.15]);
+});
+
 test("a wall's No removes its row, Reset brings it back; removing the row answers No", () => {
   const t = example();
   applied(t.floorAnswer('lintel', yes));
@@ -157,10 +168,10 @@ test("a split's pieces each have their band row; Rejoin makes it one", () => {
   const north = t.floor().rooms[0].faces.find((face) => face.wallId === t.wall('W1').id).id;
   const cut = t.apply({ type: 'split_face', faceId: north, offset: 2 });
   applied(cut);
-  assert.deepEqual(rows(t.wall('W1')), [['Lintel band', 0, 3, 2.1, 0.3, 0.2]]);
-  assert.deepEqual(rows(t.wall('W1.1')), [['Lintel band', 0, 2, 2.1, 0.3, 0.2]]);
+  assert.deepEqual(rows(t.wall('W1')), [['Lintel band', 0, 3, 2.1, 0.15, 0.2]]);
+  assert.deepEqual(rows(t.wall('W1.1')), [['Lintel band', 0, 2, 2.1, 0.15, 0.2]]);
   applied(t.apply({ type: 'rejoin_cut', cutId: cut.created.id }));
-  assert.deepEqual(rows(t.wall('W1')), [['Lintel band', 0, 5, 2.1, 0.3, 0.2]]);
+  assert.deepEqual(rows(t.wall('W1')), [['Lintel band', 0, 5, 2.1, 0.15, 0.2]]);
   assert.deepEqual(t.session.validate(), []);
 });
 

@@ -16,6 +16,11 @@ export const BAND_FIELD = 'wall_beam_band';
 /** Until the floor's underside is typed: a new window's head (0.9 + 1.2) and its sill. */
 const LINTEL_UNDERSIDE = 2.1;
 const SILL_TOP = 0.9;
+/**
+ * Until the floor's depth is typed: lintel and sill bands 150 mm (decided 2026-11-26); the ring
+ * beam as a beam added by hand.
+ */
+const BAND_DEPTH = 0.15;
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
@@ -57,7 +62,8 @@ function answerOf(wall, band) {
 function bandSize(floor, wall, band, row) {
   const value = (suffix) => floor.values?.[`${band.floor}_${suffix}`];
   const own = (key, inherited) => (ownsValue(row, key) ? row[key] : inherited);
-  const depth = own('depth', finite(value('depth')) ? value('depth') : NEW_BEAM_DEPTH);
+  const fallback = band.kind === 'ring' ? NEW_BEAM_DEPTH : BAND_DEPTH;
+  const depth = own('depth', finite(value('depth')) ? value('depth') : fallback);
   const width = own('width', wall.properties?.wall_thickness ?? null);
   if (band.kind === 'ring') {
     const height = wall.properties?.wall_height;

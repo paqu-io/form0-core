@@ -61,7 +61,7 @@ test("each face lists its wall's bands: along it, on the wall's axis, the row it
   );
   assert.deepEqual(
     [lintel.displayLabel, lintel.startRatio, lintel.endRatio, lintel.underside, lintel.depth],
-    ['Lintel band', 0, 1, 2.1, 0.3]
+    ['Lintel band', 0, 1, 2.1, 0.15]
   );
   assert.deepEqual([ring.displayLabel, ring.underside], ['Ring beam', 2.7]);
   // As wide as the wall (20 cm), centred on its axis, along its whole length.
