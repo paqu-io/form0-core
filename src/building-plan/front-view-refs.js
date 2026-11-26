@@ -1,7 +1,7 @@
 /**
  * A front view (A1) with each part's canvas element (A2, decided 2026-11-26): `ref`, the canvas
  * snapshot's `{ collection, id, path }` for a piece's wall row, a door or window, a wall beam or
- * band, so the web opens a part by double-click and marks its findings as the plan does. A part
+ * band, a column or room beam, so the web opens a part by double-click and marks its findings as the plan does. A part
  * the snapshot doesn't show has `ref` null.
  */
 
@@ -32,5 +32,13 @@ export function frontViewWithRefs(view, elements) {
       ref: ref(opening.kind === 'door' ? 'doors' : 'windows', on(opening)),
     })),
     beams: view.beams.map((beam) => ({ ...beam, ref: ref('wallBeams', on(beam)) })),
+    columns: (view.columns || []).map((column) => ({
+      ...column,
+      ref: ref('columns', (entry) => entry.id === column.subjectId),
+    })),
+    roomBeams: (view.roomBeams || []).map((beam) => ({
+      ...beam,
+      ref: ref('beams', (entry) => entry.id === beam.subjectId),
+    })),
   };
 }

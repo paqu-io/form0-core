@@ -193,6 +193,67 @@ test('a problem is the overlap: the window and the lintel band; a band above its
   assert.deepEqual(view(above, 'W1').problems, []);
 });
 
+// Columns and room beams against the side (decided 2026-11-26): those touching its face (set
+// into it too), not those standing free; a beam across the wall seen end on, one along it side on.
+test("the room's columns and beams against the side, not those standing free", () => {
+  const t = example();
+  const room = t.floor().rooms[0];
+  const element = (collection, shape) =>
+    applied(
+      t.apply({ type: 'create_element', roomId: room.id, collection, element: shape, values: {} })
+    );
+  element('columns', { position: { x: 1, y: 0.15 }, width: 0.3, height: 0.3 });
+  element('columns', { position: { x: 4, y: 0 }, width: 0.4, height: 0.4 });
+  element('columns', { position: { x: 2.5, y: 1.5 }, width: 0.3, height: 0.3 });
+  element('beams', { start: { x: 2.5, y: 0 }, end: { x: 2.5, y: 3 }, width: 0.2, height: 0.3 });
+  element('beams', {
+    start: { x: 0.1, y: 0.5 },
+    end: { x: 0.1, y: 2.5 },
+    width: 0.2,
+    height: 0.25,
+  });
+  const w1 = view(t, 'W1');
+  assert.deepEqual(
+    w1.columns.map((c) => [c.name, c.from, c.to, c.bottom, c.top, c.height, c.faceId]),
+    [
+      ['C#1', 0.85, 1.15, 0, 3, 3, faceOf(t, 'W1')],
+      ['C#2', 3.8, 4.2, 0, 3, 3, faceOf(t, 'W1')],
+    ]
+  );
+  const beamsOf = (v) => v.roomBeams.map((b) => [b.name, b.from, b.to, b.bottom, b.top, b.endOn]);
+  assert.deepEqual(beamsOf(w1), [['B#1', 2.4, 2.6, 2.7, 3, true]]);
+  // W4 seen from inside: its left end at y 3. The beam along it, side on.
+  const w4 = view(t, 'W4');
+  assert.deepEqual(beamsOf(w4), [['B#2', 0.5, 2.5, 2.75, 3, false]]);
+  assert.deepEqual(w4.columns, []);
+  // The bottom side from the Bedroom: W3 (x 5..3) then W3.2; the beam's other end on W3.2.
+  const w3 = view(t, 'W3');
+  assert.deepEqual(beamsOf(w3), [['B#1', 2.4, 2.6, 2.7, 3, true]]);
+  assert.equal(w3.roomBeams[0].faceId, faceOf(t, 'W3.2'));
+  assert.deepEqual(w3.columns, []);
+  assert.deepEqual(w1.fit, { length: 5, height: 3 });
+  // Through the controller, each with its canvas element.
+  let record = writeBuildingPlanRecord({ meta: t.f.meta, plan: t.session.getSnapshot() });
+  const controller = new BuildingPlanCanvasController({
+    meta: t.f.meta,
+    derivedCommands: true,
+    readRecord: () => record,
+    writeRecord: (next) => ((record = next), true),
+  });
+  const v = controller.frontView(faceOf(t, 'W1'));
+  const snapshot = controller.getSnapshot();
+  for (const part of [...v.columns, ...v.roomBeams]) {
+    const entry = snapshot[part.ref.collection].find((item) => item.id === part.ref.id);
+    assert.equal(entry.id, part.subjectId);
+    assert.deepEqual(part.ref.path, entry.path);
+  }
+  assert.deepEqual(
+    [...v.columns, ...v.roomBeams].map((part) => part.ref.collection),
+    ['columns', 'columns', 'beams']
+  );
+  controller.dispose();
+});
+
 test('a row on two sides is unfolded; an outline wound the other way reads the same', () => {
   // Row r turns the corner at (3, 0); the room lies below the first side, left of the second.
   const side = (start, end, normal, pieces) => ({
@@ -248,6 +309,8 @@ const withoutRefs = (v) => ({
   pieces: v.pieces.map(({ ref, ...rest }) => rest),
   openings: v.openings.map(({ ref, ...rest }) => rest),
   beams: v.beams.map(({ ref, ...rest }) => rest),
+  columns: v.columns.map(({ ref, ...rest }) => rest),
+  roomBeams: v.roomBeams.map(({ ref, ...rest }) => rest),
 });
 
 test('the canvas controller gives the front view of a wall row, each part with its element', () => {

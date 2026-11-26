@@ -10,7 +10,7 @@ import { applied, example } from './helpers/building-plan-bands.js';
 // A1 (decided 2026-11-25): every wall row's front view, checked as invariants over plans. Per
 // room: one fit; the pieces cover the view end to end, the shown ones the row's whole length;
 // every door, window, wall beam and band the canvas puts on the row is in its view, inside one of
-// the row's pieces and within the fit; the levels rise from the floor; walls of unknown height
+// the row's pieces and within the fit, as are the columns and room beams against it (2026-11-26); the levels rise from the floor; walls of unknown height
 // share one drawn height, above every level.
 
 const EPS = 1e-6;
@@ -118,6 +118,24 @@ const plans = {
       })
     );
   },
+  'columns and room beams against the walls, a column free in the room': (t) => {
+    bands(t);
+    const room = t.floor().rooms[0];
+    const element = (collection, shape) =>
+      applied(
+        t.apply({ type: 'create_element', roomId: room.id, collection, element: shape, values: {} })
+      );
+    element('columns', { position: { x: 1, y: 0.15 }, width: 0.3, height: 0.3 });
+    element('columns', { position: { x: 4.85, y: 1.5 }, width: 0.3, height: 0.3 });
+    element('columns', { position: { x: 2.5, y: 1.5 }, width: 0.3, height: 0.3 });
+    element('beams', { start: { x: 2, y: 0 }, end: { x: 2, y: 3 }, width: 0.2, height: 0.3 });
+    element('beams', {
+      start: { x: 0.1, y: 0.5 },
+      end: { x: 0.1, y: 2.5 },
+      width: 0.2,
+      height: 0.25,
+    });
+  },
   'unknown heights, bands and a free wall': (t) => {
     bands(t);
     freeWall(t);
@@ -173,7 +191,7 @@ function assertViews(t, plan) {
       });
       assert.ok(near(shown, ownLength(floor, room, face)), `${name}: the whole row shown`);
       v.folds.forEach((x, k) => assert.ok(x > (v.folds[k - 1] ?? 0) && x < v.length, name));
-      for (const child of [...v.openings, ...v.beams]) {
+      for (const child of [...v.openings, ...v.beams, ...v.columns, ...v.roomBeams]) {
         assert.ok(child.from < child.to && child.bottom < child.top, `${name}: ${child.subjectId}`);
         assert.ok(
           v.pieces.some(
@@ -186,6 +204,7 @@ function assertViews(t, plan) {
         );
         assert.ok(child.top <= v.fit.height + EPS, `${name}: ${child.subjectId} fits`);
       }
+      v.columns.forEach((column) => assert.equal(column.bottom, 0, `${name}: from the floor`));
       // From the floor (a band below it, a problem, starts lower).
       assert.ok(v.levels.includes(0) && v.levels[0] <= 0, name);
       v.levels.forEach(

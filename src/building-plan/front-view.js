@@ -4,6 +4,7 @@ import { nameOf } from './wall-children.js';
 import { at, cleanLength as clean, segmentFrame } from './geometry.js';
 import { alongStrip, freeParts, sideParts } from './front-view-strip.js';
 import { frontViewProblems } from './front-view-problems.js';
+import { frontViewStructure, structureTops } from './front-view-structure.js';
 
 /**
  * The front view of one wall row (A1, decided 2026-11-25): what the read-only Front view draws,
@@ -15,10 +16,13 @@ import { frontViewProblems } from './front-view-problems.js';
  *   a row on several sides is unfolded, `folds` where the sides meet;
  * - `openings`, `beams` (wall beams and bands): those of every row on the side, by their ends
  *   along it and their heights from the floor; one of unknown height isn't drawn;
+ * - `columns`, `roomBeams`: the room's columns and beams against the side (2026-11-26,
+ *   `front-view-structure.js`);
  * - `problems`: where the floor's problems clash in this view;
  * - `levels`: the shown row's, for its chain (the floor, its top when known, each beam's
  *   underside and top, each opening's sill and head);
- * - `fit`: the room's, for one scale across its rows: its longest row and tallest wall as drawn.
+ * - `fit`: the room's, for one scale across its rows: its longest row and tallest wall as drawn
+ *   (its columns and beams included).
  *
  * A wall of unknown height is drawn to the room's highest level plus 0.5 m, at least 1 m: every
  * such wall of the room to the same height (decided 2026-11-25).
@@ -68,6 +72,9 @@ export function buildingPlanFrontView(floor, faceId) {
     .map((id) => faces.get(id))
     .filter(Boolean);
   const { openings, beams } = elementsOf(rows, parts, walls);
+  const drawnHeight = (id) =>
+    pieces.find((piece) => piece.faceId === id)?.drawnHeight ?? heights.unknown;
+  const { columns, roomBeams } = frontViewStructure(room, parts, drawnHeight);
   const fitLength = Math.max(
     ...room.faces.map((entry) => (stripOf(entry) || []).reduce((sum, part) => sum + part.length, 0))
   );
@@ -80,6 +87,8 @@ export function buildingPlanFrontView(floor, faceId) {
     pieces,
     openings,
     beams,
+    columns,
+    roomBeams,
     problems: frontViewProblems(floor, { openings, beams }, walls),
     levels: levelsOf(heightOf(walls.get(face.wallId)), [...openings, ...beams], faceId),
     fit: { length: clean(fitLength), height: heights.fit },
@@ -87,11 +96,12 @@ export function buildingPlanFrontView(floor, faceId) {
 }
 
 /**
- * The room's highest level (its walls' known tops, their openings' heads, their beams' tops), the
- * height its walls of unknown height are drawn to, and the height it fits.
+ * The room's highest level (its walls' known tops, their openings' heads, their beams' tops, its
+ * columns' and room beams' tops), the height its walls of unknown height are drawn to, and the
+ * height it fits.
  */
 function roomHeights(room, walls) {
-  let highest = 0;
+  let highest = Math.max(0, ...structureTops(room));
   let unknown = false;
   for (const wall of new Set(room.faces.map((face) => walls.get(face.wallId)).filter(Boolean))) {
     const height = heightOf(wall);
