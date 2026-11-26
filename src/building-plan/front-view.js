@@ -1,7 +1,7 @@
 import { bandOf } from './band-rows.js';
 import { buildingPlanRoomSides } from './room-sides.js';
 import { nameOf } from './wall-children.js';
-import { at, cleanLength as clean, segmentFrame } from './geometry.js';
+import { at, cleanLength as clean, polygonArea, segmentFrame } from './geometry.js';
 import { alongStrip, freeParts, sideParts } from './front-view-strip.js';
 import { frontViewProblems } from './front-view-problems.js';
 import { frontViewStructure, structureTops } from './front-view-structure.js';
@@ -24,7 +24,9 @@ import { frontViewMap } from './front-view-map.js';
  *   underside and top, each opening's sill and head);
  * - `fit`: the room's, for one scale across its rows: its longest row and tallest wall as drawn
  *   (its columns and beams included);
- * - `map`: the room in plan for the view's mini-map (2026-11-26, `front-view-map.js`).
+ * - `map`: the room in plan for the view's mini-map (2026-11-26, `front-view-map.js`);
+ * - `around`: the room's outline rows clockwise on the plan, each where it starts, for a room's
+ *   entry to step through (A3's hand test, 2026-11-26).
  *
  * A wall of unknown height is drawn to the room's highest level plus 0.5 m, at least 1 m: every
  * such wall of the room to the same height (decided 2026-11-25).
@@ -48,6 +50,10 @@ export function buildingPlanFrontView(floor, faceId) {
   const walls = new Map((floor.walls || []).map((wall) => [wall.id, wall]));
   const faces = new Map(room.faces.map((face) => [face.id, face]));
   const sides = buildingPlanRoomSides(floor, room, 1);
+  // Clockwise on the plan (y down): the outline as it runs when its area is positive.
+  const outlineRows = sides.flatMap((side) => side.pieces.map((piece) => piece.faceId));
+  if (polygonArea(room.vertices) < 0) outlineRows.reverse();
+  const around = [...new Set(outlineRows.filter(Boolean))];
   const stripOf = (face) =>
     face.freePath ? freeParts(floor, room, face) : sideParts(sides, face.id);
   const face = faces.get(faceId);
@@ -87,6 +93,7 @@ export function buildingPlanFrontView(floor, faceId) {
     faceId,
     freeWall: Boolean(face.freePath),
     length: clean(parts.reduce((sum, part) => sum + part.length, 0)),
+    around,
     folds: parts.slice(1).map((part) => clean(part.x0)),
     pieces,
     openings,

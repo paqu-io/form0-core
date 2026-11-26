@@ -236,6 +236,8 @@ function assertViews(t, plan) {
         `${name}: every row on the map`
       );
       assert.deepEqual(map.rows.find((row) => row.faceId === face.id).segments, map.shown, name);
+      const outlineRows = room.faces.filter((entry) => !entry.freePath).map((entry) => entry.id);
+      assert.deepEqual([...v.around].sort(), outlineRows.sort(), `${name}: around, each once`);
       for (const point of map.walls.flat())
         assert.ok(
           point.x >= box.x - thickest - EPS &&
